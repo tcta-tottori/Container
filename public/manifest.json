@@ -6,8 +6,8 @@
   "scope": "/Container/",
   "display": "fullscreen",
   "orientation": "any",
-  "background_color": "#0a0a0f",
-  "theme_color": "#0a0a0f",
+  "background_color": "#f5f6f8",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "/Container/icons/icon-192.svg",

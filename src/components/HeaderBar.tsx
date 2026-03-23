@@ -69,9 +69,9 @@ export default function HeaderBar({
 
       <button onClick={onToggleAutoAnnounce} className="header-btn"
         style={{
-          background: autoAnnounce ? 'rgba(34,197,94,0.15)' : undefined,
-          borderColor: autoAnnounce ? 'rgba(34,197,94,0.3)' : undefined,
-          color: autoAnnounce ? '#22c55e' : undefined,
+          background: autoAnnounce ? 'rgba(34,197,94,0.1)' : undefined,
+          borderColor: autoAnnounce ? 'rgba(34,197,94,0.25)' : undefined,
+          color: autoAnnounce ? '#16a34a' : undefined,
         }}
         title={autoAnnounce ? '自動読上げ ON' : '自動読上げ OFF'}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

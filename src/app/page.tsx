@@ -218,6 +218,10 @@ export default function Home() {
               </svg>
               管理
             </button>
+            <div className="menu-divider" />
+            <div className="menu-version">
+              コンテナ荷降ろし管理 v1.0.0
+            </div>
           </div>
         </div>
       )}
