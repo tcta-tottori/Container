@@ -27,28 +27,20 @@ interface LayerBox {
   rd: number;
 }
 
-/** 30個パターン: 1段6個×5段 */
+/** 30個パターン: 1段6個(3列×2行, 全て縦向き)×5段 */
 function get30Layout(): LayerBox[][] {
   const layers: LayerBox[][] = [];
   for (let l = 0; l < 5; l++) {
     const boxes: LayerBox[] = [];
-    if (l % 2 === 0) {
-      // 偶数段: 上に横向き3個、下に縦向き3個
-      // 横向き3個（幅が広く、奥行きが浅い）
-      for (let i = 0; i < 3; i++) {
-        boxes.push({ rx: i * 0.333, ry: 0, rw: 0.333, rd: 0.45 });
-      }
-      // 縦向き3個（幅が狭く、奥行きが深い）
-      for (let i = 0; i < 3; i++) {
-        boxes.push({ rx: i * 0.333, ry: 0.45, rw: 0.333, rd: 0.55 });
-      }
-    } else {
-      // 奇数段: 上に縦向き3個、下に横向き3個（交互）
-      for (let i = 0; i < 3; i++) {
-        boxes.push({ rx: i * 0.333, ry: 0, rw: 0.333, rd: 0.55 });
-      }
-      for (let i = 0; i < 3; i++) {
-        boxes.push({ rx: i * 0.333, ry: 0.55, rw: 0.333, rd: 0.45 });
+    // 3列×2行、すべて縦向き
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < 3; col++) {
+        boxes.push({
+          rx: col * 0.333,
+          ry: row * 0.5,
+          rw: 0.333,
+          rd: 0.5,
+        });
       }
     }
     layers.push(boxes);
