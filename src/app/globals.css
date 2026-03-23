@@ -225,7 +225,7 @@ body {
 .detail-upper {
   display: flex; flex-direction: column; gap: 4px;
   padding: 10px 14px 10px; position: relative; z-index: 1;
-  border-radius: 0 0 18px 18px;
+  border-radius: 18px;
   height: 50%; flex-shrink: 0; overflow: hidden;
 }
 .detail-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -235,8 +235,8 @@ body {
 .detail-item-name {
   font-family: var(--font-display);
   font-size: 36px; font-weight: 900; line-height: 1.05;
-  text-align: center; margin: 4px 0;
-  letter-spacing: -0.8px;
+  text-align: left; margin: 0;
+  letter-spacing: -0.8px; flex-shrink: 0;
 }
 
 /* パレット図 */
@@ -247,8 +247,8 @@ body {
 
 /* 数量（大フォント装飾） */
 .detail-stats-free {
-  display: flex; align-items: center; justify-content: center;
-  gap: 24px; padding: 6px 0 4px; flex-shrink: 0;
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: 24px; padding: 4px 0 2px; flex-shrink: 0;
 }
 .detail-sf-item { display: flex; align-items: baseline; gap: 5px; }
 .detail-sf-num {
@@ -267,7 +267,7 @@ body {
   letter-spacing: 0.3px;
 }
 .detail-sf-sub { font-size: 11px; color: var(--text-muted); opacity: 0.5; font-family: var(--font-mono); line-height: 1; }
-.detail-sf-total { opacity: 0.4; }
+.detail-sf-total { opacity: 1; }
 
 /* 似た品目 */
 .detail-similar-warn {

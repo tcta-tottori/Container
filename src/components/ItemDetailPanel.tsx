@@ -130,8 +130,8 @@ export default function ItemDetailPanel({
     typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
   }
 
-  // 黒ベース背景 + accent色のグラデーション（参照画像: 右側から色が差す）
-  const heroBg = `linear-gradient(135deg, #080a12 0%, #0c0e18 35%, #0a0c14 65%, #0d0f1a 100%)`;
+  // 少し明るめの黒ベース + accent色グラデーション
+  const heroBg = `linear-gradient(135deg, #121620 0%, #161b28 35%, #141824 65%, #181d2c 100%)`;
 
   return (
     <div className="detail-root">
@@ -143,18 +143,18 @@ export default function ItemDetailPanel({
         {/* accent色グロー: 右上から大きく差し込む光 */}
         <div style={{
           position: 'absolute', top: '-40%', right: '-20%', width: '80%', height: '180%',
-          background: `radial-gradient(ellipse at 70% 40%, ${colors.accent}28 0%, ${colors.accent}10 40%, transparent 70%)`,
+          background: `radial-gradient(ellipse at 70% 40%, ${colors.accent}38 0%, ${colors.accent}18 40%, transparent 70%)`,
           pointerEvents: 'none',
         }} />
-        {/* 左下の控えめな補助グロー */}
+        {/* 左下の補助グロー */}
         <div style={{
-          position: 'absolute', bottom: '-30%', left: '-15%', width: '50%', height: '70%',
-          background: `radial-gradient(ellipse, ${colors.accent}0c 0%, transparent 60%)`,
+          position: 'absolute', bottom: '-20%', left: '-10%', width: '50%', height: '60%',
+          background: `radial-gradient(ellipse, ${colors.accent}15 0%, transparent 55%)`,
           pointerEvents: 'none',
         }} />
 
-        {/* バッジ行: 種目 + 色柄 + 品目数 */}
-        <div className="detail-badges" style={{ marginBottom: 2 }}>
+        {/* 1行目: 種目バッジ + 色柄 + 品目数 + 品番 */}
+        <div className="detail-badges">
           <span className="type-badge" style={{
             backgroundColor: `${colors.accent}40`, color: '#fff',
             border: `1.5px solid ${colors.accent}70`, fontWeight: 700, fontSize: 12,
@@ -177,7 +177,6 @@ export default function ItemDetailPanel({
               {itemColor}
             </span>
           )}
-          {/* 品目カウント */}
           <span style={{
             marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8,
             fontSize: 11, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)', fontWeight: 600,
@@ -195,30 +194,30 @@ export default function ItemDetailPanel({
           </span>
         </div>
 
-        {/* 品番 */}
-        {item.partNumber && (
-          <div style={{ textAlign: 'right', fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-mono)', fontWeight: 500, marginBottom: 2, letterSpacing: 0.8 }}>
-            {item.partNumber}
-          </div>
-        )}
+        {/* 品名（左揃え・品番まで1行） */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <MarqueeText text={displayItemName} className="detail-item-name"
+            style={{
+              color: '#f0f0f0', flex: 1, minWidth: 0,
+              textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
+            }} />
+          {item.partNumber && (
+            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-mono)', flexShrink: 0, letterSpacing: 0.5 }}>
+              {item.partNumber}
+            </span>
+          )}
+        </div>
 
-        {/* 品名（大きく・縁取り付き） */}
-        <MarqueeText text={displayItemName} className="detail-item-name"
-          style={{
-            color: '#f0f0f0',
-            textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
-          }} />
-
-        {/* パレット図（flex:1で余白を吸収、ない場合も同じflex枠を維持） */}
-        <div className="detail-pallet-area">
+        {/* パレット図 (flex:1で余白吸収、数量エリアに上1/3干渉可) */}
+        <div className="detail-pallet-area" style={{ marginBottom: -12 }}>
           {item.qtyPerPallet > 0 && (
             <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
           )}
         </div>
 
-        {/* 数量（縁取り付き大フォント） */}
-        <div className="detail-stats-free">
+        {/* 数量（下揃え） */}
+        <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2 }}>
           <div className="detail-sf-item">
             <span className="detail-sf-num" style={{
               color: colors.accent,
@@ -234,13 +233,13 @@ export default function ItemDetailPanel({
               color: '#e8e8e8',
               textShadow: `0 0 16px ${colors.accent}30, 0 2px 4px rgba(0,0,0,0.6)`,
             }}>{fmtNum(item.fraction)}</span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>端数</span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>ケース</span>
           </div>
           <div className="detail-sf-item detail-sf-total">
-            <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
+            <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>
               {Math.ceil(item.totalQty).toLocaleString()}
             </span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.4)' }}>総数</span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.45)' }}>総数</span>
           </div>
         </div>
 
