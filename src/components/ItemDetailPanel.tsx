@@ -44,6 +44,12 @@ function MarqueeText({ text, className, style }: {
   );
 }
 
+/* ===== 数値フォーマット（小数点2桁切り上げ） ===== */
+function fmtNum(v: number): string {
+  if (Number.isInteger(v)) return String(v);
+  return String(Math.ceil(v * 100) / 100);
+}
+
 /* ===== 品名省略 ===== */
 function shortenName(name: string): string {
   return name.replace(/ポリカバー/g, '').replace(/^[\s\-]+|[\s\-]+$/g, '') || name;
@@ -160,19 +166,19 @@ export default function ItemDetailPanel({
         {/* 数量（大きく目立つ） */}
         <div className="detail-stats-free">
           <div className="detail-sf-item">
-            <span className="detail-sf-num" style={{ color: colors.accent }}>{item.palletCount}</span>
+            <span className="detail-sf-num" style={{ color: colors.accent }}>{fmtNum(item.palletCount)}</span>
             <div className="detail-sf-labels">
               <span className="detail-sf-label">パレット</span>
               {item.qtyPerPallet > 0 && <span className="detail-sf-sub">@{item.qtyPerPallet}</span>}
             </div>
           </div>
           <div className="detail-sf-item">
-            <span className="detail-sf-num" style={{ color: colors.text }}>{item.fraction}</span>
+            <span className="detail-sf-num" style={{ color: colors.text }}>{fmtNum(item.fraction)}</span>
             <span className="detail-sf-label">端数</span>
           </div>
           <div className="detail-sf-item detail-sf-total">
             <span className="detail-sf-num-sm" style={{ color: colors.text, opacity: 0.4 }}>
-              {item.totalQty.toLocaleString()}
+              {Math.ceil(item.totalQty).toLocaleString()}
             </span>
             <span className="detail-sf-label">総数</span>
           </div>
@@ -219,7 +225,7 @@ export default function ItemDetailPanel({
             const isDone = completedIds.has(it.id);
             const displayName = shortenName(it.itemName);
             const origIdx = allItems.findIndex((a) => a.id === it.id);
-            const rowBg = isDone ? 'rgba(0,0,0,0.02)' : isActive ? `${c.accent}18` : `${c.accent}08`;
+            const rowBg = isDone ? '#f0f0f0' : isActive ? `${c.accent}22` : c.bg;
 
             const content = (
               <>
@@ -230,10 +236,10 @@ export default function ItemDetailPanel({
                     ? { color: '#bbb', textDecoration: 'line-through' }
                     : isActive ? { fontWeight: 700, color: c.text } : { color: 'var(--text-primary)' }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : c.text }}>{it.palletCount}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : c.text }}>{it.fraction}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : c.text }}>{fmtNum(it.palletCount)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : c.text }}>{fmtNum(it.fraction)}</span>
                 <span className="detail-list-num detail-list-total" style={isDone ? { color: '#ccc' } : undefined}>
-                  {it.totalQty.toLocaleString()}
+                  {Math.ceil(it.totalQty).toLocaleString()}
                 </span>
               </>
             );
@@ -241,7 +247,7 @@ export default function ItemDetailPanel({
             if (isDone) {
               return (
                 <div key={it.id} className="detail-list-row"
-                  style={{ background: rowBg, borderLeftColor: '#ddd', opacity: 0.5 }}
+                  style={{ background: '#f3f3f3', borderLeftColor: '#d0d0d0', opacity: 0.45 }}
                   onClick={() => onSelectItem?.(origIdx)}
                 >{content}</div>
               );
@@ -251,7 +257,7 @@ export default function ItemDetailPanel({
               <SwipeRow key={it.id}
                 onSwipe={() => onCompleteItem?.(it.id)}
                 className={`detail-list-row ${isActive ? 'active' : ''}`}
-                style={{ background: rowBg, borderLeftColor: isActive ? c.accent : `${c.accent}40` }}
+                style={{ background: rowBg, borderLeftColor: isActive ? c.accent : `${c.accent}80` }}
               >
                 <div style={{ display: 'contents' }} onClick={() => onSelectItem?.(origIdx)}>
                   {content}

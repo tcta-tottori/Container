@@ -268,8 +268,8 @@ function EditRow({
         </span>
       </span>
       <span className="edit-td edit-td-pallet">{item.qtyPerPallet || '-'}</span>
-      <span className="edit-td edit-td-qty">{item.palletCount}</span>
-      <span className="edit-td edit-td-frac">{item.fraction}</span>
+      <span className="edit-td edit-td-qty">{Number.isInteger(item.palletCount) ? item.palletCount : Math.ceil(item.palletCount * 100) / 100}</span>
+      <span className="edit-td edit-td-frac">{Number.isInteger(item.fraction) ? item.fraction : Math.ceil(item.fraction * 100) / 100}</span>
     </button>
   );
 }
