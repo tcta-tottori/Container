@@ -159,7 +159,7 @@ export default function ItemDetailPanel({
         {item.qtyPerPallet > 0 && (
           <div className="detail-pallet-area">
             <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
-              qtyPerPallet={item.qtyPerPallet} type={item.type} />
+              qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
           </div>
         )}
 
