@@ -66,10 +66,8 @@ function SwipeRow({ children, onSwipe, style, className }: {
   const rowRef = useRef<HTMLDivElement>(null);
 
   const onTS = useCallback((e: React.TouchEvent) => {
-    startX.current = e.touches[0].clientX;
-    dx.current = 0;
+    startX.current = e.touches[0].clientX; dx.current = 0;
   }, []);
-
   const onTM = useCallback((e: React.TouchEvent) => {
     dx.current = e.touches[0].clientX - startX.current;
     if (rowRef.current && dx.current > 0) {
@@ -77,7 +75,6 @@ function SwipeRow({ children, onSwipe, style, className }: {
       rowRef.current.style.transition = 'none';
     }
   }, []);
-
   const onTE = useCallback(() => {
     if (rowRef.current) {
       rowRef.current.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
@@ -85,23 +82,65 @@ function SwipeRow({ children, onSwipe, style, className }: {
         rowRef.current.style.transform = 'translateX(100%)';
         rowRef.current.style.opacity = '0';
         setTimeout(() => onSwipe(), 260);
-      } else {
-        rowRef.current.style.transform = 'translateX(0)';
-      }
+      } else { rowRef.current.style.transform = 'translateX(0)'; }
     }
   }, [onSwipe]);
 
   return (
     <div style={{ overflow: 'hidden', position: 'relative' }}>
-      {/* 背景にCOMPLETEラベル */}
       <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0,
-        width: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#16a34a', color: '#fff', fontSize: '10px', fontWeight: 700,
-        borderRadius: '0 4px 4px 0',
-      }}>完了</div>
+        position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%',
+        background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
+        display: 'flex', alignItems: 'center', paddingLeft: 16,
+        color: '#fff', fontSize: 12, fontWeight: 700, gap: 4,
+      }}>✓ 完了</div>
       <div ref={rowRef} className={className} style={{ ...style, position: 'relative', zIndex: 1 }}
         onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE}
+      >{children}</div>
+    </div>
+  );
+}
+
+/* ===== スワイプ行（右→左にスワイプで元に戻す） ===== */
+function UndoSwipeRow({ children, onSwipe, style, className, onClick }: {
+  children: React.ReactNode; onSwipe: () => void; onClick?: () => void;
+  style?: React.CSSProperties; className?: string;
+}) {
+  const startX = useRef(0);
+  const dx = useRef(0);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  const onTS = useCallback((e: React.TouchEvent) => {
+    startX.current = e.touches[0].clientX; dx.current = 0;
+  }, []);
+  const onTM = useCallback((e: React.TouchEvent) => {
+    dx.current = e.touches[0].clientX - startX.current;
+    if (rowRef.current && dx.current < 0) {
+      rowRef.current.style.transform = `translateX(${Math.max(dx.current, -120)}px)`;
+      rowRef.current.style.transition = 'none';
+    }
+  }, []);
+  const onTE = useCallback(() => {
+    if (rowRef.current) {
+      rowRef.current.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+      if (dx.current < -80) {
+        rowRef.current.style.transform = 'translateX(-100%)';
+        rowRef.current.style.opacity = '0';
+        setTimeout(() => onSwipe(), 260);
+      } else { rowRef.current.style.transform = 'translateX(0)'; }
+    }
+  }, [onSwipe]);
+
+  return (
+    <div style={{ overflow: 'hidden', position: 'relative' }}>
+      <div style={{
+        position: 'absolute', right: 0, top: 0, bottom: 0, width: '100%',
+        background: 'linear-gradient(270deg, #dc2626 0%, #ef4444 100%)',
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16,
+        color: '#fff', fontSize: 12, fontWeight: 700, gap: 4,
+      }}>↩ 元に戻す</div>
+      <div ref={rowRef} className={className} style={{ ...style, position: 'relative', zIndex: 1 }}
+        onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} onClick={onClick}
       >{children}</div>
     </div>
   );
@@ -194,8 +233,8 @@ export default function ItemDetailPanel({
           </span>
         </div>
 
-        {/* 品名（左揃え・品番まで1行） */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        {/* 品名（上レイヤー・パレット図より上に表示） */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, position: 'relative', zIndex: 3 }}>
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
               color: '#f0f0f0', flex: 1, minWidth: 0,
@@ -208,8 +247,8 @@ export default function ItemDetailPanel({
           )}
         </div>
 
-        {/* パレット図 (flex:1で余白吸収、数量エリアに上1/3干渉可) */}
-        <div className="detail-pallet-area" style={{ marginBottom: -12 }}>
+        {/* パレット図 (flex:1で余白吸収、品名の下1/3にのみ被る) */}
+        <div className="detail-pallet-area" style={{ marginTop: -16, zIndex: 1 }}>
           {item.qtyPerPallet > 0 && (
             <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
@@ -245,11 +284,8 @@ export default function ItemDetailPanel({
 
         {/* 似た品目 */}
         {similarItems.length > 0 && (
-          <div className="detail-similar-warn" style={{ background: 'rgba(245,158,11,0.12)', borderColor: 'rgba(245,158,11,0.25)' }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
+          <div className="detail-similar-warn" style={{ background: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' }}>
+            <span style={{ fontSize: 14 }}>⚠</span>
             <span className="detail-similar-label" style={{ color: '#fbbf24' }}>似た品目:</span>
             <span className="detail-similar-names" style={{ color: '#fde68a' }}>
               {similarItems.map((s) => {
@@ -284,23 +320,25 @@ export default function ItemDetailPanel({
             const isDone = completedIds.has(it.id);
             const displayName = shortenName(it.itemName);
             const origIdx = allItems.findIndex((a) => a.id === it.id);
-            // ダークテーマ: 種類別の暗い背景色
-            const typeBg = `${c.accent}12`;
-            const activeBg = 'rgba(255,120,0,0.12)';
-            const rowBg = isDone ? 'rgba(255,255,255,0.03)' : isActive ? activeBg : typeBg;
+            // ライトテーマ: 種類別の濃い背景色
+            const TYPE_BG: Record<string, string> = {
+              'ポリカバー': '#e6f4ea', '箱': '#e3f0fd', '部品': '#ede5f5', 'その他': '#ececec',
+            };
+            const typeBg = TYPE_BG[it.type] || TYPE_BG['その他'];
+            const rowBg = isDone ? '#f0f0f0' : isActive ? '#fff3e0' : typeBg;
 
             const content = (
               <>
-                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#555' : c.accent }} />
+                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#bbb' : c.accent }} />
                 <MarqueeText text={displayName}
                   className="detail-list-name"
                   style={isDone
-                    ? { color: 'rgba(255,255,255,0.3)', textDecoration: 'line-through' }
-                    : isActive ? { fontWeight: 700, color: '#ff9800' } : { color: 'rgba(255,255,255,0.85)' }
+                    ? { color: '#aaa', textDecoration: 'line-through' }
+                    : isActive ? { fontWeight: 700, color: '#e65100' } : { color: '#1a1a2e' }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : c.accent }}>{fmtNum(it.palletCount)}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : 'rgba(255,255,255,0.8)' }}>{fmtNum(it.fraction)}</span>
-                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#555' : 'rgba(255,255,255,0.45)' }}>
+                <span className="detail-list-num" style={{ color: isDone ? '#bbb' : isActive ? '#e65100' : c.text }}>{fmtNum(it.palletCount)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#bbb' : isActive ? '#e65100' : '#333' }}>{fmtNum(it.fraction)}</span>
+                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#bbb' : '#888' }}>
                   {Math.ceil(it.totalQty).toLocaleString()}
                 </span>
               </>
@@ -308,10 +346,12 @@ export default function ItemDetailPanel({
 
             if (isDone) {
               return (
-                <div key={it.id} className="detail-list-row"
-                  style={{ background: 'rgba(255,255,255,0.02)', borderLeftColor: '#444', opacity: 0.5 }}
+                <UndoSwipeRow key={it.id}
+                  onSwipe={() => onUncompleteItem?.(it.id)}
                   onClick={() => onUncompleteItem?.(it.id)}
-                >{content}</div>
+                  className="detail-list-row"
+                  style={{ background: rowBg, borderLeftColor: '#ccc', opacity: 0.6 }}
+                >{content}</UndoSwipeRow>
               );
             }
 
@@ -321,7 +361,7 @@ export default function ItemDetailPanel({
                 className={`detail-list-row ${isActive ? 'active' : ''}`}
                 style={{
                   background: rowBg,
-                  borderLeftColor: isActive ? '#ff6d00' : `${c.accent}60`,
+                  borderLeftColor: isActive ? '#ff6d00' : c.accent,
                   borderLeftWidth: isActive ? 4 : 3,
                 }}
               >
