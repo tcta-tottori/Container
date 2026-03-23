@@ -48,26 +48,59 @@ function get30Layout(): LayerBox[][] {
   return layers;
 }
 
-/** 35個パターン: 1段7個×5段 */
+/**
+ * 35個パターン: 1段7個×5段
+ * 1段目: 左に横向き3個(縦に3段) + 右に縦向き4個(2列×2行)
+ * 2段目: 左に縦向き4個(2列×2行) + 右に横向き3個(縦に3段) ← 左右逆
+ * 交互に5段積み
+ *
+ * 横向き箱: 幅が広く奥行きが浅い（横長）
+ * 縦向き箱: 幅が狭く奥行きが深い（縦長）
+ * パレット上で左右に分割:
+ *   横向き3個側 = パレット幅の約43% (横長の箱が3個縦並び)
+ *   縦向き4個側 = パレット幅の約57% (2列×2行)
+ */
 function get35Layout(): LayerBox[][] {
   const layers: LayerBox[][] = [];
+  // 左右の幅比率
+  const leftW = 0.43;
+  const rightW = 1 - leftW;
+
   for (let l = 0; l < 5; l++) {
     const boxes: LayerBox[] = [];
     if (l % 2 === 0) {
-      // 上段: 横向き3個
+      // 奇数段: 左=横向き3個(縦に3段), 右=縦向き4個(2列×2行)
+      // 左: 横向き3個 (幅leftW, 高さ1/3ずつ)
       for (let i = 0; i < 3; i++) {
-        boxes.push({ rx: i * 0.333, ry: 0, rw: 0.333, rd: 0.4 });
+        boxes.push({ rx: 0, ry: i * 0.333, rw: leftW, rd: 0.333 });
       }
-      // 下段: 縦向き4個
-      for (let i = 0; i < 4; i++) {
-        boxes.push({ rx: i * 0.25, ry: 0.4, rw: 0.25, rd: 0.6 });
+      // 右: 縦向き2列×2行
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 2; col++) {
+          boxes.push({
+            rx: leftW + col * (rightW / 2),
+            ry: row * 0.5,
+            rw: rightW / 2,
+            rd: 0.5,
+          });
+        }
       }
     } else {
-      for (let i = 0; i < 4; i++) {
-        boxes.push({ rx: i * 0.25, ry: 0, rw: 0.25, rd: 0.6 });
+      // 偶数段: 左=縦向き4個(2列×2行), 右=横向き3個(縦に3段) ← 左右逆
+      // 左: 縦向き2列×2行
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 2; col++) {
+          boxes.push({
+            rx: col * (leftW / 2),
+            ry: row * 0.5,
+            rw: leftW / 2,
+            rd: 0.5,
+          });
+        }
       }
+      // 右: 横向き3個
       for (let i = 0; i < 3; i++) {
-        boxes.push({ rx: i * 0.333, ry: 0.6, rw: 0.333, rd: 0.4 });
+        boxes.push({ rx: leftW, ry: i * 0.333, rw: rightW, rd: 0.333 });
       }
     }
     layers.push(boxes);
