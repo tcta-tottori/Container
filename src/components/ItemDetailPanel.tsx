@@ -130,25 +130,26 @@ export default function ItemDetailPanel({
     typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
   }
 
-  // 種目に合わせたダーク背景（accent色を強調）
-  const heroBg = `linear-gradient(160deg, ${colors.accent}15 0%, #12142a 25%, ${colors.accent}12 50%, #0d1b3a 75%, ${colors.accent}18 100%)`;
+  // 黒ベース背景 + accent色のグラデーション（参照画像: 右側から色が差す）
+  const heroBg = `linear-gradient(135deg, #080a12 0%, #0c0e18 35%, #0a0c14 65%, #0d0f1a 100%)`;
 
   return (
     <div className="detail-root">
-      {/* === 上半分（accent色強調ダーク背景・角丸・固定高さ） === */}
+      {/* === 上半分（黒ベース + accent色グロー） === */}
       <div className="detail-upper" style={{
         background: heroBg,
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* accent色のグロー効果（強め） */}
+        {/* accent色グロー: 右上から大きく差し込む光 */}
         <div style={{
-          position: 'absolute', top: '-20%', right: '-10%', width: '60%', height: '140%',
-          background: `radial-gradient(ellipse, ${colors.accent}35 0%, transparent 60%)`,
+          position: 'absolute', top: '-40%', right: '-20%', width: '80%', height: '180%',
+          background: `radial-gradient(ellipse at 70% 40%, ${colors.accent}28 0%, ${colors.accent}10 40%, transparent 70%)`,
           pointerEvents: 'none',
         }} />
+        {/* 左下の控えめな補助グロー */}
         <div style={{
-          position: 'absolute', bottom: '-10%', left: '-5%', width: '40%', height: '60%',
-          background: `radial-gradient(ellipse, ${colors.accent}20 0%, transparent 55%)`,
+          position: 'absolute', bottom: '-30%', left: '-15%', width: '50%', height: '70%',
+          background: `radial-gradient(ellipse, ${colors.accent}0c 0%, transparent 60%)`,
           pointerEvents: 'none',
         }} />
 
@@ -204,9 +205,8 @@ export default function ItemDetailPanel({
         {/* 品名（大きく・縁取り付き） */}
         <MarqueeText text={displayItemName} className="detail-item-name"
           style={{
-            color: '#fff',
-            textShadow: `0 0 20px ${colors.accent}aa, 0 0 40px ${colors.accent}40, 0 2px 8px rgba(0,0,0,0.7)`,
-            WebkitTextStroke: '0.8px rgba(255,255,255,0.2)',
+            color: '#f0f0f0',
+            textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
           }} />
 
         {/* パレット図（flex:1で余白を吸収、ない場合も同じflex枠を維持） */}
@@ -222,7 +222,7 @@ export default function ItemDetailPanel({
           <div className="detail-sf-item">
             <span className="detail-sf-num" style={{
               color: colors.accent,
-              textShadow: `0 0 12px ${colors.accent}60, 0 2px 4px rgba(0,0,0,0.5)`,
+              textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
             }}>{fmtNum(item.palletCount)}</span>
             <div className="detail-sf-labels">
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>パレット</span>
@@ -231,8 +231,8 @@ export default function ItemDetailPanel({
           </div>
           <div className="detail-sf-item">
             <span className="detail-sf-num" style={{
-              color: '#fff',
-              textShadow: '0 0 12px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.5)',
+              color: '#e8e8e8',
+              textShadow: `0 0 16px ${colors.accent}30, 0 2px 4px rgba(0,0,0,0.6)`,
             }}>{fmtNum(item.fraction)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>端数</span>
           </div>
