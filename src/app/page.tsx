@@ -5,11 +5,14 @@ import { parseExcelFile } from '@/lib/excelParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useTimer, useClock } from '@/hooks/useTimer';
 import { useSpeech } from '@/hooks/useSpeech';
+import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
+import { VoiceAction } from '@/lib/speechCommands';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import ItemListPanel from '@/components/ItemListPanel';
 import ActionBar from '@/components/ActionBar';
+import VoiceFeedback from '@/components/VoiceFeedback';
 
 export default function Home() {
   const {
@@ -29,7 +32,7 @@ export default function Home() {
 
   const elapsed = useTimer(state.itemStartTime);
   const clock = useClock();
-  const { announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining } =
+  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining } =
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
@@ -59,12 +62,11 @@ export default function Home() {
 
   const handleIncrease = useCallback(() => {
     increaseQty();
-    // 次ティックで更新後の値をアナウンス
     setTimeout(() => {
-      const item = document.querySelector('[data-pallet-count]');
-      if (item) {
-        const p = Number(item.getAttribute('data-pallet-count'));
-        const t = Number(item.getAttribute('data-total-qty'));
+      const el = document.querySelector('[data-pallet-count]');
+      if (el) {
+        const p = Number(el.getAttribute('data-pallet-count'));
+        const t = Number(el.getAttribute('data-total-qty'));
         announcePalletChange(p, t);
       }
     }, 50);
@@ -73,10 +75,10 @@ export default function Home() {
   const handleDecrease = useCallback(() => {
     decreaseQty();
     setTimeout(() => {
-      const item = document.querySelector('[data-pallet-count]');
-      if (item) {
-        const p = Number(item.getAttribute('data-pallet-count'));
-        const t = Number(item.getAttribute('data-total-qty'));
+      const el = document.querySelector('[data-pallet-count]');
+      if (el) {
+        const p = Number(el.getAttribute('data-pallet-count'));
+        const t = Number(el.getAttribute('data-total-qty'));
         announcePalletChange(p, t);
       }
     }, 50);
@@ -98,6 +100,56 @@ export default function Home() {
       setTimeout(() => announceRemaining(remaining), 1500);
     }
   }, [currentItem, state.items.length, deleteCurrent, announceComplete, announceAllComplete, announceRemaining]);
+
+  // 音声コマンド処理
+  const handleVoiceCommand = useCallback(
+    (action: VoiceAction) => {
+      switch (action) {
+        case 'MOVE_NEXT':
+          moveNext();
+          break;
+        case 'MOVE_PREV':
+          movePrev();
+          break;
+        case 'DELETE_CURRENT':
+          handleComplete();
+          break;
+        case 'ANNOUNCE':
+          handleAnnounce();
+          break;
+        case 'INCREASE_QTY':
+          handleIncrease();
+          break;
+        case 'DECREASE_QTY':
+          handleDecrease();
+          break;
+        case 'QUERY_CURRENT_QTY':
+          if (currentItem) {
+            speak(
+              `${currentItem.itemName}、総数${currentItem.totalQty}、パレット${currentItem.palletCount}枚、端数${currentItem.fraction}ケース。`
+            );
+          }
+          break;
+        case 'QUERY_REMAINING':
+          speak(`残り${state.items.length}品目です。`);
+          break;
+        case 'QUERY_PALLET':
+          if (currentItem) {
+            speak(`パレット${currentItem.palletCount}枚です。`);
+          }
+          break;
+        case 'QUERY_FRACTION':
+          if (currentItem) {
+            speak(`端数${currentItem.fraction}ケースです。`);
+          }
+          break;
+      }
+    },
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items.length, speak]
+  );
+
+  const { isListening, isSupported, lastTranscript, toggleListening } =
+    useSpeechRecognition({ onCommand: handleVoiceCommand });
 
   // データ未読込 → DropZone
   if (state.containers.length === 0) {
@@ -154,6 +206,9 @@ export default function Home() {
         </div>
       </div>
 
+      {/* 音声認識フィードバック */}
+      <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
+
       {/* メインコンテンツ */}
       <div className="main-content h-screen w-screen overflow-hidden flex-col">
         {/* ヘッダー */}
@@ -203,6 +258,9 @@ export default function Home() {
           onAnnounce={handleAnnounce}
           onComplete={handleComplete}
           hasItems={state.items.length > 0}
+          isListening={isListening}
+          isVoiceSupported={isSupported}
+          onToggleVoice={toggleListening}
         />
       </div>
     </>
