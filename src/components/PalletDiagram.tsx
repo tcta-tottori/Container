@@ -328,11 +328,21 @@ function InterlockingPalletBlock({
   const gap = 0.5;
   const palletThick = 5;
 
-  const totalStackH = numLayers * (layerH + gap);
   const isoDepth = palletDepth * 0.35;
 
-  // パレット台のY位置
-  const palletTopY = oy + totalStackH + isoDepth + 2;
+  // 充填マップを先に計算
+  const filledMap = buildFilledMap(numLayers, perLayer, filledBoxes, totalBoxes);
+
+  // 実際に箱がある段数
+  let topFilledLayer = 0;
+  for (let l = 0; l < numLayers; l++) {
+    if (filledMap[l].some(Boolean)) topFilledLayer = l;
+  }
+  const displayLayers = Math.max(topFilledLayer + 1, 1);
+
+  // 表示段数に基づいてパレット台の位置を計算
+  const displayStackH = displayLayers * (layerH + gap);
+  const palletTopY = oy + displayStackH + isoDepth + 2;
 
   const elements: JSX.Element[] = [];
 
@@ -345,23 +355,10 @@ function InterlockingPalletBlock({
     />
   );
 
-  // 端数パレット: 上段から詰め、空き位置は四隅を残して中間を間引く
-  // filledMap[layer][box] = true/false
-  const filledMap = buildFilledMap(numLayers, perLayer, filledBoxes, totalBoxes);
-
-  // 実際に箱がある段数を計算（端数時は空の上段を描画しない）
-  let topFilledLayer = 0;
-  for (let l = 0; l < numLayers; l++) {
-    if (filledMap[l].some(Boolean)) topFilledLayer = l;
-  }
-  const displayLayers = topFilledLayer + 1;
-  // 表示する段数に応じてパレット台を上に調整
-  const yOffset = (numLayers - displayLayers) * (layerH + gap);
-
   // 下の段から上に描画
   for (let l = displayLayers - 1; l >= 0; l--) {
     const layer = layoutLayers[l];
-    const layerBaseY = palletTopY - yOffset - (displayLayers - l) * (layerH + gap);
+    const layerBaseY = palletTopY - (displayLayers - l) * (layerH + gap);
 
     for (let b = 0; b < layer.length; b++) {
       const box = layer[b];
@@ -406,9 +403,7 @@ function GenericPalletBlock({
   const gapLayer = 0.5;
   const palletThick = 5;
 
-  const totalStackH = layers * (boxH + gapLayer);
   const isoDepth = depth * 0.35;
-  const palletTopY = oy + totalStackH + isoDepth + 2;
   const palletFrontW = perLayer * (boxW + gapX) + 2;
 
   const elements: JSX.Element[] = [];
@@ -419,19 +414,20 @@ function GenericPalletBlock({
   for (let l = 0; l < layers; l++) {
     if (filledMap[l].some(Boolean)) topFilledLayer = l;
   }
-  const displayLayers = topFilledLayer + 1;
-  const yOffset = (layers - displayLayers) * (boxH + gapLayer);
+  const displayLayers = Math.max(topFilledLayer + 1, 1);
+  const displayStackH = displayLayers * (boxH + gapLayer);
+  const palletTopY = oy + displayStackH + isoDepth + 2;
 
   elements.push(
     <IsoPallet
       key={`${label}-pallet`}
-      x={ox - 1} y={palletTopY - yOffset}
+      x={ox - 1} y={palletTopY}
       pw={palletFrontW + 2} ph={palletThick} pd={depth}
     />
   );
 
   for (let l = displayLayers - 1; l >= 0; l--) {
-    const layerBaseY = palletTopY - yOffset - (displayLayers - l) * (boxH + gapLayer);
+    const layerBaseY = palletTopY - (displayLayers - l) * (boxH + gapLayer);
     for (let c = 0; c < perLayer; c++) {
       const isFilled = filledMap[l][c];
       elements.push(
