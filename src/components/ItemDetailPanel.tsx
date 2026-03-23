@@ -225,7 +225,11 @@ export default function ItemDetailPanel({
             const isDone = completedIds.has(it.id);
             const displayName = shortenName(it.itemName);
             const origIdx = allItems.findIndex((a) => a.id === it.id);
-            const rowBg = isDone ? '#f0f0f0' : isActive ? `${c.accent}22` : c.bg;
+            // 種類別の濃い背景色
+            const typeBg = `${c.accent}18`;
+            // 選択中は目立つオレンジ系（種類色と別系統）
+            const activeBg = '#fff3e0';
+            const rowBg = isDone ? '#f3f3f3' : isActive ? activeBg : typeBg;
 
             const content = (
               <>
@@ -234,10 +238,10 @@ export default function ItemDetailPanel({
                   className="detail-list-name"
                   style={isDone
                     ? { color: '#bbb', textDecoration: 'line-through' }
-                    : isActive ? { fontWeight: 700, color: c.text } : { color: 'var(--text-primary)' }
+                    : isActive ? { fontWeight: 700, color: '#e65100' } : { color: 'var(--text-primary)' }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : c.text }}>{fmtNum(it.palletCount)}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : c.text }}>{fmtNum(it.fraction)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : isActive ? '#e65100' : c.text }}>{fmtNum(it.palletCount)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : isActive ? '#e65100' : c.text }}>{fmtNum(it.fraction)}</span>
                 <span className="detail-list-num detail-list-total" style={isDone ? { color: '#ccc' } : undefined}>
                   {Math.ceil(it.totalQty).toLocaleString()}
                 </span>
@@ -257,7 +261,11 @@ export default function ItemDetailPanel({
               <SwipeRow key={it.id}
                 onSwipe={() => onCompleteItem?.(it.id)}
                 className={`detail-list-row ${isActive ? 'active' : ''}`}
-                style={{ background: rowBg, borderLeftColor: isActive ? c.accent : `${c.accent}80` }}
+                style={{
+                  background: rowBg,
+                  borderLeftColor: isActive ? '#ff6d00' : `${c.accent}80`,
+                  borderLeftWidth: isActive ? 4 : 3,
+                }}
               >
                 <div style={{ display: 'contents' }} onClick={() => onSelectItem?.(origIdx)}>
                   {content}

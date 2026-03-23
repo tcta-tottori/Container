@@ -315,10 +315,13 @@ body {
 }
 .detail-list-row:active { background: rgba(0,0,0,0.03); }
 .detail-list-row.active {
-  border-left-width: 3px;
-  animation: row-blink 2.5s ease-in-out infinite;
+  border-left-width: 4px;
+  animation: row-blink 1.8s ease-in-out infinite;
 }
-@keyframes row-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes row-blink {
+  0%, 100% { background: #fff3e0; }
+  50% { background: #ffe0b2; }
+}
 .detail-list-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .detail-list-name {
   flex: 1; min-width: 0;
