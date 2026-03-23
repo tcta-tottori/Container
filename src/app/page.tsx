@@ -151,8 +151,10 @@ export default function Home() {
               qText = `${currentItem.palletCount}パレットと${currentItem.fraction}ケース`;
             } else if (currentItem.palletCount > 0) {
               qText = `${currentItem.palletCount}パレット`;
-            } else {
+            } else if (currentItem.fraction > 0) {
               qText = `${currentItem.fraction}ケース`;
+            } else {
+              qText = `${currentItem.totalQty}個`;
             }
             speak(`${itemNameForSpeech(currentItem.itemName)}、${qText}。`);
           }
@@ -232,7 +234,7 @@ export default function Home() {
             </button>
             <div className="menu-divider" />
             <div className="menu-version">
-              コンテナ荷降ろし管理 v1.0.0
+              Container Navigation System v1.0
             </div>
           </div>
         </div>

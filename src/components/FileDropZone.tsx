@@ -7,8 +7,21 @@ interface FileDropZoneProps {
   onFileLoaded: (file: File) => void;
 }
 
+const APP_VERSION = '1.0';
+const CHANGELOG = [
+  { ver: '1.0', date: '2026-03-24', changes: [
+    'ジャーポット専用パレット図（ラミネートバンドル・互い違い配置）',
+    '品目の合算処理（同一refno内の同一品番・品名）',
+    '音声コール改善（パレット・ケース0の場合は総数コール）',
+    'ダーク背景のヒーローセクション',
+    '最近のファイル メモリー機能（最大3件）',
+    '完了アイテムの取り消し機能',
+  ]},
+];
+
 export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,8 +55,40 @@ export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
   };
 
   return (
-    <div className="flex items-center justify-center h-screen w-screen" style={{ background: 'linear-gradient(135deg, #0f0c29 0%, #1a1a2e 40%, #16213e 100%)' }}>
+    <div className="flex items-center justify-center h-screen w-screen"
+      style={{ background: 'linear-gradient(135deg, #0f0c29 0%, #1a1a2e 40%, #16213e 100%)' }}>
       <div style={{ width: '100%', maxWidth: 420, padding: '0 20px' }}>
+
+        {/* バージョン表示 */}
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+          <button onClick={() => setShowChangelog(!showChangelog)}
+            style={{
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: '4px 14px', cursor: 'pointer',
+              color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'var(--font-mono)',
+              fontWeight: 500, letterSpacing: 0.5,
+            }}>
+            v{APP_VERSION}
+          </button>
+        </div>
+
+        {/* 更新履歴 */}
+        {showChangelog && (
+          <div style={{
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 12, padding: '12px 16px', marginBottom: 20,
+          }}>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+              v{CHANGELOG[0].ver} - {CHANGELOG[0].date}
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 16 }}>
+              {CHANGELOG[0].changes.map((c, i) => (
+                <li key={i} style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, lineHeight: 1.6 }}>{c}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* タイトル */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
@@ -57,11 +102,11 @@ export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
               <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
             </svg>
           </div>
-          <h1 style={{ color: '#fff', fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>
-            コンテナ荷降ろし管理
+          <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif' }}>
+            Container Navigation System
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 4 }}>
-            Excelファイルを読み込んで開始
+          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 4 }}>
+            コンテナ荷降ろし管理
           </p>
         </div>
 
@@ -89,7 +134,7 @@ export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
             </svg>
           </div>
           <p style={{ color: '#fff', fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>
-            ファイルをドラッグ＆ドロップ
+            Excelファイルをドラッグ＆ドロップ
           </p>
           <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>
             またはタップして選択（.xlsx / .xls）

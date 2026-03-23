@@ -45,7 +45,8 @@ export function useSpeech() {
     } else if (item.fraction > 0) {
       qtyText = `${item.fraction}ケース`;
     } else {
-      qtyText = '0ケース';
+      // パレットもケースも0の場合は総数のみ
+      qtyText = `${item.totalQty}個`;
     }
 
     let text = `${spokenName}。${qtyText}。`;

@@ -236,10 +236,10 @@ export default function ItemDetailPanel({
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>ケース</span>
           </div>
           <div className="detail-sf-item detail-sf-total">
-            <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.65)' }}>
+            <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
               {Math.ceil(item.totalQty).toLocaleString()}
             </span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.45)' }}>総数</span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>pcs</span>
           </div>
         </div>
 
@@ -274,8 +274,8 @@ export default function ItemDetailPanel({
         <div className="detail-list-header">
           <span className="detail-list-h-name">品名</span>
           <span className="detail-list-h-num">PL</span>
-          <span className="detail-list-h-num">端</span>
-          <span className="detail-list-h-num detail-list-h-total">総数</span>
+          <span className="detail-list-h-num">CS</span>
+          <span className="detail-list-h-num detail-list-h-total">PCS</span>
         </div>
         <div className="detail-list-scroll">
           {sortedItems.map((it) => {
@@ -284,26 +284,23 @@ export default function ItemDetailPanel({
             const isDone = completedIds.has(it.id);
             const displayName = shortenName(it.itemName);
             const origIdx = allItems.findIndex((a) => a.id === it.id);
-            // 種類別の不透明背景色（濃い目）
-            const TYPE_BG: Record<string, string> = {
-              'ポリカバー': '#d4edda', '箱': '#cfe2f3', '部品': '#e8daef', 'その他': '#e8e8e8',
-            };
-            const typeBg = TYPE_BG[it.type] || TYPE_BG['その他'];
-            const activeBg = '#fff3e0';
-            const rowBg = isDone ? '#e8e8e8' : isActive ? activeBg : typeBg;
+            // ダークテーマ: 種類別の暗い背景色
+            const typeBg = `${c.accent}12`;
+            const activeBg = 'rgba(255,120,0,0.12)';
+            const rowBg = isDone ? 'rgba(255,255,255,0.03)' : isActive ? activeBg : typeBg;
 
             const content = (
               <>
-                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#aaa' : c.accent }} />
+                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#555' : c.accent }} />
                 <MarqueeText text={displayName}
                   className="detail-list-name"
                   style={isDone
-                    ? { color: '#999', textDecoration: 'line-through' }
-                    : isActive ? { fontWeight: 700, color: '#e65100' } : { color: 'var(--text-primary)' }
+                    ? { color: 'rgba(255,255,255,0.3)', textDecoration: 'line-through' }
+                    : isActive ? { fontWeight: 700, color: '#ff9800' } : { color: 'rgba(255,255,255,0.85)' }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#aaa' : isActive ? '#e65100' : c.text }}>{fmtNum(it.palletCount)}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#aaa' : isActive ? '#e65100' : c.text }}>{fmtNum(it.fraction)}</span>
-                <span className="detail-list-num detail-list-total" style={isDone ? { color: '#aaa' } : undefined}>
+                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : c.accent }}>{fmtNum(it.palletCount)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : 'rgba(255,255,255,0.8)' }}>{fmtNum(it.fraction)}</span>
+                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#555' : 'rgba(255,255,255,0.45)' }}>
                   {Math.ceil(it.totalQty).toLocaleString()}
                 </span>
               </>
@@ -312,7 +309,7 @@ export default function ItemDetailPanel({
             if (isDone) {
               return (
                 <div key={it.id} className="detail-list-row"
-                  style={{ background: '#e8e8e8', borderLeftColor: '#bbb', opacity: 0.55 }}
+                  style={{ background: 'rgba(255,255,255,0.02)', borderLeftColor: '#444', opacity: 0.5 }}
                   onClick={() => onUncompleteItem?.(it.id)}
                 >{content}</div>
               );
@@ -324,7 +321,7 @@ export default function ItemDetailPanel({
                 className={`detail-list-row ${isActive ? 'active' : ''}`}
                 style={{
                   background: rowBg,
-                  borderLeftColor: isActive ? '#ff6d00' : c.accent,
+                  borderLeftColor: isActive ? '#ff6d00' : `${c.accent}60`,
                   borderLeftWidth: isActive ? 4 : 3,
                 }}
               >
