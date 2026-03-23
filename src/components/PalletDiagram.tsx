@@ -27,7 +27,7 @@ function isJarPot(name: string): boolean {
   return /^JP[A-Z]/.test(name) || name.includes('ジャーポット');
 }
 
-/* ===== 段ボール箱（3面: 左面・正面・上面） ===== */
+/* ===== 段ボール箱（参照画像準拠: 3面+テープ十字） ===== */
 function Box({ x, y, z, w, d, h, ghost, accent }: {
   x: number; y: number; z: number;
   w: number; d: number; h: number;
@@ -38,62 +38,86 @@ function Box({ x, y, z, w, d, h, ghost, accent }: {
     return <polygon points={pts(...q)} fill="none" stroke={accent} strokeWidth={0.12} strokeDasharray="1,1" opacity={0.12} />;
   }
 
-  // 正面 (y=min): 画面の右下方向
+  const sk = '#5a4020';
+  // 3面 (正面→上面→左面の順、左面を最後で確実に表示)
   const front = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y, z), iso(x, y, z)] as [number, number][];
-  // 上面 (z=max): 画面の上方向
-  const top = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
-  // 左面 (x=min): 画面の左下方向 — 最後に描画して確実に見えるようにする
-  const left = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
+  const top   = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
+  const left  = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
 
-  // テープ
-  const tw = w * 0.14, tx = x + (w - tw) / 2;
-  const tapeTop = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y + d, z + h), iso(tx, y + d, z + h)] as [number, number][];
-  const tapeFront = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y, z + h * 0.83), iso(tx, y, z + h * 0.83)] as [number, number][];
+  // テープ十字 (上面: 縦帯+横帯)
+  const tw = w * 0.12;
+  const tx = x + (w - tw) / 2;
+  const td = d * 0.12;
+  const ty = y + (d - td) / 2;
+  const tapeV = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y + d, z + h), iso(tx, y + d, z + h)] as [number, number][];
+  const tapeH = [iso(x, ty, z + h), iso(x + w, ty, z + h), iso(x + w, ty + td, z + h), iso(x, ty + td, z + h)] as [number, number][];
+  // テープ正面垂れ
+  const tapeFV = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y, z + h * 0.78), iso(tx, y, z + h * 0.78)] as [number, number][];
+  // テープ左面垂れ
+  const tapeLV = [iso(x, ty, z + h), iso(x, ty + td, z + h), iso(x, ty + td, z + h * 0.78), iso(x, ty, z + h * 0.78)] as [number, number][];
 
-  const sk = '#705020';
   return (
     <g>
-      {/* 正面 → 上面 → 左面 の順 (左面を最後に描画して確実に表示) */}
-      <polygon points={pts(...front)} fill="#daa54c" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
-      <polygon points={pts(...top)} fill="#f0d580" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
-      <polygon points={pts(...left)} fill="#b08030" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
-      <polygon points={pts(...tapeTop)} fill="rgba(255,255,255,0.3)" stroke="none" />
-      <polygon points={pts(...tapeFront)} fill="rgba(255,255,255,0.2)" stroke="none" />
+      <polygon points={pts(...front)} fill="#dea550" stroke={sk} strokeWidth={0.7} strokeLinejoin="round" />
+      <polygon points={pts(...top)}   fill="#e8c06a" stroke={sk} strokeWidth={0.7} strokeLinejoin="round" />
+      <polygon points={pts(...left)}  fill="#c08a3a" stroke={sk} strokeWidth={0.7} strokeLinejoin="round" />
+      {/* テープ十字 */}
+      <polygon points={pts(...tapeV)} fill="rgba(255,255,255,0.4)" stroke="none" />
+      <polygon points={pts(...tapeH)} fill="rgba(255,255,255,0.35)" stroke="none" />
+      <polygon points={pts(...tapeFV)} fill="rgba(255,255,255,0.25)" stroke="none" />
+      <polygon points={pts(...tapeLV)} fill="rgba(255,255,255,0.2)" stroke="none" />
     </g>
   );
 }
 
-/* ===== パレット台 ===== */
+/* ===== パレット台（参照画像準拠: ダークグレー+フォーク穴+上面模様） ===== */
 function PalletBase({ x, y, z, w, d, h }: {
   x: number; y: number; z: number; w: number; d: number; h: number;
 }) {
-  const sk = '#2d3636';
-  const left = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
+  const sk = '#2a2e36';
   const front = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y, z), iso(x, y, z)] as [number, number][];
-  const top = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
+  const top   = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
+  const left  = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
 
-  const hw = w * 0.2, hh = h * 0.5, hz = z + h * 0.15;
-  const forkFront = [0.15, 0.55].map((pct, i) => {
+  // フォーク穴 (正面2つ + 左面2つ)
+  const hw = w * 0.2, hh = h * 0.45, hz = z + h * 0.18;
+  const forkFront = [0.15, 0.58].map((pct, i) => {
     const hx = x + w * pct;
     const q = [iso(hx, y, hz + hh), iso(hx + hw, y, hz + hh), iso(hx + hw, y, hz), iso(hx, y, hz)] as [number, number][];
-    return <polygon key={`ff${i}`} points={pts(...q)} fill="#222c2c" stroke={sk} strokeWidth={0.3} />;
+    return <polygon key={`ff${i}`} points={pts(...q)} fill="#1a1e24" stroke={sk} strokeWidth={0.4} rx="1" />;
   });
-  const forkLeft = [0.15, 0.55].map((pct, i) => {
+  const forkLeft = [0.15, 0.58].map((pct, i) => {
     const hy = y + d * pct;
-    const hd = d * 0.2;
+    const hd = d * 0.18;
     const q = [iso(x, hy, hz + hh), iso(x, hy + hd, hz + hh), iso(x, hy + hd, hz), iso(x, hy, hz)] as [number, number][];
-    return <polygon key={`fl${i}`} points={pts(...q)} fill="#222c2c" stroke={sk} strokeWidth={0.3} />;
+    return <polygon key={`fl${i}`} points={pts(...q)} fill="#1a1e24" stroke={sk} strokeWidth={0.4} />;
   });
+
+  // 上面の模様 (X字パターン4分割)
+  const cx = x + w / 2, cy = y + d / 2;
+  const topPattern = (
+    <g opacity={0.15} stroke="#3a4050" strokeWidth={0.25} fill="none">
+      <line {...lp(iso(x + 1, y + 1, z + h), iso(cx, cy, z + h))} />
+      <line {...lp(iso(x + w - 1, y + 1, z + h), iso(cx, cy, z + h))} />
+      <line {...lp(iso(x + 1, y + d - 1, z + h), iso(cx, cy, z + h))} />
+      <line {...lp(iso(x + w - 1, y + d - 1, z + h), iso(cx, cy, z + h))} />
+    </g>
+  );
 
   return (
     <g>
-      {/* 正面 → 上面 → 左面 の順 (左面を最後に描画) */}
-      <polygon points={pts(...front)} fill="#687070" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
-      <polygon points={pts(...top)} fill="#8a9494" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
-      <polygon points={pts(...left)} fill="#4a5454" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
+      <polygon points={pts(...front)} fill="#555d68" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
+      <polygon points={pts(...top)}   fill="#6b7280" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
+      <polygon points={pts(...left)}  fill="#444c56" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
+      {topPattern}
       {forkFront}{forkLeft}
     </g>
   );
+}
+
+/* line points helper */
+function lp(a: [number, number], b: [number, number]) {
+  return { x1: a[0], y1: a[1], x2: b[0], y2: b[1] };
 }
 
 /* ===== ラミネートバンドル（2ケース1まとまり） ===== */
