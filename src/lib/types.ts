@@ -25,6 +25,8 @@ export interface ContainerItem {
   fraction: number;
   /** 1パレットあたりケース数 (K列) */
   qtyPerPallet: number;
+  /** 新建高コード（手動入力） */
+  newPartNumber?: string;
 }
 
 /** 1コンテナ分のデータ */

@@ -7,15 +7,22 @@ interface FileDropZoneProps {
   onFileLoaded: (file: File) => void;
 }
 
-const APP_VERSION = '1.0';
+const APP_VERSION = '1.1';
+// icon: ✨=新機能, 🔧=修正, 🎨=デザイン, 📦=機能追加, 🔄=改善
 const CHANGELOG = [
+  { ver: '1.1', date: '2026-03-24', changes: [
+    { icon: '📦', text: '管理ページにExcelインポート/エクスポート機能' },
+    { icon: '✨', text: '新建高コード入力欄を追加' },
+    { icon: '🎨', text: '管理ページのレスポンシブ対応(縦/横/PC)' },
+    { icon: '🔄', text: 'バージョン情報のポップアップUI改善' },
+  ]},
   { ver: '1.0', date: '2026-03-24', changes: [
-    'ジャーポット専用パレット図（ラミネートバンドル・互い違い配置）',
-    '品目の合算処理（同一refno内の同一品番・品名）',
-    '音声コール改善（パレット・ケース0の場合は総数コール）',
-    'ダーク背景のヒーローセクション',
-    '最近のファイル メモリー機能（最大3件）',
-    '完了アイテムの取り消し機能',
+    { icon: '✨', text: 'ジャーポット専用パレット図(ラミネート・互い違い)' },
+    { icon: '📦', text: '品目の合算処理(同一品番・品名)' },
+    { icon: '🔄', text: '音声コール改善(0の場合は総数コール)' },
+    { icon: '🎨', text: 'ダーク背景のヒーローセクション' },
+    { icon: '📦', text: '最近のファイル メモリー機能(最大3件)' },
+    { icon: '🔧', text: '完了アイテムの取り消し機能' },
   ]},
 ];
 
@@ -125,11 +132,14 @@ export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
                     }}>Ver {log.ver}</span>
                     <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{log.date}</span>
                   </div>
-                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {log.changes.map((c, i) => (
-                      <li key={i} style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 1.7 }}>{c}</li>
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.65)', fontSize: 12, lineHeight: 1.5 }}>
+                        <span style={{ fontSize: 14, flexShrink: 0 }}>{c.icon}</span>
+                        <span>{c.text}</span>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               ))}
             </div>
