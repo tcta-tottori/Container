@@ -33,6 +33,7 @@ export default function Home() {
     deleteCurrent,
     toggleAutoAnnounce,
     updateItem,
+    completeItem,
   } = useContainerData();
 
   const elapsed = useTimer(state.itemStartTime);
@@ -255,7 +256,14 @@ export default function Home() {
                 data-pallet-count={currentItem?.palletCount}
                 data-total-qty={currentItem?.totalQty}>
                 {currentItem && (
-                  <ItemDetailPanel item={currentItem} relatedItems={relatedItems} allItems={state.items} onSelectItem={handleSelectItem} />
+                  <ItemDetailPanel
+                    item={currentItem}
+                    relatedItems={relatedItems}
+                    allItems={state.items}
+                    completedIds={state.completedIds}
+                    onSelectItem={handleSelectItem}
+                    onCompleteItem={completeItem}
+                  />
                 )}
               </div>
               <div className="list-panel-side">

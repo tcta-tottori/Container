@@ -395,40 +395,36 @@ body {
 /* パレット図エリア */
 .detail-pallet-area {
   display: flex; justify-content: center; align-items: center;
-  min-height: 100px; max-height: 130px;
+  min-height: 80px; max-height: 110px;
+  margin: 0 0 2px;
 }
 
-/* 数量1行 */
-.detail-stats-row {
+/* 数量（枠なし大フォント） */
+.detail-stats-free {
   display: flex; align-items: baseline; justify-content: center;
-  gap: 0; padding: 4px 0; flex-shrink: 0;
-  background: var(--bg-card); border-radius: 8px;
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-sm);
+  gap: 16px; padding: 2px 0; flex-shrink: 0;
 }
-.detail-stat {
+.detail-sf-item {
   display: flex; align-items: baseline; gap: 3px;
-  padding: 4px 12px; position: relative;
 }
-.detail-stat-val {
-  font-family: 'Inter', sans-serif; font-size: 22px;
-  font-weight: 700; font-variant-numeric: tabular-nums;
+.detail-sf-num {
+  font-family: 'Inter', sans-serif; font-size: 28px;
+  font-weight: 800; font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
 }
-.detail-stat-val-sm {
-  font-family: 'Inter', sans-serif; font-size: 14px;
+.detail-sf-num-sm {
+  font-family: 'Inter', sans-serif; font-size: 16px;
   font-weight: 600; font-variant-numeric: tabular-nums;
 }
-.detail-stat-unit {
-  font-size: 10px; color: var(--text-muted); font-weight: 500;
+.detail-sf-label {
+  font-family: 'M PLUS Rounded 1c', sans-serif;
+  font-size: 11px; color: var(--text-muted); font-weight: 500;
 }
-.detail-stat-sub {
-  font-size: 9px; color: var(--text-muted); opacity: 0.7;
+.detail-sf-sub {
+  font-size: 9px; color: var(--text-muted); opacity: 0.6;
   font-family: 'Inter', sans-serif;
 }
-.detail-stat-sep {
-  width: 1px; height: 20px; background: var(--border-subtle); flex-shrink: 0;
-}
-.detail-stat-total { opacity: 0.7; }
+.detail-sf-total { opacity: 0.6; }
 
 /* 似た品目警告 */
 .detail-similar-warn {
@@ -468,7 +464,8 @@ body {
   text-transform: uppercase; color: var(--text-muted);
 }
 .detail-list-h-name { flex: 1; min-width: 0; }
-.detail-list-h-num { width: 44px; text-align: center; flex-shrink: 0; }
+.detail-list-h-num { width: 36px; text-align: center; flex-shrink: 0; }
+.detail-list-h-total { width: 48px; text-align: right; }
 .detail-list-scroll {
   flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
 }
@@ -496,8 +493,9 @@ body {
   font-size: 14px; font-weight: 500;
 }
 .detail-list-num {
-  width: 44px; text-align: center; flex-shrink: 0;
+  width: 36px; text-align: center; flex-shrink: 0;
   font-family: 'Inter', sans-serif; font-size: 15px;
   font-weight: 700; font-variant-numeric: tabular-nums;
 }
-.detail-list-total { width: 50px; text-align: right; font-size: 12px; opacity: 0.5; font-weight: 500; }
+.detail-list-total { width: 48px; text-align: right; font-size: 11px; opacity: 0.5; font-weight: 500; }
+.detail-list-name.completed { text-decoration: line-through; }

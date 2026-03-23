@@ -172,39 +172,46 @@ export default function PalletDiagram({
     return Math.round((cases / qtyPerPallet) * slotsPerPallet);
   };
 
-  // アイソメ投影の概算サイズ
-  const blockW = 52;
-  const blockH = 58;
-  const gap = 8;
+  // アイソメ投影の実際の範囲を計算
+  // PW=PD=26, 全高さ = PH(3) + 3層 * bh(26*0.32=8.32) ≈ 28
+  const PW = 26, PD = 26, PH = 3, totalZ = PH + 3 * (PW * 0.32);
+  // 左端: iso(0, PD, 0) → x = -PD*CX ≈ -22.5
+  const xMin = -PD * CX;
+  // 右端: iso(PW, 0, 0) → x = PW*CX ≈ 22.5
+  const xMax = PW * CX;
+  // 下端: iso(PW, PD, 0) → y = (PW+PD)*SX ≈ 26
+  const yMax = (PW + PD) * SX;
+  // 上端: iso(0, 0, totalZ) → y = -totalZ ≈ -28
+  const yMin = -totalZ;
+
+  const oneW = xMax - xMin;
+  const oneH = yMax - yMin;
+  const spacing = oneW * 0.15;
 
   const numBlocks = showTwo ? 2 : 1;
-  const totalW = numBlocks * blockW + (numBlocks > 1 ? gap : 0);
-
-  const vbX = -(blockW / 2) - 3;
-  const vbY = -blockH + 6;
-  const vbW = totalW + 10;
-  const vbH = blockH + 8;
+  const svgW = numBlocks * oneW + (numBlocks > 1 ? spacing : 0) + 4;
+  const svgH = oneH + 4;
+  const ox1 = 0;
+  const ox2 = oneW + spacing;
 
   return (
     <div className="pallet-diagram-container">
       <svg
         width="100%"
         height="100%"
-        viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
+        viewBox={`${xMin - 2} ${yMin - 2} ${svgW} ${svgH}`}
         preserveAspectRatio="xMidYMid meet"
-        style={{ maxHeight: '140px' }}
+        style={{ maxHeight: '110px' }}
       >
         {showTwo ? (
           <>
-            {/* 左: 端数パレット */}
             <PalletStack
-              ox={0} oy={0}
+              ox={ox1} oy={0}
               filledBoxes={hasFraction ? mapToSlots(fraction) : slotsPerPallet}
               accent={colors.accent}
             />
-            {/* 右: 満載パレット */}
             <PalletStack
-              ox={blockW + gap} oy={0}
+              ox={ox2} oy={0}
               filledBoxes={slotsPerPallet}
               accent={colors.accent}
             />

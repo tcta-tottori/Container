@@ -16,6 +16,7 @@ export interface ContainerState {
   currentItemIdx: number;
   originalValues: Map<string, OriginalValues>;
   modifiedValues: Map<string, Partial<OriginalValues>>;
+  completedIds: Set<string>;
   itemStartTime: number | null;
   autoAnnounce: boolean;
 }
@@ -30,7 +31,8 @@ export type Action =
   | { type: 'DECREASE_QTY' }
   | { type: 'DELETE_CURRENT' }
   | { type: 'TOGGLE_AUTO_ANNOUNCE' }
-  | { type: 'UPDATE_ITEM'; idx: number; updates: Partial<ContainerItem> };
+  | { type: 'UPDATE_ITEM'; idx: number; updates: Partial<ContainerItem> }
+  | { type: 'COMPLETE_ITEM'; id: string };
 
 const initialState: ContainerState = {
   containers: [],
@@ -39,6 +41,7 @@ const initialState: ContainerState = {
   currentItemIdx: 0,
   originalValues: new Map(),
   modifiedValues: new Map(),
+  completedIds: new Set(),
   itemStartTime: null,
   autoAnnounce: true,
 };
@@ -69,6 +72,7 @@ function reducer(state: ContainerState, action: Action): ContainerState {
         currentItemIdx: 0,
         originalValues: buildOriginalValues(items),
         modifiedValues: new Map(),
+        completedIds: new Set(),
         itemStartTime: Date.now(),
       };
     }
@@ -84,6 +88,7 @@ function reducer(state: ContainerState, action: Action): ContainerState {
         currentItemIdx: 0,
         originalValues: buildOriginalValues(items),
         modifiedValues: new Map(),
+        completedIds: new Set(),
         itemStartTime: Date.now(),
       };
     }
@@ -195,6 +200,30 @@ function reducer(state: ContainerState, action: Action): ContainerState {
     case 'TOGGLE_AUTO_ANNOUNCE':
       return { ...state, autoAnnounce: !state.autoAnnounce };
 
+    case 'COMPLETE_ITEM': {
+      const newCompleted = new Set(state.completedIds);
+      newCompleted.add(action.id);
+      // 次の未完了アイテムへ移動
+      const activeItems = state.items.filter((it) => !newCompleted.has(it.id));
+      let newIdx = state.currentItemIdx;
+      if (activeItems.length > 0) {
+        // 現在位置から次の未完了を探す
+        for (let i = 0; i < state.items.length; i++) {
+          const checkIdx = (state.currentItemIdx + i) % state.items.length;
+          if (!newCompleted.has(state.items[checkIdx].id)) {
+            newIdx = checkIdx;
+            break;
+          }
+        }
+      }
+      return {
+        ...state,
+        completedIds: newCompleted,
+        currentItemIdx: newIdx,
+        itemStartTime: activeItems.length > 0 ? Date.now() : null,
+      };
+    }
+
     case 'UPDATE_ITEM': {
       const { idx, updates } = action;
       if (idx < 0 || idx >= state.items.length) return state;
@@ -263,6 +292,10 @@ export function useContainerData() {
       dispatch({ type: 'UPDATE_ITEM', idx, updates }),
     []
   );
+  const completeItem = useCallback(
+    (id: string) => dispatch({ type: 'COMPLETE_ITEM', id }),
+    []
+  );
 
   return {
     state,
@@ -279,5 +312,6 @@ export function useContainerData() {
     deleteCurrent,
     toggleAutoAnnounce,
     updateItem,
+    completeItem,
   };
 }
