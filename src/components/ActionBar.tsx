@@ -26,11 +26,11 @@ export default function ActionBar({
   onToggleVoice,
 }: ActionBarProps) {
   return (
-    <div className="action-bar">
+    <div className="action-bar" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <button
         onClick={onPrev}
         disabled={!hasItems}
-        className="action-btn"
+        className="action-btn flex-1 max-w-[56px]"
         style={{
           background: 'rgba(255,255,255,0.05)',
           border: '1px solid rgba(255,255,255,0.08)',
@@ -46,7 +46,7 @@ export default function ActionBar({
       <button
         onClick={onIncrease}
         disabled={!hasItems}
-        className="action-btn"
+        className="action-btn flex-1 max-w-[56px]"
         style={{
           background: 'rgba(59,130,246,0.15)',
           border: '1px solid rgba(59,130,246,0.25)',
@@ -63,7 +63,7 @@ export default function ActionBar({
       <button
         onClick={onAnnounce}
         disabled={!hasItems}
-        className="action-btn"
+        className="action-btn flex-1 max-w-[56px]"
         style={{
           background: 'rgba(34,197,94,0.15)',
           border: '1px solid rgba(34,197,94,0.25)',
@@ -81,7 +81,7 @@ export default function ActionBar({
       {isVoiceSupported && onToggleVoice && (
         <button
           onClick={onToggleVoice}
-          className={`action-btn ${isListening ? 'listening-pulse' : ''}`}
+          className={`action-btn flex-1 max-w-[56px] ${isListening ? 'listening-pulse' : ''}`}
           style={{
             background: isListening
               ? 'rgba(239,68,68,0.2)'
@@ -103,7 +103,7 @@ export default function ActionBar({
       <button
         onClick={onDecrease}
         disabled={!hasItems}
-        className="action-btn"
+        className="action-btn flex-1 max-w-[56px]"
         style={{
           background: 'rgba(59,130,246,0.15)',
           border: '1px solid rgba(59,130,246,0.25)',
@@ -119,7 +119,7 @@ export default function ActionBar({
       <button
         onClick={onComplete}
         disabled={!hasItems}
-        className="action-btn"
+        className="action-btn flex-1 max-w-[56px]"
         style={{
           background: 'rgba(239,68,68,0.15)',
           border: '1px solid rgba(239,68,68,0.25)',
@@ -135,7 +135,7 @@ export default function ActionBar({
       <button
         onClick={onNext}
         disabled={!hasItems}
-        className="action-btn"
+        className="action-btn flex-1 max-w-[56px]"
         style={{
           background: 'rgba(255,255,255,0.05)',
           border: '1px solid rgba(255,255,255,0.08)',

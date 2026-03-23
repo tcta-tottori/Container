@@ -37,24 +37,69 @@
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
+  overscroll-behavior: none;
 }
 
-/* 横画面専用レイアウト */
-@media (orientation: portrait) {
-  .portrait-warning {
-    display: flex;
-  }
-  .main-content {
-    display: none;
-  }
-}
-
+/* ===== レスポンシブ: 横画面 ===== */
 @media (orientation: landscape) {
-  .portrait-warning {
+  .layout-landscape {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+  .layout-landscape .main-area {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+  }
+  .layout-landscape .detail-panel {
+    width: 60%;
+    height: 100%;
+  }
+  .layout-landscape .list-panel {
+    width: 40%;
+    height: 100%;
+    border-left: 1px solid var(--border-subtle);
+  }
+  .portrait-tabs {
     display: none;
   }
-  .main-content {
+}
+
+/* ===== レスポンシブ: 縦画面 ===== */
+@media (orientation: portrait) {
+  .layout-portrait {
     display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+  .layout-portrait .main-area {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+  }
+  .layout-portrait .detail-panel,
+  .layout-portrait .list-panel {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+  .layout-portrait .detail-panel.hidden-tab,
+  .layout-portrait .list-panel.hidden-tab {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .portrait-tabs {
+    display: flex;
+  }
+  /* 縦画面では統計カードを2×2に */
+  .stat-grid-portrait {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 
@@ -142,7 +187,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 48px;
+  min-width: 44px;
   min-height: 44px;
   border-radius: 10px;
   font-weight: 600;
@@ -169,7 +214,7 @@ body {
 .item-row {
   display: flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--border-subtle);
   transition: all 0.15s ease;
   cursor: pointer;
@@ -192,7 +237,7 @@ body {
 }
 
 .item-name {
-  font-size: 12px;
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -212,7 +257,7 @@ body {
 .app-header {
   display: flex;
   align-items: center;
-  height: 40px;
+  height: 44px;
   padding: 0 12px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
@@ -322,9 +367,62 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 52px;
+  height: 56px;
   padding: 0 12px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
+}
+
+/* Portrait tabs (detail/list switcher) */
+.portrait-tabs {
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.tab-btn.active {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+/* Swipe indicator in portrait */
+.swipe-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.swipe-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.3;
+  transition: all 0.2s ease;
+}
+
+.swipe-dot.active {
+  opacity: 1;
+  background: var(--text-primary);
+  width: 14px;
+  border-radius: 3px;
 }

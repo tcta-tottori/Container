@@ -63,7 +63,7 @@ export default function ItemDetailPanel({
       </div>
 
       {/* 数量情報カード */}
-      <div className="grid grid-cols-4 gap-2 mb-3 relative z-10">
+      <div className="grid grid-cols-4 gap-2 mb-3 relative z-10 stat-grid-portrait">
         <div className="stat-card">
           <div className="stat-label" style={{ color: colors.text }}>パレット</div>
           <div className="stat-value text-2xl" style={{ color: colors.accent }}>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useTimer, useClock } from '@/hooks/useTimer';
@@ -37,7 +37,10 @@ export default function Home() {
 
   const prevItemRef = useRef<string | null>(null);
 
-  // 品目が変わったとき自動読上げ
+  // 縦画面タブ: 'detail' | 'list'
+  const [activeTab, setActiveTab] = useState<'detail' | 'list'>('detail');
+
+  // 品目が変わったとき自動読上げ & 詳細タブに切り替え
   useEffect(() => {
     if (!currentItem || !state.autoAnnounce) return;
     if (prevItemRef.current !== currentItem.id) {
@@ -101,15 +104,26 @@ export default function Home() {
     }
   }, [currentItem, state.items.length, deleteCurrent, announceComplete, announceAllComplete, announceRemaining]);
 
+  // リストで品目選択時 → 詳細タブに切り替え
+  const handleSelectItem = useCallback(
+    (idx: number) => {
+      selectItem(idx);
+      setActiveTab('detail');
+    },
+    [selectItem]
+  );
+
   // 音声コマンド処理
   const handleVoiceCommand = useCallback(
     (action: VoiceAction) => {
       switch (action) {
         case 'MOVE_NEXT':
           moveNext();
+          setActiveTab('detail');
           break;
         case 'MOVE_PREV':
           movePrev();
+          setActiveTab('detail');
           break;
         case 'DELETE_CURRENT':
           handleComplete();
@@ -153,23 +167,7 @@ export default function Home() {
 
   // データ未読込 → DropZone
   if (state.containers.length === 0) {
-    return (
-      <>
-        <div className="portrait-warning fixed inset-0 z-50 flex items-center justify-center text-xl"
-          style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-          <div className="text-center p-8">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4" style={{ color: 'var(--text-muted)' }}>
-              <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
-              <line x1="12" y1="18" x2="12.01" y2="18"/>
-            </svg>
-            <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>横に回転してください</p>
-          </div>
-        </div>
-        <div className="main-content">
-          <FileDropZone onFileLoaded={handleFileLoaded} />
-        </div>
-      </>
-    );
+    return <FileDropZone onFileLoaded={handleFileLoaded} />;
   }
 
   // 全品目完了
@@ -219,24 +217,14 @@ export default function Home() {
 
   return (
     <>
-      {/* 縦画面警告 */}
-      <div className="portrait-warning fixed inset-0 z-50 flex items-center justify-center text-xl"
-        style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
-        <div className="text-center p-8">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4" style={{ color: 'var(--text-muted)' }}>
-            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
-            <line x1="12" y1="18" x2="12.01" y2="18"/>
-          </svg>
-          <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>横に回転してください</p>
-        </div>
-      </div>
-
       {/* 音声認識フィードバック */}
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
 
-      {/* メインコンテンツ */}
-      <div className="main-content h-screen w-screen overflow-hidden flex-col"
-        style={{ background: 'var(--bg-primary)' }}>
+      {/* メインレイアウト (横/縦 両対応) */}
+      <div
+        className="layout-landscape layout-portrait"
+        style={{ background: 'var(--bg-primary)' }}
+      >
         {/* ヘッダー */}
         <HeaderBar
           containers={state.containers}
@@ -249,11 +237,27 @@ export default function Home() {
           onToggleAutoAnnounce={toggleAutoAnnounce}
         />
 
-        {/* メイン 2カラム */}
-        <div className="flex flex-1 min-h-0">
-          {/* 左: 詳細パネル 60% */}
+        {/* 縦画面タブ切り替え */}
+        <div className="portrait-tabs">
+          <button
+            className={`tab-btn ${activeTab === 'detail' ? 'active' : ''}`}
+            onClick={() => setActiveTab('detail')}
+          >
+            詳細
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'list' ? 'active' : ''}`}
+            onClick={() => setActiveTab('list')}
+          >
+            一覧 ({state.items.length})
+          </button>
+        </div>
+
+        {/* メインエリア */}
+        <div className="main-area">
+          {/* 詳細パネル */}
           <div
-            className="w-[60%] h-full"
+            className={`detail-panel ${activeTab !== 'detail' ? 'hidden-tab' : ''}`}
             data-pallet-count={currentItem?.palletCount}
             data-total-qty={currentItem?.totalQty}
           >
@@ -265,23 +269,20 @@ export default function Home() {
             )}
           </div>
 
-          {/* 右: 一覧パネル 40% */}
-          <div
-            className="w-[40%] h-full"
-            style={{ borderLeft: '1px solid var(--border-subtle)' }}
-          >
+          {/* 一覧パネル */}
+          <div className={`list-panel ${activeTab !== 'list' ? 'hidden-tab' : ''}`}>
             <ItemListPanel
               items={state.items}
               currentIdx={state.currentItemIdx}
-              onSelect={selectItem}
+              onSelect={handleSelectItem}
             />
           </div>
         </div>
 
         {/* 操作バー */}
         <ActionBar
-          onPrev={movePrev}
-          onNext={moveNext}
+          onPrev={() => { movePrev(); setActiveTab('detail'); }}
+          onNext={() => { moveNext(); setActiveTab('detail'); }}
           onIncrease={handleIncrease}
           onDecrease={handleDecrease}
           onAnnounce={handleAnnounce}
