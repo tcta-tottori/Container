@@ -15,36 +15,78 @@ export default function ItemListPanel({
   onSelect,
 }: ItemListPanelProps) {
   return (
-    <div className="flex flex-col h-full overflow-y-auto bg-gray-900">
-      {items.map((item, idx) => {
-        const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
-        const isSelected = idx === currentIdx;
+    <div className="flex flex-col h-full overflow-y-auto" style={{ background: 'var(--bg-primary)' }}>
+      {/* リストヘッダー */}
+      <div
+        className="flex items-center px-3 py-2 border-b"
+        style={{
+          background: 'var(--bg-secondary)',
+          borderColor: 'var(--border-subtle)',
+        }}
+      >
+        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+          品目一覧
+        </span>
+        <span
+          className="ml-auto text-xs font-mono"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {items.length}
+        </span>
+      </div>
 
-        return (
-          <button
-            key={item.id}
-            onClick={() => onSelect(idx)}
-            className={`flex items-center text-left px-2 py-1.5 border-b border-gray-700 transition-colors ${
-              isSelected ? 'bg-gray-600' : 'hover:bg-gray-800'
-            }`}
-          >
-            {/* 左端の色バー */}
-            <div
-              className="w-1 self-stretch rounded-sm mr-2 shrink-0"
+      {/* アイテムリスト */}
+      <div className="flex-1 overflow-y-auto">
+        {items.map((item, idx) => {
+          const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
+          const isSelected = idx === currentIdx;
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => onSelect(idx)}
+              className={`item-row w-full text-left ${isSelected ? 'active' : ''}`}
               style={{
-                backgroundColor: isSelected ? colors.accent : 'transparent',
+                background: isSelected
+                  ? `${colors.accent}10`
+                  : undefined,
+                borderLeftColor: isSelected ? colors.accent : 'transparent',
+                borderLeftWidth: 2,
+                borderLeftStyle: 'solid',
               }}
-            />
-            {/* 品名 */}
-            <span
-              className="text-xs truncate"
-              style={{ color: colors.bg }}
             >
-              {item.itemName}
-            </span>
-          </button>
-        );
-      })}
+              {/* ドット */}
+              <span
+                className="item-dot"
+                style={{
+                  backgroundColor: isSelected ? colors.accent : `${colors.accent}40`,
+                  boxShadow: isSelected ? `0 0 6px ${colors.accent}40` : 'none',
+                }}
+              />
+              {/* 品名 */}
+              <span
+                className="item-name"
+                style={{
+                  color: isSelected ? colors.text : 'var(--text-secondary)',
+                  fontWeight: isSelected ? 500 : 400,
+                }}
+              >
+                {item.itemName}
+              </span>
+              {/* 種類タグ */}
+              <span
+                className="item-type-tag"
+                style={{
+                  backgroundColor: `${colors.accent}15`,
+                  color: colors.accent,
+                }}
+              >
+                {item.type}
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

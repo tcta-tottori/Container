@@ -155,10 +155,14 @@ export default function Home() {
   if (state.containers.length === 0) {
     return (
       <>
-        <div className="portrait-warning fixed inset-0 z-50 flex items-center justify-center bg-gray-900 text-white text-xl">
+        <div className="portrait-warning fixed inset-0 z-50 flex items-center justify-center text-xl"
+          style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
           <div className="text-center p-8">
-            <p className="text-4xl mb-4">📱</p>
-            <p className="font-bold">横に回転してください</p>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4" style={{ color: 'var(--text-muted)' }}>
+              <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
+              <line x1="12" y1="18" x2="12.01" y2="18"/>
+            </svg>
+            <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>横に回転してください</p>
           </div>
         </div>
         <div className="main-content">
@@ -171,11 +175,23 @@ export default function Home() {
   // 全品目完了
   if (state.items.length === 0) {
     return (
-      <div className="flex items-center justify-center h-screen w-screen bg-gray-900 text-white">
+      <div className="flex items-center justify-center h-screen w-screen"
+        style={{ background: 'var(--bg-primary)' }}>
         <div className="text-center">
-          <p className="text-5xl mb-4">🎉</p>
-          <p className="text-2xl font-bold mb-2">全品目完了！</p>
-          <p className="text-gray-400">お疲れ様でした</p>
+          <div
+            className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
+            style={{ background: 'rgba(34,197,94,0.1)', border: '2px solid rgba(34,197,94,0.2)' }}
+          >
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <p className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+            全品目完了
+          </p>
+          <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+            お疲れ様でした
+          </p>
           <button
             onClick={() => {
               const input = document.createElement('input');
@@ -187,7 +203,12 @@ export default function Home() {
               };
               input.click();
             }}
-            className="mt-4 px-4 py-2 bg-blue-600 rounded hover:bg-blue-500"
+            className="action-btn px-5 py-2.5 text-sm"
+            style={{
+              background: 'rgba(59,130,246,0.15)',
+              border: '1px solid rgba(59,130,246,0.3)',
+              color: '#60a5fa',
+            }}
           >
             新しいファイルを読み込む
           </button>
@@ -199,10 +220,14 @@ export default function Home() {
   return (
     <>
       {/* 縦画面警告 */}
-      <div className="portrait-warning fixed inset-0 z-50 flex items-center justify-center bg-gray-900 text-white text-xl">
+      <div className="portrait-warning fixed inset-0 z-50 flex items-center justify-center text-xl"
+        style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
         <div className="text-center p-8">
-          <p className="text-4xl mb-4">📱</p>
-          <p className="font-bold">横に回転してください</p>
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-4" style={{ color: 'var(--text-muted)' }}>
+            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
+            <line x1="12" y1="18" x2="12.01" y2="18"/>
+          </svg>
+          <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>横に回転してください</p>
         </div>
       </div>
 
@@ -210,7 +235,8 @@ export default function Home() {
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
 
       {/* メインコンテンツ */}
-      <div className="main-content h-screen w-screen overflow-hidden flex-col">
+      <div className="main-content h-screen w-screen overflow-hidden flex-col"
+        style={{ background: 'var(--bg-primary)' }}>
         {/* ヘッダー */}
         <HeaderBar
           containers={state.containers}
@@ -240,7 +266,10 @@ export default function Home() {
           </div>
 
           {/* 右: 一覧パネル 40% */}
-          <div className="w-[40%] h-full border-l border-gray-700">
+          <div
+            className="w-[40%] h-full"
+            style={{ borderLeft: '1px solid var(--border-subtle)' }}
+          >
             <ItemListPanel
               items={state.items}
               currentIdx={state.currentItemIdx}

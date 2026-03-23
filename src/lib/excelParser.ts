@@ -49,7 +49,7 @@ function createContainerItem(
   const fraction = toNumber(row[9]);
   const qtyPerPallet = toNumber(row[10]);
 
-  const type = detectItemType(itemName, qtyPerPallet, palletCount);
+  const type = detectItemType(itemName, qtyPerPallet, palletCount, partNumber);
 
   return {
     id: `${containerNo}-${rowIndex}`,

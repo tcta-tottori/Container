@@ -27,14 +27,20 @@ export default function HeaderBar({
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="flex items-center h-10 px-2 bg-gray-800 text-white text-sm gap-2 shrink-0">
+    <div className="app-header">
       {/* ファイル読込 */}
       <button
         onClick={() => inputRef.current?.click()}
-        className="px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 min-w-[48px] min-h-[32px]"
+        className="header-btn"
         title="ファイル読込"
       >
-        📁
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="12" y2="12"/>
+          <line x1="15" y1="15" x2="12" y2="12"/>
+        </svg>
       </button>
       <input
         ref={inputRef}
@@ -52,7 +58,7 @@ export default function HeaderBar({
       <select
         value={selectedIdx}
         onChange={(e) => onSelectContainer(Number(e.target.value))}
-        className="bg-gray-700 text-white rounded px-2 py-1 text-sm min-h-[32px]"
+        className="header-select"
       >
         {containers.map((c, i) => (
           <option key={c.containerNo} value={i}>
@@ -64,24 +70,41 @@ export default function HeaderBar({
       <div className="flex-1" />
 
       {/* 現在時刻 */}
-      <span className="text-gray-300" title="現在時刻">
-        🕐 {clock}
+      <span className="header-time" title="現在時刻">
+        {clock}
       </span>
 
       {/* 経過時間 */}
-      <span className="text-yellow-300 font-mono" title="経過時間">
-        ⏱ {elapsed}
+      <span className="header-elapsed" title="経過時間">
+        {elapsed}
       </span>
 
       {/* 自動読上げ */}
       <button
         onClick={onToggleAutoAnnounce}
-        className={`px-2 py-1 rounded min-w-[48px] min-h-[32px] ${
-          autoAnnounce ? 'bg-green-700' : 'bg-gray-700'
-        }`}
+        className="header-btn"
+        style={{
+          background: autoAnnounce ? 'rgba(34, 197, 94, 0.15)' : undefined,
+          borderColor: autoAnnounce ? 'rgba(34, 197, 94, 0.3)' : undefined,
+          color: autoAnnounce ? '#22c55e' : undefined,
+        }}
         title={autoAnnounce ? '自動読上げ ON' : '自動読上げ OFF'}
       >
-        {autoAnnounce ? '🔊' : '🔇'}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {autoAnnounce ? (
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </>
+          ) : (
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <line x1="23" y1="9" x2="17" y2="15"/>
+              <line x1="17" y1="9" x2="23" y2="15"/>
+            </>
+          )}
+        </svg>
       </button>
     </div>
   );
