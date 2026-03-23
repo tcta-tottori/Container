@@ -61,31 +61,78 @@ export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
 
         {/* バージョン表示 */}
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <button onClick={() => setShowChangelog(!showChangelog)}
+          <button onClick={() => setShowChangelog(true)}
             style={{
               background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 20, padding: '4px 14px', cursor: 'pointer',
               color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'var(--font-mono)',
               fontWeight: 500, letterSpacing: 0.5,
             }}>
-            v{APP_VERSION}
+            Ver {APP_VERSION}
           </button>
         </div>
 
-        {/* 更新履歴 */}
+        {/* バージョン情報ポップアップ */}
         {showChangelog && (
           <div style={{
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 12, padding: '12px 16px', marginBottom: 20,
-          }}>
-            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
-              v{CHANGELOG[0].ver} - {CHANGELOG[0].date}
-            </p>
-            <ul style={{ margin: 0, paddingLeft: 16 }}>
-              {CHANGELOG[0].changes.map((c, i) => (
-                <li key={i} style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, lineHeight: 1.6 }}>{c}</li>
+            position: 'fixed', inset: 0, zIndex: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
+          }} onClick={() => setShowChangelog(false)}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: '24px', width: '90%', maxWidth: 360,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}>
+              {/* ポップアップヘッダー */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.5">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                      <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p style={{ color: '#fff', fontSize: 14, fontWeight: 700, margin: 0 }}>CNS</p>
+                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, margin: 0 }}>Container Navigation System</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowChangelog(false)} style={{
+                  width: 28, height: 28, borderRadius: 8, border: 'none',
+                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                }}>✕</button>
+              </div>
+
+              {/* バージョン一覧 */}
+              {CHANGELOG.map((log) => (
+                <div key={log.ver} style={{
+                  background: 'rgba(255,255,255,0.04)', borderRadius: 12,
+                  padding: '14px 16px', marginBottom: 8,
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{
+                      background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                      color: '#fff', fontSize: 11, fontWeight: 700, padding: '2px 10px',
+                      borderRadius: 12, fontFamily: 'var(--font-mono)',
+                    }}>Ver {log.ver}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>{log.date}</span>
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    {log.changes.map((c, i) => (
+                      <li key={i} style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, lineHeight: 1.7 }}>{c}</li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
 

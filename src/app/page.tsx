@@ -234,7 +234,7 @@ export default function Home() {
             </button>
             <div className="menu-divider" />
             <div className="menu-version">
-              Container Navigation System v1.0
+              CNS Ver 1.0
             </div>
           </div>
         </div>
