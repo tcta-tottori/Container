@@ -209,13 +209,11 @@ export default function ItemDetailPanel({
             WebkitTextStroke: '0.8px rgba(255,255,255,0.2)',
           }} />
 
-        {/* パレット図（ない場合もスペース確保） */}
+        {/* パレット図（flex:1で余白を吸収、ない場合も同じflex枠を維持） */}
         <div className="detail-pallet-area">
-          {item.qtyPerPallet > 0 ? (
+          {item.qtyPerPallet > 0 && (
             <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
-          ) : (
-            <div style={{ minHeight: 60 }} />
           )}
         </div>
 

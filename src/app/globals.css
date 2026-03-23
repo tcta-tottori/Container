@@ -226,7 +226,7 @@ body {
   display: flex; flex-direction: column; gap: 4px;
   padding: 10px 14px 10px; position: relative; z-index: 1;
   border-radius: 0 0 18px 18px;
-  min-height: 50%; flex-shrink: 0;
+  height: 50%; flex-shrink: 0; overflow: hidden;
 }
 .detail-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .detail-part-no { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-left: auto; letter-spacing: 0.3px; }
@@ -242,7 +242,7 @@ body {
 /* パレット図 */
 .detail-pallet-area {
   display: flex; justify-content: center; align-items: center;
-  min-height: 80px; max-height: 110px; margin: 0;
+  flex: 1 1 0; min-height: 0; margin: 0;
 }
 
 /* 数量（大フォント装飾） */

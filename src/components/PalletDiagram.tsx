@@ -351,7 +351,7 @@ export default function PalletDiagram({
       <svg width="100%" height="100%"
         viewBox={`${xL - 2} ${yT - 2} ${svgW} ${svgH}`}
         preserveAspectRatio="xMidYMid meet"
-        style={{ maxHeight: '110px' }}
+        style={{ maxHeight: '100%' }}
       >
         {showTwo ? (
           <>
