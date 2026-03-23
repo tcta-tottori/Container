@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
-import { itemNameForSpeech, areSimilarItems, extractColor } from '@/lib/typeDetector';
+import { itemNameForSpeech, areSimilarItems } from '@/lib/typeDetector';
 
 function speak(text: string): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -34,8 +34,30 @@ export function useSpeech() {
 
   const announceItem = useCallback((item: ContainerItem, allItems?: ContainerItem[]) => {
     const spokenName = itemNameForSpeech(item.itemName);
+    const isPolycover = item.type === 'ポリカバー';
 
-    let text = `${spokenName}。パレット${item.palletCount}枚、端数${item.fraction}ケース、総数${item.totalQty}。`;
+    // パレットと端数の読み上げ
+    let qtyText = '';
+    if (item.palletCount > 0 && item.fraction > 0) {
+      qtyText = `${item.palletCount}パレットと${item.fraction}ケース`;
+    } else if (item.palletCount > 0) {
+      qtyText = `${item.palletCount}パレット`;
+    } else if (item.fraction > 0) {
+      qtyText = `${item.fraction}ケース`;
+    } else {
+      qtyText = '0ケース';
+    }
+
+    let text = `${spokenName}。${qtyText}。`;
+
+    // ポリカバーは検査で1ケース抜く
+    if (isPolycover) {
+      const totalCases = item.palletCount * item.qtyPerPallet + item.fraction;
+      const afterInspection = totalCases - 1;
+      if (afterInspection >= 0) {
+        text += `検査を抜いて${afterInspection}ケース。`;
+      }
+    }
 
     // 似た名前のアイテムがある場合に警告
     if (allItems && allItems.length > 0) {
@@ -44,8 +66,7 @@ export function useSpeech() {
       );
       if (similarItems.length > 0) {
         const names = similarItems.map((s) => {
-          const color = extractColor(s.itemName);
-          return color ? `${itemNameForSpeech(s.itemName)}` : itemNameForSpeech(s.itemName);
+          return itemNameForSpeech(s.itemName);
         }).join('、');
         text += `注意、似た品目があります。${names}。`;
       }
@@ -55,8 +76,8 @@ export function useSpeech() {
   }, []);
 
   const announcePalletChange = useCallback(
-    (newPallet: number, newTotal: number) => {
-      speak(`パレット${newPallet}枚、総数${newTotal}。`);
+    (newPallet: number) => {
+      speak(`パレット${newPallet}。`);
     },
     []
   );

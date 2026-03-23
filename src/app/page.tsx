@@ -72,8 +72,7 @@ export default function Home() {
       const el = document.querySelector('[data-pallet-count]');
       if (el) {
         const p = Number(el.getAttribute('data-pallet-count'));
-        const t = Number(el.getAttribute('data-total-qty'));
-        announcePalletChange(p, t);
+        announcePalletChange(p);
       }
     }, 50);
   }, [increaseQty, announcePalletChange]);
@@ -84,8 +83,7 @@ export default function Home() {
       const el = document.querySelector('[data-pallet-count]');
       if (el) {
         const p = Number(el.getAttribute('data-pallet-count'));
-        const t = Number(el.getAttribute('data-total-qty'));
-        announcePalletChange(p, t);
+        announcePalletChange(p);
       }
     }, 50);
   }, [decreaseQty, announcePalletChange]);
@@ -142,7 +140,15 @@ export default function Home() {
           handleDecrease(); break;
         case 'QUERY_CURRENT_QTY':
           if (currentItem) {
-            speak(`${itemNameForSpeech(currentItem.itemName)}、総数${currentItem.totalQty}、パレット${currentItem.palletCount}枚、端数${currentItem.fraction}ケース。`);
+            let qText = '';
+            if (currentItem.palletCount > 0 && currentItem.fraction > 0) {
+              qText = `${currentItem.palletCount}パレットと${currentItem.fraction}ケース`;
+            } else if (currentItem.palletCount > 0) {
+              qText = `${currentItem.palletCount}パレット`;
+            } else {
+              qText = `${currentItem.fraction}ケース`;
+            }
+            speak(`${itemNameForSpeech(currentItem.itemName)}、${qText}。`);
           }
           break;
         case 'QUERY_REMAINING':
