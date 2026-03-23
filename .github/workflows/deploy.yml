@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [claude/init-container-app-0RJFr]
 
 permissions:
   contents: read
