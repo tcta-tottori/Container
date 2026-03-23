@@ -66,6 +66,25 @@ function createContainerItem(
   };
 }
 
+/** 同一品番＋品名のアイテムを合算する */
+function mergeItems(items: ContainerItem[]): ContainerItem[] {
+  const map = new Map<string, ContainerItem>();
+  for (const item of items) {
+    const key = `${item.partNumber}::${item.itemName}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.totalQty += item.totalQty;
+      existing.caseCount += item.caseCount;
+      existing.palletCount += item.palletCount;
+      existing.fraction += item.fraction;
+      // qtyPerPallet, packingQty は同じ品目なので最初の値を維持
+    } else {
+      map.set(key, { ...item });
+    }
+  }
+  return Array.from(map.values());
+}
+
 /**
  * Excel ファイルをブラウザ内でパースし、コンテナデータを返す
  */
@@ -120,6 +139,11 @@ export async function parseExcelFile(file: File): Promise<ParseResult> {
   }
   if (current && current.items.length > 0) {
     containers.push(current);
+  }
+
+  // 同一コンテナ内の同一品番・同一品名を合算
+  for (const c of containers) {
+    c.items = mergeItems(c.items);
   }
 
   // 各コンテナの品目を並べ替え
