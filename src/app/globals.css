@@ -224,7 +224,9 @@ body {
 .detail-root { display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden; }
 .detail-upper {
   display: flex; flex-direction: column; gap: 4px;
-  padding: 8px 12px 8px; flex-shrink: 0; position: relative; z-index: 1;
+  padding: 10px 14px 10px; position: relative; z-index: 1;
+  border-radius: 0 0 18px 18px;
+  min-height: 50%; flex-shrink: 0;
 }
 .detail-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .detail-part-no { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-left: auto; letter-spacing: 0.3px; }
@@ -232,9 +234,9 @@ body {
 /* 品名 */
 .detail-item-name {
   font-family: var(--font-display);
-  font-size: 28px; font-weight: 900; line-height: 1.1;
-  text-align: center; margin: 2px 0;
-  letter-spacing: -0.5px;
+  font-size: 36px; font-weight: 900; line-height: 1.05;
+  text-align: center; margin: 4px 0;
+  letter-spacing: -0.8px;
 }
 
 /* パレット図 */
@@ -246,25 +248,25 @@ body {
 /* 数量（大フォント装飾） */
 .detail-stats-free {
   display: flex; align-items: center; justify-content: center;
-  gap: 20px; padding: 4px 0 2px; flex-shrink: 0;
+  gap: 24px; padding: 6px 0 4px; flex-shrink: 0;
 }
-.detail-sf-item { display: flex; align-items: baseline; gap: 4px; }
+.detail-sf-item { display: flex; align-items: baseline; gap: 5px; }
 .detail-sf-num {
-  font-family: var(--font-mono); font-size: 40px;
+  font-family: var(--font-mono); font-size: 64px;
   font-weight: 900; font-variant-numeric: tabular-nums;
-  letter-spacing: -1.5px; line-height: 1;
+  letter-spacing: -2px; line-height: 1;
 }
 .detail-sf-num-sm {
-  font-family: var(--font-mono); font-size: 18px;
-  font-weight: 600; font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono); font-size: 28px;
+  font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .detail-sf-labels { display: flex; flex-direction: column; gap: 0; }
 .detail-sf-label {
-  font-family: var(--font-body); font-size: 10px;
-  color: var(--text-muted); font-weight: 500; line-height: 1.3;
+  font-family: var(--font-body); font-size: 12px;
+  color: var(--text-muted); font-weight: 600; line-height: 1.3;
   letter-spacing: 0.3px;
 }
-.detail-sf-sub { font-size: 9px; color: var(--text-muted); opacity: 0.5; font-family: var(--font-mono); line-height: 1; }
+.detail-sf-sub { font-size: 11px; color: var(--text-muted); opacity: 0.5; font-family: var(--font-mono); line-height: 1; }
 .detail-sf-total { opacity: 0.4; }
 
 /* 似た品目 */

@@ -130,119 +130,131 @@ export default function ItemDetailPanel({
     typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
   }
 
+  // 種目に合わせたダーク背景（accent色を強調）
+  const heroBg = `linear-gradient(160deg, ${colors.accent}15 0%, #12142a 25%, ${colors.accent}12 50%, #0d1b3a 75%, ${colors.accent}18 100%)`;
+
   return (
     <div className="detail-root">
-      {/* === 上半分（ダーク背景で統一） === */}
+      {/* === 上半分（accent色強調ダーク背景・角丸・固定高さ） === */}
       <div className="detail-upper" style={{
-        background: 'linear-gradient(160deg, #0f0c29 0%, #1a1a2e 30%, #16213e 60%, #0f3460 100%)',
+        background: heroBg,
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* グロー効果 */}
+        {/* accent色のグロー効果（強め） */}
         <div style={{
-          position: 'absolute', top: '-30%', right: '-15%', width: '70%', height: '160%',
-          background: `radial-gradient(ellipse, ${colors.accent}20 0%, transparent 65%)`,
+          position: 'absolute', top: '-20%', right: '-10%', width: '60%', height: '140%',
+          background: `radial-gradient(ellipse, ${colors.accent}35 0%, transparent 60%)`,
           pointerEvents: 'none',
         }} />
         <div style={{
-          position: 'absolute', bottom: '-20%', left: '-10%', width: '50%', height: '80%',
-          background: `radial-gradient(ellipse, ${colors.accent}10 0%, transparent 60%)`,
+          position: 'absolute', bottom: '-10%', left: '-5%', width: '40%', height: '60%',
+          background: `radial-gradient(ellipse, ${colors.accent}20 0%, transparent 55%)`,
           pointerEvents: 'none',
         }} />
 
-        {/* バッジ行 + 品目数 */}
+        {/* バッジ行: 種目 + 色柄 + 品目数 */}
         <div className="detail-badges" style={{ marginBottom: 2 }}>
           <span className="type-badge" style={{
-            backgroundColor: `${colors.accent}35`, color: colors.accent,
-            border: `1px solid ${colors.accent}50`,
+            backgroundColor: `${colors.accent}40`, color: '#fff',
+            border: `1.5px solid ${colors.accent}70`, fontWeight: 700, fontSize: 12,
           }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: colors.accent, display: 'inline-block' }} />
+            <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: colors.accent, display: 'inline-block' }} />
             {item.type}
           </span>
           {itemColor && (
             <span className="type-badge" style={{
-              backgroundColor: itemColor === '黒' ? 'rgba(80,80,80,0.5)' : itemColor === '白' ? 'rgba(200,200,200,0.2)' : 'rgba(180,130,50,0.3)',
-              color: itemColor === '黒' ? '#aaa' : itemColor === '白' ? '#ccc' : '#daa520',
-              border: `1px solid ${itemColor === '黒' ? '#777' : itemColor === '白' ? '#999' : '#daa520'}`,
+              backgroundColor: itemColor === '黒' ? 'rgba(30,30,30,0.8)' : itemColor === '白' ? 'rgba(240,240,240,0.9)' : 'rgba(200,160,50,0.4)',
+              color: itemColor === '黒' ? '#fff' : itemColor === '白' ? '#222' : '#ffe066',
+              border: `1.5px solid ${itemColor === '黒' ? '#666' : itemColor === '白' ? '#ddd' : '#daa520'}`,
+              fontWeight: 700, fontSize: 12,
             }}>
               <span style={{
-                width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-                backgroundColor: itemColor === '黒' ? '#444' : itemColor === '白' ? '#eee' : '#daa520',
-                border: itemColor === '白' ? '1px solid #aaa' : 'none',
+                width: 10, height: 10, borderRadius: '50%', display: 'inline-block',
+                backgroundColor: itemColor === '黒' ? '#222' : itemColor === '白' ? '#fff' : '#daa520',
+                border: `1.5px solid ${itemColor === '黒' ? '#888' : itemColor === '白' ? '#bbb' : '#b8860b'}`,
               }} />
               {itemColor}
             </span>
           )}
-          {/* 品目数 */}
+          {/* 品目カウント */}
           <span style={{
-            marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
-            fontSize: 10, color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)',
+            marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8,
+            fontSize: 11, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)', fontWeight: 600,
           }}>
             {Array.from(typeCounts.entries()).map(([type, count]) => {
               const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
               return (
-                <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
-                  {count}
+                <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
+                  <span style={{ color: '#fff' }}>{count}</span>
                 </span>
               );
             })}
-            <span style={{ opacity: 0.6 }}>/ {allItems.length}品目</span>
+            <span style={{ color: 'rgba(255,255,255,0.5)' }}>/ {allItems.length}品</span>
           </span>
         </div>
 
         {/* 品番 */}
         {item.partNumber && (
-          <div style={{ textAlign: 'right', fontSize: 10, color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)', marginBottom: 2, letterSpacing: 0.5 }}>
+          <div style={{ textAlign: 'right', fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-mono)', fontWeight: 500, marginBottom: 2, letterSpacing: 0.8 }}>
             {item.partNumber}
           </div>
         )}
 
-        {/* 品名（大きく・アウトライン付き） */}
+        {/* 品名（大きく・縁取り付き） */}
         <MarqueeText text={displayItemName} className="detail-item-name"
           style={{
             color: '#fff',
-            textShadow: `0 0 16px ${colors.accent}80, 0 2px 6px rgba(0,0,0,0.6)`,
-            WebkitTextStroke: '0.5px rgba(255,255,255,0.25)',
+            textShadow: `0 0 20px ${colors.accent}aa, 0 0 40px ${colors.accent}40, 0 2px 8px rgba(0,0,0,0.7)`,
+            WebkitTextStroke: '0.8px rgba(255,255,255,0.2)',
           }} />
 
-        {/* パレット図 */}
-        {item.qtyPerPallet > 0 && (
-          <div className="detail-pallet-area">
+        {/* パレット図（ない場合もスペース確保） */}
+        <div className="detail-pallet-area">
+          {item.qtyPerPallet > 0 ? (
             <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
-          </div>
-        )}
+          ) : (
+            <div style={{ minHeight: 60 }} />
+          )}
+        </div>
 
-        {/* 数量 */}
+        {/* 数量（縁取り付き大フォント） */}
         <div className="detail-stats-free">
           <div className="detail-sf-item">
-            <span className="detail-sf-num" style={{ color: colors.accent }}>{fmtNum(item.palletCount)}</span>
+            <span className="detail-sf-num" style={{
+              color: colors.accent,
+              textShadow: `0 0 12px ${colors.accent}60, 0 2px 4px rgba(0,0,0,0.5)`,
+            }}>{fmtNum(item.palletCount)}</span>
             <div className="detail-sf-labels">
-              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.45)' }}>パレット</span>
-              {item.qtyPerPallet > 0 && <span className="detail-sf-sub" style={{ color: 'rgba(255,255,255,0.25)' }}>@{item.qtyPerPallet}</span>}
+              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>パレット</span>
+              {item.qtyPerPallet > 0 && <span className="detail-sf-sub" style={{ color: 'rgba(255,255,255,0.4)' }}>@{item.qtyPerPallet}</span>}
             </div>
           </div>
           <div className="detail-sf-item">
-            <span className="detail-sf-num" style={{ color: '#fff' }}>{fmtNum(item.fraction)}</span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.45)' }}>端数</span>
+            <span className="detail-sf-num" style={{
+              color: '#fff',
+              textShadow: '0 0 12px rgba(255,255,255,0.3), 0 2px 4px rgba(0,0,0,0.5)',
+            }}>{fmtNum(item.fraction)}</span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>端数</span>
           </div>
           <div className="detail-sf-item detail-sf-total">
-            <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
               {Math.ceil(item.totalQty).toLocaleString()}
             </span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.25)' }}>総数</span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.4)' }}>総数</span>
           </div>
         </div>
 
         {/* 似た品目 */}
         {similarItems.length > 0 && (
-          <div className="detail-similar-warn" style={{ background: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.2)' }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="detail-similar-warn" style={{ background: 'rgba(245,158,11,0.12)', borderColor: 'rgba(245,158,11,0.25)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
               <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
-            <span className="detail-similar-label" style={{ color: '#f59e0b' }}>似た品目:</span>
-            <span className="detail-similar-names" style={{ color: '#fbbf24' }}>
+            <span className="detail-similar-label" style={{ color: '#fbbf24' }}>似た品目:</span>
+            <span className="detail-similar-names" style={{ color: '#fde68a' }}>
               {similarItems.map((s) => {
                 const c2 = extractColor(s.itemName);
                 return c2 ? `${s.itemName}(${c2})` : s.itemName;
@@ -253,9 +265,9 @@ export default function ItemDetailPanel({
 
         {/* 関連 */}
         {relatedItems.length > 0 && (
-          <div className="detail-related" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-            <span className="detail-related-label" style={{ color: 'rgba(255,255,255,0.35)' }}>関連:</span>
-            <MarqueeText text={relatedText} className="detail-related-text" style={{ color: 'rgba(255,255,255,0.5)' }} />
+          <div className="detail-related" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+            <span className="detail-related-label" style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>関連:</span>
+            <MarqueeText text={relatedText} className="detail-related-text" style={{ color: 'rgba(255,255,255,0.8)' }} />
           </div>
         )}
       </div>
