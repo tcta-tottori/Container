@@ -10,6 +10,7 @@ interface ItemDetailPanelProps {
   item: ContainerItem;
   relatedItems: ContainerItem[];
   allItems: ContainerItem[];
+  onSelectItem?: (idx: number) => void;
 }
 
 /* ===== マーキーテキスト（はみ出したらスムーズスクロール） ===== */
@@ -54,7 +55,7 @@ function shortenName(name: string): string {
 }
 
 export default function ItemDetailPanel({
-  item, relatedItems, allItems,
+  item, relatedItems, allItems, onSelectItem,
 }: ItemDetailPanelProps) {
   const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
   const itemColor = extractColor(item.itemName);
@@ -179,7 +180,7 @@ export default function ItemDetailPanel({
           <span className="detail-list-h-num">総数</span>
         </div>
         <div className="detail-list-scroll">
-          {allItems.map((it) => {
+          {allItems.map((it, idx) => {
             const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
             const isActive = it.id === item.id;
             const displayName = shortenName(it.itemName);
@@ -187,9 +188,10 @@ export default function ItemDetailPanel({
               <div key={it.id}
                 className={`detail-list-row ${isActive ? 'active' : ''}`}
                 style={isActive ? { background: `${c.accent}10`, borderLeftColor: c.accent } : undefined}
+                onClick={() => onSelectItem?.(idx)}
               >
                 <span className="detail-list-dot" style={{ backgroundColor: c.accent }} />
-                <span className="detail-list-name" style={isActive ? { fontWeight: 600, color: c.text } : undefined}>
+                <span className="detail-list-name" style={isActive ? { fontWeight: 700, color: c.text } : undefined}>
                   {displayName}
                 </span>
                 <span className="detail-list-num">{it.palletCount}</span>

@@ -249,7 +249,7 @@ export default function Home() {
                 data-pallet-count={currentItem?.palletCount}
                 data-total-qty={currentItem?.totalQty}>
                 {currentItem && (
-                  <ItemDetailPanel item={currentItem} relatedItems={relatedItems} allItems={state.items} />
+                  <ItemDetailPanel item={currentItem} relatedItems={relatedItems} allItems={state.items} onSelectItem={handleSelectItem} />
                 )}
               </div>
               <div className="list-panel-side">
