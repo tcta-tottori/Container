@@ -8,6 +8,7 @@ import { useSpeech } from '@/hooks/useSpeech';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForSpeech } from '@/lib/typeDetector';
+import { saveRecentFile } from '@/lib/recentFiles';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
@@ -59,6 +60,9 @@ export default function Home() {
       const result = await parseExcelFile(file);
       if (result.containers.length > 0) {
         loadData(result.containers);
+        // メモリーに保存
+        const totalItems = result.containers.reduce((sum, c) => sum + c.items.length, 0);
+        saveRecentFile(file, result.containers.length, totalItems);
       }
     },
     [loadData]

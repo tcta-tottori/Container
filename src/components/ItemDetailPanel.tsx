@@ -121,40 +121,60 @@ export default function ItemDetailPanel({
   const doneItems = allItems.filter((it) => completedIds.has(it.id));
   const sortedItems = [...activeItems, ...doneItems];
 
+  // 品名からポリカバーを省く
+  const displayItemName = item.itemName.replace(/ポリカバー/g, '').replace(/^[\s\-]+|[\s\-]+$/g, '') || item.itemName;
+
   return (
     <div className="detail-root" style={{ background: colors.gradient }}>
       <div className="type-glow" style={{ background: `radial-gradient(ellipse at 30% 20%, ${colors.glow} 0%, transparent 70%)` }} />
 
       {/* === 上半分 === */}
       <div className="detail-upper">
-        {/* バッジ */}
-        <div className="detail-badges">
-          <span className="type-badge" style={{
-            backgroundColor: `${colors.accent}20`, color: colors.accent,
-            border: `1px solid ${colors.accent}40`,
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: colors.accent, display: 'inline-block' }} />
-            {item.type}
-          </span>
-          {itemColor && (
+        {/* 品名ヒーローセクション（ダーク背景） */}
+        <div className="detail-hero" style={{
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+          borderRadius: 14, padding: '10px 14px', margin: '0 0 6px',
+          position: 'relative', overflow: 'hidden',
+        }}>
+          {/* グロー効果 */}
+          <div style={{
+            position: 'absolute', top: '-20%', right: '-10%', width: '60%', height: '140%',
+            background: `radial-gradient(ellipse, ${colors.accent}30 0%, transparent 70%)`,
+            pointerEvents: 'none',
+          }} />
+          {/* バッジ行 */}
+          <div className="detail-badges" style={{ marginBottom: 4 }}>
             <span className="type-badge" style={{
-              backgroundColor: itemColor === '黒' ? 'rgba(50,50,50,0.7)' : itemColor === '白' ? 'rgba(200,200,200,0.3)' : 'rgba(150,100,50,0.2)',
-              color: itemColor === '黒' ? '#888' : itemColor === '白' ? '#666' : '#8b6914',
-              border: `1px solid ${itemColor === '黒' ? '#666' : itemColor === '白' ? '#bbb' : '#8b6914'}`,
+              backgroundColor: `${colors.accent}35`, color: colors.accent,
+              border: `1px solid ${colors.accent}50`,
             }}>
-              <span style={{
-                width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-                backgroundColor: itemColor === '黒' ? '#333' : itemColor === '白' ? '#eee' : '#c49a3c',
-                border: itemColor === '白' ? '1px solid #ccc' : 'none',
-              }} />
-              {itemColor}
+              <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: colors.accent, display: 'inline-block' }} />
+              {item.type}
             </span>
-          )}
-          {item.partNumber && <span className="detail-part-no">{item.partNumber}</span>}
+            {itemColor && (
+              <span className="type-badge" style={{
+                backgroundColor: itemColor === '黒' ? 'rgba(80,80,80,0.5)' : itemColor === '白' ? 'rgba(200,200,200,0.2)' : 'rgba(180,130,50,0.3)',
+                color: itemColor === '黒' ? '#aaa' : itemColor === '白' ? '#ccc' : '#daa520',
+                border: `1px solid ${itemColor === '黒' ? '#777' : itemColor === '白' ? '#999' : '#daa520'}`,
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+                  backgroundColor: itemColor === '黒' ? '#444' : itemColor === '白' ? '#eee' : '#daa520',
+                  border: itemColor === '白' ? '1px solid #aaa' : 'none',
+                }} />
+                {itemColor}
+              </span>
+            )}
+            {item.partNumber && <span className="detail-part-no" style={{ color: 'rgba(255,255,255,0.4)' }}>{item.partNumber}</span>}
+          </div>
+          {/* 品名（大きく・アウトライン付き） */}
+          <MarqueeText text={displayItemName} className="detail-item-name"
+            style={{
+              color: '#fff',
+              textShadow: `0 0 12px ${colors.accent}80, 0 2px 4px rgba(0,0,0,0.5)`,
+              WebkitTextStroke: '0.5px rgba(255,255,255,0.3)',
+            }} />
         </div>
-
-        {/* 品名 */}
-        <MarqueeText text={item.itemName} className="detail-item-name" style={{ color: colors.text }} />
 
         {/* パレット図 */}
         {item.qtyPerPallet > 0 && (
