@@ -184,18 +184,24 @@ export default function ItemDetailPanel({
             const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
             const isActive = it.id === item.id;
             const displayName = shortenName(it.itemName);
+            const rowBg = isActive
+              ? `${c.accent}18`
+              : `${c.accent}08`;
             return (
               <div key={it.id}
                 className={`detail-list-row ${isActive ? 'active' : ''}`}
-                style={isActive ? { background: `${c.accent}10`, borderLeftColor: c.accent } : undefined}
+                style={{
+                  background: rowBg,
+                  borderLeftColor: isActive ? c.accent : `${c.accent}40`,
+                }}
                 onClick={() => onSelectItem?.(idx)}
               >
                 <span className="detail-list-dot" style={{ backgroundColor: c.accent }} />
-                <span className="detail-list-name" style={isActive ? { fontWeight: 700, color: c.text } : undefined}>
+                <span className="detail-list-name" style={isActive ? { fontWeight: 700, color: c.text } : { color: 'var(--text-primary)' }}>
                   {displayName}
                 </span>
-                <span className="detail-list-num">{it.palletCount}</span>
-                <span className="detail-list-num">{it.fraction}</span>
+                <span className="detail-list-num" style={{ color: c.text }}>{it.palletCount}</span>
+                <span className="detail-list-num" style={{ color: c.text }}>{it.fraction}</span>
                 <span className="detail-list-num detail-list-total">{it.totalQty.toLocaleString()}</span>
               </div>
             );
