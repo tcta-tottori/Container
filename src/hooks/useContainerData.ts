@@ -32,7 +32,8 @@ export type Action =
   | { type: 'DELETE_CURRENT' }
   | { type: 'TOGGLE_AUTO_ANNOUNCE' }
   | { type: 'UPDATE_ITEM'; idx: number; updates: Partial<ContainerItem> }
-  | { type: 'COMPLETE_ITEM'; id: string };
+  | { type: 'COMPLETE_ITEM'; id: string }
+  | { type: 'UNCOMPLETE_ITEM'; id: string };
 
 const initialState: ContainerState = {
   containers: [],
@@ -224,6 +225,19 @@ function reducer(state: ContainerState, action: Action): ContainerState {
       };
     }
 
+    case 'UNCOMPLETE_ITEM': {
+      const restored = new Set(state.completedIds);
+      restored.delete(action.id);
+      // 復元したアイテムを選択
+      const restoredIdx = state.items.findIndex((it) => it.id === action.id);
+      return {
+        ...state,
+        completedIds: restored,
+        currentItemIdx: restoredIdx >= 0 ? restoredIdx : state.currentItemIdx,
+        itemStartTime: Date.now(),
+      };
+    }
+
     case 'UPDATE_ITEM': {
       const { idx, updates } = action;
       if (idx < 0 || idx >= state.items.length) return state;
@@ -296,6 +310,10 @@ export function useContainerData() {
     (id: string) => dispatch({ type: 'COMPLETE_ITEM', id }),
     []
   );
+  const uncompleteItem = useCallback(
+    (id: string) => dispatch({ type: 'UNCOMPLETE_ITEM', id }),
+    []
+  );
 
   return {
     state,
@@ -313,5 +331,6 @@ export function useContainerData() {
     toggleAutoAnnounce,
     updateItem,
     completeItem,
+    uncompleteItem,
   };
 }

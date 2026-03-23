@@ -38,21 +38,27 @@ function Box({ x, y, z, w, d, h, ghost, accent }: {
     return <polygon points={pts(...q)} fill="none" stroke={accent} strokeWidth={0.12} strokeDasharray="1,1" opacity={0.12} />;
   }
 
-  const left = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
+  // 正面 (y=min): 画面の右下方向
   const front = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y, z), iso(x, y, z)] as [number, number][];
+  // 上面 (z=max): 画面の上方向
   const top = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
+  // 左面 (x=min): 画面の左下方向 — 最後に描画して確実に見えるようにする
+  const left = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
 
+  // テープ
   const tw = w * 0.14, tx = x + (w - tw) / 2;
   const tapeTop = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y + d, z + h), iso(tx, y + d, z + h)] as [number, number][];
   const tapeFront = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y, z + h * 0.83), iso(tx, y, z + h * 0.83)] as [number, number][];
 
+  const sk = '#705020';
   return (
     <g>
-      <polygon points={pts(...left)} fill="#c4923a" stroke="#8a6520" strokeWidth={0.5} strokeLinejoin="round" />
-      <polygon points={pts(...front)} fill="#dba84e" stroke="#8a6520" strokeWidth={0.5} strokeLinejoin="round" />
-      <polygon points={pts(...top)} fill="#efd07a" stroke="#8a6520" strokeWidth={0.5} strokeLinejoin="round" />
-      <polygon points={pts(...tapeTop)} fill="rgba(255,255,255,0.35)" stroke="none" />
-      <polygon points={pts(...tapeFront)} fill="rgba(255,255,255,0.25)" stroke="none" />
+      {/* 正面 → 上面 → 左面 の順 (左面を最後に描画して確実に表示) */}
+      <polygon points={pts(...front)} fill="#daa54c" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
+      <polygon points={pts(...top)} fill="#f0d580" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
+      <polygon points={pts(...left)} fill="#b08030" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
+      <polygon points={pts(...tapeTop)} fill="rgba(255,255,255,0.3)" stroke="none" />
+      <polygon points={pts(...tapeFront)} fill="rgba(255,255,255,0.2)" stroke="none" />
     </g>
   );
 }
@@ -81,10 +87,11 @@ function PalletBase({ x, y, z, w, d, h }: {
 
   return (
     <g>
-      <polygon points={pts(...left)} fill="#525c5c" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
+      {/* 正面 → 上面 → 左面 の順 (左面を最後に描画) */}
       <polygon points={pts(...front)} fill="#687070" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
       <polygon points={pts(...top)} fill="#8a9494" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
-      {forkLeft}{forkFront}
+      <polygon points={pts(...left)} fill="#4a5454" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
+      {forkFront}{forkLeft}
     </g>
   );
 }

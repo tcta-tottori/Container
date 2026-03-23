@@ -34,6 +34,7 @@ export default function Home() {
     toggleAutoAnnounce,
     updateItem,
     completeItem,
+    uncompleteItem,
   } = useContainerData();
 
   const elapsed = useTimer(state.itemStartTime);
@@ -263,6 +264,7 @@ export default function Home() {
                     completedIds={state.completedIds}
                     onSelectItem={handleSelectItem}
                     onCompleteItem={completeItem}
+                    onUncompleteItem={uncompleteItem}
                   />
                 )}
               </div>
