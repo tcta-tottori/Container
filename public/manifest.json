@@ -4,10 +4,10 @@
   "description": "気高電機 コンテナ入荷・荷降ろし管理アプリ",
   "start_url": "/Container/",
   "scope": "/Container/",
-  "display": "standalone",
-  "orientation": "landscape",
-  "background_color": "#1a1a2e",
-  "theme_color": "#1a1a2e",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0a0a0f",
+  "theme_color": "#0a0a0f",
   "icons": [
     {
       "src": "/Container/icons/icon-192.svg",

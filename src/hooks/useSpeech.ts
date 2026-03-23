@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
+import { itemNameForSpeech, areSimilarItems, extractColor } from '@/lib/typeDetector';
 
 function speak(text: string): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -25,17 +26,32 @@ export function useSpeech() {
       voicesLoaded.current = true;
     };
     window.speechSynthesis.addEventListener('voiceschanged', handleVoices);
-    // Trigger initial load
     window.speechSynthesis.getVoices();
     return () => {
       window.speechSynthesis.removeEventListener('voiceschanged', handleVoices);
     };
   }, []);
 
-  const announceItem = useCallback((item: ContainerItem) => {
-    speak(
-      `${item.type}、${item.itemName}。パレット${item.palletCount}枚、端数${item.fraction}ケース、総数${item.totalQty}。`
-    );
+  const announceItem = useCallback((item: ContainerItem, allItems?: ContainerItem[]) => {
+    const spokenName = itemNameForSpeech(item.itemName);
+
+    let text = `${spokenName}。パレット${item.palletCount}枚、端数${item.fraction}ケース、総数${item.totalQty}。`;
+
+    // 似た名前のアイテムがある場合に警告
+    if (allItems && allItems.length > 0) {
+      const similarItems = allItems.filter(
+        (other) => other.id !== item.id && areSimilarItems(item.itemName, other.itemName)
+      );
+      if (similarItems.length > 0) {
+        const names = similarItems.map((s) => {
+          const color = extractColor(s.itemName);
+          return color ? `${itemNameForSpeech(s.itemName)}` : itemNameForSpeech(s.itemName);
+        }).join('、');
+        text += `注意、似た品目があります。${names}。`;
+      }
+    }
+
+    speak(text);
   }, []);
 
   const announcePalletChange = useCallback(
@@ -46,7 +62,7 @@ export function useSpeech() {
   );
 
   const announceComplete = useCallback((itemName: string) => {
-    speak(`${itemName}、完了。`);
+    speak(`${itemNameForSpeech(itemName)}、完了。`);
   }, []);
 
   const announceAllComplete = useCallback(() => {

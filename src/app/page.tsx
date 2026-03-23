@@ -7,6 +7,7 @@ import { useTimer, useClock } from '@/hooks/useTimer';
 import { useSpeech } from '@/hooks/useSpeech';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
+import { itemNameForSpeech } from '@/lib/typeDetector';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
@@ -45,9 +46,9 @@ export default function Home() {
     if (!currentItem || !state.autoAnnounce) return;
     if (prevItemRef.current !== currentItem.id) {
       prevItemRef.current = currentItem.id;
-      announceItem(currentItem);
+      announceItem(currentItem, state.items);
     }
-  }, [currentItem, state.autoAnnounce, announceItem]);
+  }, [currentItem, state.autoAnnounce, announceItem, state.items]);
 
   const handleFileLoaded = useCallback(
     async (file: File) => {
@@ -60,8 +61,8 @@ export default function Home() {
   );
 
   const handleAnnounce = useCallback(() => {
-    if (currentItem) announceItem(currentItem);
-  }, [currentItem, announceItem]);
+    if (currentItem) announceItem(currentItem, state.items);
+  }, [currentItem, announceItem, state.items]);
 
   const handleIncrease = useCallback(() => {
     increaseQty();
@@ -140,7 +141,7 @@ export default function Home() {
         case 'QUERY_CURRENT_QTY':
           if (currentItem) {
             speak(
-              `${currentItem.itemName}、総数${currentItem.totalQty}、パレット${currentItem.palletCount}枚、端数${currentItem.fraction}ケース。`
+              `${itemNameForSpeech(currentItem.itemName)}、総数${currentItem.totalQty}、パレット${currentItem.palletCount}枚、端数${currentItem.fraction}ケース。`
             );
           }
           break;
@@ -265,6 +266,7 @@ export default function Home() {
               <ItemDetailPanel
                 item={currentItem}
                 relatedItems={relatedItems}
+                allItems={state.items}
               />
             )}
           </div>
