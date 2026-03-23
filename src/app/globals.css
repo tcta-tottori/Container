@@ -388,7 +388,7 @@ body {
 /* 品名: 中央寄せ、マーキー */
 .detail-item-name {
   font-family: 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif;
-  font-size: 20px; font-weight: 700; line-height: 1.2;
+  font-size: 22px; font-weight: 800; line-height: 1.2;
   text-align: center; margin: 2px 0;
 }
 
@@ -408,23 +408,27 @@ body {
   display: flex; align-items: baseline; gap: 3px;
 }
 .detail-sf-num {
-  font-family: 'Inter', sans-serif; font-size: 28px;
-  font-weight: 800; font-variant-numeric: tabular-nums;
-  letter-spacing: -0.5px;
+  font-family: 'Inter', sans-serif; font-size: 36px;
+  font-weight: 900; font-variant-numeric: tabular-nums;
+  letter-spacing: -1px; line-height: 1;
 }
 .detail-sf-num-sm {
-  font-family: 'Inter', sans-serif; font-size: 16px;
+  font-family: 'Inter', sans-serif; font-size: 18px;
   font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.detail-sf-labels {
+  display: flex; flex-direction: column; gap: 0;
 }
 .detail-sf-label {
   font-family: 'M PLUS Rounded 1c', sans-serif;
   font-size: 11px; color: var(--text-muted); font-weight: 500;
+  line-height: 1.2;
 }
 .detail-sf-sub {
   font-size: 9px; color: var(--text-muted); opacity: 0.6;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', sans-serif; line-height: 1;
 }
-.detail-sf-total { opacity: 0.6; }
+.detail-sf-total { opacity: 0.5; }
 
 /* 似た品目警告 */
 .detail-similar-warn {

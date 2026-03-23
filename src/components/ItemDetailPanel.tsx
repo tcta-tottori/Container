@@ -16,12 +16,8 @@ interface ItemDetailPanelProps {
 }
 
 /* ===== マーキーテキスト ===== */
-function MarqueeText({
-  text, className, style,
-}: {
-  text: string;
-  className?: string;
-  style?: React.CSSProperties;
+function MarqueeText({ text, className, style }: {
+  text: string; className?: string; style?: React.CSSProperties;
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLSpanElement>(null);
@@ -48,65 +44,58 @@ function MarqueeText({
   );
 }
 
-/* ===== 品名から種類語を省略 ===== */
+/* ===== 品名省略 ===== */
 function shortenName(name: string): string {
   return name.replace(/ポリカバー/g, '').replace(/^[\s\-]+|[\s\-]+$/g, '') || name;
 }
 
-/* ===== スワイプ行 ===== */
-function SwipeRow({
-  children, onSwipeLeft, style, className,
-}: {
-  children: React.ReactNode;
-  onSwipeLeft: () => void;
-  style?: React.CSSProperties;
-  className?: string;
+/* ===== スワイプ行（左→右にスワイプで完了） ===== */
+function SwipeRow({ children, onSwipe, style, className }: {
+  children: React.ReactNode; onSwipe: () => void;
+  style?: React.CSSProperties; className?: string;
 }) {
   const startX = useRef(0);
-  const deltaX = useRef(0);
+  const dx = useRef(0);
   const rowRef = useRef<HTMLDivElement>(null);
 
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
+  const onTS = useCallback((e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
-    deltaX.current = 0;
+    dx.current = 0;
   }, []);
 
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    deltaX.current = e.touches[0].clientX - startX.current;
-    if (rowRef.current && deltaX.current < 0) {
-      rowRef.current.style.transform = `translateX(${Math.max(deltaX.current, -100)}px)`;
+  const onTM = useCallback((e: React.TouchEvent) => {
+    dx.current = e.touches[0].clientX - startX.current;
+    if (rowRef.current && dx.current > 0) {
+      rowRef.current.style.transform = `translateX(${Math.min(dx.current, 120)}px)`;
       rowRef.current.style.transition = 'none';
     }
   }, []);
 
-  const onTouchEnd = useCallback(() => {
+  const onTE = useCallback(() => {
     if (rowRef.current) {
-      rowRef.current.style.transition = 'transform 0.25s ease';
-      if (deltaX.current < -80) {
-        rowRef.current.style.transform = 'translateX(-100%)';
+      rowRef.current.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
+      if (dx.current > 80) {
+        rowRef.current.style.transform = 'translateX(100%)';
         rowRef.current.style.opacity = '0';
-        setTimeout(() => onSwipeLeft(), 250);
+        setTimeout(() => onSwipe(), 260);
       } else {
         rowRef.current.style.transform = 'translateX(0)';
       }
     }
-  }, [onSwipeLeft]);
+  }, [onSwipe]);
 
   return (
     <div style={{ overflow: 'hidden', position: 'relative' }}>
       {/* 背景にCOMPLETEラベル */}
       <div style={{
-        position: 'absolute', right: 0, top: 0, bottom: 0,
-        width: '80px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: '#16a34a', color: '#fff', fontSize: '11px', fontWeight: 700,
-      }}>
-        完了
-      </div>
-      <div ref={rowRef} className={className} style={style}
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-      >
-        {children}
-      </div>
+        position: 'absolute', left: 0, top: 0, bottom: 0,
+        width: '70px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#16a34a', color: '#fff', fontSize: '10px', fontWeight: 700,
+        borderRadius: '0 4px 4px 0',
+      }}>完了</div>
+      <div ref={rowRef} className={className} style={{ ...style, position: 'relative', zIndex: 1 }}
+        onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE}
+      >{children}</div>
     </div>
   );
 }
@@ -121,10 +110,9 @@ export default function ItemDetailPanel({
   );
   const relatedText = relatedItems.map((r) => r.itemName).join('  /  ');
 
-  // リストをアクティブ→完了の順にソート
   const activeItems = allItems.filter((it) => !completedIds.has(it.id));
-  const completedItems = allItems.filter((it) => completedIds.has(it.id));
-  const sortedItems = [...activeItems, ...completedItems];
+  const doneItems = allItems.filter((it) => completedIds.has(it.id));
+  const sortedItems = [...activeItems, ...doneItems];
 
   return (
     <div className="detail-root" style={{ background: colors.gradient }}>
@@ -132,7 +120,7 @@ export default function ItemDetailPanel({
 
       {/* === 上半分 === */}
       <div className="detail-upper">
-        {/* バッジ行 */}
+        {/* バッジ */}
         <div className="detail-badges">
           <span className="type-badge" style={{
             backgroundColor: `${colors.accent}20`, color: colors.accent,
@@ -155,41 +143,35 @@ export default function ItemDetailPanel({
               {itemColor}
             </span>
           )}
-          {item.partNumber && (
-            <span className="detail-part-no">{item.partNumber}</span>
-          )}
+          {item.partNumber && <span className="detail-part-no">{item.partNumber}</span>}
         </div>
 
         {/* 品名 */}
         <MarqueeText text={item.itemName} className="detail-item-name" style={{ color: colors.text }} />
 
-        {/* パレット図（品名直下、コンパクト） */}
+        {/* パレット図 */}
         {item.qtyPerPallet > 0 && (
           <div className="detail-pallet-area">
-            <PalletDiagram
-              palletCount={item.palletCount}
-              fraction={item.fraction}
-              qtyPerPallet={item.qtyPerPallet}
-              type={item.type}
-            />
+            <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
+              qtyPerPallet={item.qtyPerPallet} type={item.type} />
           </div>
         )}
 
-        {/* 数量（枠なし大フォント） */}
+        {/* 数量（大きく目立つ） */}
         <div className="detail-stats-free">
           <div className="detail-sf-item">
             <span className="detail-sf-num" style={{ color: colors.accent }}>{item.palletCount}</span>
-            <span className="detail-sf-label">パレット</span>
-            {item.qtyPerPallet > 0 && (
-              <span className="detail-sf-sub">@{item.qtyPerPallet}</span>
-            )}
+            <div className="detail-sf-labels">
+              <span className="detail-sf-label">パレット</span>
+              {item.qtyPerPallet > 0 && <span className="detail-sf-sub">@{item.qtyPerPallet}</span>}
+            </div>
           </div>
           <div className="detail-sf-item">
             <span className="detail-sf-num" style={{ color: colors.text }}>{item.fraction}</span>
             <span className="detail-sf-label">端数</span>
           </div>
           <div className="detail-sf-item detail-sf-total">
-            <span className="detail-sf-num-sm" style={{ color: colors.text, opacity: 0.5 }}>
+            <span className="detail-sf-num-sm" style={{ color: colors.text, opacity: 0.4 }}>
               {item.totalQty.toLocaleString()}
             </span>
             <span className="detail-sf-label">総数</span>
@@ -213,7 +195,7 @@ export default function ItemDetailPanel({
           </div>
         )}
 
-        {/* 関連品名 */}
+        {/* 関連 */}
         {relatedItems.length > 0 && (
           <div className="detail-related">
             <span className="detail-related-label">関連:</span>
@@ -234,60 +216,45 @@ export default function ItemDetailPanel({
           {sortedItems.map((it) => {
             const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
             const isActive = it.id === item.id;
-            const isCompleted = completedIds.has(it.id);
+            const isDone = completedIds.has(it.id);
             const displayName = shortenName(it.itemName);
-            const originalIdx = allItems.findIndex((a) => a.id === it.id);
-            const rowBg = isCompleted
-              ? 'rgba(0,0,0,0.03)'
-              : isActive ? `${c.accent}18` : `${c.accent}08`;
+            const origIdx = allItems.findIndex((a) => a.id === it.id);
+            const rowBg = isDone ? 'rgba(0,0,0,0.02)' : isActive ? `${c.accent}18` : `${c.accent}08`;
 
-            const rowContent = (
+            const content = (
               <>
-                <span className="detail-list-dot" style={{
-                  backgroundColor: isCompleted ? '#ccc' : c.accent,
-                }} />
-                <MarqueeText
-                  text={displayName}
-                  className={`detail-list-name ${isCompleted ? 'completed' : ''}`}
-                  style={isCompleted
-                    ? { color: '#bbb', fontWeight: 400, textDecoration: 'line-through' }
-                    : isActive
-                      ? { fontWeight: 700, color: c.text }
-                      : { color: 'var(--text-primary)' }
-                  }
-                />
-                <span className="detail-list-num" style={{
-                  color: isCompleted ? '#ccc' : c.text,
-                }}>{it.palletCount}</span>
-                <span className="detail-list-num" style={{
-                  color: isCompleted ? '#ccc' : c.text,
-                }}>{it.fraction}</span>
-                <span className="detail-list-num detail-list-total" style={
-                  isCompleted ? { color: '#ccc' } : undefined
-                }>{it.totalQty.toLocaleString()}</span>
+                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#ccc' : c.accent }} />
+                <MarqueeText text={displayName}
+                  className="detail-list-name"
+                  style={isDone
+                    ? { color: '#bbb', textDecoration: 'line-through' }
+                    : isActive ? { fontWeight: 700, color: c.text } : { color: 'var(--text-primary)' }
+                  } />
+                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : c.text }}>{it.palletCount}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#ccc' : c.text }}>{it.fraction}</span>
+                <span className="detail-list-num detail-list-total" style={isDone ? { color: '#ccc' } : undefined}>
+                  {it.totalQty.toLocaleString()}
+                </span>
               </>
             );
 
-            if (isCompleted) {
+            if (isDone) {
               return (
-                <div key={it.id}
-                  className="detail-list-row"
-                  style={{ background: rowBg, borderLeftColor: '#ddd', opacity: 0.6 }}
-                  onClick={() => onSelectItem?.(originalIdx)}
-                >
-                  {rowContent}
-                </div>
+                <div key={it.id} className="detail-list-row"
+                  style={{ background: rowBg, borderLeftColor: '#ddd', opacity: 0.5 }}
+                  onClick={() => onSelectItem?.(origIdx)}
+                >{content}</div>
               );
             }
 
             return (
               <SwipeRow key={it.id}
-                onSwipeLeft={() => onCompleteItem?.(it.id)}
+                onSwipe={() => onCompleteItem?.(it.id)}
                 className={`detail-list-row ${isActive ? 'active' : ''}`}
                 style={{ background: rowBg, borderLeftColor: isActive ? c.accent : `${c.accent}40` }}
               >
-                <div style={{ display: 'contents' }} onClick={() => onSelectItem?.(originalIdx)}>
-                  {rowContent}
+                <div style={{ display: 'contents' }} onClick={() => onSelectItem?.(origIdx)}>
+                  {content}
                 </div>
               </SwipeRow>
             );
