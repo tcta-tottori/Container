@@ -213,6 +213,87 @@ function IsoPallet({
   );
 }
 
+/**
+ * 端数パレット用の充填マップを生成
+ * 上の段から詰めていき、最後の端数段では四隅を残して中間を間引く
+ */
+function buildFilledMap(
+  numLayers: number,
+  perLayer: number,
+  filledBoxes: number,
+  totalBoxes: number
+): boolean[][] {
+  const map: boolean[][] = Array.from({ length: numLayers }, () =>
+    Array(perLayer).fill(false)
+  );
+
+  if (filledBoxes >= totalBoxes) {
+    // 満載: 全てtrue
+    return map.map((layer) => layer.map(() => true));
+  }
+
+  let remaining = filledBoxes;
+
+  // 上の段(layer 0)から順に詰める
+  for (let l = 0; l < numLayers && remaining > 0; l++) {
+    if (remaining >= perLayer) {
+      // この段は全部埋まる
+      for (let b = 0; b < perLayer; b++) {
+        map[l][b] = true;
+      }
+      remaining -= perLayer;
+    } else {
+      // 端数段: 四隅を残して中間を間引く
+      // まず四隅（先頭と末尾）を優先的に埋め、残りは前から順に
+      if (remaining <= 0) break;
+
+      // 四隅のインデックス（パレット上の角に位置する箱）
+      const corners = getCornerIndices(perLayer);
+      const middleIndices = Array.from({ length: perLayer }, (_, i) => i)
+        .filter((i) => !corners.includes(i));
+
+      // まず四隅を埋める
+      const filledIndices: number[] = [];
+      for (const c of corners) {
+        if (filledIndices.length < remaining) {
+          filledIndices.push(c);
+        }
+      }
+      // 残りは中間を埋める
+      for (const m of middleIndices) {
+        if (filledIndices.length < remaining) {
+          filledIndices.push(m);
+        }
+      }
+
+      for (const idx of filledIndices) {
+        map[l][idx] = true;
+      }
+      remaining = 0;
+    }
+  }
+
+  return map;
+}
+
+/** 1段内の四隅に相当するインデックスを返す */
+function getCornerIndices(perLayer: number): number[] {
+  if (perLayer <= 4) {
+    // 4個以下なら全部が角
+    return Array.from({ length: perLayer }, (_, i) => i);
+  }
+  if (perLayer === 6) {
+    // 3×2: 四隅 = [0, 2, 3, 5] (左上, 右上, 左下, 右下)
+    return [0, 2, 3, 5];
+  }
+  if (perLayer === 7) {
+    // 35パターン: 横3+縦4 → 四隅 = [0, 2, 3, 6] (横の上下 + 縦の左上右下)
+    return [0, 2, 3, 6];
+  }
+  // 汎用: 先頭と末尾
+  return [0, perLayer - 1];
+}
+
 /** 30/35パターン用のインターロッキングパレットブロック描画 */
 function InterlockingPalletBlock({
   ox, oy, filledBoxes, totalBoxes, qtyPerPallet, colors, label,
@@ -264,20 +345,30 @@ function InterlockingPalletBlock({
     />
   );
 
+  // 端数パレット: 上段から詰め、空き位置は四隅を残して中間を間引く
+  // filledMap[layer][box] = true/false
+  const filledMap = buildFilledMap(numLayers, perLayer, filledBoxes, totalBoxes);
+
+  // 実際に箱がある段数を計算（端数時は空の上段を描画しない）
+  let topFilledLayer = 0;
+  for (let l = 0; l < numLayers; l++) {
+    if (filledMap[l].some(Boolean)) topFilledLayer = l;
+  }
+  const displayLayers = topFilledLayer + 1;
+  // 表示する段数に応じてパレット台を上に調整
+  const yOffset = (numLayers - displayLayers) * (layerH + gap);
+
   // 下の段から上に描画
-  for (let l = numLayers - 1; l >= 0; l--) {
+  for (let l = displayLayers - 1; l >= 0; l--) {
     const layer = layoutLayers[l];
-    const layerBaseY = palletTopY - (numLayers - l) * (layerH + gap);
+    const layerBaseY = palletTopY - yOffset - (displayLayers - l) * (layerH + gap);
 
     for (let b = 0; b < layer.length; b++) {
-      const globalIdx = l * perLayer + b;
-      if (globalIdx >= totalBoxes) continue;
-
       const box = layer[b];
       const bx = ox + box.rx * palletFrontW;
       const bw = box.rw * palletFrontW - 1;
       const bd = box.rd * palletDepth;
-      const isFilled = globalIdx < filledBoxes;
+      const isFilled = filledMap[l][b];
 
       elements.push(
         <IsoBox
@@ -321,21 +412,28 @@ function GenericPalletBlock({
   const palletFrontW = perLayer * (boxW + gapX) + 2;
 
   const elements: JSX.Element[] = [];
-  let boxIdx = 0;
+
+  const filledMap = buildFilledMap(layers, perLayer, filledBoxes, totalBoxes);
+
+  let topFilledLayer = 0;
+  for (let l = 0; l < layers; l++) {
+    if (filledMap[l].some(Boolean)) topFilledLayer = l;
+  }
+  const displayLayers = topFilledLayer + 1;
+  const yOffset = (layers - displayLayers) * (boxH + gapLayer);
 
   elements.push(
     <IsoPallet
       key={`${label}-pallet`}
-      x={ox - 1} y={palletTopY}
+      x={ox - 1} y={palletTopY - yOffset}
       pw={palletFrontW + 2} ph={palletThick} pd={depth}
     />
   );
 
-  for (let l = layers - 1; l >= 0; l--) {
-    const layerBaseY = palletTopY - (layers - l) * (boxH + gapLayer);
+  for (let l = displayLayers - 1; l >= 0; l--) {
+    const layerBaseY = palletTopY - yOffset - (displayLayers - l) * (boxH + gapLayer);
     for (let c = 0; c < perLayer; c++) {
-      if (boxIdx >= totalBoxes) break;
-      const isFilled = boxIdx < filledBoxes;
+      const isFilled = filledMap[l][c];
       elements.push(
         <IsoBox
           key={`${label}-${l}-${c}`}
@@ -349,7 +447,6 @@ function GenericPalletBlock({
           opacity={isFilled ? 0.92 : 0.15}
         />
       );
-      boxIdx++;
     }
   }
 
