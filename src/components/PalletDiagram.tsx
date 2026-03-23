@@ -11,111 +11,87 @@ interface PalletDiagramProps {
 }
 
 /**
- * パレットあたりのケース数から段数と1段あたりの個数を推定
- * 35個: 5段×7個 (写真参考パターン)
- * 30個: 5段×6個 or 6段×5個
+ * 30個パターンのレイアウト情報
+ * 1段 = 横向き3個 + 縦向き3個 = 6個
+ * 5段積みで合計30個
+ * 各段で横/縦が交互に入れ替わるインターロッキング
  */
-function estimateLayout(q: number): { perLayer: number; layers: number; pattern: number[][] } {
-  if (q <= 0) return { perLayer: 1, layers: 1, pattern: [[1]] };
+interface LayerBox {
+  /** パレット上のX位置（0-1の比率） */
+  rx: number;
+  /** パレット上のY位置（0-1の比率） */
+  ry: number;
+  /** 幅（0-1の比率） */
+  rw: number;
+  /** 奥行き（0-1の比率） */
+  rd: number;
+}
 
-  // 35個パターン: 5段、各段7個 (交互配置)
-  if (q === 35) {
-    return {
-      perLayer: 7,
-      layers: 5,
-      pattern: [
-        // 各段の配置パターン (0=横向き, 1=縦向き)
-        // 奇数段: 3横+4縦の交互パターン
-        [0, 0, 0, 1, 1, 1, 1],
-        [1, 1, 1, 1, 0, 0, 0],
-        [0, 0, 0, 1, 1, 1, 1],
-        [1, 1, 1, 1, 0, 0, 0],
-        [0, 0, 0, 1, 1, 1, 1],
-      ],
-    };
+/** 30個パターン: 1段6個×5段 */
+function get30Layout(): LayerBox[][] {
+  const layers: LayerBox[][] = [];
+  for (let l = 0; l < 5; l++) {
+    const boxes: LayerBox[] = [];
+    if (l % 2 === 0) {
+      // 偶数段: 上に横向き3個、下に縦向き3個
+      // 横向き3個（幅が広く、奥行きが浅い）
+      for (let i = 0; i < 3; i++) {
+        boxes.push({ rx: i * 0.333, ry: 0, rw: 0.333, rd: 0.45 });
+      }
+      // 縦向き3個（幅が狭く、奥行きが深い）
+      for (let i = 0; i < 3; i++) {
+        boxes.push({ rx: i * 0.333, ry: 0.45, rw: 0.333, rd: 0.55 });
+      }
+    } else {
+      // 奇数段: 上に縦向き3個、下に横向き3個（交互）
+      for (let i = 0; i < 3; i++) {
+        boxes.push({ rx: i * 0.333, ry: 0, rw: 0.333, rd: 0.55 });
+      }
+      for (let i = 0; i < 3; i++) {
+        boxes.push({ rx: i * 0.333, ry: 0.55, rw: 0.333, rd: 0.45 });
+      }
+    }
+    layers.push(boxes);
   }
+  return layers;
+}
 
-  // 30個パターン: 5段×6個
-  if (q === 30) {
-    return {
-      perLayer: 6,
-      layers: 5,
-      pattern: [
-        [0, 0, 0, 1, 1, 1],
-        [1, 1, 1, 0, 0, 0],
-        [0, 0, 0, 1, 1, 1],
-        [1, 1, 1, 0, 0, 0],
-        [0, 0, 0, 1, 1, 1],
-      ],
-    };
+/** 35個パターン: 1段7個×5段 */
+function get35Layout(): LayerBox[][] {
+  const layers: LayerBox[][] = [];
+  for (let l = 0; l < 5; l++) {
+    const boxes: LayerBox[] = [];
+    if (l % 2 === 0) {
+      // 上段: 横向き3個
+      for (let i = 0; i < 3; i++) {
+        boxes.push({ rx: i * 0.333, ry: 0, rw: 0.333, rd: 0.4 });
+      }
+      // 下段: 縦向き4個
+      for (let i = 0; i < 4; i++) {
+        boxes.push({ rx: i * 0.25, ry: 0.4, rw: 0.25, rd: 0.6 });
+      }
+    } else {
+      for (let i = 0; i < 4; i++) {
+        boxes.push({ rx: i * 0.25, ry: 0, rw: 0.25, rd: 0.6 });
+      }
+      for (let i = 0; i < 3; i++) {
+        boxes.push({ rx: i * 0.333, ry: 0.6, rw: 0.333, rd: 0.4 });
+      }
+    }
+    layers.push(boxes);
   }
+  return layers;
+}
 
-  // 25個パターン: 5段×5個
-  if (q === 25) {
-    return {
-      perLayer: 5,
-      layers: 5,
-      pattern: Array.from({ length: 5 }, (_, i) =>
-        i % 2 === 0 ? [0, 0, 1, 1, 1] : [1, 1, 1, 0, 0]
-      ),
-    };
-  }
-
-  // その他: 段数と1段個数を推定
+/** 汎用グリッドパターン */
+function getGenericLayout(q: number): { layers: number; perLayer: number } {
   let layers = 5;
   let perLayer = Math.ceil(q / layers);
   if (perLayer > 8) {
     layers = Math.ceil(q / 7);
     perLayer = Math.ceil(q / layers);
   }
-
-  const pattern = Array.from({ length: layers }, (_, i) =>
-    Array.from({ length: perLayer }, (_, j) =>
-      (i + j) % 2 === 0 ? 0 : 1
-    )
-  );
-
-  return { perLayer, layers, pattern };
-}
-
-/** 3Dアイソメトリック箱を描画 */
-function Box3D({
-  x, y, w, h, d, filled, colors, opacity = 1,
-}: {
-  x: number; y: number; w: number; h: number; d: number;
-  filled: boolean; colors: { bg: string; accent: string; text: string };
-  opacity?: number;
-}) {
-  if (!filled) {
-    // 空の位置はゴースト表示
-    return (
-      <g opacity={0.15}>
-        <rect x={x} y={y} width={w} height={h} rx={1}
-          fill="none" stroke={colors.accent} strokeWidth={0.5} strokeDasharray="2,2" />
-      </g>
-    );
-  }
-
-  // アイソメトリック3D箱
-  const topColor = colors.accent;
-  const frontColor = adjustBrightness(colors.accent, -20);
-  const sideColor = adjustBrightness(colors.accent, -40);
-
-  return (
-    <g opacity={opacity}>
-      {/* 前面 */}
-      <rect x={x} y={y} width={w} height={h} rx={0.5}
-        fill={frontColor} stroke={adjustBrightness(frontColor, -15)} strokeWidth={0.3} />
-      {/* 上面（平行四辺形） */}
-      <polygon
-        points={`${x},${y} ${x + d * 0.6},${y - d * 0.4} ${x + w + d * 0.6},${y - d * 0.4} ${x + w},${y}`}
-        fill={topColor} stroke={adjustBrightness(topColor, -10)} strokeWidth={0.3} />
-      {/* 右側面（平行四辺形） */}
-      <polygon
-        points={`${x + w},${y} ${x + w + d * 0.6},${y - d * 0.4} ${x + w + d * 0.6},${y + h - d * 0.4} ${x + w},${y + h}`}
-        fill={sideColor} stroke={adjustBrightness(sideColor, -10)} strokeWidth={0.3} />
-    </g>
-  );
+  return { layers, perLayer };
 }
 
 function adjustBrightness(hex: string, amount: number): string {
@@ -126,101 +102,279 @@ function adjustBrightness(hex: string, amount: number): string {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
 }
 
-function PalletBlock({
-  x, y, filledBoxes, totalBoxes, qtyPerPallet, colors, label,
+/** アイソメトリック3D箱を描画 */
+function IsoBox({
+  cx, cy, bw, bd, bh, filled, colors, opacity = 1,
 }: {
-  x: number; y: number; filledBoxes: number; totalBoxes: number;
-  qtyPerPallet: number; colors: { bg: string; accent: string; text: string };
+  /** 前面左下のX */
+  cx: number;
+  /** 前面左下のY */
+  cy: number;
+  /** 前面の幅 */
+  bw: number;
+  /** 奥行き（上面のY方向） */
+  bd: number;
+  /** 高さ（前面の高さ） */
+  bh: number;
+  filled: boolean;
+  colors: { accent: string };
+  opacity?: number;
+}) {
+  if (!filled) {
+    return (
+      <g opacity={0.12}>
+        <rect x={cx} y={cy - bh} width={bw} height={bh} rx={0.5}
+          fill="none" stroke={colors.accent} strokeWidth={0.4} strokeDasharray="1.5,1.5" />
+      </g>
+    );
+  }
+
+  const isoX = bd * 0.55;
+  const isoY = bd * 0.35;
+
+  const topColor = colors.accent;
+  const frontColor = adjustBrightness(colors.accent, -25);
+  const sideColor = adjustBrightness(colors.accent, -50);
+
+  const topY = cy - bh;
+
+  return (
+    <g opacity={opacity}>
+      {/* 前面 */}
+      <rect x={cx} y={topY} width={bw} height={bh} rx={0.4}
+        fill={frontColor} stroke={adjustBrightness(frontColor, -15)} strokeWidth={0.25} />
+      {/* 上面 */}
+      <polygon
+        points={`${cx},${topY} ${cx + isoX},${topY - isoY} ${cx + bw + isoX},${topY - isoY} ${cx + bw},${topY}`}
+        fill={topColor} stroke={adjustBrightness(topColor, -10)} strokeWidth={0.25} />
+      {/* 右側面 */}
+      <polygon
+        points={`${cx + bw},${topY} ${cx + bw + isoX},${topY - isoY} ${cx + bw + isoX},${topY + bh - isoY} ${cx + bw},${topY + bh}`}
+        fill={sideColor} stroke={adjustBrightness(sideColor, -10)} strokeWidth={0.25} />
+    </g>
+  );
+}
+
+/** パレット台の3D描画 */
+function IsoPallet({
+  x, y, pw, ph, pd,
+}: {
+  x: number; y: number; pw: number; ph: number; pd: number;
+}) {
+  const isoX = pd * 0.55;
+  const isoY = pd * 0.35;
+
+  return (
+    <g>
+      {/* 前面 */}
+      <rect x={x} y={y} width={pw} height={ph} rx={1}
+        fill="#8D6E63" stroke="#6D4C41" strokeWidth={0.4} />
+      {/* 上面 */}
+      <polygon
+        points={`${x},${y} ${x + isoX},${y - isoY} ${x + pw + isoX},${y - isoY} ${x + pw},${y}`}
+        fill="#A1887F" stroke="#8D6E63" strokeWidth={0.3} />
+      {/* 右側面 */}
+      <polygon
+        points={`${x + pw},${y} ${x + pw + isoX},${y - isoY} ${x + pw + isoX},${y + ph - isoY} ${x + pw},${y + ph}`}
+        fill="#795548" stroke="#6D4C41" strokeWidth={0.3} />
+      {/* スリット */}
+      {[0.25, 0.5, 0.75].map((pct, i) => (
+        <line key={`slit-${i}`}
+          x1={x + pw * pct} y1={y + 1}
+          x2={x + pw * pct} y2={y + ph - 1}
+          stroke="#6D4C41" strokeWidth={0.4} />
+      ))}
+    </g>
+  );
+}
+
+/** 30/35パターン用のインターロッキングパレットブロック描画 */
+function InterlockingPalletBlock({
+  ox, oy, filledBoxes, totalBoxes, qtyPerPallet, colors, label,
+}: {
+  ox: number; oy: number;
+  filledBoxes: number; totalBoxes: number; qtyPerPallet: number;
+  colors: { accent: string };
   label: string;
 }) {
-  const { perLayer, layers } = estimateLayout(qtyPerPallet);
-  const boxW = 12;
-  const boxH = 7;
-  const depth = 6;
-  const gapX = 1.5;
-  const gapY = 1;
+  const is30 = qtyPerPallet === 30;
+  const is35 = qtyPerPallet === 35;
 
-  let boxIdx = 0;
-  const boxes = [];
+  if (!is30 && !is35) {
+    // 汎用グリッド描画
+    return (
+      <GenericPalletBlock
+        ox={ox} oy={oy}
+        filledBoxes={filledBoxes} totalBoxes={totalBoxes}
+        qtyPerPallet={qtyPerPallet} colors={colors} label={label}
+      />
+    );
+  }
 
-  // 下の段から上に描画（奥から手前へ）
-  for (let layer = layers - 1; layer >= 0; layer--) {
-    for (let col = 0; col < perLayer; col++) {
-      if (boxIdx >= totalBoxes) break;
-      const bx = x + col * (boxW + gapX);
-      const by = y + layer * (boxH + gapY);
-      const isFilled = boxIdx < filledBoxes;
+  const layoutLayers = is30 ? get30Layout() : get35Layout();
+  const numLayers = layoutLayers.length;
+  const perLayer = is30 ? 6 : 7;
 
-      boxes.push(
-        <Box3D
-          key={`${label}-${boxIdx}`}
-          x={bx}
-          y={by}
-          w={boxW}
-          h={boxH}
-          d={depth}
+  // パレット全体のサイズ
+  const palletFrontW = 82;
+  const palletDepth = 14;
+  const layerH = 9;
+  const gap = 0.5;
+  const palletThick = 5;
+
+  const totalStackH = numLayers * (layerH + gap);
+  const isoDepth = palletDepth * 0.35;
+
+  // パレット台のY位置
+  const palletTopY = oy + totalStackH + isoDepth + 2;
+
+  const elements: JSX.Element[] = [];
+
+  // パレット台
+  elements.push(
+    <IsoPallet
+      key={`${label}-pallet`}
+      x={ox - 2} y={palletTopY}
+      pw={palletFrontW + 4} ph={palletThick} pd={palletDepth}
+    />
+  );
+
+  // 下の段から上に描画
+  for (let l = numLayers - 1; l >= 0; l--) {
+    const layer = layoutLayers[l];
+    const layerBaseY = palletTopY - (numLayers - l) * (layerH + gap);
+
+    for (let b = 0; b < layer.length; b++) {
+      const globalIdx = l * perLayer + b;
+      if (globalIdx >= totalBoxes) continue;
+
+      const box = layer[b];
+      const bx = ox + box.rx * palletFrontW;
+      const bw = box.rw * palletFrontW - 1;
+      const bd = box.rd * palletDepth;
+      const isFilled = globalIdx < filledBoxes;
+
+      elements.push(
+        <IsoBox
+          key={`${label}-${l}-${b}`}
+          cx={bx}
+          cy={layerBaseY + layerH}
+          bw={bw}
+          bd={bd}
+          bh={layerH}
           filled={isFilled}
           colors={colors}
-          opacity={isFilled ? 0.95 : 0.2}
+          opacity={isFilled ? 0.92 : 0.15}
+        />
+      );
+    }
+  }
+
+  return <g>{elements}</g>;
+}
+
+/** 汎用グリッドパレットブロック */
+function GenericPalletBlock({
+  ox, oy, filledBoxes, totalBoxes, qtyPerPallet, colors, label,
+}: {
+  ox: number; oy: number;
+  filledBoxes: number; totalBoxes: number; qtyPerPallet: number;
+  colors: { accent: string };
+  label: string;
+}) {
+  const { layers, perLayer } = getGenericLayout(qtyPerPallet);
+  const boxW = 12;
+  const boxH = 8;
+  const depth = 8;
+  const gapX = 1;
+  const gapLayer = 0.5;
+  const palletThick = 5;
+
+  const totalStackH = layers * (boxH + gapLayer);
+  const isoDepth = depth * 0.35;
+  const palletTopY = oy + totalStackH + isoDepth + 2;
+  const palletFrontW = perLayer * (boxW + gapX) + 2;
+
+  const elements: JSX.Element[] = [];
+  let boxIdx = 0;
+
+  elements.push(
+    <IsoPallet
+      key={`${label}-pallet`}
+      x={ox - 1} y={palletTopY}
+      pw={palletFrontW + 2} ph={palletThick} pd={depth}
+    />
+  );
+
+  for (let l = layers - 1; l >= 0; l--) {
+    const layerBaseY = palletTopY - (layers - l) * (boxH + gapLayer);
+    for (let c = 0; c < perLayer; c++) {
+      if (boxIdx >= totalBoxes) break;
+      const isFilled = boxIdx < filledBoxes;
+      elements.push(
+        <IsoBox
+          key={`${label}-${l}-${c}`}
+          cx={ox + c * (boxW + gapX)}
+          cy={layerBaseY + boxH}
+          bw={boxW}
+          bd={depth}
+          bh={boxH}
+          filled={isFilled}
+          colors={colors}
+          opacity={isFilled ? 0.92 : 0.15}
         />
       );
       boxIdx++;
     }
   }
 
-  // パレット台（3D）
-  const palletY = y + layers * (boxH + gapY);
-  const palletW = perLayer * (boxW + gapX) + 4;
-  const palletH = 5;
+  return <g>{elements}</g>;
+}
 
-  return (
-    <g>
-      {/* パレット台 - 前面 */}
-      <rect x={x - 2} y={palletY} width={palletW} height={palletH} rx={1}
-        fill="#8D6E63" stroke="#6D4C41" strokeWidth={0.5} />
-      {/* パレット台 - 上面 */}
-      <polygon
-        points={`${x - 2},${palletY} ${x - 2 + depth * 0.6},${palletY - depth * 0.4} ${x + palletW + depth * 0.6 - 2},${palletY - depth * 0.4} ${x + palletW - 2},${palletY}`}
-        fill="#A1887F" stroke="#8D6E63" strokeWidth={0.3} />
-      {/* パレット台 - 右側面 */}
-      <polygon
-        points={`${x + palletW - 2},${palletY} ${x + palletW + depth * 0.6 - 2},${palletY - depth * 0.4} ${x + palletW + depth * 0.6 - 2},${palletY + palletH - depth * 0.4} ${x + palletW - 2},${palletY + palletH}`}
-        fill="#795548" stroke="#6D4C41" strokeWidth={0.3} />
-      {/* パレット台スリット */}
-      {[0.2, 0.5, 0.8].map((pct, i) => (
-        <line key={`slit-${label}-${i}`}
-          x1={x - 2 + palletW * pct} y1={palletY + 1}
-          x2={x - 2 + palletW * pct} y2={palletY + palletH - 1}
-          stroke="#6D4C41" strokeWidth={0.5} />
-      ))}
-      {/* 箱 */}
-      {boxes}
-    </g>
-  );
+/** パレットブロックのサイズを計算 */
+function calcBlockSize(qtyPerPallet: number): { w: number; h: number } {
+  if (qtyPerPallet === 30 || qtyPerPallet === 35) {
+    const palletFrontW = 82;
+    const palletDepth = 14;
+    const numLayers = 5;
+    const layerH = 9;
+    const gap = 0.5;
+    const palletThick = 5;
+    const isoX = palletDepth * 0.55;
+    const isoY = palletDepth * 0.35;
+    return {
+      w: palletFrontW + isoX + 8,
+      h: numLayers * (layerH + gap) + isoY + palletThick + 8,
+    };
+  }
+  const { layers, perLayer } = getGenericLayout(qtyPerPallet);
+  const boxW = 12;
+  const boxH = 8;
+  const depth = 8;
+  const gapX = 1;
+  const gapLayer = 0.5;
+  const palletThick = 5;
+  const isoX = depth * 0.55;
+  const isoY = depth * 0.35;
+  return {
+    w: perLayer * (boxW + gapX) + isoX + 6,
+    h: layers * (boxH + gapLayer) + isoY + palletThick + 8,
+  };
 }
 
 export default function PalletDiagram({
   palletCount, fraction, qtyPerPallet, type,
 }: PalletDiagramProps) {
   const colors = COLOR_MAP[type] || COLOR_MAP['その他'];
-  const { perLayer, layers } = estimateLayout(qtyPerPallet);
-
-  const boxW = 12;
-  const boxH = 7;
-  const depth = 6;
-  const gapX = 1.5;
-  const gapY = 1;
-
-  const blockW = perLayer * (boxW + gapX) + depth * 0.6 + 4;
-  const blockH = layers * (boxH + gapY) + depth * 0.4 + 12;
+  const blockSize = calcBlockSize(qtyPerPallet);
 
   const showFraction = fraction > 0;
   const totalBlocks = palletCount + (showFraction ? 1 : 0);
-  const displayBlocks = Math.min(totalBlocks, 3);
-  const blockGap = 10;
+  const displayBlocks = Math.min(totalBlocks, 2);
+  const blockGap = 8;
 
-  const svgW = Math.max(displayBlocks * (blockW + blockGap) - blockGap + 8, 100);
-  const svgH = blockH + 20;
+  const svgW = Math.max(displayBlocks * (blockSize.w + blockGap) - blockGap + 4, 80);
+  const svgH = blockSize.h + 16;
 
   return (
     <div className="pallet-diagram-container">
@@ -229,22 +383,15 @@ export default function PalletDiagram({
         height="100%"
         viewBox={`0 0 ${svgW} ${svgH}`}
         preserveAspectRatio="xMidYMid meet"
-        style={{ maxHeight: '180px' }}
+        style={{ maxHeight: '200px' }}
       >
-        <defs>
-          <linearGradient id={`grad-${type}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={colors.accent} stopOpacity={0.1} />
-            <stop offset="100%" stopColor={colors.accent} stopOpacity={0.03} />
-          </linearGradient>
-        </defs>
-
         {/* 満載パレット */}
-        {Array.from({ length: Math.min(palletCount, showFraction ? 2 : 3) }).map(
+        {Array.from({ length: Math.min(palletCount, showFraction ? 1 : 2) }).map(
           (_, i) => (
-            <PalletBlock
+            <InterlockingPalletBlock
               key={`full-${i}`}
-              x={4 + i * (blockW + blockGap)}
-              y={4}
+              ox={4 + i * (blockSize.w + blockGap)}
+              oy={4}
               filledBoxes={qtyPerPallet}
               totalBoxes={qtyPerPallet}
               qtyPerPallet={qtyPerPallet}
@@ -256,9 +403,9 @@ export default function PalletDiagram({
 
         {/* 端数パレット */}
         {showFraction && (
-          <PalletBlock
-            x={4 + Math.min(palletCount, 2) * (blockW + blockGap)}
-            y={4}
+          <InterlockingPalletBlock
+            ox={4 + Math.min(palletCount, 1) * (blockSize.w + blockGap)}
+            oy={4}
             filledBoxes={fraction}
             totalBoxes={qtyPerPallet}
             qtyPerPallet={qtyPerPallet}
@@ -279,9 +426,9 @@ export default function PalletDiagram({
             + 端数 {fraction}ケース
           </span>
         )}
-        {totalBlocks > 3 && (
+        {totalBlocks > 2 && (
           <span className="pallet-more">
-            (他{totalBlocks - 3}パレット)
+            (他{totalBlocks - 2}パレット)
           </span>
         )}
       </div>
