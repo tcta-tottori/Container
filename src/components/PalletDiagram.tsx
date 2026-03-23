@@ -21,7 +21,7 @@ function p(...c: [number, number][]): string {
   return c.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
 }
 
-/* ===== 段ボール箱 ===== */
+/* ===== 段ボール箱（3面を明確に描画） ===== */
 function Box({ x, y, z, w, d, h, ghost, accent }: {
   x: number; y: number; z: number;
   w: number; d: number; h: number;
@@ -31,22 +31,31 @@ function Box({ x, y, z, w, d, h, ghost, accent }: {
     const q = [iso(x, y, z), iso(x + w, y, z), iso(x + w, y + d, z), iso(x, y + d, z)] as [number, number][];
     return <polygon points={p(...q)} fill="none" stroke={accent} strokeWidth={0.15} strokeDasharray="1,1" opacity={0.15} />;
   }
-  // 段ボール色
-  const top = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
+
+  // 3面をすべて描画（front=左手前面, right=右手前面, top=上面）
   const front = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y, z), iso(x, y, z)] as [number, number][];
   const right = [iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x + w, y + d, z), iso(x + w, y, z)] as [number, number][];
+  const top   = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
+
   // テープ（上面の中央帯）
-  const t1 = iso(x + w * 0.4, y, z + h);
-  const t2 = iso(x + w * 0.6, y, z + h);
-  const t3 = iso(x + w * 0.4, y + d, z + h);
-  const t4 = iso(x + w * 0.6, y + d, z + h);
+  const tw = w * 0.15;
+  const tx = x + (w - tw) / 2;
+  const tape = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y + d, z + h), iso(tx, y + d, z + h)] as [number, number][];
+
+  // テープの正面部分
+  const tapeFront = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y, z + h - h * 0.15), iso(tx, y, z + h - h * 0.15)] as [number, number][];
 
   return (
     <g>
-      <polygon points={p(...front)} fill="#d4a54a" stroke="#a87830" strokeWidth={0.3} />
-      <polygon points={p(...right)} fill="#be8e38" stroke="#a87830" strokeWidth={0.3} />
-      <polygon points={p(...top)} fill="#e8c870" stroke="#a87830" strokeWidth={0.3} />
-      <polygon points={p(t1, t2, t4, t3)} fill="rgba(255,255,255,0.3)" />
+      {/* front face (左手前) - 明るめ */}
+      <polygon points={p(...front)} fill="#dba84e" stroke="#96692a" strokeWidth={0.5} strokeLinejoin="round" />
+      {/* right face (右手前) - 少し暗め */}
+      <polygon points={p(...right)} fill="#c4923a" stroke="#96692a" strokeWidth={0.5} strokeLinejoin="round" />
+      {/* top face (上面) - 最も明るい */}
+      <polygon points={p(...top)} fill="#efd07a" stroke="#96692a" strokeWidth={0.5} strokeLinejoin="round" />
+      {/* テープ */}
+      <polygon points={p(...tape)} fill="rgba(255,255,255,0.35)" stroke="none" />
+      <polygon points={p(...tapeFront)} fill="rgba(255,255,255,0.25)" stroke="none" />
     </g>
   );
 }
@@ -55,41 +64,45 @@ function Box({ x, y, z, w, d, h, ghost, accent }: {
 function Pallet({ x, y, z, w, d, h }: {
   x: number; y: number; z: number; w: number; d: number; h: number;
 }) {
-  const sk = '#3e4848';
-  const top = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
+  const sk = '#2d3636';
+  const top   = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
   const front = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y, z), iso(x, y, z)] as [number, number][];
   const right = [iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x + w, y + d, z), iso(x + w, y, z)] as [number, number][];
-  const hw = w * 0.22, hh = h * 0.55, hz = z + h * 0.12;
-  const fH = [0.12, 0.52].map((pct, i) => {
+
+  // フォークリフト穴（正面2つ）
+  const hw = w * 0.2, hh = h * 0.5, hz = z + h * 0.15;
+  const forkHolesFront = [0.15, 0.55].map((pct, i) => {
     const hx = x + w * pct;
     const q = [iso(hx, y, hz + hh), iso(hx + hw, y, hz + hh), iso(hx + hw, y, hz), iso(hx, y, hz)] as [number, number][];
-    return <polygon key={`f${i}`} points={p(...q)} fill="#2e3838" stroke={sk} strokeWidth={0.25} />;
+    return <polygon key={`f${i}`} points={p(...q)} fill="#222c2c" stroke={sk} strokeWidth={0.3} />;
   });
-  const sH = [0.12, 0.52].map((pct, i) => {
+  // フォークリフト穴（側面2つ）
+  const forkHolesSide = [0.15, 0.55].map((pct, i) => {
     const hy = y + d * pct;
-    const hd = d * 0.22;
+    const hd = d * 0.2;
     const q = [iso(x + w, hy, hz + hh), iso(x + w, hy + hd, hz + hh), iso(x + w, hy + hd, hz), iso(x + w, hy, hz)] as [number, number][];
-    return <polygon key={`s${i}`} points={p(...q)} fill="#2e3838" stroke={sk} strokeWidth={0.25} />;
+    return <polygon key={`s${i}`} points={p(...q)} fill="#222c2c" stroke={sk} strokeWidth={0.3} />;
   });
+
   return (
     <g>
-      <polygon points={p(...front)} fill="#6a7272" stroke={sk} strokeWidth={0.5} />
-      <polygon points={p(...right)} fill="#555e5e" stroke={sk} strokeWidth={0.5} />
-      <polygon points={p(...top)} fill="#8a9090" stroke={sk} strokeWidth={0.5} />
-      {fH}{sH}
+      <polygon points={p(...front)} fill="#687070" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
+      <polygon points={p(...right)} fill="#525c5c" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
+      <polygon points={p(...top)} fill="#8a9494" stroke={sk} strokeWidth={0.6} strokeLinejoin="round" />
+      {forkHolesFront}{forkHolesSide}
     </g>
   );
 }
 
-/* ===== 1パレットスタック: 3列 x 2行 x 5段 = 30ケース ===== */
+/* ===== 1パレットスタック: 2列 x 3行 x 2段 = 12ケース ===== */
 function Stack({ ox, oy, filled, accent }: {
   ox: number; oy: number; filled: number; accent: string;
 }) {
-  const PW = 24, PD = 16, PH = 2.5;
-  const cols = 3, rows = 2, layers = 5;
+  const PW = 22, PD = 22, PH = 3;
+  const cols = 2, rows = 3, layers = 2;
   const perLayer = cols * rows; // 6
-  const bw = PW / cols, bd = PD / rows, bh = 4.5;
-  const g = 0.3;
+  const bw = PW / cols, bd = PD / rows, bh = 7;
+  const g = 0.4; // gap between boxes
 
   let topL = 0;
   for (let l = 0; l < layers; l++) {
@@ -100,6 +113,7 @@ function Stack({ ox, oy, filled, accent }: {
   const elems: JSX.Element[] = [];
   elems.push(<Pallet key="pl" x={0} y={0} z={0} w={PW} d={PD} h={PH} />);
 
+  // 描画順序: 下の段→上の段, 奥→手前, 左→右（奥行きソート）
   for (let l = 0; l < dL; l++) {
     const z = PH + l * bh;
     for (let r = rows - 1; r >= 0; r--) {
@@ -125,16 +139,15 @@ export default function PalletDiagram({
   const hasFrac = fraction > 0;
   const showTwo = palletCount >= 2 || (palletCount >= 1 && hasFrac);
 
-  // 30ケース→30スロット(実寸), それ以外はリマップ
-  const slots = 30;
-  const map = (n: number) => qtyPerPallet > 0 ? Math.round((n / qtyPerPallet) * slots) : n;
+  const slots = 12;
+  const map = (n: number) => qtyPerPallet > 0 ? Math.round((n / qtyPerPallet) * slots) : Math.min(n, slots);
 
-  // 投影範囲の計算 (PW=24, PD=16)
-  const PW = 24, PD = 16, PH = 2.5, totalZ = PH + 5 * 4.5;
-  const xL = -PD * CS;           // 左端
-  const xR = PW * CS;            // 右端
-  const yB = (PW + PD) * SN;     // 下端
-  const yT = -totalZ;            // 上端
+  // 投影範囲の計算
+  const PW = 22, PD = 22, PH = 3, totalZ = PH + 2 * 7;
+  const xL = -PD * CS;
+  const xR = PW * CS;
+  const yB = (PW + PD) * SN;
+  const yT = -totalZ;
   const oneW = xR - xL;
   const oneH = yB - yT;
   const sp = oneW * 0.12;
