@@ -29,7 +29,8 @@ export type Action =
   | { type: 'INCREASE_QTY' }
   | { type: 'DECREASE_QTY' }
   | { type: 'DELETE_CURRENT' }
-  | { type: 'TOGGLE_AUTO_ANNOUNCE' };
+  | { type: 'TOGGLE_AUTO_ANNOUNCE' }
+  | { type: 'UPDATE_ITEM'; idx: number; updates: Partial<ContainerItem> };
 
 const initialState: ContainerState = {
   containers: [],
@@ -194,6 +195,14 @@ function reducer(state: ContainerState, action: Action): ContainerState {
     case 'TOGGLE_AUTO_ANNOUNCE':
       return { ...state, autoAnnounce: !state.autoAnnounce };
 
+    case 'UPDATE_ITEM': {
+      const { idx, updates } = action;
+      if (idx < 0 || idx >= state.items.length) return state;
+      const newItems = [...state.items];
+      newItems[idx] = { ...newItems[idx], ...updates };
+      return { ...state, items: newItems };
+    }
+
     default:
       return state;
   }
@@ -249,6 +258,11 @@ export function useContainerData() {
     () => dispatch({ type: 'TOGGLE_AUTO_ANNOUNCE' }),
     []
   );
+  const updateItem = useCallback(
+    (idx: number, updates: Partial<ContainerItem>) =>
+      dispatch({ type: 'UPDATE_ITEM', idx, updates }),
+    []
+  );
 
   return {
     state,
@@ -264,5 +278,6 @@ export function useContainerData() {
     decreaseQty,
     deleteCurrent,
     toggleAutoAnnounce,
+    updateItem,
   };
 }

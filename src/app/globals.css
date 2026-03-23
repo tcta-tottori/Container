@@ -52,6 +52,7 @@ body {
     display: flex;
     flex: 1;
     min-height: 0;
+    position: relative;
   }
   .layout-landscape .detail-panel {
     width: 60%;
@@ -62,8 +63,20 @@ body {
     height: 100%;
     border-left: 1px solid var(--border-subtle);
   }
-  .portrait-tabs {
-    display: none;
+  .nav-tabs {
+    display: flex;
+  }
+  .layout-landscape .edit-panel {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+  .layout-landscape .edit-panel.hidden-tab {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 
@@ -94,8 +107,20 @@ body {
     visibility: hidden;
     pointer-events: none;
   }
-  .portrait-tabs {
+  .nav-tabs {
     display: flex;
+  }
+  .layout-portrait .edit-panel {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+  .layout-portrait .edit-panel.hidden-tab {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
   }
   /* 縦画面では統計カードを2×2に */
   .stat-grid-portrait {
@@ -374,8 +399,8 @@ body {
   flex-shrink: 0;
 }
 
-/* Portrait tabs (detail/list switcher) */
-.portrait-tabs {
+/* Navigation tabs */
+.nav-tabs {
   align-items: center;
   justify-content: center;
   gap: 2px;
@@ -388,7 +413,7 @@ body {
 .tab-btn {
   flex: 1;
   padding: 6px 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   border-radius: 6px;
   border: none;
@@ -396,6 +421,10 @@ body {
   transition: all 0.15s ease;
   background: transparent;
   color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
 .tab-btn.active {
@@ -425,4 +454,369 @@ body {
   background: var(--text-primary);
   width: 14px;
   border-radius: 3px;
+}
+
+/* ===== Edit / Management Page ===== */
+.edit-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+/* Summary header */
+.edit-summary {
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.edit-summary-title {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.edit-summary-count {
+  font-family: 'Inter', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.edit-summary-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.edit-type-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.edit-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--chip-bg);
+  color: var(--chip-color);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-chip.active {
+  border-color: var(--chip-color);
+}
+
+.edit-chip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.edit-chip-count {
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+/* Search */
+.edit-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.edit-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.edit-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.edit-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+/* Table header */
+.edit-table-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.edit-th {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.edit-th-name { flex: 1; min-width: 0; }
+.edit-th-code { width: 60px; text-align: center; flex-shrink: 0; }
+.edit-th-type { width: 56px; text-align: center; flex-shrink: 0; }
+.edit-th-pallet { width: 36px; text-align: center; flex-shrink: 0; }
+.edit-th-qty { width: 32px; text-align: center; flex-shrink: 0; }
+.edit-th-frac { width: 32px; text-align: center; flex-shrink: 0; }
+
+/* Table row */
+.edit-list {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.edit-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s ease;
+  text-align: left;
+}
+
+.edit-row:active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.edit-td {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.edit-td-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.edit-row-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.edit-row-name-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 400;
+}
+
+.edit-td-code {
+  width: 60px;
+  text-align: center;
+  flex-shrink: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.5;
+}
+
+.edit-td-type {
+  width: 56px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.edit-type-mini {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.edit-td-pallet,
+.edit-td-qty,
+.edit-td-frac {
+  flex-shrink: 0;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.edit-td-pallet { width: 36px; }
+.edit-td-qty { width: 32px; }
+.edit-td-frac { width: 32px; }
+
+/* Expanded edit row */
+.edit-row-expanded {
+  padding: 12px 16px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-accent);
+}
+
+.edit-row-name-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.edit-color-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.edit-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.edit-field-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.edit-field-select,
+.edit-field-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 8px 10px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+  -webkit-appearance: none;
+}
+
+.edit-field-select:focus,
+.edit-field-input:focus {
+  border-color: var(--border-accent);
+}
+
+.edit-field-input {
+  font-family: 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.edit-row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-btn {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.12s ease;
+}
+
+.edit-btn:active {
+  transform: scale(0.97);
+}
+
+.edit-btn-detail {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.edit-btn-cancel {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.edit-btn-save {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+}
+
+.edit-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ===== Xiaomi 17 Ultra optimization (412×915 CSS px base) ===== */
+/* Optimized for ~412px width screens, scales proportionally for others */
+@media (max-width: 480px) {
+  .edit-summary { padding: 10px 14px; }
+  .edit-search { padding: 6px 14px; }
+  .edit-table-header { padding: 5px 14px; }
+  .edit-row { padding: 9px 14px; }
+  .edit-row-expanded { padding: 10px 14px; }
+  .edit-th-code { width: 52px; }
+  .edit-th-type { width: 48px; }
+  .edit-td-code { width: 52px; }
+  .edit-td-type { width: 48px; }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .edit-row-name-text { font-size: 14px; }
+}
+
+/* Landscape edit page */
+@media (orientation: landscape) {
+  .edit-fields {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }

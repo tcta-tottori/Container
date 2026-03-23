@@ -12,8 +12,11 @@ import FileDropZone from '@/components/FileDropZone';
 import HeaderBar from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import ItemListPanel from '@/components/ItemListPanel';
+import ItemEditPage from '@/components/ItemEditPage';
 import ActionBar from '@/components/ActionBar';
 import VoiceFeedback from '@/components/VoiceFeedback';
+
+type TabName = 'detail' | 'list' | 'edit';
 
 export default function Home() {
   const {
@@ -29,6 +32,7 @@ export default function Home() {
     decreaseQty,
     deleteCurrent,
     toggleAutoAnnounce,
+    updateItem,
   } = useContainerData();
 
   const elapsed = useTimer(state.itemStartTime);
@@ -37,11 +41,8 @@ export default function Home() {
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabName>('detail');
 
-  // 縦画面タブ: 'detail' | 'list'
-  const [activeTab, setActiveTab] = useState<'detail' | 'list'>('detail');
-
-  // 品目が変わったとき自動読上げ & 詳細タブに切り替え
   useEffect(() => {
     if (!currentItem || !state.autoAnnounce) return;
     if (prevItemRef.current !== currentItem.id) {
@@ -105,7 +106,6 @@ export default function Home() {
     }
   }, [currentItem, state.items.length, deleteCurrent, announceComplete, announceAllComplete, announceRemaining]);
 
-  // リストで品目選択時 → 詳細タブに切り替え
   const handleSelectItem = useCallback(
     (idx: number) => {
       selectItem(idx);
@@ -114,7 +114,15 @@ export default function Home() {
     [selectItem]
   );
 
-  // 音声コマンド処理
+  // 管理ページから品目詳細へ移動
+  const handleSelectAndGoDetail = useCallback(
+    (idx: number) => {
+      selectItem(idx);
+      setActiveTab('detail');
+    },
+    [selectItem]
+  );
+
   const handleVoiceCommand = useCallback(
     (action: VoiceAction) => {
       switch (action) {
@@ -166,12 +174,10 @@ export default function Home() {
   const { isListening, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
-  // データ未読込 → DropZone
   if (state.containers.length === 0) {
     return <FileDropZone onFileLoaded={handleFileLoaded} />;
   }
 
-  // 全品目完了
   if (state.items.length === 0) {
     return (
       <div className="flex items-center justify-center h-screen w-screen"
@@ -185,12 +191,8 @@ export default function Home() {
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           </div>
-          <p className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-            全品目完了
-          </p>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-            お疲れ様でした
-          </p>
+          <p className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>全品目完了</p>
+          <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>お疲れ様でした</p>
           <button
             onClick={() => {
               const input = document.createElement('input');
@@ -218,10 +220,8 @@ export default function Home() {
 
   return (
     <>
-      {/* 音声認識フィードバック */}
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
 
-      {/* メインレイアウト (横/縦 両対応) */}
       <div
         className="layout-landscape layout-portrait"
         style={{ background: 'var(--bg-primary)' }}
@@ -238,19 +238,41 @@ export default function Home() {
           onToggleAutoAnnounce={toggleAutoAnnounce}
         />
 
-        {/* 縦画面タブ切り替え */}
-        <div className="portrait-tabs">
+        {/* タブ切り替え（縦画面＋横画面の管理タブ） */}
+        <div className="nav-tabs">
           <button
             className={`tab-btn ${activeTab === 'detail' ? 'active' : ''}`}
             onClick={() => setActiveTab('detail')}
           >
-            詳細
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+            </svg>
+            <span>詳細</span>
           </button>
           <button
             className={`tab-btn ${activeTab === 'list' ? 'active' : ''}`}
             onClick={() => setActiveTab('list')}
           >
-            一覧 ({state.items.length})
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6"/>
+              <line x1="8" y1="12" x2="21" y2="12"/>
+              <line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/>
+              <line x1="3" y1="12" x2="3.01" y2="12"/>
+              <line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+            <span>一覧</span>
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'edit' ? 'active' : ''}`}
+            onClick={() => setActiveTab('edit')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            <span>管理</span>
           </button>
         </div>
 
@@ -279,21 +301,32 @@ export default function Home() {
               onSelect={handleSelectItem}
             />
           </div>
+
+          {/* 管理ページ */}
+          <div className={`edit-panel ${activeTab !== 'edit' ? 'hidden-tab' : ''}`}>
+            <ItemEditPage
+              items={state.items}
+              onUpdateItem={updateItem}
+              onSelectAndGoDetail={handleSelectAndGoDetail}
+            />
+          </div>
         </div>
 
-        {/* 操作バー */}
-        <ActionBar
-          onPrev={() => { movePrev(); setActiveTab('detail'); }}
-          onNext={() => { moveNext(); setActiveTab('detail'); }}
-          onIncrease={handleIncrease}
-          onDecrease={handleDecrease}
-          onAnnounce={handleAnnounce}
-          onComplete={handleComplete}
-          hasItems={state.items.length > 0}
-          isListening={isListening}
-          isVoiceSupported={isSupported}
-          onToggleVoice={toggleListening}
-        />
+        {/* 操作バー (詳細/一覧タブのみ表示) */}
+        {activeTab !== 'edit' && (
+          <ActionBar
+            onPrev={() => { movePrev(); setActiveTab('detail'); }}
+            onNext={() => { moveNext(); setActiveTab('detail'); }}
+            onIncrease={handleIncrease}
+            onDecrease={handleDecrease}
+            onAnnounce={handleAnnounce}
+            onComplete={handleComplete}
+            hasItems={state.items.length > 0}
+            isListening={isListening}
+            isVoiceSupported={isSupported}
+            onToggleVoice={toggleListening}
+          />
+        )}
       </div>
     </>
   );
