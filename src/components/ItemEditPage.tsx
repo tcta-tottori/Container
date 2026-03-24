@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { ContainerItem, ItemType } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
+import { saveToGitHub, getStoredToken, storeToken } from '@/lib/githubSave';
 import { detectItemType } from '@/lib/typeDetector';
 import * as XLSX from 'xlsx';
 
@@ -20,47 +21,7 @@ interface ItemEditPageProps {
 
 const ITEM_TYPES: ItemType[] = ['ポリカバー', '箱', '部品', 'その他'];
 
-/* ===== マスタ保存（CNS品目一覧_全集約版.xlsx をダウンロード上書き用） ===== */
-function saveMasterExcel(items: ContainerItem[]) {
-  const groupRow = [
-    'ベース情報', '', '', '', '', '', '', '', '',
-    '气高编号', '', '',
-    'コンテナ日程', '', '', '',
-    '', '', '', '', '',
-  ];
-  const headerRow = [
-    '新建高コード', '気高コード', '規格', '種類', '代表機種', '入数', '総数', 'ケース数', '1P数',
-    '新建高コード\n(气高编号)', '規格\n(气高编号)', '紐付状態',
-    '規格\n(コンテナ)', '代表機種\n(コンテナ)', '入数\n(コンテナ)', '1P数\n(コンテナ)',
-    'ITEM\nDESCRIPTION', 'MODEL NO.', 'G.W.\n(per carton)', 'CBM', 'Meas.',
-  ];
-  const dataRows = items.map((it) => [
-    it.newPartNumber || '', it.partNumber, it.itemName,
-    it.type || '', it.representModel,
-    it.packingQty || '', it.totalQty || '', it.caseCount || '', it.qtyPerPallet || '',
-    it.newPartNumberKetaka || '', it.itemNameKetaka || '', it.linkStatus || '',
-    it.itemNameContainer || '', it.representModelContainer || '',
-    it.packingQtyContainer || '', it.qtyPerPalletContainer || '',
-    it.description || '', it.modelNo || '',
-    it.grossWeight || '', it.cbm || '', it.measurements || '',
-  ]);
-  const ws = XLSX.utils.aoa_to_sheet([groupRow, headerRow, ...dataRows]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '品目一覧（全集約）');
-  ws['!cols'] = [
-    { wch: 14 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 22 },
-    { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 6 },
-    { wch: 14 }, { wch: 28 }, { wch: 8 },
-    { wch: 28 }, { wch: 22 }, { wch: 6 }, { wch: 6 },
-    { wch: 22 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 14 },
-  ];
-  ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
-    { s: { r: 0, c: 9 }, e: { r: 0, c: 11 } },
-    { s: { r: 0, c: 12 }, e: { r: 0, c: 15 } },
-  ];
-  XLSX.writeFile(wb, `CNS_品目一覧_全集約版.xlsx`);
-}
+/* saveMasterExcel は githubSave.ts に移動済み */
 
 /* ===== Excel Export（CNS品目一覧 全集約版フォーマット） ===== */
 function exportToExcel(items: ContainerItem[]) {
@@ -264,6 +225,10 @@ export default function ItemEditPage({
   const [showAddForm, setShowAddForm] = useState(false);
   const [containerFirst, setContainerFirst] = useState(true);
   const [showSubMenu, setShowSubMenu] = useState(false);
+  const [showTokenDialog, setShowTokenDialog] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [saveMsg, setSaveMsg] = useState('');
+  const [saving, setSaving] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   const filtered = items.filter((item) => {
@@ -308,6 +273,29 @@ export default function ItemEditPage({
     setShowAddForm(false);
   }, [onAddItem]);
 
+  const handleGitHubSave = useCallback(async () => {
+    const token = getStoredToken();
+    if (!token) { setShowTokenDialog(true); setTokenInput(''); return; }
+    setSaving(true);
+    setSaveMsg('');
+    const result = await saveToGitHub(items, token, (msg) => setSaveMsg(msg));
+    setSaveMsg(result.message);
+    setSaving(false);
+    setTimeout(() => setSaveMsg(''), 5000);
+  }, [items]);
+
+  const handleTokenSubmit = useCallback(async () => {
+    if (!tokenInput.trim()) return;
+    storeToken(tokenInput.trim());
+    setShowTokenDialog(false);
+    setSaving(true);
+    setSaveMsg('');
+    const result = await saveToGitHub(items, tokenInput.trim(), (msg) => setSaveMsg(msg));
+    setSaveMsg(result.message);
+    setSaving(false);
+    setTimeout(() => setSaveMsg(''), 5000);
+  }, [items, tokenInput]);
+
   const handleDeleteItem = useCallback((idx: number, name: string) => {
     if (!window.confirm(`「${name}」を削除しますか？`)) return;
     onDeleteItem(idx);
@@ -336,14 +324,15 @@ export default function ItemEditPage({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               新規
             </button>
-            {/* マスタ保存（メイン） */}
-            <button onClick={() => saveMasterExcel(items)} style={{
+            {/* GitHub保存（メイン） */}
+            <button onClick={handleGitHubSave} disabled={saving} style={{
               display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
-              borderRadius: 8, border: '1px solid rgba(139,92,246,0.4)', cursor: 'pointer',
+              borderRadius: 8, border: '1px solid rgba(139,92,246,0.4)', cursor: saving ? 'wait' : 'pointer',
               background: 'rgba(139,92,246,0.15)', color: '#a78bfa', fontSize: 12, fontWeight: 600,
+              opacity: saving ? 0.6 : 1,
             }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-              保存
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+              {saving ? '保存中...' : '保存'}
             </button>
             {/* マスタ再読込（メイン） */}
             {onMasterReload && (
@@ -435,6 +424,58 @@ export default function ItemEditPage({
         </div>
       </div>
 
+      {/* 保存メッセージ */}
+      {saveMsg && (
+        <div style={{
+          padding: '6px 16px', fontSize: 12, fontWeight: 600, flexShrink: 0,
+          background: saveMsg.includes('完了') ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+          color: saveMsg.includes('完了') ? '#4ade80' : '#f87171',
+          borderBottom: '1px solid rgba(255,255,255,0.04)',
+        }}>
+          {saveMsg}
+        </div>
+      )}
+
+      {/* GitHubトークン入力ダイアログ */}
+      {showTokenDialog && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+        }} onClick={() => setShowTokenDialog(false)}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: '#1e2235', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 16, padding: 24, width: '90%', maxWidth: 400,
+          }}>
+            <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 700, margin: '0 0 8px' }}>GitHub Personal Access Token</h3>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 16px', lineHeight: 1.5 }}>
+              GitHubに保存するにはPersonal Access Tokenが必要です。<br/>
+              Settings → Developer settings → Personal access tokens で作成してください。<br/>
+              必要な権限: <code style={{ color: '#a78bfa' }}>repo</code> (Contents: Read and write)
+            </p>
+            <input type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleTokenSubmit()}
+              style={{
+                width: '100%', padding: '10px 12px', borderRadius: 8, fontSize: 13,
+                background: '#141720', border: '1px solid rgba(255,255,255,0.15)', color: '#fff',
+                outline: 'none', marginBottom: 12, boxSizing: 'border-box',
+              }} />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowTokenDialog(false)} style={{
+                padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)',
+                background: 'transparent', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 12,
+              }}>キャンセル</button>
+              <button onClick={handleTokenSubmit} style={{
+                padding: '8px 16px', borderRadius: 8, border: 'none',
+                background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', color: '#fff',
+                cursor: 'pointer', fontSize: 12, fontWeight: 600,
+              }}>保存して送信</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 検索 */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
@@ -465,10 +506,10 @@ export default function ItemEditPage({
 
       {/* テーブルヘッダー */}
       <div className="edit-grid-row" style={{
-        padding: '5px 12px', flexShrink: 0,
+        padding: '8px 16px', flexShrink: 0,
         background: '#181b28', borderBottom: '1px solid rgba(255,255,255,0.04)',
-        fontSize: 9, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' as const,
-        color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)',
+        fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' as const,
+        color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-mono)',
       }}>
         <span>品名</span>
         <span style={{ textAlign: 'center' }}>気高</span>
@@ -888,49 +929,49 @@ function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpd
 
   return (
     <button onClick={onStartEdit} className="edit-grid-row" style={{
-      width: '100%', padding: '9px 12px',
+      width: '100%', padding: '12px 16px',
       border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
       background: isContainerMatch ? `${colors.accent}14` : `${colors.accent}08`,
       cursor: 'pointer', textAlign: 'left' as const,
       borderLeft: isContainerMatch ? `3px solid ${colors.accent}` : 'none',
     }}>
       {/* 品名 */}
-      <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-        <span style={{ width: 5, height: 5, borderRadius: '50%', background: colors.accent, flexShrink: 0 }} />
-        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: colors.accent, flexShrink: 0 }} />
+        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 15, fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>
           {item.itemName}
         </span>
       </span>
       {/* 気高コード */}
       <span style={{
-        textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        color: 'rgba(255,255,255,0.55)',
+        textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        color: 'rgba(255,255,255,0.6)',
       }}>
         {item.partNumber || '---'}
       </span>
       {/* 新建高コード */}
       <span style={{
-        textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        color: item.newPartNumber ? 'rgba(167,139,250,0.7)' : 'rgba(255,255,255,0.15)',
+        textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        color: item.newPartNumber ? 'rgba(167,139,250,0.8)' : 'rgba(255,255,255,0.15)',
       }}>
         {item.newPartNumber || '---'}
       </span>
       {/* 種類 */}
       <span style={{ textAlign: 'center' }}>
-        <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, fontWeight: 500, color: colors.accent, background: `${colors.accent}15` }}>
+        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600, color: colors.accent, background: `${colors.accent}15` }}>
           {item.type}
         </span>
       </span>
       {/* 1P */}
-      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.qtyPerPallet || '-'}</span>
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>{item.qtyPerPallet || '-'}</span>
       {/* 入数 */}
-      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.packingQty || '-'}</span>
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>{item.packingQty || '-'}</span>
       {/* G.W. */}
-      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, color: item.grossWeight ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)' }}>
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: item.grossWeight ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.15)' }}>
         {item.grossWeight ? item.grossWeight.toFixed(1) : '---'}
       </span>
       {/* CBM */}
-      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, color: item.cbm ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)' }}>
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: item.cbm ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.15)' }}>
         {item.cbm ? item.cbm.toFixed(2) : '---'}
       </span>
       {/* Meas. */}

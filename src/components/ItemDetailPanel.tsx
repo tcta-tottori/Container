@@ -292,23 +292,23 @@ export default function ItemDetailPanel({
               color: '#f0f0f0',
               textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
             }} />
-          {/* 品名の下に気高コード + 新建高コード */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2, flexWrap: 'wrap' }}>
+          {/* 品名の下に気高コード（KTE青）+ 新建高コード（KEN赤）縦並び */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
             {item.partNumber && (
               <span style={{
                 fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)',
                 letterSpacing: 0.5,
               }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: colors.accent, letterSpacing: 1, marginRight: 4 }}>KTE</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#3b82f6', letterSpacing: 1, marginRight: 4 }}>KTE</span>
                 {item.partNumber}
               </span>
             )}
             {item.newPartNumber && (
               <span style={{
-                fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)',
-                letterSpacing: 0.3,
+                fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)',
+                letterSpacing: 0.5,
               }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: 1, marginRight: 4 }}>KEN</span>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', letterSpacing: 1, marginRight: 4 }}>KEN</span>
                 {item.newPartNumber}
               </span>
             )}
