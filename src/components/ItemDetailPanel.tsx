@@ -355,24 +355,30 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 類似品（黄色点滅・アイコン+品名・差異赤太字） */}
+        {/* 類似品（琥珀枠点滅・白文字・アイコン+品名・差異赤太字） */}
         {similarItems.length > 0 && (
           <div className="similar-warn-blink" style={{
             display: 'flex', alignItems: 'center', gap: 6,
             borderRadius: 6, padding: '4px 10px',
             flexShrink: 0, position: 'relative', zIndex: 2,
-            overflow: 'hidden', border: '2px solid #f59e0b',
+            overflow: 'hidden',
             whiteSpace: 'nowrap',
           }}>
+            <span style={{
+              fontSize: 11, fontWeight: 800, color: '#fbbf24', whiteSpace: 'nowrap', flexShrink: 0,
+              display: 'flex', alignItems: 'center', gap: 3,
+            }}>
+              <span style={{ fontSize: 13 }}>⚠️</span>類似品:
+            </span>
             {similarItems.map((s, i) => {
               const reason = getSimilarityReason(item.itemName, s.itemName);
               const icon = reason === 'color' ? '🎨' : '🔤';
               return (
                 <span key={s.id} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,
-                  fontSize: 12, fontWeight: 700, color: '#000',
+                  fontSize: 12, fontWeight: 700, color: '#fff',
                 }}>
-                  {i > 0 && <span style={{ color: '#b45309', margin: '0 2px' }}>|</span>}
+                  {i > 0 && <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 2px' }}>|</span>}
                   <span style={{ fontSize: 13 }}>{icon}</span>
                   <HighlightDiff base={item.itemName} target={s.itemName} />
                 </span>
