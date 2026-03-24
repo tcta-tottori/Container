@@ -457,7 +457,8 @@ export default function ItemDetailPanel({
             }}>
               <div style={{ width: '55%', height: '100%' }}>
                 <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
-                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
+                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+                  measurements={item.measurements} />
               </div>
             </div>
           )}

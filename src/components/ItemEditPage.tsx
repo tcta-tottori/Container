@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ContainerItem, ItemType } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { saveToGitHub, getStoredToken, storeToken } from '@/lib/githubSave';
@@ -219,7 +219,6 @@ export default function ItemEditPage({
   items, containerNo, containerPartNumbers, onUpdateItem, onAddItem, onDeleteItem, onSelectAndGoDetail, onMasterReload,
 }: ItemEditPageProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
-  const [filterType, setFilterType] = useState<ItemType | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [importMsg, setImportMsg] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -232,11 +231,64 @@ export default function ItemEditPage({
   const [refreshKey, setRefreshKey] = useState(0);
   const importRef = useRef<HTMLInputElement>(null);
 
+  // Excel-like column filter/sort state
+  const [columnFilters, setColumnFilters] = useState<Record<string, Set<string>>>({});
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+  const filterDropdownRef = useRef<HTMLDivElement>(null);
+
   // refreshKeyが変わるとfiltered/sortedFilteredが再計算される
   void refreshKey;
 
+  // Close filter dropdown when clicking outside
+  useEffect(() => {
+    if (!activeFilterColumn) return;
+    const handleClick = (e: MouseEvent) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target as Node)) {
+        setActiveFilterColumn(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [activeFilterColumn]);
+
+  // Column definitions for filtering
+  const FILTER_COLUMNS: { key: string; label: string; align?: string; getValue: (item: ContainerItem) => string }[] = useMemo(() => [
+    { key: 'itemName', label: '品名', getValue: (item) => item.itemName || '' },
+    { key: 'partNumber', label: '気高', align: 'center', getValue: (item) => item.partNumber || '' },
+    { key: 'newPartNumber', label: '新建高', align: 'center', getValue: (item) => item.newPartNumber || '' },
+    { key: 'type', label: '種類', align: 'center', getValue: (item) => item.type || '' },
+    { key: 'qtyPerPallet', label: '1P', align: 'center', getValue: (item) => String(item.qtyPerPallet || '') },
+    { key: 'packingQty', label: '入数', align: 'center', getValue: (item) => String(item.packingQty || '') },
+    { key: 'grossWeight', label: 'G.W.', align: 'center', getValue: (item) => item.grossWeight != null ? String(item.grossWeight) : '' },
+    { key: 'cbm', label: 'CBM', align: 'center', getValue: (item) => item.cbm != null ? String(item.cbm) : '' },
+    { key: 'measurements', label: 'Meas.', align: 'right', getValue: (item) => item.measurements || '' },
+  ], []);
+
+  // Compute unique values per column (for filter dropdowns)
+  const columnUniqueValues = useMemo(() => {
+    const result: Record<string, Map<string, number>> = {};
+    for (const col of FILTER_COLUMNS) {
+      const counts = new Map<string, number>();
+      for (const item of items) {
+        const val = col.getValue(item) || '(空白)';
+        counts.set(val, (counts.get(val) || 0) + 1);
+      }
+      result[col.key] = counts;
+    }
+    return result;
+  }, [items, FILTER_COLUMNS]);
+
   const filtered = items.filter((item) => {
-    if (filterType !== 'all' && item.type !== filterType) return false;
+    // Column filters
+    for (const col of FILTER_COLUMNS) {
+      const filterSet = columnFilters[col.key];
+      if (filterSet && filterSet.size > 0) {
+        const val = col.getValue(item) || '(空白)';
+        if (!filterSet.has(val)) return false;
+      }
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return item.itemName.toLowerCase().includes(q)
@@ -247,18 +299,114 @@ export default function ItemEditPage({
     return true;
   });
 
-  // コンテナ対象品目を上部にソート
-  const sortedFiltered = containerFirst && containerPartNumbers && containerPartNumbers.size > 0
-    ? [...filtered].sort((a, b) => {
+  // Sort: first by containerFirst, then by sortColumn
+  const sortedFiltered = useMemo(() => {
+    let result = [...filtered];
+    // Column sort
+    if (sortColumn) {
+      const col = FILTER_COLUMNS.find((c) => c.key === sortColumn);
+      if (col) {
+        result.sort((a, b) => {
+          const aVal = col.getValue(a);
+          const bVal = col.getValue(b);
+          // Try numeric comparison
+          const aNum = Number(aVal);
+          const bNum = Number(bVal);
+          let cmp: number;
+          if (!isNaN(aNum) && !isNaN(bNum) && aVal !== '' && bVal !== '') {
+            cmp = aNum - bNum;
+          } else {
+            cmp = aVal.localeCompare(bVal, 'ja');
+          }
+          return sortDirection === 'asc' ? cmp : -cmp;
+        });
+      }
+    }
+    // コンテナ対象品目を上部にソート (stable: container items go first)
+    if (containerFirst && containerPartNumbers && containerPartNumbers.size > 0) {
+      result.sort((a, b) => {
         const aMatch = containerPartNumbers.has(a.partNumber) ? 0 : 1;
         const bMatch = containerPartNumbers.has(b.partNumber) ? 0 : 1;
         return aMatch - bMatch;
-      })
-    : filtered;
+      });
+    }
+    return result;
+  }, [filtered, sortColumn, sortDirection, containerFirst, containerPartNumbers, FILTER_COLUMNS]);
 
-  const typeCounts = items.reduce<Record<string, number>>((acc, item) => {
-    acc[item.type] = (acc[item.type] || 0) + 1; return acc;
-  }, {});
+  // Check if a column has active filters (not all selected)
+  const hasActiveFilter = useCallback((colKey: string) => {
+    const filterSet = columnFilters[colKey];
+    if (!filterSet || filterSet.size === 0) return false;
+    const totalUnique = columnUniqueValues[colKey]?.size || 0;
+    return filterSet.size < totalUnique;
+  }, [columnFilters, columnUniqueValues]);
+
+  const handleToggleFilter = useCallback((colKey: string, value: string) => {
+    setColumnFilters((prev) => {
+      const current = prev[colKey];
+      const allValues = columnUniqueValues[colKey];
+      if (!allValues) return prev;
+
+      let newSet: Set<string>;
+      if (!current || current.size === 0) {
+        // First click: start from all selected, then remove this one
+        newSet = new Set(allValues.keys());
+        newSet.delete(value);
+      } else {
+        newSet = new Set(current);
+        if (newSet.has(value)) {
+          newSet.delete(value);
+        } else {
+          newSet.add(value);
+        }
+      }
+      // If all selected, clear the filter
+      if (newSet.size === allValues.size) {
+        const next = { ...prev };
+        delete next[colKey];
+        return next;
+      }
+      if (newSet.size === 0) {
+        // Don't allow empty — keep at least the toggled value
+        newSet.add(value);
+      }
+      return { ...prev, [colKey]: newSet };
+    });
+  }, [columnUniqueValues]);
+
+  const handleSelectAll = useCallback((colKey: string) => {
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      delete next[colKey];
+      return next;
+    });
+  }, []);
+
+  const handleDeselectAll = useCallback((colKey: string) => {
+    // Select nothing — but we need at least something, so just clear
+    // Actually for "deselect all" we set an empty set which means show nothing
+    // But that's weird UX, so toggle: if all selected -> deselect all (show first only), if partially -> select all
+    const filterSet = columnFilters[colKey];
+    const allValues = columnUniqueValues[colKey];
+    if (!allValues) return;
+
+    if (!filterSet || filterSet.size === 0) {
+      // Currently all selected — do nothing (selectAll checkbox will handle)
+      return;
+    }
+    // Clear filter = select all
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      delete next[colKey];
+      return next;
+    });
+  }, [columnFilters, columnUniqueValues]);
+
+  const handleSort = useCallback((colKey: string, direction: 'asc' | 'desc') => {
+    setSortColumn(colKey);
+    setSortDirection(direction);
+    setActiveFilterColumn(null);
+  }, []);
 
   const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -390,9 +538,9 @@ export default function ItemEditPage({
             {importMsg}
           </div>
         )}
-        {/* チップフィルター */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {containerPartNumbers && containerPartNumbers.size > 0 && (
+        {/* CN優先トグル */}
+        {containerPartNumbers && containerPartNumbers.size > 0 && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button onClick={() => setContainerFirst(!containerFirst)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
@@ -406,26 +554,8 @@ export default function ItemEditPage({
               </svg>
               CN優先
             </button>
-          )}
-          {ITEM_TYPES.map((t) => {
-            const c = COLOR_MAP[t];
-            const count = typeCounts[t] || 0;
-            if (count === 0) return null;
-            return (
-              <button key={t} onClick={() => setFilterType(filterType === t ? 'all' : t)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
-                  borderRadius: 16, fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                  background: filterType === t ? `${c.accent}30` : 'rgba(255,255,255,0.05)',
-                  color: filterType === t ? c.accent : 'rgba(255,255,255,0.6)',
-                  border: `1px solid ${filterType === t ? c.accent + '50' : 'transparent'}`,
-                }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: c.accent }} />
-                {t} <span style={{ opacity: 0.6 }}>{count}</span>
-              </button>
-            );
-          })}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* 保存メッセージ */}
@@ -508,22 +638,143 @@ export default function ItemEditPage({
         />
       )}
 
-      {/* テーブルヘッダー */}
+      {/* テーブルヘッダー（Excel-like filter/sort） */}
       <div className="edit-grid-row" style={{
         padding: '8px 16px', flexShrink: 0,
         background: '#181b28', borderBottom: '1px solid rgba(255,255,255,0.04)',
         fontSize: 11, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' as const,
         color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-mono)',
       }}>
-        <span>品名</span>
-        <span style={{ textAlign: 'center' }}>気高</span>
-        <span style={{ textAlign: 'center' }}>新建高</span>
-        <span style={{ textAlign: 'center' }}>種類</span>
-        <span style={{ textAlign: 'center' }}>1P</span>
-        <span style={{ textAlign: 'center' }}>入数</span>
-        <span style={{ textAlign: 'center' }}>G.W.</span>
-        <span style={{ textAlign: 'center' }}>CBM</span>
-        <span style={{ textAlign: 'right' }}>Meas.</span>
+        {FILTER_COLUMNS.map((col) => {
+          const isActive = hasActiveFilter(col.key);
+          const isSorted = sortColumn === col.key;
+          const isOpen = activeFilterColumn === col.key;
+          return (
+            <span key={col.key} style={{
+              position: 'relative',
+              textAlign: (col.align || 'left') as 'left' | 'center' | 'right',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: col.align === 'right' ? 'flex-end' : col.align === 'center' ? 'center' : 'flex-start',
+              gap: 2,
+              cursor: 'pointer',
+              userSelect: 'none',
+              color: isActive || isSorted ? '#60a5fa' : 'rgba(255,255,255,0.45)',
+            }}
+              onClick={() => setActiveFilterColumn(isOpen ? null : col.key)}
+            >
+              {col.label}
+              {isSorted && <span style={{ fontSize: 9 }}>{sortDirection === 'asc' ? '↑' : '↓'}</span>}
+              <span style={{
+                fontSize: 8, marginLeft: 1,
+                color: isActive ? '#60a5fa' : 'rgba(255,255,255,0.25)',
+              }}>▼</span>
+              {isActive && (
+                <span style={{
+                  position: 'absolute', top: -2, right: -2,
+                  width: 5, height: 5, borderRadius: '50%',
+                  background: '#60a5fa',
+                }} />
+              )}
+              {/* Filter dropdown */}
+              {isOpen && (
+                <div
+                  ref={filterDropdownRef}
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: col.align === 'right' ? 'auto' : 0,
+                    right: col.align === 'right' ? 0 : 'auto',
+                    marginTop: 4,
+                    zIndex: 50,
+                    background: '#252a40',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 10,
+                    minWidth: 180,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                    textTransform: 'none' as const,
+                    letterSpacing: 0,
+                    fontFamily: 'inherit',
+                    fontWeight: 400,
+                  }}
+                >
+                  {/* Sort buttons */}
+                  <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <button onClick={() => handleSort(col.key, 'asc')} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 8px',
+                      borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12,
+                      background: sortColumn === col.key && sortDirection === 'asc' ? 'rgba(96,165,250,0.15)' : 'transparent',
+                      color: sortColumn === col.key && sortDirection === 'asc' ? '#60a5fa' : 'rgba(255,255,255,0.7)',
+                    }}>
+                      <span>↑</span> 昇順
+                    </button>
+                    <button onClick={() => handleSort(col.key, 'desc')} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '6px 8px',
+                      borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12,
+                      background: sortColumn === col.key && sortDirection === 'desc' ? 'rgba(96,165,250,0.15)' : 'transparent',
+                      color: sortColumn === col.key && sortDirection === 'desc' ? '#60a5fa' : 'rgba(255,255,255,0.7)',
+                    }}>
+                      <span>↓</span> 降順
+                    </button>
+                  </div>
+                  {/* Divider */}
+                  <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '0 10px' }} />
+                  {/* Select all checkbox */}
+                  <div style={{ padding: '8px 10px 4px' }}>
+                    <label style={{
+                      display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                      fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600,
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={!columnFilters[col.key] || columnFilters[col.key]?.size === 0}
+                        onChange={() => {
+                          const filterSet = columnFilters[col.key];
+                          if (!filterSet || filterSet.size === 0) {
+                            // Currently all selected — can't deselect all, do nothing
+                          } else {
+                            handleSelectAll(col.key);
+                          }
+                        }}
+                        style={{ accentColor: '#60a5fa', width: 14, height: 14 }}
+                      />
+                      すべて選択
+                    </label>
+                  </div>
+                  {/* Value checkboxes */}
+                  <div style={{ maxHeight: 300, overflowY: 'auto', padding: '4px 10px 8px' }}>
+                    {Array.from(columnUniqueValues[col.key]?.entries() || [])
+                      .sort((a: [string, number], b: [string, number]) => a[0].localeCompare(b[0], 'ja'))
+                      .map(([value, count]: [string, number]) => {
+                        const filterSet = columnFilters[col.key];
+                        const isChecked = !filterSet || filterSet.size === 0 || filterSet.has(value);
+                        return (
+                          <label key={value} style={{
+                            display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+                            fontSize: 12, color: 'rgba(255,255,255,0.7)', padding: '3px 0',
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleToggleFilter(col.key, value)}
+                              style={{ accentColor: '#60a5fa', width: 14, height: 14, flexShrink: 0 }}
+                            />
+                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {value}
+                            </span>
+                            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
+                              {count}
+                            </span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </span>
+          );
+        })}
       </div>
 
       {/* リスト */}

@@ -9,9 +9,10 @@ interface PalletDiagramProps {
   qtyPerPallet: number;
   type: ItemType;
   itemName?: string;
+  measurements?: string;
 }
 
-/* ===== アイソメトリック変換 ===== */
+/* ===== Isometric transform ===== */
 const A30 = Math.PI / 6;
 const CS = Math.cos(A30);
 const SN = Math.sin(A30);
@@ -19,85 +20,162 @@ function iso(x: number, y: number, z: number): [number, number] {
   return [(x - y) * CS, (x + y) * SN - z];
 }
 function pts(...c: [number, number][]): string {
-  return c.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  return c.map(([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
 }
 
-/* ===== ジャーポット判定 ===== */
+/* ===== Parse measurements string "W*D*H" (cm) ===== */
+function parseMeasurements(s: string): [number, number, number] | null {
+  const m = s.match(/(\d+(?:\.\d+)?)\s*[*xX\u00d7]\s*(\d+(?:\.\d+)?)\s*[*xX\u00d7]\s*(\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3])];
+}
+
+/* ===== Jar-pot detection ===== */
 function isJarPot(name: string): boolean {
   return /^JP[A-Z]/.test(name) || name.includes('ジャーポット');
 }
 
-/* ===== 段ボール箱（参照画像準拠: 3面+テープ十字） ===== */
+/* ===== Solid Cardboard Box (3 faces + white tape cross) ===== */
 function Box({ x, y, z, w, d, h, ghost, accent }: {
   x: number; y: number; z: number;
   w: number; d: number; h: number;
   ghost: boolean; accent: string;
 }) {
   if (ghost) {
-    const q = [iso(x, y, z), iso(x + w, y, z), iso(x + w, y + d, z), iso(x, y + d, z)] as [number, number][];
-    return <polygon points={pts(...q)} fill="none" stroke={accent} strokeWidth={0.12} strokeDasharray="1,1" opacity={0.12} />;
+    // Ghost: dashed outline of the top face footprint
+    const q = [
+      iso(x, y, z + h), iso(x + w, y, z + h),
+      iso(x + w, y + d, z + h), iso(x, y + d, z + h),
+    ] as [number, number][];
+    return (
+      <polygon
+        points={pts(...q)}
+        fill="none"
+        stroke={accent}
+        strokeWidth={0.15}
+        strokeDasharray="0.8,0.8"
+        opacity={0.2}
+      />
+    );
   }
 
   const sk = '#5a4020';
-  const front = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y, z), iso(x, y, z)] as [number, number][];
-  const top   = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
-  const left  = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
+  const sw = 0.5;
 
+  // Three visible faces (solid, opaque)
+  const front = [
+    iso(x, y, z + h), iso(x + w, y, z + h),
+    iso(x + w, y, z), iso(x, y, z),
+  ] as [number, number][];
+  const top = [
+    iso(x, y, z + h), iso(x + w, y, z + h),
+    iso(x + w, y + d, z + h), iso(x, y + d, z + h),
+  ] as [number, number][];
+  const left = [
+    iso(x, y, z + h), iso(x, y + d, z + h),
+    iso(x, y + d, z), iso(x, y, z),
+  ] as [number, number][];
+
+  // Tape dimensions
   const tw = w * 0.12;
-  const tx = x + (w - tw) / 2;
   const td = d * 0.12;
+  const tx = x + (w - tw) / 2;
   const ty = y + (d - td) / 2;
-  const tapeV = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y + d, z + h), iso(tx, y + d, z + h)] as [number, number][];
-  const tapeH = [iso(x, ty, z + h), iso(x + w, ty, z + h), iso(x + w, ty + td, z + h), iso(x, ty + td, z + h)] as [number, number][];
-  const tapeFV = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y, z + h * 0.78), iso(tx, y, z + h * 0.78)] as [number, number][];
-  const tapeLV = [iso(x, ty, z + h), iso(x, ty + td, z + h), iso(x, ty + td, z + h * 0.78), iso(x, ty, z + h * 0.78)] as [number, number][];
+  const tapeWrap = h * 0.22;
+
+  // White tape cross on top face
+  const tapeVTop = [
+    iso(tx, y, z + h), iso(tx + tw, y, z + h),
+    iso(tx + tw, y + d, z + h), iso(tx, y + d, z + h),
+  ] as [number, number][];
+  const tapeHTop = [
+    iso(x, ty, z + h), iso(x + w, ty, z + h),
+    iso(x + w, ty + td, z + h), iso(x, ty + td, z + h),
+  ] as [number, number][];
+
+  // Tape wrapping down front face (vertical strip center)
+  const tapeFront = [
+    iso(tx, y, z + h), iso(tx + tw, y, z + h),
+    iso(tx + tw, y, z + h - tapeWrap), iso(tx, y, z + h - tapeWrap),
+  ] as [number, number][];
+
+  // Tape wrapping down left face (horizontal strip center)
+  const tapeLeft = [
+    iso(x, ty, z + h), iso(x, ty + td, z + h),
+    iso(x, ty + td, z + h - tapeWrap), iso(x, ty, z + h - tapeWrap),
+  ] as [number, number][];
 
   return (
     <g>
-      <polygon points={pts(...front)} fill="#dea550" stroke={sk} strokeWidth={0.7} strokeLinejoin="round" />
-      <polygon points={pts(...top)}   fill="#e8c06a" stroke={sk} strokeWidth={0.7} strokeLinejoin="round" />
-      <polygon points={pts(...left)}  fill="#c08a3a" stroke={sk} strokeWidth={0.7} strokeLinejoin="round" />
-      <polygon points={pts(...tapeV)} fill="rgba(255,255,255,0.4)" stroke="none" />
-      <polygon points={pts(...tapeH)} fill="rgba(255,255,255,0.35)" stroke="none" />
-      <polygon points={pts(...tapeFV)} fill="rgba(255,255,255,0.25)" stroke="none" />
-      <polygon points={pts(...tapeLV)} fill="rgba(255,255,255,0.2)" stroke="none" />
+      {/* Front face - medium brown */}
+      <polygon points={pts(...front)} fill="#dea550" stroke={sk} strokeWidth={sw} strokeLinejoin="round" />
+      {/* Left face - darkest brown */}
+      <polygon points={pts(...left)} fill="#c08a3a" stroke={sk} strokeWidth={sw} strokeLinejoin="round" />
+      {/* Top face - lightest brown */}
+      <polygon points={pts(...top)} fill="#e8c06a" stroke={sk} strokeWidth={sw} strokeLinejoin="round" />
+      {/* Tape cross on top */}
+      <polygon points={pts(...tapeVTop)} fill="rgba(255,255,255,0.5)" stroke="none" />
+      <polygon points={pts(...tapeHTop)} fill="rgba(255,255,255,0.45)" stroke="none" />
+      {/* Tape wrapping down sides */}
+      <polygon points={pts(...tapeFront)} fill="rgba(255,255,255,0.3)" stroke="none" />
+      <polygon points={pts(...tapeLeft)} fill="rgba(255,255,255,0.25)" stroke="none" />
     </g>
   );
 }
 
-/* ===== パレット台 ===== */
+/* ===== Pallet base with fork openings ===== */
 function PalletBase({ x, y, z, w, d, h }: {
   x: number; y: number; z: number; w: number; d: number; h: number;
 }) {
   const sk = '#2a2e36';
-  const front = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y, z), iso(x, y, z)] as [number, number][];
-  const top   = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
-  const left  = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
+  const front = [
+    iso(x, y, z + h), iso(x + w, y, z + h),
+    iso(x + w, y, z), iso(x, y, z),
+  ] as [number, number][];
+  const top = [
+    iso(x, y, z + h), iso(x + w, y, z + h),
+    iso(x + w, y + d, z + h), iso(x, y + d, z + h),
+  ] as [number, number][];
+  const left = [
+    iso(x, y, z + h), iso(x, y + d, z + h),
+    iso(x, y + d, z), iso(x, y, z),
+  ] as [number, number][];
 
-  const hw = w * 0.2, hh = h * 0.45, hz = z + h * 0.18;
+  // Fork openings on front face
+  const forkW = w * 0.2;
+  const forkH = h * 0.45;
+  const forkZ = z + h * 0.18;
   const forkFront = [0.15, 0.58].map((pct, i) => {
-    const hx = x + w * pct;
-    const q = [iso(hx, y, hz + hh), iso(hx + hw, y, hz + hh), iso(hx + hw, y, hz), iso(hx, y, hz)] as [number, number][];
+    const fx = x + w * pct;
+    const q = [
+      iso(fx, y, forkZ + forkH), iso(fx + forkW, y, forkZ + forkH),
+      iso(fx + forkW, y, forkZ), iso(fx, y, forkZ),
+    ] as [number, number][];
     return <polygon key={`ff${i}`} points={pts(...q)} fill="#1a1e24" stroke={sk} strokeWidth={0.4} />;
   });
+
+  // Fork openings on left face
   const forkLeft = [0.15, 0.58].map((pct, i) => {
-    const hy = y + d * pct;
-    const hd = d * 0.18;
-    const q = [iso(x, hy, hz + hh), iso(x, hy + hd, hz + hh), iso(x, hy + hd, hz), iso(x, hy, hz)] as [number, number][];
+    const fy = y + d * pct;
+    const fd = d * 0.18;
+    const q = [
+      iso(x, fy, forkZ + forkH), iso(x, fy + fd, forkZ + forkH),
+      iso(x, fy + fd, forkZ), iso(x, fy, forkZ),
+    ] as [number, number][];
     return <polygon key={`fl${i}`} points={pts(...q)} fill="#1a1e24" stroke={sk} strokeWidth={0.4} />;
   });
 
   return (
     <g>
       <polygon points={pts(...front)} fill="#555d68" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
-      <polygon points={pts(...top)}   fill="#6b7280" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
-      <polygon points={pts(...left)}  fill="#444c56" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
+      <polygon points={pts(...left)} fill="#444c56" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
+      <polygon points={pts(...top)} fill="#6b7280" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
       {forkFront}{forkLeft}
     </g>
   );
 }
 
-/* ===== ラミネートバンドル ===== */
+/* ===== Laminate Bundle (for JarPot items) ===== */
 function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
   x: number; y: number; z: number;
   cw: number; cd: number; h: number;
@@ -139,8 +217,10 @@ function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
   }
 
   const refY = z + h * 0.5;
-  const ref = [iso(wx + ww * 0.1, wy, refY + 0.2), iso(wx + ww * 0.7, wy, refY + 0.2),
-               iso(wx + ww * 0.7, wy, refY), iso(wx + ww * 0.1, wy, refY)] as [number, number][];
+  const ref = [
+    iso(wx + ww * 0.1, wy, refY + 0.2), iso(wx + ww * 0.7, wy, refY + 0.2),
+    iso(wx + ww * 0.7, wy, refY), iso(wx + ww * 0.1, wy, refY),
+  ] as [number, number][];
 
   return (
     <g>
@@ -154,7 +234,7 @@ function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
   );
 }
 
-/* ===== ジャーポット用スタック ===== */
+/* ===== JarPot Stack ===== */
 interface BundleSlot {
   x: number; y: number; z: number;
   horizontal: boolean;
@@ -228,87 +308,144 @@ function JarPotStack({ ox, oy, filled, accent }: {
   return <g transform={`translate(${ox},${oy})`}>{elems}</g>;
 }
 
-/* ===== 汎用ボックス位置定義 ===== */
-interface BoxSlot { x: number; y: number; z: number; }
+/* ===== Calculate box layout from measurements ===== */
+interface BoxLayout {
+  cols: number;
+  rows: number;
+  layers: number;
+  boxW: number;   // isometric units
+  boxD: number;
+  boxH: number;
+  totalSlots: number;
+}
 
-function buildGenericSlots(PH: number): BoxSlot[] {
-  const bw = 7, bd = 7, bh = 6;
-  const PS = 22;
-  const g = (PS - 3 * bw) / 4;
-  const cols3 = [g, g + bw + g, g + 2 * (bw + g)];
-  const g2 = (PS - 2 * bd) / 3;
-  const rows2 = [g2, g2 + bd + g2];
+function calculateLayout(measurements?: string, qtyPerPallet?: number): BoxLayout {
+  const PALLET_CM = 110; // standard pallet 110x110 cm
+  const ISO_PALLET = 22; // isometric pallet size units
+  const scale = ISO_PALLET / PALLET_CM;
 
+  if (measurements) {
+    const dims = parseMeasurements(measurements);
+    if (dims) {
+      const [wCm, dCm, hCm] = dims;
+      const cols = Math.max(1, Math.floor(PALLET_CM / wCm));
+      const rows = Math.max(1, Math.floor(PALLET_CM / dCm));
+      const perLayer = cols * rows;
+      const layers = qtyPerPallet && qtyPerPallet > 0
+        ? Math.max(1, Math.ceil(qtyPerPallet / perLayer))
+        : 3;
+
+      // Clamp layers so the diagram doesn't get absurdly tall
+      const clampedLayers = Math.min(layers, 8);
+
+      const boxW = wCm * scale;
+      const boxD = dCm * scale;
+      const boxH = hCm * scale;
+
+      return { cols, rows, layers: clampedLayers, boxW, boxD, boxH, totalSlots: perLayer * clampedLayers };
+    }
+  }
+
+  // Default: 3 cols x 2 rows x 3 layers
+  return {
+    cols: 3, rows: 2, layers: 3,
+    boxW: 7, boxD: 10, boxH: 6,
+    totalSlots: 18,
+  };
+}
+
+/* ===== Generic box slot builder ===== */
+interface BoxSlot { x: number; y: number; z: number; fillIdx: number; }
+
+function buildGenericSlots(layout: BoxLayout, PH: number, PS: number): BoxSlot[] {
+  const { cols, rows, layers, boxW, boxD, boxH } = layout;
   const slots: BoxSlot[] = [];
-  const addLayer6 = (z: number) => {
-    for (const y of rows2) for (const x of cols3) slots.push({ x, y, z });
-  };
-  const addLayer4 = (z: number) => {
-    const g3 = (PS - 2 * bw) / 3;
-    const cx = [g3, g3 + bw + g3];
-    for (const y of rows2) for (const x of cx) slots.push({ x, y, z });
-  };
 
-  addLayer6(PH);
-  addLayer4(PH + bh);
-  addLayer6(PH + bh * 2);
+  // Tight packing: small gaps between boxes
+  const gap = 0.2;
+  const totalBoxW = cols * boxW + (cols - 1) * gap;
+  const totalBoxD = rows * boxD + (rows - 1) * gap;
+  // Center the grid on the pallet
+  const offsetX = (PS - totalBoxW) / 2;
+  const offsetY = (PS - totalBoxD) / 2;
+
+  let idx = 0;
+  for (let layer = 0; layer < layers; layer++) {
+    const z = PH + layer * boxH;
+    for (let r = rows - 1; r >= 0; r--) {
+      for (let c = 0; c < cols; c++) {
+        const x = offsetX + c * (boxW + gap);
+        const y = offsetY + r * (boxD + gap);
+        slots.push({ x, y, z, fillIdx: idx++ });
+      }
+    }
+  }
+
   return slots;
 }
 
-function GenericStack({ ox, oy, filled, accent }: {
+/* ===== Generic Stack (measurements-aware) ===== */
+function GenericStack({ ox, oy, filled, accent, measurements, qtyPerPallet }: {
   ox: number; oy: number; filled: number; accent: string;
+  measurements?: string; qtyPerPallet?: number;
 }) {
   const PS = 22, PH = 3;
-  const bw = 7, bd = 7, bh = 6;
-  const allSlots = buildGenericSlots(PH);
-  const layerCaps = [6, 4, 6];
-  let maxLayer = 0, acc = 0;
-  for (let l = 0; l < layerCaps.length; l++) {
-    acc += layerCaps[l];
-    if (filled > acc - layerCaps[l]) maxLayer = l;
+  const layout = calculateLayout(measurements, qtyPerPallet);
+  const { boxW, boxD, boxH } = layout;
+
+  const allSlots = buildGenericSlots(layout, PH, PS);
+
+  // For fraction pallets, show enough layers for filled + one ghost layer
+  const perLayer = layout.cols * layout.rows;
+  let slotsToRender = allSlots.length;
+  if (filled < allSlots.length) {
+    const layersNeeded = Math.min(layout.layers, Math.ceil(filled / perLayer) + 1);
+    slotsToRender = Math.min(allSlots.length, Math.max(layersNeeded, 1) * perLayer);
   }
-  const slotsToRender = layerCaps.slice(0, maxLayer + 1).reduce((a, b) => a + b, 0);
-  const elems: JSX.Element[] = [];
-  elems.push(<PalletBase key="pl" x={0} y={0} z={0} w={PS} d={PS} h={PH} />);
-  const indexed = allSlots.slice(0, slotsToRender).map((s, i) => ({ ...s, fillIdx: i }));
-  indexed.sort((a, b) => {
+  const renderSlots = allSlots.slice(0, slotsToRender);
+
+  // Sort for proper occlusion: z asc, then y desc, then x desc (back-to-front)
+  const sorted = [...renderSlots].sort((a, b) => {
     if (a.z !== b.z) return a.z - b.z;
     if (a.y !== b.y) return b.y - a.y;
     return b.x - a.x;
   });
-  for (const s of indexed) {
+
+  const elems: JSX.Element[] = [];
+  elems.push(<PalletBase key="pl" x={0} y={0} z={0} w={PS} d={PS} h={PH} />);
+
+  for (const s of sorted) {
     elems.push(
       <Box key={`b${s.fillIdx}`}
         x={s.x} y={s.y} z={s.z}
-        w={bw} d={bd} h={bh}
+        w={boxW} d={boxD} h={boxH}
         ghost={s.fillIdx >= filled} accent={accent} />
     );
   }
+
   return <g transform={`translate(${ox},${oy})`}>{elems}</g>;
 }
 
-/* ===== メイン =====
- * レイアウト:
- *   右側エリアに配置
- *   [1パレット分の積み方図] [×N] + [端数の積み方図]
- */
+/* ===== Main component ===== */
 export default function PalletDiagram({
-  palletCount, fraction, qtyPerPallet, type, itemName,
+  palletCount, fraction, qtyPerPallet, type, itemName, measurements,
 }: PalletDiagramProps) {
-  void qtyPerPallet;
   const colors = COLOR_MAP[type] || COLOR_MAP['その他'];
   const hasFrac = fraction > 0;
   const jarPot = isJarPot(itemName || '');
 
-  const maxSlots = jarPot ? 20 : 16;
+  const layout = jarPot ? null : calculateLayout(measurements, qtyPerPallet);
+  const maxSlots = jarPot ? 20 : (layout ? layout.totalSlots : 18);
+
   const mapFrac = (n: number) => {
-    if (jarPot) return Math.min(Math.ceil(n / 2), maxSlots);
+    if (jarPot) return Math.min(Math.ceil(n / 2), 20);
     return Math.min(Math.ceil(n), maxSlots);
   };
 
   const PW = 22, PD = 22, PH = 3;
-  const layerH = jarPot ? 5.5 : 6;
-  const totalZ = PH + 2 * layerH;
+  const layerH = jarPot ? 5.5 : (layout ? layout.boxH : 6);
+  const layers = jarPot ? 2 : (layout ? layout.layers : 3);
+  const totalZ = PH + layers * layerH;
   const xL = -PD * CS;
   const xR = PW * CS;
   const yB = (PW + PD) * SN;
@@ -316,9 +453,6 @@ export default function PalletDiagram({
   const oneW = xR - xL;
   const oneH = yB - yT;
 
-  const StackComponent = jarPot ? JarPotStack : GenericStack;
-
-  // パレット1枚分 + ×Nラベル + 端数図
   const showFrac = hasFrac;
   const fracW = showFrac ? oneW * 0.7 : 0;
   const labelW = palletCount > 0 ? 10 : 0;
@@ -333,14 +467,18 @@ export default function PalletDiagram({
         preserveAspectRatio="xMidYMid meet"
         style={{ maxHeight: '100%' }}
       >
-        {/* 1パレット分の積み方図 */}
+        {/* Full pallet diagram */}
         {palletCount > 0 && (
-          <StackComponent ox={0} oy={0}
-            filled={maxSlots}
-            accent={colors.accent} />
+          jarPot ? (
+            <JarPotStack ox={0} oy={0} filled={maxSlots} accent={colors.accent} />
+          ) : (
+            <GenericStack ox={0} oy={0} filled={maxSlots}
+              accent={colors.accent} measurements={measurements}
+              qtyPerPallet={qtyPerPallet} />
+          )
         )}
 
-        {/* ×Nパレット数ラベル（図の右下） */}
+        {/* xN pallet count label */}
         {palletCount > 0 && (
           <text
             x={xR + 1}
@@ -355,12 +493,17 @@ export default function PalletDiagram({
           </text>
         )}
 
-        {/* 端数の積み方図（右側、少し小さめ、ケース数ラベルなし） */}
+        {/* Fraction pallet (right side, smaller) */}
         {showFrac && (
           <g transform={`translate(${mainW + labelW + sp}, ${(oneH - oneH * 0.7) / 2 - 2}) scale(0.7)`}>
-            <StackComponent ox={0} oy={0}
-              filled={mapFrac(fraction)}
-              accent={colors.accent} />
+            {jarPot ? (
+              <JarPotStack ox={0} oy={0}
+                filled={mapFrac(fraction)} accent={colors.accent} />
+            ) : (
+              <GenericStack ox={0} oy={0}
+                filled={mapFrac(fraction)} accent={colors.accent}
+                measurements={measurements} qtyPerPallet={qtyPerPallet} />
+            )}
           </g>
         )}
       </svg>
