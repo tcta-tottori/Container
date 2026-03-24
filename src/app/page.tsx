@@ -215,6 +215,7 @@ export default function Home() {
 
   const handleJkpLoaded = useCallback(
     async (file: File) => {
+      setLoadingMsg('JKPファイルを読み込み中...');
       try {
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array' });
@@ -237,6 +238,8 @@ export default function Home() {
         }
       } catch (e) {
         console.error('JKP parse error:', e);
+      } finally {
+        setLoadingMsg(null);
       }
     },
     []

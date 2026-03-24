@@ -154,8 +154,14 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onJkpLoaded, 
 
   const loadRecent = useCallback((entry: RecentFile) => {
     const file = base64ToFile(entry);
-    onFileLoaded(file);
-  }, [onFileLoaded]);
+    // 最近のファイルも分類に基づいて適切なハンドラにルーティング
+    const { role } = classifyFile(file.name);
+    if (role === 'jkp') {
+      if (onJkpLoaded) onJkpLoaded(file);
+    } else {
+      onFileLoaded(file);
+    }
+  }, [onFileLoaded, onJkpLoaded]);
 
   const fmtDate = (iso: string) => {
     const d = new Date(iso);
