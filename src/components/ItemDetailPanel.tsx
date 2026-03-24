@@ -307,7 +307,7 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 類似品（白背景黒文字・流れるアニメーション） */}
+        {/* 類似品（黄色背景・強い点滅・マーキー） */}
         {similarItems.length > 0 && (() => {
           const similarText = similarItems.map((s) => {
             const reason = getSimilarityReason(item.itemName, s.itemName);
@@ -320,17 +320,20 @@ export default function ItemDetailPanel({
             return `⚠ ${name} [${tag}]`;
           }).join('　　');
           return (
-            <div style={{
+            <div className="similar-warn-blink" style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              background: 'rgba(255,255,255,0.92)', borderRadius: 6,
-              padding: '4px 10px',
+              borderRadius: 6, padding: '5px 10px',
               flexShrink: 0, position: 'relative', zIndex: 2,
-              overflow: 'hidden',
+              overflow: 'hidden', border: '2px solid #f59e0b',
             }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                類似品{similarItems.length}件
+              <span style={{
+                fontSize: 12, fontWeight: 900, color: '#000', whiteSpace: 'nowrap', flexShrink: 0,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                <span style={{ fontSize: 14 }}>⚠</span>
+                類似{similarItems.length}件
               </span>
-              <MarqueeText text={similarText} style={{ color: '#1a1a1a', fontSize: 11, fontWeight: 600, flex: 1, minWidth: 0 }} />
+              <MarqueeText text={similarText} style={{ color: '#000', fontSize: 11, fontWeight: 700, flex: 1, minWidth: 0 }} />
             </div>
           );
         })()}

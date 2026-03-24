@@ -158,15 +158,22 @@ body {
 }
 
 /* ===== Edit / Management Page - Grid ===== */
-/* 品名, 気高, 新建高, 種類, 1P, 入数, G.W., CBM, Meas. */
+/* PC: 品名, 気高, 新建高, 種類, 1P, 入数, G.W., CBM, Meas. */
 .edit-grid-row {
   display: grid;
   grid-template-columns: 2.5fr 1.2fr 1.2fr 0.7fr 0.5fr 0.5fr 0.6fr 0.5fr 0.8fr;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
-@media (max-width: 480px) {
-  .edit-grid-row { grid-template-columns: 2fr 1fr 1fr 0.6fr 0.4fr 0.4fr 0.5fr 0.5fr 0.7fr; gap: 2px; }
+.edit-grid-row > * { overflow: hidden; text-overflow: ellipsis; }
+/* スマホ: 6列のみ（G.W., CBM, Meas.を非表示） */
+@media (max-width: 768px) {
+  .edit-grid-row {
+    grid-template-columns: 2.5fr 1fr 1fr 0.6fr 0.5fr 0.5fr;
+    gap: 2px;
+  }
+  .edit-grid-row > :nth-child(n+7) { display: none; }
 }
 @media (min-width: 1024px) {
   .edit-grid-row { grid-template-columns: 3fr 1.4fr 1.4fr 0.8fr 0.5fr 0.5fr 0.7fr 0.6fr 1fr; gap: 8px; }
@@ -331,6 +338,14 @@ body {
 @keyframes warn-blink {
   0%, 100% { background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.3); }
   50% { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.12); }
+}
+/* 類似品 強い点滅（黄色背景） */
+.similar-warn-blink {
+  animation: similar-flash 1s ease-in-out infinite;
+}
+@keyframes similar-flash {
+  0%, 100% { background: rgba(251,191,36,0.85); box-shadow: 0 0 8px rgba(245,158,11,0.6); }
+  50% { background: rgba(251,191,36,0.4); box-shadow: 0 0 2px rgba(245,158,11,0.2); }
 }
 .detail-similar-label { color: #d97706; font-weight: 600; white-space: nowrap; }
 .detail-similar-names { color: #92400e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

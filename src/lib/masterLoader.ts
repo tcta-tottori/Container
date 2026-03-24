@@ -109,16 +109,33 @@ export function parseAqssExcel(buffer: ArrayBuffer): Map<string, Partial<Contain
   return map;
 }
 
+/** GitHub Raw URL（最新マスタデータ取得用） */
+const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/tcta-tottori/Container/main/public/data/CNS_%E5%93%81%E7%9B%AE%E4%B8%80%E8%A6%A7_%E5%85%A8%E9%9B%86%E7%B4%84%E7%89%88.xlsx';
+
 /**
- * public/data/からCNS品目一覧を自動取得
+ * CNS品目一覧を取得（GitHub Raw → ローカルの順でフォールバック）
+ * cache-busting付きでキャッシュを回避
  */
 export async function fetchMasterData(): Promise<ContainerItem[]> {
+  const bust = `?t=${Date.now()}`;
+
+  // 1. GitHubから最新を取得（キャッシュ回避）
+  try {
+    const res = await fetch(GITHUB_RAW_URL + bust, { cache: 'no-store' });
+    if (res.ok) {
+      const buffer = await res.arrayBuffer();
+      const items = parseMasterExcel(buffer);
+      if (items.length > 0) return items;
+    }
+  } catch { /* GitHubが使えない場合はローカルにフォールバック */ }
+
+  // 2. ローカル public/data/ からフォールバック
   try {
     const basePath = typeof window !== 'undefined'
       ? (document.querySelector('base')?.href || window.location.origin + '/')
       : '/';
     const url = new URL('data/CNS_品目一覧_全集約版.xlsx', basePath).href;
-    const res = await fetch(url);
+    const res = await fetch(url + bust, { cache: 'no-store' });
     if (!res.ok) return [];
     const buffer = await res.arrayBuffer();
     return parseMasterExcel(buffer);
