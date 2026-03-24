@@ -237,39 +237,38 @@ export default function ItemDetailPanel({
           </span>
         </div>
 
-        {/* 品名 + 気高コード（右揃え） */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, position: 'relative', zIndex: 3 }}>
+        {/* 品名 */}
+        <div style={{ position: 'relative', zIndex: 3 }}>
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
-              color: '#f0f0f0', flex: 1, minWidth: 0,
+              color: '#f0f0f0',
               textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
             }} />
+          {/* 品名の下に気高コード + 新建高コード */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 2, flexWrap: 'wrap' }}>
+            {item.partNumber && (
+              <span style={{
+                fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)',
+                letterSpacing: 0.5,
+              }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: colors.accent, letterSpacing: 1, marginRight: 4 }}>KTE</span>
+                {item.partNumber}
+              </span>
+            )}
+            {item.newPartNumber && (
+              <span style={{
+                fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)',
+                letterSpacing: 0.3,
+              }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: 1, marginRight: 4 }}>KEN</span>
+                {item.newPartNumber}
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* KTE (気高コード) / KEN (新建高コード) — 右揃え */}
-        <div style={{ position: 'relative', zIndex: 4, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-          {item.partNumber && (
-            <span style={{
-              fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--font-mono)',
-              letterSpacing: 0.5,
-            }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: colors.accent, letterSpacing: 1, marginRight: 4 }}>KTE</span>
-              {item.partNumber}
-            </span>
-          )}
-          {item.newPartNumber && (
-            <span style={{
-              fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-mono)',
-              letterSpacing: 0.3,
-            }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: 1, marginRight: 4 }}>KEN</span>
-              {item.newPartNumber}
-            </span>
-          )}
-        </div>
-
-        {/* パレット図（品名下部に制限） */}
-        <div className="detail-pallet-area" style={{ zIndex: 1, maxHeight: '35%', marginTop: 0 }}>
+        {/* パレット図（赤枠範囲に限定・コンパクト） */}
+        <div className="detail-pallet-area" style={{ zIndex: 1, maxHeight: '25%', marginTop: 0, overflow: 'hidden' }}>
           {item.qtyPerPallet > 0 && (
             <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
@@ -308,60 +307,33 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 類似品 */}
-        {similarItems.length > 0 && (
-          <div style={{
-            display: 'flex', flexDirection: 'column', gap: 4,
-            background: 'rgba(245,158,11,0.1)', borderRadius: 8,
-            padding: '6px 10px', border: '1px solid rgba(245,158,11,0.25)',
-            flexShrink: 0, position: 'relative', zIndex: 2,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                width: 20, height: 20, borderRadius: 4, flexShrink: 0,
-                background: '#f59e0b', color: '#000', fontSize: 13, fontWeight: 900, lineHeight: 1,
-              }}>!</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24' }}>類似品 ({similarItems.length}件)</span>
+        {/* 類似品（白背景黒文字・流れるアニメーション） */}
+        {similarItems.length > 0 && (() => {
+          const similarText = similarItems.map((s) => {
+            const reason = getSimilarityReason(item.itemName, s.itemName);
+            const c2 = extractColor(s.itemName);
+            const myColor = extractColor(item.itemName);
+            const name = s.itemName.replace(/ポリカバー/g, '').trim() || s.itemName;
+            const tag = reason === 'color'
+              ? `色違い${myColor && c2 ? `(${myColor}↔${c2})` : ''}`
+              : '品名類似';
+            return `⚠ ${name} [${tag}]`;
+          }).join('　　');
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'rgba(255,255,255,0.92)', borderRadius: 6,
+              padding: '4px 10px',
+              flexShrink: 0, position: 'relative', zIndex: 2,
+              overflow: 'hidden',
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#b45309', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                類似品{similarItems.length}件
+              </span>
+              <MarqueeText text={similarText} style={{ color: '#1a1a1a', fontSize: 11, fontWeight: 600, flex: 1, minWidth: 0 }} />
             </div>
-            {similarItems.map((s) => {
-              const reason = getSimilarityReason(item.itemName, s.itemName);
-              const c2 = extractColor(s.itemName);
-              const myColor = extractColor(item.itemName);
-              return (
-                <div key={s.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  paddingLeft: 26, fontSize: 11,
-                }}>
-                  {reason === 'color' ? (
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-                      background: 'rgba(239,68,68,0.25)', fontSize: 10,
-                    }}>🎨</span>
-                  ) : (
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                      width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-                      background: 'rgba(59,130,246,0.25)', fontSize: 10,
-                    }}>Aa</span>
-                  )}
-                  <span style={{ color: '#fde68a', fontWeight: 600 }}>
-                    {s.itemName.replace(/ポリカバー/g, '').trim() || s.itemName}
-                  </span>
-                  <span style={{
-                    fontSize: 9, color: 'rgba(255,255,255,0.45)', fontWeight: 500,
-                    background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 3,
-                  }}>
-                    {reason === 'color'
-                      ? `色違い${myColor && c2 ? ` (${myColor}↔${c2})` : ''}`
-                      : '品名類似'}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+          );
+        })()}
 
         {/* 関連 */}
         {relatedItems.length > 0 && (

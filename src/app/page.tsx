@@ -478,6 +478,15 @@ export default function Home() {
                 onAddItem={addItem}
                 onDeleteItem={deleteItem}
                 onSelectAndGoDetail={handleSelectAndGoDetail}
+                onMasterReload={() => {
+                  masterLoadedRef.current = false;
+                  fetchMasterData().then((items) => {
+                    if (items.length > 0) {
+                      loadMaster(items);
+                      linkedRef.current = null;
+                    }
+                  });
+                }}
               />
             </div>
           )}

@@ -158,17 +158,18 @@ body {
 }
 
 /* ===== Edit / Management Page - Grid ===== */
+/* 品名, 気高, 新建高, 種類, 1P, 入数, G.W., CBM, Meas. */
 .edit-grid-row {
   display: grid;
-  grid-template-columns: 2.5fr 1fr 2fr 0.8fr 0.5fr 0.5fr 0.7fr 0.7fr 0.7fr;
+  grid-template-columns: 2.5fr 1.2fr 1.2fr 0.7fr 0.5fr 0.5fr 0.6fr 0.5fr 0.8fr;
   align-items: center;
   gap: 4px;
 }
 @media (max-width: 480px) {
-  .edit-grid-row { grid-template-columns: 2fr 0.8fr 1.5fr 0.7fr 0.4fr 0.4fr 0.6fr 0.6fr 0.6fr; gap: 2px; }
+  .edit-grid-row { grid-template-columns: 2fr 1fr 1fr 0.6fr 0.4fr 0.4fr 0.5fr 0.5fr 0.7fr; gap: 2px; }
 }
 @media (min-width: 1024px) {
-  .edit-grid-row { grid-template-columns: 3fr 1.2fr 2.5fr 1fr 0.6fr 0.6fr 0.8fr 0.8fr 0.8fr; gap: 8px; }
+  .edit-grid-row { grid-template-columns: 3fr 1.4fr 1.4fr 0.8fr 0.5fr 0.5fr 0.7fr 0.6fr 1fr; gap: 8px; }
 }
 
 /* ===== Edit / Management Page ===== */
@@ -288,11 +289,11 @@ body {
   letter-spacing: -0.8px; flex-shrink: 0;
 }
 
-/* パレット図 — 品名下部に制限 */
+/* パレット図 — コンパクト表示エリア */
 .detail-pallet-area {
   display: flex; justify-content: center; align-items: center;
   flex: 1 1 0; min-height: 0; margin: 0;
-  max-height: 35%; overflow: hidden;
+  max-height: 25%; overflow: hidden;
 }
 
 /* 数量（大フォント装飾） */

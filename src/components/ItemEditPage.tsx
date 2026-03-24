@@ -15,9 +15,52 @@ interface ItemEditPageProps {
   onAddItem: (item: ContainerItem) => void;
   onDeleteItem: (idx: number) => void;
   onSelectAndGoDetail: (idx: number) => void;
+  onMasterReload?: () => void;
 }
 
 const ITEM_TYPES: ItemType[] = ['ポリカバー', '箱', '部品', 'その他'];
+
+/* ===== マスタ保存（CNS品目一覧_全集約版.xlsx をダウンロード上書き用） ===== */
+function saveMasterExcel(items: ContainerItem[]) {
+  const groupRow = [
+    'ベース情報', '', '', '', '', '', '', '', '',
+    '气高编号', '', '',
+    'コンテナ日程', '', '', '',
+    '', '', '', '', '',
+  ];
+  const headerRow = [
+    '新建高コード', '気高コード', '規格', '種類', '代表機種', '入数', '総数', 'ケース数', '1P数',
+    '新建高コード\n(气高编号)', '規格\n(气高编号)', '紐付状態',
+    '規格\n(コンテナ)', '代表機種\n(コンテナ)', '入数\n(コンテナ)', '1P数\n(コンテナ)',
+    'ITEM\nDESCRIPTION', 'MODEL NO.', 'G.W.\n(per carton)', 'CBM', 'Meas.',
+  ];
+  const dataRows = items.map((it) => [
+    it.newPartNumber || '', it.partNumber, it.itemName,
+    it.type || '', it.representModel,
+    it.packingQty || '', it.totalQty || '', it.caseCount || '', it.qtyPerPallet || '',
+    it.newPartNumberKetaka || '', it.itemNameKetaka || '', it.linkStatus || '',
+    it.itemNameContainer || '', it.representModelContainer || '',
+    it.packingQtyContainer || '', it.qtyPerPalletContainer || '',
+    it.description || '', it.modelNo || '',
+    it.grossWeight || '', it.cbm || '', it.measurements || '',
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([groupRow, headerRow, ...dataRows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '品目一覧（全集約）');
+  ws['!cols'] = [
+    { wch: 14 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 22 },
+    { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 6 },
+    { wch: 14 }, { wch: 28 }, { wch: 8 },
+    { wch: 28 }, { wch: 22 }, { wch: 6 }, { wch: 6 },
+    { wch: 22 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 14 },
+  ];
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+    { s: { r: 0, c: 9 }, e: { r: 0, c: 11 } },
+    { s: { r: 0, c: 12 }, e: { r: 0, c: 15 } },
+  ];
+  XLSX.writeFile(wb, `CNS_品目一覧_全集約版.xlsx`);
+}
 
 /* ===== Excel Export（CNS品目一覧 全集約版フォーマット） ===== */
 function exportToExcel(items: ContainerItem[]) {
@@ -212,7 +255,7 @@ const labelStyle: React.CSSProperties = {
 
 /* ===== メインコンポーネント ===== */
 export default function ItemEditPage({
-  items, containerNo, containerPartNumbers, onUpdateItem, onAddItem, onDeleteItem, onSelectAndGoDetail,
+  items, containerNo, containerPartNumbers, onUpdateItem, onAddItem, onDeleteItem, onSelectAndGoDetail, onMasterReload,
 }: ItemEditPageProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<ItemType | 'all'>('all');
@@ -220,6 +263,7 @@ export default function ItemEditPage({
   const [importMsg, setImportMsg] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [containerFirst, setContainerFirst] = useState(true);
+  const [showSubMenu, setShowSubMenu] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
   const filtered = items.filter((item) => {
@@ -282,7 +326,7 @@ export default function ItemEditPage({
             <span style={{ fontSize: 24, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)' }}>{items.length}</span>
             <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>品目</span>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
             <button onClick={() => { setShowAddForm(!showAddForm); setEditingIdx(null); }} style={{
               display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
               borderRadius: 8, border: '1px solid rgba(59,130,246,0.4)', cursor: 'pointer',
@@ -292,22 +336,59 @@ export default function ItemEditPage({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               新規
             </button>
-            <button onClick={() => importRef.current?.click()} style={{
+            {/* マスタ保存（メイン） */}
+            <button onClick={() => saveMasterExcel(items)} style={{
               display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
-              borderRadius: 8, border: '1px solid rgba(33,115,70,0.4)', cursor: 'pointer',
-              background: 'rgba(33,115,70,0.15)', color: '#4caf50', fontSize: 12, fontWeight: 600,
+              borderRadius: 8, border: '1px solid rgba(139,92,246,0.4)', cursor: 'pointer',
+              background: 'rgba(139,92,246,0.15)', color: '#a78bfa', fontSize: 12, fontWeight: 600,
             }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Import
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              保存
             </button>
-            <button onClick={() => exportToExcel(items)} style={{
-              display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
-              borderRadius: 8, border: '1px solid rgba(33,115,70,0.4)', cursor: 'pointer',
-              background: 'rgba(33,115,70,0.15)', color: '#4caf50', fontSize: 12, fontWeight: 600,
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Export
-            </button>
+            {/* マスタ再読込（メイン） */}
+            {onMasterReload && (
+              <button onClick={onMasterReload} style={{
+                display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
+                borderRadius: 8, border: '1px solid rgba(59,130,246,0.4)', cursor: 'pointer',
+                background: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontSize: 12, fontWeight: 600,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                再読込
+              </button>
+            )}
+            {/* サブメニュー（外部Import/Export） */}
+            <button onClick={() => setShowSubMenu(!showSubMenu)} style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 32, height: 32, borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
+              background: showSubMenu ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.04)',
+              color: 'rgba(255,255,255,0.5)', fontSize: 14,
+            }}>⋮</button>
+            {showSubMenu && (
+              <div style={{
+                position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 10,
+                background: '#252a40', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 10, padding: 4, minWidth: 160,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+              }}>
+                <button onClick={() => { importRef.current?.click(); setShowSubMenu(false); }} style={{
+                  display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '8px 12px',
+                  borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: 'transparent', color: '#4caf50', fontSize: 12, fontWeight: 500,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  外部Excelインポート
+                </button>
+                <button onClick={() => { exportToExcel(items); setShowSubMenu(false); }} style={{
+                  display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '8px 12px',
+                  borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: 'transparent', color: '#4caf50', fontSize: 12, fontWeight: 500,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  外部Excelエクスポート
+                </button>
+              </div>
+            )}
           </div>
           <input ref={importRef} type="file" accept=".xlsx,.xls" onChange={handleImport} className="hidden" />
         </div>
@@ -390,14 +471,14 @@ export default function ItemEditPage({
         color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)',
       }}>
         <span>品名</span>
+        <span style={{ textAlign: 'center' }}>気高</span>
         <span style={{ textAlign: 'center' }}>新建高</span>
-        <span style={{ textAlign: 'center' }}>Description</span>
         <span style={{ textAlign: 'center' }}>種類</span>
-        <span style={{ textAlign: 'center' }}>CS</span>
         <span style={{ textAlign: 'center' }}>1P</span>
-        <span style={{ textAlign: 'center' }}>PCS</span>
+        <span style={{ textAlign: 'center' }}>入数</span>
         <span style={{ textAlign: 'center' }}>G.W.</span>
-        <span style={{ textAlign: 'right' }}>CBM</span>
+        <span style={{ textAlign: 'center' }}>CBM</span>
+        <span style={{ textAlign: 'right' }}>Meas.</span>
       </div>
 
       {/* リスト */}
@@ -805,8 +886,6 @@ function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpd
     );
   }
 
-  const fmtNum = (v: number) => Number.isInteger(v) ? v : Math.ceil(v * 100) / 100;
-
   return (
     <button onClick={onStartEdit} className="edit-grid-row" style={{
       width: '100%', padding: '9px 12px',
@@ -815,37 +894,48 @@ function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpd
       cursor: 'pointer', textAlign: 'left' as const,
       borderLeft: isContainerMatch ? `3px solid ${colors.accent}` : 'none',
     }}>
+      {/* 品名 */}
       <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
         <span style={{ width: 5, height: 5, borderRadius: '50%', background: colors.accent, flexShrink: 0 }} />
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
           {item.itemName}
         </span>
       </span>
+      {/* 気高コード */}
+      <span style={{
+        textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        color: 'rgba(255,255,255,0.55)',
+      }}>
+        {item.partNumber || '---'}
+      </span>
+      {/* 新建高コード */}
       <span style={{
         textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
         color: item.newPartNumber ? 'rgba(167,139,250,0.7)' : 'rgba(255,255,255,0.15)',
       }}>
         {item.newPartNumber || '---'}
       </span>
-      <span style={{
-        textAlign: 'center', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        color: item.description ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
-      }}>
-        {item.description || '---'}
-      </span>
+      {/* 種類 */}
       <span style={{ textAlign: 'center' }}>
         <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, fontWeight: 500, color: colors.accent, background: `${colors.accent}15` }}>
           {item.type}
         </span>
       </span>
-      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{fmtNum(item.caseCount)}</span>
+      {/* 1P */}
       <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.qtyPerPallet || '-'}</span>
-      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{item.totalQty.toLocaleString()}</span>
+      {/* 入数 */}
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.packingQty || '-'}</span>
+      {/* G.W. */}
       <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, color: item.grossWeight ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)' }}>
         {item.grossWeight ? item.grossWeight.toFixed(1) : '---'}
       </span>
-      <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 10, color: item.cbm ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)' }}>
+      {/* CBM */}
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, color: item.cbm ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)' }}>
         {item.cbm ? item.cbm.toFixed(2) : '---'}
+      </span>
+      {/* Meas. */}
+      <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: item.measurements ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)' }}>
+        {item.measurements || '---'}
       </span>
     </button>
   );
