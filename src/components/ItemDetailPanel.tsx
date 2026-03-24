@@ -5,7 +5,7 @@ import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 import PalletDiagram from './PalletDiagram';
-import SizeDiagram from './SizeDiagram';
+import SizeDiagram, { parseMeas } from './SizeDiagram';
 
 interface ItemDetailPanelProps {
   item: ContainerItem;
@@ -298,6 +298,21 @@ export default function ItemDetailPanel({
 
   const displayItemName = item.itemName.replace(/ポリカバー/g, '').replace(/^[\s\-]+|[\s\-]+$/g, '') || item.itemName;
 
+  // コンテナ内全アイテムの最大寸法を計算（箱イメージのスケーリング基準）
+  const maxContainerDim = (() => {
+    let maxD = 0;
+    for (const it of allItems) {
+      if (it.measurements) {
+        const d = parseMeas(it.measurements);
+        if (d) maxD = Math.max(maxD, d[0], d[1], d[2]);
+      }
+    }
+    return maxD || 50;
+  })();
+
+  // 現在のアイテムの寸法
+  const currentDims = item.measurements ? parseMeas(item.measurements) : null;
+
   const typeCounts = new Map<string, number>();
   for (const it of allItems) {
     typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
@@ -403,18 +418,44 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* パレット図 + サイズ図（右側配置） */}
-        <div className="detail-pallet-area" style={{ zIndex: 1, display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+        {/* 箱イメージ（背景レイヤー：KENコード下〜PL数上の固定エリア） */}
+        <div className="detail-pallet-area" style={{
+          position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0, overflow: 'hidden',
+        }}>
+          {/* 箱3Dイメージ — 背景レイヤー（テキストの下） */}
           {(item.measurements || item.cbm) && (
-            <div style={{ flex: item.qtyPerPallet > 0 ? '0 0 35%' : '0 0 50%', minWidth: 0, height: '100%' }}>
+            <div style={{
+              position: 'absolute', inset: 0, zIndex: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              opacity: 0.7,
+            }}>
               <SizeDiagram measurements={item.measurements} cbm={item.cbm}
-                grossWeight={item.grossWeight} type={item.type} />
+                type={item.type} maxContainerDim={maxContainerDim} />
             </div>
           )}
+
+          {/* mean寸法テキスト — 右揃えオーバーレイ */}
+          {currentDims && (
+            <div style={{
+              position: 'absolute', top: 4, right: 0, zIndex: 2,
+              fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 11,
+              color: colors.accent,
+              textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+            }}>
+              {currentDims[0]}×{currentDims[1]}×{currentDims[2]}
+            </div>
+          )}
+
+          {/* パレット図 — 前面レイヤー */}
           {item.qtyPerPallet > 0 && (
-            <div style={{ flex: 1, minWidth: 0, height: '100%' }}>
-              <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
-                qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
+            <div style={{
+              position: 'relative', zIndex: 1, width: '100%', height: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+            }}>
+              <div style={{ width: '55%', height: '100%' }}>
+                <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
+                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
+              </div>
             </div>
           )}
         </div>
