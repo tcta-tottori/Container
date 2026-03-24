@@ -42,6 +42,13 @@ export const COLOR_MAP: Record<ItemType | 'その他', {
     gradient: 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)',
     glow: 'rgba(239, 68, 68, 0.1)',
   },
+  'ヤーマン部品': {
+    bg: '#fefce8',
+    text: '#854d0e',
+    accent: '#eab308',
+    gradient: 'linear-gradient(135deg, #fefce8 0%, #fef08a 100%)',
+    glow: 'rgba(234, 179, 8, 0.1)',
+  },
   'その他': {
     bg: '#f9fafb',
     text: '#374151',

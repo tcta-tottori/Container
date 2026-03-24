@@ -124,7 +124,7 @@ function ProgressRing({ done, total, color }: { done: number; total: number; col
 function ContainerTruckDistribution({ items, completedIds, containerType }: {
   items: ContainerItem[]; completedIds: Set<string>; containerType: string;
 }) {
-  const types = ['ポリカバー', 'ジャーポット', '箱', '部品', '鍋', 'その他'] as const;
+  const types = ['ポリカバー', 'ジャーポット', '箱', '部品', '鍋', 'ヤーマン部品', 'その他'] as const;
   const counts: Record<string, { total: number; done: number }> = {};
   for (const t of types) counts[t] = { total: 0, done: 0 };
   for (const it of items) {

@@ -3,9 +3,45 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { getRecentFiles, base64ToFile, RecentFile } from '@/lib/recentFiles';
 
+/** 判別されたファイルの役割 */
+export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'unknown';
+
+export interface ClassifiedFile {
+  file: File;
+  role: FileRole;
+  label: string;
+}
+
+/** ファイル名からロールを自動判別 */
+export function classifyFile(name: string): { role: FileRole; label: string } {
+  const upper = name.toUpperCase();
+  if (upper.includes('CNS_品目一覧') || upper.includes('CNS_品目') || upper.includes('全集約版')) {
+    return { role: 'master', label: 'マスターデータ' };
+  }
+  if (upper.includes('气高出货') || upper.includes('気高出荷')) {
+    return { role: 'ketaka', label: '气高编号マッピング' };
+  }
+  if (upper.includes('コンテナ日程')) {
+    return { role: 'container_schedule', label: 'コンテナ日程' };
+  }
+  if (upper.startsWith('AQSS04L') || upper.includes('AQSS04L')) {
+    return { role: 'aqss04l', label: 'AQSS04L (Invoice)' };
+  }
+  if (upper.startsWith('AQSS05L') || upper.includes('AQSS05L')) {
+    return { role: 'aqss05l', label: 'AQSS05L (Packing)' };
+  }
+  if (upper.includes('JKP')) {
+    return { role: 'jkp', label: 'JKP出荷スケジュール' };
+  }
+  // デフォルト: コンテナ日程（内容シート含む作業ファイル）
+  return { role: 'container', label: 'コンテナ作業ファイル' };
+}
+
 interface FileDropZoneProps {
   onFileLoaded: (file: File) => void;
   onAqssLoaded?: (files: File[]) => void;
+  onJkpLoaded?: (file: File) => void;
+  onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
 const APP_VERSION = '1.3';
@@ -55,34 +91,48 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   );
 }
 
-export default function FileDropZone({ onFileLoaded, onAqssLoaded }: FileDropZoneProps) {
+export default function FileDropZone({ onFileLoaded, onAqssLoaded, onJkpLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+  const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setRecentFiles(getRecentFiles());
   }, []);
 
-  // ファイル名で自動判定: AQSS系 or コンテナ系
+  // ファイル名で自動判別・振り分け
   const handleFiles = useCallback(
     (files: FileList | File[]) => {
+      const classified: ClassifiedFile[] = [];
       const aqssFiles: File[] = [];
       let containerFile: File | null = null;
+
       for (const f of Array.from(files)) {
         if (!f.name.endsWith('.xlsx') && !f.name.endsWith('.xls')) continue;
-        const upper = f.name.toUpperCase();
-        if (upper.includes('AQSS') || upper.includes('04L') || upper.includes('05L')) {
+        const { role, label } = classifyFile(f.name);
+        classified.push({ file: f, role, label });
+
+        if (role === 'aqss04l' || role === 'aqss05l') {
           aqssFiles.push(f);
-        } else {
+        } else if (role === 'jkp') {
+          if (onJkpLoaded) onJkpLoaded(f);
+        } else if (role === 'container') {
           containerFile = f;
         }
       }
+
+      setClassifiedFiles(classified);
+
+      if (onMultiFilesLoaded && classified.length > 0) {
+        onMultiFilesLoaded(classified);
+      }
+
       if (containerFile) onFileLoaded(containerFile);
       if (aqssFiles.length > 0 && onAqssLoaded) onAqssLoaded(aqssFiles);
     },
-    [onFileLoaded, onAqssLoaded]
+    [onFileLoaded, onAqssLoaded, onJkpLoaded, onMultiFilesLoaded]
   );
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -237,16 +287,49 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded }: FileDropZon
             またはタップして選択（.xlsx / .xls）
           </p>
           {/* 対応ファイル説明 */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{
-              fontSize: 10, color: 'rgba(96,165,250,0.8)', background: 'rgba(59,130,246,0.1)',
-              padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(59,130,246,0.15)',
-            }}>コンテナ日程（内容シート）</span>
-            <span style={{
-              fontSize: 10, color: 'rgba(167,139,250,0.8)', background: 'rgba(139,92,246,0.1)',
-              padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(139,92,246,0.15)',
-            }}>AQSS04L / 05L</span>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {[
+              { label: 'コンテナ日程', color: '#60a5fa' },
+              { label: '品目一覧', color: '#34d399' },
+              { label: 'AQSS', color: '#a78bfa' },
+              { label: 'JKP', color: '#f59e0b' },
+              { label: '气高编号', color: '#f472b6' },
+            ].map(({ label, color }) => (
+              <span key={label} style={{
+                fontSize: 9, color: `${color}cc`, background: `${color}15`,
+                padding: '2px 6px', borderRadius: 4, border: `1px solid ${color}25`,
+              }}>{label}</span>
+            ))}
           </div>
+
+          {/* 判別結果表示 */}
+          {classifiedFiles.length > 0 && (
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {classifiedFiles.map((cf, i) => {
+                const roleIcons: Record<FileRole, string> = {
+                  container: '📋', master: '📊', ketaka: '🔗', container_schedule: '📅',
+                  aqss04l: '📄', aqss05l: '📄', jkp: '🍲', unknown: '❓',
+                };
+                return (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
+                    padding: '3px 8px', borderRadius: 6,
+                    background: cf.role === 'unknown' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.08)',
+                    border: cf.role === 'unknown' ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(34,197,94,0.15)',
+                  }}>
+                    <span>{roleIcons[cf.role]}</span>
+                    <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>{cf.label}:</span>
+                    <span style={{ color: 'rgba(255,255,255,0.8)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {cf.file.name}
+                    </span>
+                    <span style={{ color: cf.role === 'unknown' ? '#ef4444' : '#22c55e', fontSize: 12 }}>
+                      {cf.role === 'unknown' ? '⚠' : '✓'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <input ref={inputRef} type="file" accept=".xlsx,.xls" multiple
             onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
             className="hidden" />

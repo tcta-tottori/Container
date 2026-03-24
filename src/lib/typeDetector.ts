@@ -51,6 +51,15 @@ export function detectTypeByItemName(itemName: string): ItemType {
 }
 
 /**
+ * 品番パターンでヤーマン部品を判定
+ */
+export function isYamanPart(partNumber: string): boolean {
+  if (!partNumber) return false;
+  const pn = partNumber.trim().toUpperCase();
+  return pn.startsWith('3YM') || pn.startsWith('23F');
+}
+
+/**
  * 品名・品番の情報から種類を自動判定する（マスタにD列が無い場合のフォールバック）
  *
  * 判定フロー:
@@ -68,7 +77,11 @@ export function detectItemType(
 ): ItemType {
   void qtyPerPallet;
   void palletCount;
-  void partNumber;
+
+  // ヤーマン部品判定（品番3YM/23Fで始まる）
+  if (partNumber && isYamanPart(partNumber)) {
+    return 'ヤーマン部品';
+  }
 
   // 鍋は最優先（品名のどこかにｳﾁﾅﾍﾞが含まれる）
   const allNames = [itemName, itemNameKetaka || ''].join('');

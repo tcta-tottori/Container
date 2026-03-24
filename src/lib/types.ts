@@ -1,5 +1,5 @@
 /** 品目の種類 */
-export type ItemType = 'ポリカバー' | 'ジャーポット' | '箱' | '部品' | '鍋' | 'その他';
+export type ItemType = 'ポリカバー' | 'ジャーポット' | '箱' | '部品' | '鍋' | 'ヤーマン部品' | 'その他';
 
 /** コンテナ内の1品目 */
 export interface ContainerItem {
@@ -25,35 +25,37 @@ export interface ContainerItem {
   fraction: number;
   /** 1パレットあたりケース数 — 「内容」シート K列 */
   qtyPerPallet: number;
+  /** サイズ — J列 (100 or 180) */
+  size?: string;
   // --- 以下はCNS品目一覧マスタデータ ---
   /** 新建高コード (A列) */
   newPartNumber?: string;
   // -- 气高编号 参照 --
-  /** 新建高コード/气高编号 (J列) */
+  /** 新建高コード/气高编号 (K列) */
   newPartNumberKetaka?: string;
-  /** 規格/气高编号 (K列) */
+  /** 規格/气高编号 (L列) */
   itemNameKetaka?: string;
-  /** 紐付状態 (L列: ✓ or —) */
+  /** 紐付状態 (M列: ✓ or —) */
   linkStatus?: string;
   // -- コンテナ日程 参照 --
-  /** 規格/コンテナ (M列) */
+  /** 規格/コンテナ (N列) */
   itemNameContainer?: string;
-  /** 代表機種/コンテナ (N列) */
+  /** 代表機種/コンテナ (O列) */
   representModelContainer?: string;
-  /** 入数/コンテナ (O列) */
+  /** 入数/コンテナ (P列) */
   packingQtyContainer?: number;
-  /** 1P数/コンテナ (P列) */
+  /** 1P数/コンテナ (Q列) */
   qtyPerPalletContainer?: number;
   // -- AQSS --
-  /** ITEM DESCRIPTION (Q列) */
+  /** ITEM DESCRIPTION (R列) */
   description?: string;
-  /** MODEL NO. (R列) */
+  /** MODEL NO. (S列) */
   modelNo?: string;
-  /** G.W. per carton (S列) */
+  /** G.W. per carton (T列) */
   grossWeight?: number;
-  /** CBM (T列) */
+  /** CBM (U列) */
   cbm?: number;
-  /** Meas. (U列) */
+  /** Meas. (V列) */
   measurements?: string;
 }
 

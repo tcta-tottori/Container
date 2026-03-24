@@ -19,8 +19,12 @@ import ActionBar from '@/components/ActionBar';
 import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
+import JkpSchedulePage from '@/components/JkpSchedulePage';
+import HistoryPanel from '@/components/HistoryPanel';
+import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems } from '@/lib/jkpParser';
+import * as XLSX from 'xlsx';
 
-type ViewMode = 'work' | 'list' | 'edit' | 'analytics';
+type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
 
 export default function Home() {
   const {
@@ -57,6 +61,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
+  const [jkpShipments, setJkpShipments] = useState<JkpShipment[]>([]);
 
   // 作業ページ表示中は画面スリープを防止（Wake Lock API）
   useEffect(() => {
@@ -206,6 +211,32 @@ export default function Home() {
       }
     },
     [state.items, updateItem]
+  );
+
+  const handleJkpLoaded = useCallback(
+    async (file: File) => {
+      try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array' });
+
+        // Sheet1: 鍋品目リスト
+        const sheet1Items = parseJkpSheet1(wb);
+        // 体積Ｍ３: CBM・箱寸
+        const volumeMap = parseJkpVolume(wb);
+        // updata: 出荷スケジュール
+        const shipments = parseJkpUpdata(wb);
+        setJkpShipments(shipments);
+
+        // 品目一覧に鍋品目を反映
+        const nabeItems = jkpToContainerItems(sheet1Items, volumeMap);
+        // TODO: マスターデータにマージする処理を追加
+
+        void nabeItems;
+      } catch (e) {
+        console.error('JKP parse error:', e);
+      }
+    },
+    []
   );
 
   const handleAnnounce = useCallback(() => {
@@ -373,7 +404,7 @@ export default function Home() {
   if (state.containers.length === 0) {
     return (
       <>
-        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} />
+        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onJkpLoaded={handleJkpLoaded} />
         {loadingMsg && (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 300,
@@ -465,6 +496,19 @@ export default function Home() {
               </svg>
               分析
             </button>
+            <button className={`menu-item ${viewMode === 'jkp' ? 'active' : ''}`} onClick={() => switchView('jkp')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              鍋出荷
+            </button>
+            <button className={`menu-item ${viewMode === 'history' ? 'active' : ''}`} onClick={() => switchView('history')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              履歴
+            </button>
             <div className="menu-divider" />
             <button className="menu-item" onClick={() => { setManualOpen(true); setMenuOpen(false); }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -533,6 +577,18 @@ export default function Home() {
                 completedIds={state.completedIds}
                 containerNo={state.containers[state.selectedContainerIdx]?.containerNo || ''}
               />
+            </div>
+          )}
+
+          {viewMode === 'jkp' && (
+            <div className="full-panel">
+              <JkpSchedulePage shipments={jkpShipments} />
+            </div>
+          )}
+
+          {viewMode === 'history' && (
+            <div className="full-panel" style={{ padding: 16, overflowY: 'auto' }}>
+              <HistoryPanel />
             </div>
           )}
 
