@@ -87,9 +87,36 @@ export function useSpeech() {
         }
 
         if (nameItems.length > 0) {
-          const currentName = itemNameForSpeech(item.itemName);
-          const names = nameItems.map(s => itemNameForSpeech(s.itemName));
-          text += `注意、${currentName}と${names.join('と')}があります。`;
+          // 異なる文字だけを抽出して読み上げ
+          const descs = nameItems.map(s => {
+            const base1 = item.itemName.replace(/\([^)]*\)/g, '').replace(/ポリカバー/g, '').trim();
+            const base2 = s.itemName.replace(/\([^)]*\)/g, '').replace(/ポリカバー/g, '').trim();
+            // 1文字違いの箇所を特定
+            let diffChar = '';
+            if (base1.length === base2.length) {
+              for (let i = 0; i < base1.length; i++) {
+                if (base1[i] !== base2[i]) { diffChar = base2[i]; break; }
+              }
+            } else {
+              const longer = base1.length > base2.length ? base2 : base1;
+              const shorter = base1.length > base2.length ? base1 : base2;
+              for (let i = 0; i < longer.length; i++) {
+                if (i >= shorter.length || longer[i] !== shorter[i]) { diffChar = longer[i]; break; }
+              }
+            }
+            const label = diffChar || itemNameForSpeech(s.itemName);
+            const fractionCeil = s.fraction % 1 !== 0 ? Math.ceil(s.fraction) : s.fraction;
+            let qty = '';
+            if (s.palletCount > 0 && fractionCeil > 0) {
+              qty = `${s.palletCount}パレット${fractionCeil}ケース`;
+            } else if (s.palletCount > 0) {
+              qty = `${s.palletCount}パレット`;
+            } else if (fractionCeil > 0) {
+              qty = `${fractionCeil}ケース`;
+            }
+            return qty ? `${label}が${qty}` : label;
+          }).join('、');
+          text += `注意、類似品で${descs}あります。`;
         }
       }
     }
