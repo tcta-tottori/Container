@@ -181,18 +181,18 @@ export default function ItemEditPage({ items, onUpdateItem, onSelectAndGoDetail 
       </div>
 
       {/* テーブルヘッダー */}
-      <div style={{
-        display: 'flex', alignItems: 'center', padding: '5px 12px', flexShrink: 0,
+      <div className="edit-grid-row" style={{
+        padding: '5px 12px', flexShrink: 0,
         background: '#181b28', borderBottom: '1px solid rgba(255,255,255,0.04)',
         fontSize: 9, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' as const,
-        color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)', gap: 4,
+        color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)',
       }}>
-        <span style={{ flex: 1, minWidth: 0 }}>品名</span>
-        <span className="edit-col-new" style={{ width: 70, textAlign: 'center', flexShrink: 0 }}>新コード</span>
-        <span style={{ width: 56, textAlign: 'center', flexShrink: 0 }}>種類</span>
-        <span style={{ width: 32, textAlign: 'center', flexShrink: 0 }}>PL</span>
-        <span style={{ width: 32, textAlign: 'center', flexShrink: 0 }}>CS</span>
-        <span style={{ width: 44, textAlign: 'right', flexShrink: 0 }}>PCS</span>
+        <span>品名</span>
+        <span style={{ textAlign: 'center' }}>新コード</span>
+        <span style={{ textAlign: 'center' }}>種類</span>
+        <span style={{ textAlign: 'center' }}>PL</span>
+        <span style={{ textAlign: 'center' }}>CS</span>
+        <span style={{ textAlign: 'right' }}>PCS</span>
       </div>
 
       {/* リスト */}
@@ -315,31 +315,31 @@ function EditRow({ item, isEditing, colors, onStartEdit, onUpdate, onGoDetail }:
   const fmtNum = (v: number) => Number.isInteger(v) ? v : Math.ceil(v * 100) / 100;
 
   return (
-    <button onClick={onStartEdit} style={{
-      display: 'flex', alignItems: 'center', width: '100%', padding: '9px 12px',
+    <button onClick={onStartEdit} className="edit-grid-row" style={{
+      width: '100%', padding: '9px 12px',
       border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
-      background: `${colors.accent}08`, cursor: 'pointer', textAlign: 'left' as const, gap: 4,
+      background: `${colors.accent}08`, cursor: 'pointer', textAlign: 'left' as const,
     }}>
-      <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
         <span style={{ width: 5, height: 5, borderRadius: '50%', background: colors.accent, flexShrink: 0 }} />
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
           {item.itemName}
         </span>
       </span>
-      <span className="edit-col-new" style={{
-        width: 70, textAlign: 'center', flexShrink: 0, fontSize: 9,
+      <span style={{
+        textAlign: 'center', fontSize: 10,
         fontFamily: 'var(--font-mono)', color: item.newPartNumber ? '#4ade80' : 'rgba(255,255,255,0.15)',
       }}>
         {item.newPartNumber ? item.newPartNumber.slice(-6) : '---'}
       </span>
-      <span style={{ width: 56, textAlign: 'center', flexShrink: 0 }}>
+      <span style={{ textAlign: 'center' }}>
         <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, fontWeight: 500, color: colors.accent, background: `${colors.accent}15` }}>
           {item.type}
         </span>
       </span>
-      <span style={{ width: 32, textAlign: 'center', flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{fmtNum(item.palletCount)}</span>
-      <span style={{ width: 32, textAlign: 'center', flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{fmtNum(item.fraction)}</span>
-      <span style={{ width: 44, textAlign: 'right', flexShrink: 0, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{item.totalQty.toLocaleString()}</span>
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{fmtNum(item.palletCount)}</span>
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{fmtNum(item.fraction)}</span>
+      <span style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{item.totalQty.toLocaleString()}</span>
     </button>
   );
 }
