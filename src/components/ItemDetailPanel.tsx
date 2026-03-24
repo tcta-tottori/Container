@@ -403,24 +403,24 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* パレット図 + サイズ図 */}
-        <div className="detail-pallet-area" style={{ zIndex: 1, display: 'flex', gap: 4 }}>
+        {/* パレット図 + サイズ図（右側配置） */}
+        <div className="detail-pallet-area" style={{ zIndex: 1, display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+          {(item.measurements || item.cbm) && (
+            <div style={{ flex: item.qtyPerPallet > 0 ? '0 0 35%' : '0 0 50%', minWidth: 0, height: '100%' }}>
+              <SizeDiagram measurements={item.measurements} cbm={item.cbm}
+                grossWeight={item.grossWeight} type={item.type} />
+            </div>
+          )}
           {item.qtyPerPallet > 0 && (
             <div style={{ flex: 1, minWidth: 0, height: '100%' }}>
               <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
                 qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
             </div>
           )}
-          {(item.measurements || item.cbm) && (
-            <div style={{ flex: item.qtyPerPallet > 0 ? '0 0 38%' : 1, minWidth: 0, height: '100%' }}>
-              <SizeDiagram measurements={item.measurements} cbm={item.cbm}
-                grossWeight={item.grossWeight} type={item.type} />
-            </div>
-          )}
         </div>
 
-        {/* 数量（PL / CT / pcs 下揃え） */}
-        <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2 }}>
+        {/* 数量（PL / CT / pcs 右揃え） */}
+        <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'flex-end' }}>
           <div className="detail-sf-item">
             <span className="detail-sf-num" style={{
               color: colors.accent,

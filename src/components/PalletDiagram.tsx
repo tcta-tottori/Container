@@ -39,21 +39,17 @@ function Box({ x, y, z, w, d, h, ghost, accent }: {
   }
 
   const sk = '#5a4020';
-  // 3面 (正面→上面→左面の順、左面を最後で確実に表示)
   const front = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y, z), iso(x, y, z)] as [number, number][];
   const top   = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
   const left  = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
 
-  // テープ十字 (上面: 縦帯+横帯)
   const tw = w * 0.12;
   const tx = x + (w - tw) / 2;
   const td = d * 0.12;
   const ty = y + (d - td) / 2;
   const tapeV = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y + d, z + h), iso(tx, y + d, z + h)] as [number, number][];
   const tapeH = [iso(x, ty, z + h), iso(x + w, ty, z + h), iso(x + w, ty + td, z + h), iso(x, ty + td, z + h)] as [number, number][];
-  // テープ正面垂れ
   const tapeFV = [iso(tx, y, z + h), iso(tx + tw, y, z + h), iso(tx + tw, y, z + h * 0.78), iso(tx, y, z + h * 0.78)] as [number, number][];
-  // テープ左面垂れ
   const tapeLV = [iso(x, ty, z + h), iso(x, ty + td, z + h), iso(x, ty + td, z + h * 0.78), iso(x, ty, z + h * 0.78)] as [number, number][];
 
   return (
@@ -61,7 +57,6 @@ function Box({ x, y, z, w, d, h, ghost, accent }: {
       <polygon points={pts(...front)} fill="#dea550" stroke={sk} strokeWidth={0.7} strokeLinejoin="round" />
       <polygon points={pts(...top)}   fill="#e8c06a" stroke={sk} strokeWidth={0.7} strokeLinejoin="round" />
       <polygon points={pts(...left)}  fill="#c08a3a" stroke={sk} strokeWidth={0.7} strokeLinejoin="round" />
-      {/* テープ十字 */}
       <polygon points={pts(...tapeV)} fill="rgba(255,255,255,0.4)" stroke="none" />
       <polygon points={pts(...tapeH)} fill="rgba(255,255,255,0.35)" stroke="none" />
       <polygon points={pts(...tapeFV)} fill="rgba(255,255,255,0.25)" stroke="none" />
@@ -70,7 +65,7 @@ function Box({ x, y, z, w, d, h, ghost, accent }: {
   );
 }
 
-/* ===== パレット台（正方形・シンプル・見栄えの良いアイソメトリック） ===== */
+/* ===== パレット台 ===== */
 function PalletBase({ x, y, z, w, d, h }: {
   x: number; y: number; z: number; w: number; d: number; h: number;
 }) {
@@ -79,7 +74,6 @@ function PalletBase({ x, y, z, w, d, h }: {
   const top   = [iso(x, y, z + h), iso(x + w, y, z + h), iso(x + w, y + d, z + h), iso(x, y + d, z + h)] as [number, number][];
   const left  = [iso(x, y, z + h), iso(x, y + d, z + h), iso(x, y + d, z), iso(x, y, z)] as [number, number][];
 
-  // フォーク穴 (正面2つ + 左面2つ)
   const hw = w * 0.2, hh = h * 0.45, hz = z + h * 0.18;
   const forkFront = [0.15, 0.58].map((pct, i) => {
     const hx = x + w * pct;
@@ -103,7 +97,7 @@ function PalletBase({ x, y, z, w, d, h }: {
   );
 }
 
-/* ===== ラミネートバンドル（2ケース1まとまり） ===== */
+/* ===== ラミネートバンドル ===== */
 function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
   x: number; y: number; z: number;
   cw: number; cd: number; h: number;
@@ -118,9 +112,7 @@ function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
     return <polygon points={pts(...q)} fill="none" stroke={accent} strokeWidth={0.1} strokeDasharray="1,1" opacity={0.1} />;
   }
 
-  const ig = 0.15; // ケース間の隙間
-
-  // 2つのケースを描画
+  const ig = 0.15;
   const cases: JSX.Element[] = [];
   if (horizontal) {
     cases.push(<Box key="c0" x={x} y={y} z={z} w={cw - ig} d={cd} h={h} ghost={false} accent={accent} />);
@@ -130,28 +122,22 @@ function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
     cases.push(<Box key="c1" x={x} y={y + cw} z={z} w={cd} d={cw - ig} h={h} ghost={false} accent={accent} />);
   }
 
-  // ラミネートラップ（3面に半透明オーバーレイ）
-  const m = 0.08; // wrap margin
+  const m = 0.08;
   const wx = x - m, wy = y - m, ww = bw + m * 2, wd = bd + m * 2, wh = h + m;
-
   const wrapLeft = [iso(wx, wy, z + wh), iso(wx, wy + wd, z + wh), iso(wx, wy + wd, z), iso(wx, wy, z)] as [number, number][];
   const wrapFront = [iso(wx, wy, z + wh), iso(wx + ww, wy, z + wh), iso(wx + ww, wy, z), iso(wx, wy, z)] as [number, number][];
   const wrapTop = [iso(wx, wy, z + wh), iso(wx + ww, wy, z + wh), iso(wx + ww, wy + wd, z + wh), iso(wx, wy + wd, z + wh)] as [number, number][];
 
-  // ラミネートバンド（上下2本）
   const bandH = 0.4;
   const bands: JSX.Element[] = [];
   for (const pct of [0.25, 0.72]) {
     const bz = z + h * pct;
-    // 正面バンド
     const bf = [iso(wx, wy, bz + bandH), iso(wx + ww, wy, bz + bandH), iso(wx + ww, wy, bz), iso(wx, wy, bz)] as [number, number][];
     bands.push(<polygon key={`bf${pct}`} points={pts(...bf)} fill="rgba(200,230,255,0.22)" stroke="none" />);
-    // 左面バンド
     const bl = [iso(wx, wy, bz + bandH), iso(wx, wy + wd, bz + bandH), iso(wx, wy + wd, bz), iso(wx, wy, bz)] as [number, number][];
     bands.push(<polygon key={`bl${pct}`} points={pts(...bl)} fill="rgba(180,210,240,0.18)" stroke="none" />);
   }
 
-  // 光の反射（正面にハイライト線）
   const refY = z + h * 0.5;
   const ref = [iso(wx + ww * 0.1, wy, refY + 0.2), iso(wx + ww * 0.7, wy, refY + 0.2),
                iso(wx + ww * 0.7, wy, refY), iso(wx + ww * 0.1, wy, refY)] as [number, number][];
@@ -159,7 +145,6 @@ function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
   return (
     <g>
       {cases}
-      {/* ラミネートラップ */}
       <polygon points={pts(...wrapLeft)} fill="rgba(180,215,250,0.12)" stroke="rgba(150,190,230,0.35)" strokeWidth={0.3} strokeLinejoin="round" />
       <polygon points={pts(...wrapFront)} fill="rgba(190,220,250,0.1)" stroke="rgba(150,190,230,0.35)" strokeWidth={0.3} strokeLinejoin="round" />
       <polygon points={pts(...wrapTop)} fill="rgba(220,240,255,0.08)" stroke="rgba(150,190,230,0.35)" strokeWidth={0.3} strokeLinejoin="round" />
@@ -169,11 +154,7 @@ function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
   );
 }
 
-/* ===== ジャーポット用スタック =====
- * 1段 = 10バンドル(20ケース)
- * Layer 0: 横向き 2列×5行
- * Layer 1: 縦向き 5列×2行（互い違い）
- */
+/* ===== ジャーポット用スタック ===== */
 interface BundleSlot {
   x: number; y: number; z: number;
   horizontal: boolean;
@@ -182,17 +163,14 @@ interface BundleSlot {
 
 function buildJarPotSlots(PH: number): BundleSlot[] {
   const PW = 22, PD = 22;
-  // ケースサイズ: 4*cw = PW, 5*cd = PD → cw:cd = 5:4
   const gOuter = 0.3;
-  const cw = (PW - 3 * gOuter) / 4; // ≈5.275
-  const cd = (PD - 6 * gOuter) / 5; // ≈4.04
+  const cw = (PW - 3 * gOuter) / 4;
+  const cd = (PD - 6 * gOuter) / 5;
   const bh = 5.5;
 
   const slots: BundleSlot[] = [];
   let idx = 0;
 
-  // Layer 0: 横向きバンドル (2cols × 5rows)
-  // bw=2*cw, bd=cd
   const z0 = PH;
   for (let r = 4; r >= 0; r--) {
     for (let c = 0; c < 2; c++) {
@@ -202,8 +180,6 @@ function buildJarPotSlots(PH: number): BundleSlot[] {
     }
   }
 
-  // Layer 1: 縦向きバンドル (5cols × 2rows) — 互い違い
-  // bw=cd, bd=2*cw
   const z1 = PH + bh;
   for (let r = 1; r >= 0; r--) {
     for (let c = 0; c < 5; c++) {
@@ -220,18 +196,16 @@ function JarPotStack({ ox, oy, filled, accent }: {
   ox: number; oy: number; filled: number; accent: string;
 }) {
   const PW = 22, PD = 22, PH = 3;
-  const cw = (PW - 3 * 0.3) / 4;
-  const cd = (PD - 6 * 0.3) / 5;
+  const gOuter = 0.3;
+  const cw = (PW - 3 * gOuter) / 4;
+  const cd = (PD - 6 * gOuter) / 5;
   const bh = 5.5;
 
   const allSlots = buildJarPotSlots(PH);
-
-  // 表示するレイヤー数
   const maxLayer0 = 10;
   const slotsToShow = filled > maxLayer0 ? allSlots.length : maxLayer0;
   const renderSlots = allSlots.slice(0, slotsToShow);
 
-  // 描画順ソート: z昇順 → y降順 → x降順
   const sorted = [...renderSlots].sort((a, b) => {
     if (a.z !== b.z) return a.z - b.z;
     if (a.y !== b.y) return b.y - a.y;
@@ -254,23 +228,21 @@ function JarPotStack({ ox, oy, filled, accent }: {
   return <g transform={`translate(${ox},${oy})`}>{elems}</g>;
 }
 
-/* ===== 汎用ボックス位置定義 (4+4パターン・正方形パレット) ===== */
+/* ===== 汎用ボックス位置定義 ===== */
 interface BoxSlot { x: number; y: number; z: number; }
 
 function buildGenericSlots(PH: number): BoxSlot[] {
   const bw = 7, bd = 7, bh = 6;
-  const PS = 22; // 正方形パレット
+  const PS = 22;
   const g = (PS - 3 * bw) / 4;
   const cols3 = [g, g + bw + g, g + 2 * (bw + g)];
   const g2 = (PS - 2 * bd) / 3;
   const rows2 = [g2, g2 + bd + g2];
 
   const slots: BoxSlot[] = [];
-  // Layer0: 3×2=6個
   const addLayer6 = (z: number) => {
     for (const y of rows2) for (const x of cols3) slots.push({ x, y, z });
   };
-  // Layer1: 2×2=4個（交互配置）
   const addLayer4 = (z: number) => {
     const g3 = (PS - 2 * bw) / 3;
     const cx = [g3, g3 + bw + g3];
@@ -315,25 +287,25 @@ function GenericStack({ ox, oy, filled, accent }: {
   return <g transform={`translate(${ox},${oy})`}>{elems}</g>;
 }
 
-/* ===== メイン ===== */
+/* ===== メイン =====
+ * レイアウト:
+ *   右側エリアに配置
+ *   [1パレット分の積み方図] [×N] + [端数の積み方図]
+ */
 export default function PalletDiagram({
   palletCount, fraction, qtyPerPallet, type, itemName,
 }: PalletDiagramProps) {
   void qtyPerPallet;
   const colors = COLOR_MAP[type] || COLOR_MAP['その他'];
   const hasFrac = fraction > 0;
-  const showTwo = palletCount >= 2 || (palletCount >= 1 && hasFrac);
   const jarPot = isJarPot(itemName || '');
 
-  // スロット数
   const maxSlots = jarPot ? 20 : 16;
-  // ジャーポット: 端数をバンドル数に変換 (2ケース=1バンドル)
   const mapFrac = (n: number) => {
     if (jarPot) return Math.min(Math.ceil(n / 2), maxSlots);
     return Math.min(Math.ceil(n), maxSlots);
   };
 
-  // 投影範囲（汎用も正方形パレット22×22）
   const PW = 22, PD = 22, PH = 3;
   const layerH = jarPot ? 5.5 : 6;
   const totalZ = PH + 2 * layerH;
@@ -343,34 +315,65 @@ export default function PalletDiagram({
   const yT = -totalZ - 2;
   const oneW = xR - xL;
   const oneH = yB - yT;
-  const sp = oneW * 0.1;
-
-  const n = showTwo ? 2 : 1;
-  const svgW = n * oneW + (n > 1 ? sp : 0) + 4;
-  const svgH = oneH + 4;
 
   const StackComponent = jarPot ? JarPotStack : GenericStack;
 
+  // パレット1枚分 + ×Nラベル + 端数図
+  const showFrac = hasFrac;
+  const fracW = showFrac ? oneW * 0.7 : 0;
+  const labelW = palletCount > 0 ? 10 : 0;
+  const sp = 3;
+  const mainW = palletCount > 0 ? oneW : 0;
+  const totalSvgW = mainW + labelW + (showFrac ? sp + fracW : 0) + 4;
+
   return (
-    <div className="pallet-diagram-container">
+    <div className="pallet-diagram-container" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
       <svg width="100%" height="100%"
-        viewBox={`${xL - 2} ${yT - 2} ${svgW} ${svgH}`}
+        viewBox={`${xL - 2} ${yT - 2} ${totalSvgW} ${oneH + 4}`}
         preserveAspectRatio="xMidYMid meet"
         style={{ maxHeight: '100%' }}
       >
-        {showTwo ? (
-          <>
-            <StackComponent ox={0} oy={0}
-              filled={hasFrac ? mapFrac(fraction) : maxSlots}
-              accent={colors.accent} />
-            <StackComponent ox={oneW + sp} oy={0}
-              filled={maxSlots}
-              accent={colors.accent} />
-          </>
-        ) : (
+        {/* 1パレット分の積み方図 */}
+        {palletCount > 0 && (
           <StackComponent ox={0} oy={0}
-            filled={hasFrac ? mapFrac(fraction) : maxSlots}
+            filled={maxSlots}
             accent={colors.accent} />
+        )}
+
+        {/* ×Nパレット数ラベル（図の右下） */}
+        {palletCount > 0 && (
+          <text
+            x={xR + 1}
+            y={yB - 1}
+            textAnchor="start"
+            style={{
+              fontSize: 7, fontWeight: 900, fontFamily: 'var(--font-mono)',
+              fill: colors.accent,
+            }}
+          >
+            ×{palletCount}
+          </text>
+        )}
+
+        {/* 端数の積み方図（右側、少し小さめ） */}
+        {showFrac && (
+          <g transform={`translate(${mainW + labelW + sp}, ${(oneH - oneH * 0.7) / 2 - 2}) scale(0.7)`}>
+            <StackComponent ox={0} oy={0}
+              filled={mapFrac(fraction)}
+              accent={colors.accent} />
+            {/* 端数ラベル */}
+            <text
+              x={xR + 1}
+              y={yB - 1}
+              textAnchor="start"
+              style={{
+                fontSize: 8, fontWeight: 800, fontFamily: 'var(--font-mono)',
+                fill: 'rgba(255,255,255,0.6)',
+              }}
+            >
+              +{fraction % 1 !== 0 ? Math.ceil(fraction) : fraction}
+            </text>
+          </g>
         )}
       </svg>
     </div>
