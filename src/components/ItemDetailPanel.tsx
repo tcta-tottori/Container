@@ -250,7 +250,7 @@ export default function ItemDetailPanel({
         {/* パレット図 (flex:1で余白吸収、品名の下1/3にのみ被る) */}
         <div className="detail-pallet-area" style={{ marginTop: -16, zIndex: 1 }}>
           {item.qtyPerPallet > 0 && (
-            <PalletDiagram caseCount={item.caseCount}
+            <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
           )}
         </div>
@@ -261,27 +261,25 @@ export default function ItemDetailPanel({
             <span className="detail-sf-num" style={{
               color: colors.accent,
               textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
-            }}>{fmtNum(item.caseCount)}</span>
+            }}>{fmtNum(item.palletCount)}</span>
             <div className="detail-sf-labels">
-              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>ケース</span>
-              {item.qtyPerPallet > 0 && <span className="detail-sf-sub" style={{ color: 'rgba(255,255,255,0.4)' }}>@{item.qtyPerPallet}/PL</span>}
+              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>パレット</span>
+              {item.qtyPerPallet > 0 && <span className="detail-sf-sub" style={{ color: 'rgba(255,255,255,0.4)' }}>@{item.qtyPerPallet}</span>}
             </div>
           </div>
           <div className="detail-sf-item">
             <span className="detail-sf-num" style={{
               color: '#e8e8e8',
               textShadow: `0 0 16px ${colors.accent}30, 0 2px 4px rgba(0,0,0,0.6)`,
-            }}>{fmtNum(item.totalQty)}</span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>pcs</span>
+            }}>{fmtNum(item.fraction)}</span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>ケース</span>
           </div>
-          {item.qtyPerPallet > 0 && (
-            <div className="detail-sf-item detail-sf-total">
-              <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                {Math.floor(item.caseCount / item.qtyPerPallet)}PL+{item.caseCount % item.qtyPerPallet}
-              </span>
-              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>内訳</span>
-            </div>
-          )}
+          <div className="detail-sf-item detail-sf-total">
+            <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
+              {Math.ceil(item.totalQty).toLocaleString()}
+            </span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>pcs</span>
+          </div>
         </div>
 
         {/* 似た品目 */}
@@ -311,8 +309,8 @@ export default function ItemDetailPanel({
       <div className="detail-list-section">
         <div className="detail-list-header">
           <span className="detail-list-h-name">品名</span>
+          <span className="detail-list-h-num">PL</span>
           <span className="detail-list-h-num">CS</span>
-          <span className="detail-list-h-num">1P</span>
           <span className="detail-list-h-num detail-list-h-total">PCS</span>
         </div>
         <div className="detail-list-scroll">
@@ -338,8 +336,8 @@ export default function ItemDetailPanel({
                     ? { color: '#aaa', textDecoration: 'line-through' }
                     : isActive ? { fontWeight: 700, color: '#e65100' } : { color: '#1a1a2e' }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#bbb' : isActive ? '#e65100' : c.text }}>{fmtNum(it.caseCount)}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#bbb' : isActive ? '#e65100' : '#333' }}>{it.qtyPerPallet || '-'}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#bbb' : isActive ? '#e65100' : c.text }}>{fmtNum(it.palletCount)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#bbb' : isActive ? '#e65100' : '#333' }}>{fmtNum(it.fraction)}</span>
                 <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#bbb' : '#888' }}>
                   {Math.ceil(it.totalQty).toLocaleString()}
                 </span>

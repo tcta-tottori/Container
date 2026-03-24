@@ -36,19 +36,14 @@ export function useSpeech() {
     const spokenName = itemNameForSpeech(item.itemName);
     const isPolycover = item.type === 'ポリカバー';
 
-    // ケース数ベースの読み上げ
+    // パレットと端数の読み上げ
     let qtyText = '';
-    if (item.caseCount > 0) {
-      qtyText = `${item.caseCount}ケース`;
-      if (item.qtyPerPallet > 0) {
-        const pallets = Math.floor(item.caseCount / item.qtyPerPallet);
-        const frac = item.caseCount % item.qtyPerPallet;
-        if (pallets > 0 && frac > 0) {
-          qtyText = `${pallets}パレットと${frac}ケース`;
-        } else if (pallets > 0) {
-          qtyText = `${pallets}パレット`;
-        }
-      }
+    if (item.palletCount > 0 && item.fraction > 0) {
+      qtyText = `${item.palletCount}パレットと${item.fraction}ケース`;
+    } else if (item.palletCount > 0) {
+      qtyText = `${item.palletCount}パレット`;
+    } else if (item.fraction > 0) {
+      qtyText = `${item.fraction}ケース`;
     } else {
       qtyText = `${item.totalQty}個`;
     }
@@ -57,7 +52,8 @@ export function useSpeech() {
 
     // ポリカバーは検査で1ケース抜く
     if (isPolycover) {
-      const afterInspection = item.caseCount - 1;
+      const totalCases = item.palletCount * item.qtyPerPallet + item.fraction;
+      const afterInspection = totalCases - 1;
       if (afterInspection >= 0) {
         text += `検査を抜いて${afterInspection}ケース。`;
       }
@@ -79,9 +75,9 @@ export function useSpeech() {
     speak(text);
   }, []);
 
-  const announceCaseChange = useCallback(
-    (newCase: number) => {
-      speak(`ケース${newCase}。`);
+  const announcePalletChange = useCallback(
+    (newPallet: number) => {
+      speak(`パレット${newPallet}。`);
     },
     []
   );
@@ -101,7 +97,7 @@ export function useSpeech() {
   return {
     speak,
     announceItem,
-    announceCaseChange,
+    announcePalletChange,
     announceComplete,
     announceAllComplete,
     announceRemaining,

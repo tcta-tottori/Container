@@ -42,7 +42,7 @@ export default function Home() {
 
   const elapsed = useTimer(state.itemStartTime);
   const clock = useClock();
-  const { speak, announceItem, announceCaseChange, announceComplete, announceAllComplete, announceRemaining } =
+  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining } =
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
@@ -77,24 +77,24 @@ export default function Home() {
   const handleIncrease = useCallback(() => {
     increaseQty();
     setTimeout(() => {
-      const el = document.querySelector('[data-case-count]');
+      const el = document.querySelector('[data-pallet-count]');
       if (el) {
-        const c = Number(el.getAttribute('data-case-count'));
-        announceCaseChange(c);
+        const p = Number(el.getAttribute('data-pallet-count'));
+        announcePalletChange(p);
       }
     }, 50);
-  }, [increaseQty, announceCaseChange]);
+  }, [increaseQty, announcePalletChange]);
 
   const handleDecrease = useCallback(() => {
     decreaseQty();
     setTimeout(() => {
-      const el = document.querySelector('[data-case-count]');
+      const el = document.querySelector('[data-pallet-count]');
       if (el) {
-        const c = Number(el.getAttribute('data-case-count'));
-        announceCaseChange(c);
+        const p = Number(el.getAttribute('data-pallet-count'));
+        announcePalletChange(p);
       }
     }, 50);
-  }, [decreaseQty, announceCaseChange]);
+  }, [decreaseQty, announcePalletChange]);
 
   const handleComplete = useCallback(() => {
     if (!currentItem) return;
@@ -149,17 +149,12 @@ export default function Home() {
         case 'QUERY_CURRENT_QTY':
           if (currentItem) {
             let qText = '';
-            if (currentItem.caseCount > 0) {
-              qText = `${currentItem.caseCount}ケース`;
-              if (currentItem.qtyPerPallet > 0) {
-                const pallets = Math.floor(currentItem.caseCount / currentItem.qtyPerPallet);
-                const frac = currentItem.caseCount % currentItem.qtyPerPallet;
-                if (pallets > 0 && frac > 0) {
-                  qText = `${pallets}パレットと${frac}ケース`;
-                } else if (pallets > 0) {
-                  qText = `${pallets}パレット`;
-                }
-              }
+            if (currentItem.palletCount > 0 && currentItem.fraction > 0) {
+              qText = `${currentItem.palletCount}パレットと${currentItem.fraction}ケース`;
+            } else if (currentItem.palletCount > 0) {
+              qText = `${currentItem.palletCount}パレット`;
+            } else if (currentItem.fraction > 0) {
+              qText = `${currentItem.fraction}ケース`;
             } else {
               qText = `${currentItem.totalQty}個`;
             }
@@ -169,20 +164,10 @@ export default function Home() {
         case 'QUERY_REMAINING':
           speak(`残り${state.items.length}品目です。`); break;
         case 'QUERY_PALLET':
-          if (currentItem && currentItem.qtyPerPallet > 0) {
-            const pallets = Math.floor(currentItem.caseCount / currentItem.qtyPerPallet);
-            speak(`パレット${pallets}枚です。`);
-          } else if (currentItem) {
-            speak(`ケース${currentItem.caseCount}です。`);
-          }
+          if (currentItem) speak(`パレット${currentItem.palletCount}枚です。`);
           break;
         case 'QUERY_FRACTION':
-          if (currentItem && currentItem.qtyPerPallet > 0) {
-            const frac = currentItem.caseCount % currentItem.qtyPerPallet;
-            speak(`端数${frac}ケースです。`);
-          } else if (currentItem) {
-            speak(`ケース${currentItem.caseCount}です。`);
-          }
+          if (currentItem) speak(`端数${currentItem.fraction}ケースです。`);
           break;
       }
     },
@@ -277,7 +262,7 @@ export default function Home() {
             <>
               {/* 横: 左60%詳細+右40%一覧, 縦: 詳細のみフル */}
               <div className="detail-panel"
-                data-case-count={currentItem?.caseCount}
+                data-pallet-count={currentItem?.palletCount}
                 data-total-qty={currentItem?.totalQty}>
                 {currentItem && (
                   <ItemDetailPanel
@@ -308,6 +293,7 @@ export default function Home() {
               <ItemEditPage
                 items={state.items}
                 containerNo={state.containers[state.selectedContainerIdx]?.containerNo || ''}
+                containerPartNumbers={new Set(state.items.map((it) => it.partNumber))}
                 onUpdateItem={updateItem}
                 onAddItem={addItem}
                 onDeleteItem={deleteItem}

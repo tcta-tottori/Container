@@ -9,6 +9,8 @@ import * as XLSX from 'xlsx';
 interface ItemEditPageProps {
   items: ContainerItem[];
   containerNo: string;
+  /** 現在のコンテナに含まれる品番セット（自動ソート用） */
+  containerPartNumbers?: Set<string>;
   onUpdateItem: (idx: number, updates: Partial<ContainerItem>) => void;
   onAddItem: (item: ContainerItem) => void;
   onDeleteItem: (idx: number) => void;
@@ -91,13 +93,14 @@ const labelStyle: React.CSSProperties = {
 
 /* ===== メインコンポーネント ===== */
 export default function ItemEditPage({
-  items, containerNo, onUpdateItem, onAddItem, onDeleteItem, onSelectAndGoDetail,
+  items, containerNo, containerPartNumbers, onUpdateItem, onAddItem, onDeleteItem, onSelectAndGoDetail,
 }: ItemEditPageProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [filterType, setFilterType] = useState<ItemType | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [importMsg, setImportMsg] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [containerFirst, setContainerFirst] = useState(true);
   const importRef = useRef<HTMLInputElement>(null);
 
   const filtered = items.filter((item) => {
@@ -111,6 +114,15 @@ export default function ItemEditPage({
     }
     return true;
   });
+
+  // コンテナ対象品目を上部にソート
+  const sortedFiltered = containerFirst && containerPartNumbers && containerPartNumbers.size > 0
+    ? [...filtered].sort((a, b) => {
+        const aMatch = containerPartNumbers.has(a.partNumber) ? 0 : 1;
+        const bMatch = containerPartNumbers.has(b.partNumber) ? 0 : 1;
+        return aMatch - bMatch;
+      })
+    : filtered;
 
   const typeCounts = items.reduce<Record<string, number>>((acc, item) => {
     acc[item.type] = (acc[item.type] || 0) + 1; return acc;
@@ -184,6 +196,21 @@ export default function ItemEditPage({
         )}
         {/* チップフィルター */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {containerPartNumbers && containerPartNumbers.size > 0 && (
+            <button onClick={() => setContainerFirst(!containerFirst)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                borderRadius: 16, fontSize: 11, fontWeight: 500, cursor: 'pointer',
+                background: containerFirst ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.05)',
+                color: containerFirst ? '#fbbf24' : 'rgba(255,255,255,0.6)',
+                border: `1px solid ${containerFirst ? 'rgba(251,191,36,0.4)' : 'transparent'}`,
+              }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <polyline points="3 6 9 6 9 6"/><polyline points="3 12 15 12"/><polyline points="3 18 21 18"/>
+              </svg>
+              CN優先
+            </button>
+          )}
           {ITEM_TYPES.map((t) => {
             const c = COLOR_MAP[t];
             const count = typeCounts[t] || 0;
@@ -252,17 +279,30 @@ export default function ItemEditPage({
 
       {/* リスト */}
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        {filtered.map((item) => {
+        {sortedFiltered.map((item, sortIdx) => {
           const realIdx = items.indexOf(item);
           const isEditing = editingIdx === realIdx;
           const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
+          const isContainerMatch = containerPartNumbers?.has(item.partNumber) ?? false;
+          // コンテナ対象/非対象の境界線
+          const isLastMatch = containerFirst && isContainerMatch && sortIdx < sortedFiltered.length - 1
+            && !containerPartNumbers?.has(sortedFiltered[sortIdx + 1]?.partNumber);
 
           return (
-            <EditRow key={item.id} item={item} isEditing={isEditing} colors={colors}
-              onStartEdit={() => { setEditingIdx(isEditing ? null : realIdx); setShowAddForm(false); }}
-              onUpdate={(updates) => onUpdateItem(realIdx, updates)}
-              onDelete={() => handleDeleteItem(realIdx, item.itemName)}
-              onGoDetail={() => onSelectAndGoDetail(realIdx)} />
+            <div key={item.id}>
+              <EditRow item={item} isEditing={isEditing} colors={colors}
+                isContainerMatch={isContainerMatch}
+                onStartEdit={() => { setEditingIdx(isEditing ? null : realIdx); setShowAddForm(false); }}
+                onUpdate={(updates) => onUpdateItem(realIdx, updates)}
+                onDelete={() => handleDeleteItem(realIdx, item.itemName)}
+                onGoDetail={() => onSelectAndGoDetail(realIdx)} />
+              {isLastMatch && (
+                <div style={{
+                  height: 2, background: 'linear-gradient(90deg, rgba(251,191,36,0.4), transparent)',
+                  margin: '0 12px',
+                }} />
+              )}
+            </div>
           );
         })}
         {filtered.length === 0 && (
@@ -300,7 +340,7 @@ function AddItemForm({ containerNo, itemCount, onAdd, onCancel }: {
   const handleSubmit = () => {
     if (!itemName.trim()) return;
     const detectedType = partNumber
-      ? detectItemType(itemName, Number(qtyPerPallet) || 0, Number(caseCount) || 0, partNumber)
+      ? detectItemType(itemName, Number(qtyPerPallet) || 0, 0, partNumber)
       : type;
     const item: ContainerItem = {
       id: `${containerNo}-new-${itemCount}-${Date.now()}`,
@@ -311,6 +351,8 @@ function AddItemForm({ containerNo, itemCount, onAdd, onCancel }: {
       packingQty: Number(packingQty) || 0,
       totalQty: Number(totalQty) || 0,
       caseCount: Number(caseCount) || 0,
+      palletCount: 0,
+      fraction: 0,
       qtyPerPallet: Number(qtyPerPallet) || 0,
       newPartNumber: newPartNumber.trim() || undefined,
       description: description.trim() || undefined,
@@ -424,9 +466,10 @@ function AddItemForm({ containerNo, itemCount, onAdd, onCancel }: {
 }
 
 /* ===== 編集行 ===== */
-function EditRow({ item, isEditing, colors, onStartEdit, onUpdate, onDelete, onGoDetail }: {
+function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpdate, onDelete, onGoDetail }: {
   item: ContainerItem; isEditing: boolean;
   colors: { accent: string; text: string };
+  isContainerMatch?: boolean;
   onStartEdit: () => void;
   onUpdate: (updates: Partial<ContainerItem>) => void;
   onDelete: () => void;
@@ -586,7 +629,9 @@ function EditRow({ item, isEditing, colors, onStartEdit, onUpdate, onDelete, onG
     <button onClick={onStartEdit} className="edit-grid-row" style={{
       width: '100%', padding: '9px 12px',
       border: 'none', borderBottom: '1px solid rgba(255,255,255,0.04)',
-      background: `${colors.accent}08`, cursor: 'pointer', textAlign: 'left' as const,
+      background: isContainerMatch ? `${colors.accent}14` : `${colors.accent}08`,
+      cursor: 'pointer', textAlign: 'left' as const,
+      borderLeft: isContainerMatch ? `3px solid ${colors.accent}` : 'none',
     }}>
       <span style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
         <span style={{ width: 5, height: 5, borderRadius: '50%', background: colors.accent, flexShrink: 0 }} />

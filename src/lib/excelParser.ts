@@ -45,9 +45,11 @@ function createContainerItem(
   const packingQty = toNumber(row[5]);
   const totalQty = toNumber(row[6]);
   const caseCount = toNumber(row[7]);
-  const qtyPerPallet = toNumber(row[8]);
+  const palletCount = toNumber(row[8]);
+  const fraction = toNumber(row[9]);
+  const qtyPerPallet = toNumber(row[10]);
 
-  const type = detectItemType(itemName, qtyPerPallet, caseCount, partNumber);
+  const type = detectItemType(itemName, qtyPerPallet, palletCount, partNumber);
 
   return {
     id: `${containerNo}-${rowIndex}`,
@@ -58,6 +60,8 @@ function createContainerItem(
     packingQty,
     totalQty,
     caseCount,
+    palletCount,
+    fraction,
     qtyPerPallet,
   };
 }
@@ -71,6 +75,8 @@ function mergeItems(items: ContainerItem[]): ContainerItem[] {
     if (existing) {
       existing.totalQty += item.totalQty;
       existing.caseCount += item.caseCount;
+      existing.palletCount += item.palletCount;
+      existing.fraction += item.fraction;
       // qtyPerPallet, packingQty は同じ品目なので最初の値を維持
     } else {
       map.set(key, { ...item });

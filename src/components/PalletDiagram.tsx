@@ -4,7 +4,8 @@ import { ItemType } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 
 interface PalletDiagramProps {
-  caseCount: number;
+  palletCount: number;
+  fraction: number;
   qtyPerPallet: number;
   type: ItemType;
   itemName?: string;
@@ -335,12 +336,10 @@ function GenericStack({ ox, oy, filled, accent }: {
 
 /* ===== メイン ===== */
 export default function PalletDiagram({
-  caseCount, qtyPerPallet, type, itemName,
+  palletCount, fraction, qtyPerPallet, type, itemName,
 }: PalletDiagramProps) {
+  void qtyPerPallet;
   const colors = COLOR_MAP[type] || COLOR_MAP['その他'];
-  // caseCount と qtyPerPallet からパレット枚数・端数を算出
-  const palletCount = qtyPerPallet > 0 ? Math.floor(caseCount / qtyPerPallet) : 0;
-  const fraction = qtyPerPallet > 0 ? caseCount % qtyPerPallet : caseCount;
   const hasFrac = fraction > 0;
   const showTwo = palletCount >= 2 || (palletCount >= 1 && hasFrac);
   const jarPot = isJarPot(itemName || '');
