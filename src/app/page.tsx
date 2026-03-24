@@ -21,7 +21,7 @@ import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
-import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems } from '@/lib/jkpParser';
+import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, findNearestScheduleDate } from '@/lib/jkpParser';
 import * as XLSX from 'xlsx';
 
 type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
@@ -42,6 +42,7 @@ export default function Home() {
     deleteCurrent,
     toggleAutoAnnounce,
     updateItem,
+    updateMasterItem,
     addItem,
     deleteItem,
     completeItem,
@@ -58,6 +59,7 @@ export default function Home() {
   const loadedContainerRef = useRef<string | null>(null);
   const masterLoadedRef = useRef(false);
   const linkedRef = useRef<string | null>(null);
+  const announcedThresholdsRef = useRef<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>('work');
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -139,12 +141,30 @@ export default function Home() {
     const key = `${container.containerNo}-${state.selectedContainerIdx}`;
     if (loadedContainerRef.current === key) return;
     loadedContainerRef.current = key;
+    announcedThresholdsRef.current = new Set();
     // 少し遅延して概要アナウンス
     const timer = setTimeout(() => {
       announceContainerSummary(state.items, container.containerNo);
     }, 800);
     return () => clearTimeout(timer);
   }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
+
+  // 進捗マイルストーンアナウンス（20%刻み）
+  useEffect(() => {
+    if (state.items.length === 0) return;
+    const pct = state.completedIds.size / state.items.length * 100;
+    const thresholds = [20, 40, 60, 80, 100];
+    for (const t of thresholds) {
+      if (pct >= t && !announcedThresholdsRef.current.has(t)) {
+        announcedThresholdsRef.current.add(t);
+        // Delay slightly so completion speech finishes first
+        setTimeout(() => {
+          speak(`進捗${t}パーセント`);
+        }, 2000);
+        break; // Only announce one threshold at a time
+      }
+    }
+  }, [state.completedIds.size, state.items.length, speak]);
 
   const handleFileLoaded = useCallback(
     async (file: File) => {
@@ -200,15 +220,23 @@ export default function Home() {
 
   const handleAqssLoaded = useCallback(
     async (files: File[]) => {
-      for (const file of files) {
-        const buffer = await file.arrayBuffer();
-        const aqssMap = parseAqssExcel(buffer);
-        // AQSSのキーは新建高コード → partNumber(気高)とnewPartNumber(新建高)の両方で検索
-        state.items.forEach((item, idx) => {
-          const aqss = aqssMap.get(item.partNumber)
-            || (item.newPartNumber ? aqssMap.get(item.newPartNumber) : undefined);
-          if (aqss) updateItem(idx, aqss);
-        });
+      setLoadingMsg('AQSSファイルを読み込み中...');
+      try {
+        let totalUpdated = 0;
+        for (const file of files) {
+          const buffer = await file.arrayBuffer();
+          const aqssMap = parseAqssExcel(buffer);
+          // AQSSのキーは新建高コード → partNumber(気高)とnewPartNumber(新建高)の両方で検索
+          state.items.forEach((item, idx) => {
+            const aqss = aqssMap.get(item.partNumber)
+              || (item.newPartNumber ? aqssMap.get(item.newPartNumber) : undefined);
+            if (aqss) { updateItem(idx, aqss); totalUpdated++; }
+          });
+        }
+        setLoadingMsg(`AQSS読込完了: ${totalUpdated}件更新`);
+        await new Promise((r) => setTimeout(r, 1000));
+      } finally {
+        setLoadingMsg(null);
       }
     },
     [state.items, updateItem]
@@ -216,6 +244,8 @@ export default function Home() {
 
   const handleJkpLoaded = useCallback(
     async (file: File) => {
+      loadedContainerRef.current = null;
+      linkedRef.current = null;
       setLoadingMsg('JKPファイルを読み込み中...');
       try {
         const buffer = await file.arrayBuffer();
@@ -229,21 +259,51 @@ export default function Home() {
         const shipments = parseJkpUpdata(wb);
         setJkpShipments(shipments);
 
-        // 品目一覧に鍋品目を反映
-        const nabeItems = jkpToContainerItems(sheet1Items, volumeMap);
-        void nabeItems;
+        // 今日または最も近い未来の出荷日を特定
+        const today = new Date().toISOString().slice(0, 10);
+        const targetDate = findNearestScheduleDate(shipments, today) || today;
 
-        // JKPページに自動遷移
-        if (shipments.length > 0) {
-          setViewMode('jkp');
+        // JKP → ContainerItem[] 変換（対象日の数量付き）
+        setLoadingMsg(`出荷日 ${targetDate} のデータを変換中...`);
+        const nabeItems = jkpToContainerItems(sheet1Items, volumeMap, shipments, targetDate);
+
+        if (nabeItems.length === 0) {
+          setLoadingMsg('対象日の出荷データがありません');
+          await new Promise((r) => setTimeout(r, 1500));
+          return;
         }
+
+        // GitHubから最新マスタを取得してリンク
+        setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+        const masterItems = await fetchMasterData();
+        if (masterItems.length > 0) {
+          loadMaster(masterItems);
+        }
+
+        setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
+        const { linkedItems, linked, total } = linkItemsWithMaster(nabeItems, masterItems);
+
+        // Container オブジェクトを作成
+        const container = {
+          date: targetDate,
+          containerNo: 'JKP',
+          items: linkedItems,
+        };
+
+        setLoadingMsg(`紐付完了: ${linked}/${total}件  データを表示中...`);
+        loadData([container]);
+
+        // 紐付済みなのでuseEffectの再紐付をスキップ
+        linkedRef.current = `${container.containerNo}-0`;
+
+        await new Promise((r) => setTimeout(r, 200));
       } catch (e) {
         console.error('JKP parse error:', e);
       } finally {
         setLoadingMsg(null);
       }
     },
-    []
+    [loadData, loadMaster]
   );
 
   const handleAnnounce = useCallback(() => {
@@ -319,6 +379,19 @@ export default function Home() {
 
   const handleDecrease = useCallback(() => {
     if (!currentItem) return;
+
+    // Auto-complete if pallet is already 0
+    if (currentItem.palletCount === 0) {
+      const name = currentItem.itemName;
+      const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
+      completeItem(currentItem.id);
+      announceComplete(name);
+      if (remaining <= 0) {
+        setTimeout(() => announceAllComplete(), 1500);
+      }
+      return;
+    }
+
     decreaseQty();
     // 消費時間を記録（パレット減少）
     if (state.itemStartTime) {
@@ -348,7 +421,7 @@ export default function Home() {
         speak(qtyText);
       }
     }, 50);
-  }, [currentItem, decreaseQty, speak, state.itemStartTime]);
+  }, [currentItem, decreaseQty, speak, state.itemStartTime, state.items, state.completedIds, completeItem, announceComplete, announceAllComplete]);
 
   const handleComplete = useCallback(() => {
     if (!currentItem) return;
@@ -527,6 +600,32 @@ export default function Home() {
     <>
       {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
+      {loadingMsg && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+        }}>
+          <div style={{
+            background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 20, padding: '32px 40px', textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{
+              width: 40, height: 40, margin: '0 auto 16px',
+              border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6',
+              borderRadius: '50%', animation: 'spin 1s linear infinite',
+            }} />
+            <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>
+              {loadingMsg}
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>
+              しばらくお待ちください
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* メニューオーバーレイ */}
       {menuOpen && (
@@ -593,6 +692,7 @@ export default function Home() {
           onMenuToggle={() => setMenuOpen(!menuOpen)}
           onResetWorkTimer={() => { resetWorkTimer(); setItemTimeLogs([]); }}
           itemTimeLogs={itemTimeLogs}
+          completionLog={state.completionLog}
         />
 
         {/* メインエリア */}
@@ -612,6 +712,7 @@ export default function Home() {
                     onSelectItem={handleSelectItem}
                     onCompleteItem={completeItem}
                     onUncompleteItem={uncompleteItem}
+                    onDecrementPallet={handleDecrease}
                   />
                 )}
               </div>
@@ -660,7 +761,21 @@ export default function Home() {
                 })()}
                 containerNo={state.containers[state.selectedContainerIdx]?.containerNo || ''}
                 containerPartNumbers={new Set(state.items.map((it) => it.partNumber))}
-                onUpdateItem={updateItem}
+                onUpdateItem={(idx, updates) => {
+                  // Container items are first in the merged list, master-only items follow
+                  if (idx < state.items.length) {
+                    updateItem(idx, updates);
+                  } else {
+                    // Convert merged-list index to masterItems index
+                    const containerParts = new Set(state.items.map((it) => it.partNumber));
+                    const masterOnly = state.masterItems.filter((it) => !containerParts.has(it.partNumber));
+                    const masterOnlyIdx = idx - state.items.length;
+                    if (masterOnlyIdx >= 0 && masterOnlyIdx < masterOnly.length) {
+                      const masterRealIdx = state.masterItems.indexOf(masterOnly[masterOnlyIdx]);
+                      if (masterRealIdx >= 0) updateMasterItem(masterRealIdx, updates);
+                    }
+                  }
+                }}
                 onAddItem={addItem}
                 onDeleteItem={deleteItem}
                 onSelectAndGoDetail={handleSelectAndGoDetail}

@@ -15,6 +15,7 @@ interface ItemDetailPanelProps {
   onSelectItem?: (idx: number) => void;
   onCompleteItem?: (id: string) => void;
   onUncompleteItem?: (id: string) => void;
+  onDecrementPallet?: () => void;
 }
 
 /* ===== 類似品アイコン ===== */
@@ -283,9 +284,26 @@ function UndoSwipeRow({ children, onSwipe, style, className, onClick }: {
 }
 
 export default function ItemDetailPanel({
-  item, relatedItems, allItems, completedIds, onSelectItem, onCompleteItem, onUncompleteItem,
+  item, relatedItems, allItems, completedIds, onSelectItem, onCompleteItem, onUncompleteItem, onDecrementPallet,
 }: ItemDetailPanelProps) {
   const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
+  const [palletFlash, setPalletFlash] = useState(false);
+  const doubleTapRef = useRef<number | null>(null);
+
+  const handlePalletDoubleTap = useCallback(() => {
+    const now = Date.now();
+    if (doubleTapRef.current && now - doubleTapRef.current < 300) {
+      // Double-tap detected
+      doubleTapRef.current = null;
+      if (onDecrementPallet) {
+        onDecrementPallet();
+        setPalletFlash(true);
+        setTimeout(() => setPalletFlash(false), 200);
+      }
+    } else {
+      doubleTapRef.current = now;
+    }
+  }, [onDecrementPallet]);
   const itemColor = extractColor(item.itemName);
   const similarItems = allItems.filter(
     (o) => o.id !== item.id && areSimilarItems(item.itemName, o.itemName)
@@ -420,7 +438,7 @@ export default function ItemDetailPanel({
 
         {/* 箱イメージ + パレット図（KENコード下〜PL数上の固定エリア） */}
         <div className="detail-pallet-area" style={{
-          position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0, overflow: 'hidden',
+          position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0,
         }}>
           {/* 箱3Dイメージ — 背景レイヤー（左寄せ、寄り表示） */}
           {(item.measurements || item.cbm) && (
@@ -429,7 +447,7 @@ export default function ItemDetailPanel({
               display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
               paddingLeft: 4,
             }}>
-              <div style={{ width: '60%', height: '120%' }}>
+              <div style={{ width: '33%', height: '120%' }}>
                 <SizeDiagram measurements={item.measurements} cbm={item.cbm}
                   type={item.type} maxContainerDim={maxContainerDim} />
               </div>
@@ -467,9 +485,14 @@ export default function ItemDetailPanel({
         {/* 数量（PL / CT / pcs 右揃え） */}
         <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'flex-end' }}>
           <div className="detail-sf-item">
-            <span className="detail-sf-num" style={{
+            <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
               color: colors.accent,
               textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
+              cursor: 'pointer',
+              transition: 'background 0.15s ease',
+              background: palletFlash ? 'rgba(255,255,255,0.25)' : 'transparent',
+              borderRadius: 8,
+              userSelect: 'none',
             }}>{fmtNum(item.palletCount)}</span>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
               {(() => {

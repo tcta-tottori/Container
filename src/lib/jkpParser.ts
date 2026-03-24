@@ -157,26 +157,63 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
   return shipments;
 }
 
-/** JKP → 品目一覧用ContainerItemに変換 */
+/** 今日以降の最も近い出荷日を探す */
+export function findNearestScheduleDate(shipments: JkpShipment[], today: string): string | null {
+  const allDates = new Set<string>();
+  for (const s of shipments) {
+    s.schedule.forEach((val, date) => {
+      if (typeof val === 'number' && val > 0 && date >= today) {
+        allDates.add(date);
+      }
+    });
+  }
+  if (allDates.size === 0) return null;
+  return Array.from(allDates).sort()[0];
+}
+
+/** JKP → ContainerItem[]に変換（スケジュール数量付き） */
 export function jkpToContainerItems(
   sheet1Items: JkpItem[],
   volumeMap: Map<string, JkpVolume>,
-): Partial<ContainerItem>[] {
-  return sheet1Items.map((item) => {
-    const vol = volumeMap.get(item.partNumber);
-    const size = detectNabeSize(item.itemName);
-    const measurements = vol?.measMm ? mmToCmMeas(vol.measMm) : undefined;
+  shipments: JkpShipment[],
+  targetDate: string,
+): ContainerItem[] {
+  // 品番→出荷数量マップ
+  const qtyMap = new Map<string, number>();
+  for (const s of shipments) {
+    const val = s.schedule.get(targetDate);
+    if (typeof val === 'number' && val > 0) {
+      qtyMap.set(s.partNumber, val);
+    }
+  }
 
-    return {
-      partNumber: item.partNumber,
-      itemName: item.itemName,
-      type: '鍋' as const,
-      size: size || undefined,
-      packingQty: vol?.packingQty || 0,
-      cbm: vol?.cbmPerPc || undefined,
-      measurements,
-    };
-  });
+  return sheet1Items
+    .filter((item) => qtyMap.has(item.partNumber))
+    .map((item, idx) => {
+      const vol = volumeMap.get(item.partNumber);
+      const size = detectNabeSize(item.itemName);
+      const measurements = vol?.measMm ? mmToCmMeas(vol.measMm) : undefined;
+      const totalQty = qtyMap.get(item.partNumber) || 0;
+      const packingQty = vol?.packingQty || 0;
+      const caseCount = packingQty > 0 ? Math.ceil(totalQty / packingQty) : 0;
+
+      return {
+        id: `jkp-${idx}`,
+        partNumber: item.partNumber,
+        itemName: item.itemName,
+        representModel: '',
+        type: '鍋' as const,
+        size: size || undefined,
+        packingQty,
+        totalQty,
+        caseCount,
+        palletCount: 0,
+        fraction: caseCount,
+        qtyPerPallet: 0,
+        cbm: vol?.cbmPerPc || undefined,
+        measurements,
+      };
+    });
 }
 
 /** 日付範囲でスケジュールをフィルタ */

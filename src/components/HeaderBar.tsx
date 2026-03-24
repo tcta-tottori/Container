@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { Container } from '@/lib/types';
+import { CompletionLogEntry } from '@/hooks/useContainerData';
 
 export interface ItemTimeLog {
   itemName: string;
@@ -21,6 +22,7 @@ interface HeaderBarProps {
   onMenuToggle: () => void;
   onResetWorkTimer: () => void;
   itemTimeLogs: ItemTimeLog[];
+  completionLog: CompletionLogEntry[];
 }
 
 export default function HeaderBar({
@@ -35,6 +37,7 @@ export default function HeaderBar({
   onMenuToggle,
   onResetWorkTimer,
   itemTimeLogs,
+  completionLog,
 }: HeaderBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [popupOpen, setPopupOpen] = useState(false);
@@ -160,6 +163,36 @@ export default function HeaderBar({
                           {log.itemName}
                         </span>
                         <span style={{ color: '#f59e0b', fontFamily: 'var(--font-mono)', fontWeight: 600, flexShrink: 0 }}>
+                          {m > 0 ? `${m}分${String(s).padStart(2, '0')}秒` : `${s}秒`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* 完了品目 */}
+            {completionLog.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8, marginTop: 12 }}>完了品目</div>
+                <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                  {completionLog.map((entry, i) => {
+                    const m = Math.floor(entry.duration / 60);
+                    const s = entry.duration % 60;
+                    return (
+                      <div key={entry.id} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        fontSize: 12,
+                      }}>
+                        <span style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-mono)', fontWeight: 600, flexShrink: 0, marginRight: 8, minWidth: 24 }}>
+                          #{i + 1}
+                        </span>
+                        <span style={{ color: 'rgba(255,255,255,0.8)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>
+                          {entry.name}
+                        </span>
+                        <span style={{ color: '#34d399', fontFamily: 'var(--font-mono)', fontWeight: 600, flexShrink: 0 }}>
                           {m > 0 ? `${m}分${String(s).padStart(2, '0')}秒` : `${s}秒`}
                         </span>
                       </div>

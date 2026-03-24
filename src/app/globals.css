@@ -78,17 +78,20 @@ body {
 .header-work-elapsed {
   font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums;
   color: rgba(255,255,255,0.85); font-weight: 700;
-  padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);
-  transition: all 0.3s ease;
+  border: none;
+  transition: font-size 0.4s ease, color 0.4s ease, transform 0.4s ease;
 }
 .header-elapsed-flash {
-  font-size: 22px !important; color: #f59e0b !important;
-  background: rgba(245,158,11,0.15) !important; border-color: rgba(245,158,11,0.4) !important;
-  animation: elapsed-pulse 0.8s ease-in-out infinite;
-}
-@keyframes elapsed-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.08); }
+  position: fixed !important;
+  top: 6px; left: 50%; transform: translateX(-50%);
+  z-index: 9999;
+  font-size: 56px !important; color: #f59e0b !important;
+  background: rgba(0,0,0,0.85) !important;
+  border: none !important;
+  border-radius: 12px;
+  padding: 8px 24px !important;
+  pointer-events: auto;
+  transition: font-size 0.4s ease, color 0.4s ease, transform 0.4s ease, opacity 0.4s ease;
 }
 
 /* ===== Menu ===== */

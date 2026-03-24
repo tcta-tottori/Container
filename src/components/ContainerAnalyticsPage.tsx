@@ -147,6 +147,7 @@ function ContainerTruckDistribution({ items, completedIds, containerType }: {
     type: t,
     pct: counts[t].total / total * 100,
     count: counts[t].total,
+    done: counts[t].done,
     color: COLOR_MAP[t].accent,
   }));
 
@@ -170,6 +171,10 @@ function ContainerTruckDistribution({ items, completedIds, containerType }: {
       <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
         <svg viewBox="0 0 400 160" style={{ width: '100%', height: 'auto' }}>
           <defs>
+            <pattern id="done-stripe" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <rect width="6" height="6" fill="transparent" />
+              <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
+            </pattern>
             <linearGradient id="truck-body" x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stopColor="#5a6378" />
               <stop offset="100%" stopColor="#3d4556" />
@@ -290,14 +295,36 @@ function ContainerTruckDistribution({ items, completedIds, containerType }: {
                 const w = (seg.pct / 100) * 268;
                 x -= w;
                 const showInside = w > 28;
+                const donePct = seg.count > 0 ? seg.done / seg.count : 0;
+                const doneW = Math.max((w - 1) * donePct, 0);
+                const remainW = Math.max(w - 1 - doneW, 0);
                 const pctStr = `${seg.pct.toFixed(0)}%`;
                 return (
                   <g key={seg.type}>
-                    <rect x={x + 1} y={cTop}
-                      width={Math.max(w - 1, 1)} height={cH}
-                      fill={seg.color} opacity={0.8}
-                      rx={i === 0 ? 2 : i === segments.length - 1 ? 2 : 0}
-                    />
+                    {/* 完了分（暗く表示） */}
+                    {doneW > 0 && (
+                      <rect x={x + 1} y={cTop}
+                        width={doneW} height={cH}
+                        fill={seg.color} opacity={0.25}
+                        rx={i === 0 ? 2 : 0}
+                      />
+                    )}
+                    {/* 残り分（明るく表示） */}
+                    {remainW > 0 && (
+                      <rect x={x + 1 + doneW} y={cTop}
+                        width={remainW} height={cH}
+                        fill={seg.color} opacity={0.8}
+                        rx={i === segments.length - 1 ? 2 : 0}
+                      />
+                    )}
+                    {/* 全完了時のストライプ */}
+                    {seg.done === seg.count && seg.count > 0 && (
+                      <rect x={x + 1} y={cTop}
+                        width={Math.max(w - 1, 1)} height={cH}
+                        fill="url(#done-stripe)" opacity={0.3}
+                        rx={i === 0 ? 2 : i === segments.length - 1 ? 2 : 0}
+                      />
+                    )}
                     {showInside ? (
                       <text x={x + w / 2} y={cTop + cH / 2 + 1}
                         textAnchor="middle" dominantBaseline="middle"

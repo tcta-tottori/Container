@@ -9,6 +9,13 @@ interface OriginalValues {
   caseCount: number;
 }
 
+export interface CompletionLogEntry {
+  id: string;
+  name: string;
+  completedAt: number;
+  duration: number;
+}
+
 export interface ContainerState {
   containers: Container[];
   selectedContainerIdx: number;
@@ -18,6 +25,7 @@ export interface ContainerState {
   originalValues: Map<string, OriginalValues>;
   modifiedValues: Map<string, Partial<OriginalValues>>;
   completedIds: Set<string>;
+  completionLog: CompletionLogEntry[];
   itemStartTime: number | null;
   workStartTime: number | null;
   autoAnnounce: boolean;
@@ -35,6 +43,7 @@ export type Action =
   | { type: 'DELETE_CURRENT' }
   | { type: 'TOGGLE_AUTO_ANNOUNCE' }
   | { type: 'UPDATE_ITEM'; idx: number; updates: Partial<ContainerItem> }
+  | { type: 'UPDATE_MASTER_ITEM'; idx: number; updates: Partial<ContainerItem> }
   | { type: 'ADD_ITEM'; item: ContainerItem }
   | { type: 'DELETE_ITEM'; idx: number }
   | { type: 'COMPLETE_ITEM'; id: string }
@@ -50,6 +59,7 @@ const initialState: ContainerState = {
   originalValues: new Map(),
   modifiedValues: new Map(),
   completedIds: new Set(),
+  completionLog: [],
   itemStartTime: null,
   workStartTime: null,
   autoAnnounce: true,
@@ -82,6 +92,7 @@ function reducer(state: ContainerState, action: Action): ContainerState {
         originalValues: buildOriginalValues(items),
         modifiedValues: new Map(),
         completedIds: new Set(),
+        completionLog: [],
         itemStartTime: Date.now(),
         workStartTime: Date.now(),
       };
@@ -103,6 +114,7 @@ function reducer(state: ContainerState, action: Action): ContainerState {
         originalValues: buildOriginalValues(items),
         modifiedValues: new Map(),
         completedIds: new Set(),
+        completionLog: [],
         itemStartTime: Date.now(),
         workStartTime: Date.now(),
       };
@@ -229,9 +241,16 @@ function reducer(state: ContainerState, action: Action): ContainerState {
           }
         }
       }
+      const completedItem = state.items.find((it) => it.id === action.id);
+      const now = Date.now();
+      const duration = state.itemStartTime ? Math.floor((now - state.itemStartTime) / 1000) : 0;
+      const newLog: CompletionLogEntry[] = completedItem
+        ? [...state.completionLog, { id: action.id, name: completedItem.itemName, completedAt: now, duration }]
+        : state.completionLog;
       return {
         ...state,
         completedIds: newCompleted,
+        completionLog: newLog,
         currentItemIdx: newIdx,
         itemStartTime: activeItems.length > 0 ? Date.now() : null,
       };
@@ -257,6 +276,14 @@ function reducer(state: ContainerState, action: Action): ContainerState {
       return { ...state, items: newItems };
     }
 
+    case 'UPDATE_MASTER_ITEM': {
+      const { idx, updates } = action;
+      if (idx < 0 || idx >= state.masterItems.length) return state;
+      const newMaster = [...state.masterItems];
+      newMaster[idx] = { ...newMaster[idx], ...updates };
+      return { ...state, masterItems: newMaster };
+    }
+
     case 'ADD_ITEM': {
       const newItems = [...state.items, action.item];
       return { ...state, items: newItems };
@@ -271,7 +298,7 @@ function reducer(state: ContainerState, action: Action): ContainerState {
     }
 
     case 'RESET_WORK_TIMER':
-      return { ...state, workStartTime: Date.now() };
+      return { ...state, workStartTime: Date.now(), completionLog: [] };
 
     default:
       return state;
@@ -337,6 +364,11 @@ export function useContainerData() {
       dispatch({ type: 'UPDATE_ITEM', idx, updates }),
     []
   );
+  const updateMasterItem = useCallback(
+    (idx: number, updates: Partial<ContainerItem>) =>
+      dispatch({ type: 'UPDATE_MASTER_ITEM', idx, updates }),
+    []
+  );
   const addItem = useCallback(
     (item: ContainerItem) => dispatch({ type: 'ADD_ITEM', item }),
     []
@@ -374,6 +406,7 @@ export function useContainerData() {
     deleteCurrent,
     toggleAutoAnnounce,
     updateItem,
+    updateMasterItem,
     addItem,
     deleteItem,
     completeItem,

@@ -47,16 +47,15 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim }
     }}>
       <style>{`
         @keyframes ${animName} {
-          0% { transform: rotateX(-20deg) rotateY(-30deg); }
-          50% { transform: rotateX(-20deg) rotateY(30deg); }
-          100% { transform: rotateX(-20deg) rotateY(-30deg); }
+          0% { transform: rotateX(-20deg) rotateY(0deg); }
+          100% { transform: rotateX(-20deg) rotateY(360deg); }
         }
       `}</style>
       <div style={{
         width: sw, height: sh,
         position: 'relative',
         transformStyle: 'preserve-3d',
-        animation: `${animName} 12s ease-in-out infinite`,
+        animation: `${animName} 12s linear infinite`,
       }}>
         {/* 前面 */}
         <div style={{
