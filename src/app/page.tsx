@@ -57,6 +57,27 @@ export default function Home() {
   const [manualOpen, setManualOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
 
+  // 作業ページ表示中は画面スリープを防止（Wake Lock API）
+  useEffect(() => {
+    if (viewMode !== 'work' || state.items.length === 0) return;
+    let wl: WakeLockSentinel | null = null;
+    const request = async () => {
+      try {
+        if ('wakeLock' in navigator) {
+          wl = await navigator.wakeLock.request('screen');
+        }
+      } catch { /* ユーザー拒否やバックグラウンド時は無視 */ }
+    };
+    request();
+    // タブ復帰時に再取得
+    const onVisibility = () => { if (document.visibilityState === 'visible') request(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      wl?.release();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [viewMode, state.items.length]);
+
   // CNS品目一覧マスタデータを起動時に自動読込
   useEffect(() => {
     if (masterLoadedRef.current) return;
