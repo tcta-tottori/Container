@@ -390,6 +390,7 @@ export default function ItemEditPage({
         color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)',
       }}>
         <span>品名</span>
+        <span style={{ textAlign: 'center' }}>新建高</span>
         <span style={{ textAlign: 'center' }}>Description</span>
         <span style={{ textAlign: 'center' }}>種類</span>
         <span style={{ textAlign: 'center' }}>CS</span>
@@ -819,6 +820,12 @@ function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpd
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
           {item.itemName}
         </span>
+      </span>
+      <span style={{
+        textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        color: item.newPartNumber ? 'rgba(167,139,250,0.7)' : 'rgba(255,255,255,0.15)',
+      }}>
+        {item.newPartNumber || '---'}
       </span>
       <span style={{
         textAlign: 'center', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',

@@ -160,15 +160,15 @@ body {
 /* ===== Edit / Management Page - Grid ===== */
 .edit-grid-row {
   display: grid;
-  grid-template-columns: 2.5fr 2fr 0.8fr 0.5fr 0.5fr 0.7fr 0.7fr 0.7fr;
+  grid-template-columns: 2.5fr 1fr 2fr 0.8fr 0.5fr 0.5fr 0.7fr 0.7fr 0.7fr;
   align-items: center;
   gap: 4px;
 }
 @media (max-width: 480px) {
-  .edit-grid-row { grid-template-columns: 2fr 1.5fr 0.7fr 0.4fr 0.4fr 0.6fr 0.6fr 0.6fr; gap: 2px; }
+  .edit-grid-row { grid-template-columns: 2fr 0.8fr 1.5fr 0.7fr 0.4fr 0.4fr 0.6fr 0.6fr 0.6fr; gap: 2px; }
 }
 @media (min-width: 1024px) {
-  .edit-grid-row { grid-template-columns: 3fr 2.5fr 1fr 0.6fr 0.6fr 0.8fr 0.8fr 0.8fr; gap: 8px; }
+  .edit-grid-row { grid-template-columns: 3fr 1.2fr 2.5fr 1fr 0.6fr 0.6fr 0.8fr 0.8fr 0.8fr; gap: 8px; }
 }
 
 /* ===== Edit / Management Page ===== */
@@ -377,6 +377,7 @@ body {
   0%, 100% { background: #2a1f10; }
   50% { background: #3a2a14; }
 }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .detail-list-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .detail-list-name {
   flex: 1; min-width: 0;

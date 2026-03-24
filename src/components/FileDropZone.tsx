@@ -37,22 +37,16 @@ const CHANGELOG = [
   ]},
 ];
 
-/* ===== CNSロゴSVG ===== */
+/* ===== CNSロゴSVG（段ボール箱） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <g transform="translate(100,90)">
-        <polygon points="0,-55 58,-25 0,5 -58,-25" fill="rgba(255,255,255,0.25)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
-        <polygon points="-58,-25 0,5 0,64 -58,34" fill="rgba(255,255,255,0.15)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
-        <polygon points="58,-25 0,5 0,64 58,34" fill="rgba(255,255,255,0.1)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
-      </g>
-      <g stroke="#fff" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        <path d="M115,72 C125,55 135,45 155,33"/>
-        <polygon points="150,22 163,32 152,42" fill="#fff" stroke="none"/>
-      </g>
-      <g fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round">
-        <path d="M78,118 C63,128 55,145 65,160 C75,175 95,172 105,153 C113,138 108,122 93,112 L135,88"/>
-      </g>
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* 箱本体: 上面・左面・右面 */}
+      <polygon points="50,20 85,38 50,56 15,38" fill="rgba(255,255,255,0.3)" stroke="#fff" strokeWidth="2" strokeLinejoin="round"/>
+      <polygon points="15,38 50,56 50,88 15,70" fill="rgba(255,255,255,0.18)" stroke="#fff" strokeWidth="2" strokeLinejoin="round"/>
+      <polygon points="85,38 50,56 50,88 85,70" fill="rgba(255,255,255,0.1)" stroke="#fff" strokeWidth="2" strokeLinejoin="round"/>
+      {/* 上面テープライン */}
+      <line x1="50" y1="20" x2="50" y2="56" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5"/>
     </svg>
   );
 }

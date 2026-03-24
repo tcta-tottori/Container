@@ -51,9 +51,11 @@ export default function Home() {
   const prevItemRef = useRef<string | null>(null);
   const loadedContainerRef = useRef<string | null>(null);
   const masterLoadedRef = useRef(false);
+  const linkedRef = useRef<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('work');
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
 
   // CNS品目一覧マスタデータを自動読込
   useEffect(() => {
@@ -63,6 +65,38 @@ export default function Home() {
       if (items.length > 0) loadMaster(items);
     });
   }, [loadMaster]);
+
+  // コンテナ品目にマスタデータを自動紐付（気高コード→新建高コード等）
+  useEffect(() => {
+    if (state.items.length === 0 || state.masterItems.length === 0) return;
+    // コンテナが変わった時だけ紐付を実行
+    const container = state.containers[state.selectedContainerIdx];
+    const key = container ? `${container.containerNo}-${state.selectedContainerIdx}` : '';
+    if (linkedRef.current === key) return;
+    linkedRef.current = key;
+
+    const masterMap = new Map(state.masterItems.map((m) => [m.partNumber, m]));
+    state.items.forEach((item, idx) => {
+      if (item.newPartNumber) return; // 既に紐付済み
+      const master = masterMap.get(item.partNumber);
+      if (!master) return;
+      const updates: Partial<typeof item> = {};
+      if (master.newPartNumber) updates.newPartNumber = master.newPartNumber;
+      if (master.newPartNumberKetaka) updates.newPartNumberKetaka = master.newPartNumberKetaka;
+      if (master.itemNameKetaka) updates.itemNameKetaka = master.itemNameKetaka;
+      if (master.linkStatus) updates.linkStatus = master.linkStatus;
+      if (master.itemNameContainer) updates.itemNameContainer = master.itemNameContainer;
+      if (master.representModelContainer) updates.representModelContainer = master.representModelContainer;
+      if (master.packingQtyContainer !== undefined) updates.packingQtyContainer = master.packingQtyContainer;
+      if (master.qtyPerPalletContainer !== undefined) updates.qtyPerPalletContainer = master.qtyPerPalletContainer;
+      if (master.description) updates.description = master.description;
+      if (master.modelNo) updates.modelNo = master.modelNo;
+      if (master.grossWeight !== undefined) updates.grossWeight = master.grossWeight;
+      if (master.cbm !== undefined) updates.cbm = master.cbm;
+      if (master.measurements) updates.measurements = master.measurements;
+      if (Object.keys(updates).length > 0) updateItem(idx, updates);
+    });
+  }, [state.items, state.masterItems, state.containers, state.selectedContainerIdx, updateItem]);
 
   // 品目切替時の自動アナウンス
   useEffect(() => {
@@ -91,11 +125,20 @@ export default function Home() {
   const handleFileLoaded = useCallback(
     async (file: File) => {
       loadedContainerRef.current = null;
-      const result = await parseExcelFile(file);
-      if (result.containers.length > 0) {
-        loadData(result.containers);
-        const totalItems = result.containers.reduce((sum, c) => sum + c.items.length, 0);
-        saveRecentFile(file, result.containers.length, totalItems);
+      linkedRef.current = null;
+      setLoadingMsg('Excelファイルを読み込み中...');
+      try {
+        const result = await parseExcelFile(file);
+        if (result.containers.length > 0) {
+          setLoadingMsg('マスタデータと紐付中...');
+          loadData(result.containers);
+          const totalItems = result.containers.reduce((sum, c) => sum + c.items.length, 0);
+          saveRecentFile(file, result.containers.length, totalItems);
+          // 紐付処理完了を待つ
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      } finally {
+        setLoadingMsg(null);
       }
     },
     [loadData]
@@ -272,7 +315,37 @@ export default function Home() {
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
   if (state.containers.length === 0) {
-    return <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} />;
+    return (
+      <>
+        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} />
+        {loadingMsg && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 300,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          }}>
+            <div style={{
+              background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: '32px 40px', textAlign: 'center',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}>
+              <div style={{
+                width: 40, height: 40, margin: '0 auto 16px',
+                border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6',
+                borderRadius: '50%', animation: 'spin 1s linear infinite',
+              }} />
+              <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>
+                {loadingMsg}
+              </p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>
+                しばらくお待ちください
+              </p>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   if (state.items.length === 0) {
