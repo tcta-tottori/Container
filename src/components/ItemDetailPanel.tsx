@@ -16,6 +16,54 @@ interface ItemDetailPanelProps {
   onUncompleteItem?: (id: string) => void;
 }
 
+/* ===== 類似品名の差異ハイライト ===== */
+function HighlightDiff({ base, target }: { base: string; target: string }) {
+  // 括弧部分を分離
+  const baseParen = base.match(/\([^)]+\)/)?.[0] || '';
+  const targetParen = target.match(/\([^)]+\)/)?.[0] || '';
+  const baseCore = base.replace(/\([^)]+\)/, '').replace(/ポリカバー/g, '').trim();
+  const targetCore = target.replace(/\([^)]+\)/, '').replace(/ポリカバー/g, '').trim();
+  const targetDisplay = target.replace(/ポリカバー/g, '').trim();
+
+  // コア部分の差異位置を特定
+  const diffIndices = new Set<number>();
+  const maxLen = Math.max(baseCore.length, targetCore.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (i >= baseCore.length || i >= targetCore.length || baseCore[i] !== targetCore[i]) {
+      diffIndices.add(i);
+    }
+  }
+
+  // 括弧が違う場合は括弧全体を強調
+  const parenDiff = baseParen !== targetParen;
+
+  // targetDisplayをレンダリング（コア部分の差異は赤太字、括弧差異も赤太字）
+  const parenInDisplay = targetDisplay.match(/\([^)]+\)/)?.[0] || '';
+  const parenStart = targetDisplay.indexOf(parenInDisplay);
+
+  const elements: React.ReactNode[] = [];
+  let coreIdx = 0;
+  for (let i = 0; i < targetDisplay.length; i++) {
+    const inParen = parenInDisplay && i >= parenStart && i < parenStart + parenInDisplay.length;
+    if (inParen) {
+      if (parenDiff) {
+        elements.push(<span key={i} style={{ color: '#ef4444', fontWeight: 900 }}>{targetDisplay[i]}</span>);
+      } else {
+        elements.push(<span key={i}>{targetDisplay[i]}</span>);
+      }
+    } else {
+      if (diffIndices.has(coreIdx)) {
+        elements.push(<span key={i} style={{ color: '#ef4444', fontWeight: 900 }}>{targetDisplay[i]}</span>);
+      } else {
+        elements.push(<span key={i}>{targetDisplay[i]}</span>);
+      }
+      coreIdx++;
+    }
+  }
+
+  return <span>{elements}</span>;
+}
+
 /* ===== マーキーテキスト ===== */
 function MarqueeText({ text, className, style }: {
   text: string; className?: string; style?: React.CSSProperties;
@@ -268,7 +316,7 @@ export default function ItemDetailPanel({
         </div>
 
         {/* パレット図（赤枠範囲に限定・コンパクト） */}
-        <div className="detail-pallet-area" style={{ zIndex: 1, maxHeight: '25%', marginTop: 0, overflow: 'hidden' }}>
+        <div className="detail-pallet-area" style={{ zIndex: 1 }}>
           {item.qtyPerPallet > 0 && (
             <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
@@ -277,18 +325,18 @@ export default function ItemDetailPanel({
 
         {/* 数量（PL / CT表記） */}
         <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2 }}>
-          <div className="detail-sf-item" style={{ flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-            {item.qtyPerPallet > 0 && (
-              <span style={{
-                fontSize: 13, fontWeight: 700, color: `${colors.accent}cc`,
-                fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
-              }}>@{item.qtyPerPallet}</span>
-            )}
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-              <span className="detail-sf-num" style={{
-                color: colors.accent,
-                textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
-              }}>{fmtNum(item.palletCount)}</span>
+          <div className="detail-sf-item" style={{ alignItems: 'baseline', gap: 5 }}>
+            <span className="detail-sf-num" style={{
+              color: colors.accent,
+              textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
+            }}>{fmtNum(item.palletCount)}</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
+              {item.qtyPerPallet > 0 && (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, color: `${colors.accent}cc`,
+                  fontFamily: 'var(--font-mono)', letterSpacing: 0.3, lineHeight: 1,
+                }}>@{item.qtyPerPallet}</span>
+              )}
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>PL</span>
             </div>
           </div>
@@ -307,36 +355,31 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 類似品（黄色背景・強い点滅・マーキー） */}
-        {similarItems.length > 0 && (() => {
-          const similarText = similarItems.map((s) => {
-            const reason = getSimilarityReason(item.itemName, s.itemName);
-            const c2 = extractColor(s.itemName);
-            const myColor = extractColor(item.itemName);
-            const name = s.itemName.replace(/ポリカバー/g, '').trim() || s.itemName;
-            const tag = reason === 'color'
-              ? `色違い${myColor && c2 ? `(${myColor}↔${c2})` : ''}`
-              : '品名類似';
-            return `⚠ ${name} [${tag}]`;
-          }).join('　　');
-          return (
-            <div className="similar-warn-blink" style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              borderRadius: 6, padding: '5px 10px',
-              flexShrink: 0, position: 'relative', zIndex: 2,
-              overflow: 'hidden', border: '2px solid #f59e0b',
-            }}>
-              <span style={{
-                fontSize: 12, fontWeight: 900, color: '#000', whiteSpace: 'nowrap', flexShrink: 0,
-                display: 'flex', alignItems: 'center', gap: 4,
-              }}>
-                <span style={{ fontSize: 14 }}>⚠</span>
-                類似{similarItems.length}件
-              </span>
-              <MarqueeText text={similarText} style={{ color: '#000', fontSize: 11, fontWeight: 700, flex: 1, minWidth: 0 }} />
-            </div>
-          );
-        })()}
+        {/* 類似品（黄色点滅・アイコン+品名・差異赤太字） */}
+        {similarItems.length > 0 && (
+          <div className="similar-warn-blink" style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            borderRadius: 6, padding: '4px 10px',
+            flexShrink: 0, position: 'relative', zIndex: 2,
+            overflow: 'hidden', border: '2px solid #f59e0b',
+            whiteSpace: 'nowrap',
+          }}>
+            {similarItems.map((s, i) => {
+              const reason = getSimilarityReason(item.itemName, s.itemName);
+              const icon = reason === 'color' ? '🎨' : '🔤';
+              return (
+                <span key={s.id} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  fontSize: 12, fontWeight: 700, color: '#000',
+                }}>
+                  {i > 0 && <span style={{ color: '#b45309', margin: '0 2px' }}>|</span>}
+                  <span style={{ fontSize: 13 }}>{icon}</span>
+                  <HighlightDiff base={item.itemName} target={s.itemName} />
+                </span>
+              );
+            })}
+          </div>
+        )}
 
         {/* 関連 */}
         {relatedItems.length > 0 && (
