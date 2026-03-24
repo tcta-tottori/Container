@@ -15,11 +15,11 @@ export const COLOR_MAP: Record<ItemType | 'その他', {
     glow: 'rgba(34, 197, 94, 0.1)',
   },
   '箱': {
-    bg: '#eff6ff',
-    text: '#1e40af',
-    accent: '#3b82f6',
-    gradient: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-    glow: 'rgba(59, 130, 246, 0.1)',
+    bg: '#fff7ed',
+    text: '#9a3412',
+    accent: '#f97316',
+    gradient: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+    glow: 'rgba(249, 115, 22, 0.1)',
   },
   '部品': {
     bg: '#faf5ff',
