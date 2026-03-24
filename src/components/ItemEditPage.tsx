@@ -821,33 +821,46 @@ function EditModal({ item, onClose, onUpdate, onDelete, onGoDetail }: {
         overflow: 'auto', WebkitOverflowScrolling: 'touch',
         boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
       }}>
-        {/* ヘッダー: 品名+コード */}
+        {/* ヘッダー: コード+品名（コンパクト） */}
         <div style={{
-          padding: '20px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          padding: '14px 16px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)',
           background: `linear-gradient(135deg, ${colors.accent}12 0%, transparent 60%)`,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)',
-            }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: colors.accent }} />
-              {item.partNumber}
-              {item.newPartNumber && <span style={{ color: '#a78bfa' }}>/ {item.newPartNumber}</span>}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {/* コード行 */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4,
+                fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600,
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: colors.accent, flexShrink: 0 }} />
+                <span style={{ color: 'rgba(255,255,255,0.6)' }}>{item.partNumber}</span>
+                {item.newPartNumber && (
+                  <span style={{ color: '#a78bfa' }}>{item.newPartNumber}</span>
+                )}
+              </div>
+              {/* 品名（マーキー対応） */}
+              <div className="marquee-outer" style={{
+                fontSize: 16, fontWeight: 800, color: '#fff', lineHeight: 1.2,
+              }}>
+                <div className={item.itemName.length > 18 ? 'marquee-scroll' : ''}>
+                  <span className="marquee-text">{item.itemName}</span>
+                  {item.itemName.length > 18 && (
+                    <span className="marquee-text marquee-dup" aria-hidden="true">{item.itemName}</span>
+                  )}
+                </div>
+              </div>
+              {item.representModel && (
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{item.representModel}</div>
+              )}
+            </div>
             <button onClick={onClose} style={{
               width: 28, height: 28, borderRadius: 8, border: 'none', cursor: 'pointer',
               background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+              flexShrink: 0,
             }}>✕</button>
           </div>
-          <div style={{
-            fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.2,
-            textShadow: `0 0 20px ${colors.accent}30`,
-          }}>{item.itemName}</div>
-          {item.representModel && (
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>{item.representModel}</div>
-          )}
         </div>
 
         <div style={{ padding: '16px 20px' }}>
