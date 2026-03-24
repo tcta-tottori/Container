@@ -44,8 +44,17 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.4';
 const CHANGELOG = [
+  { ver: '1.4', date: '2026-03-24', changes: [
+    { icon: '🔄', text: '統合ドロップゾーン（全ファイル自動判別）' },
+    { icon: '🍲', text: 'JKP出荷予定表示（日付範囲指定）' },
+    { icon: '📂', text: '更新履歴管理（過去5件・DL対応）' },
+    { icon: '✨', text: 'ヤーマン部品タイプ追加（3YM/23F）' },
+    { icon: '📊', text: 'コンテナトラック種類分布アニメーション' },
+    { icon: '🎨', text: '半透明3D箱イメージ・パレット図レイアウト改善' },
+    { icon: '🔊', text: 'CT切り上げ表示・検査控除修正・類似品判定改善' },
+  ]},
   { ver: '1.3', date: '2026-03-24', changes: [
     { icon: '📦', text: 'CNS品目一覧を自動読込（管理ページ即反映）' },
     { icon: '✨', text: 'AQSS04L/05Lファイル読込対応' },
