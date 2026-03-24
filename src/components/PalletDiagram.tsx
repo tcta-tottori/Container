@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { ItemType } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 
@@ -191,7 +192,7 @@ function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
   }
 
   const ig = 0.15;
-  const cases: JSX.Element[] = [];
+  const cases: React.ReactElement[] = [];
   if (horizontal) {
     cases.push(<Box key="c0" x={x} y={y} z={z} w={cw - ig} d={cd} h={h} ghost={false} accent={accent} />);
     cases.push(<Box key="c1" x={x + cw} y={y} z={z} w={cw - ig} d={cd} h={h} ghost={false} accent={accent} />);
@@ -207,7 +208,7 @@ function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
   const wrapTop = [iso(wx, wy, z + wh), iso(wx + ww, wy, z + wh), iso(wx + ww, wy + wd, z + wh), iso(wx, wy + wd, z + wh)] as [number, number][];
 
   const bandH = 0.4;
-  const bands: JSX.Element[] = [];
+  const bands: React.ReactElement[] = [];
   for (const pct of [0.25, 0.72]) {
     const bz = z + h * pct;
     const bf = [iso(wx, wy, bz + bandH), iso(wx + ww, wy, bz + bandH), iso(wx + ww, wy, bz), iso(wx, wy, bz)] as [number, number][];
@@ -292,7 +293,7 @@ function JarPotStack({ ox, oy, filled, accent }: {
     return b.x - a.x;
   });
 
-  const elems: JSX.Element[] = [];
+  const elems: React.ReactElement[] = [];
   elems.push(<PalletBase key="pl" x={0} y={0} z={0} w={PW} d={PD} h={PH} />);
 
   for (const s of sorted) {
@@ -411,7 +412,7 @@ function GenericStack({ ox, oy, filled, accent, measurements, qtyPerPallet }: {
     return b.x - a.x;
   });
 
-  const elems: JSX.Element[] = [];
+  const elems: React.ReactElement[] = [];
   elems.push(<PalletBase key="pl" x={0} y={0} z={0} w={PS} d={PS} h={PH} />);
 
   for (const s of sorted) {
