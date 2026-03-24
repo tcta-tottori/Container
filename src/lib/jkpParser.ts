@@ -50,11 +50,9 @@ function mmToCmMeas(mmStr: string): string {
 /** シート名を柔軟に検索（大文字小文字・空白・全角半角を無視） */
 function findSheet(wb: XLSX.WorkBook, ...candidates: string[]): XLSX.WorkSheet | null {
   const names = Object.keys(wb.Sheets);
-  // 完全一致優先
   for (const cand of candidates) {
     if (wb.Sheets[cand]) return wb.Sheets[cand];
   }
-  // 正規化一致
   const normalize = (s: string) =>
     s.toLowerCase().replace(/[\s\u3000]/g, '').replace(/[Ｍｍ]/g, 'm').replace(/[３3]/g, '3');
   for (const cand of candidates) {
@@ -62,7 +60,6 @@ function findSheet(wb: XLSX.WorkBook, ...candidates: string[]): XLSX.WorkSheet |
     const found = names.find(n => normalize(n) === nc);
     if (found) return wb.Sheets[found];
   }
-  // 部分一致
   for (const cand of candidates) {
     const nc = normalize(cand);
     const found = names.find(n => normalize(n).includes(nc));
@@ -89,9 +86,6 @@ function is3tgCode(val: string): boolean {
 // Sheet1 パース
 // ──────────────────────────────────────────────────────────
 
-/** JKP Sheet1 パース
- *  実際のフォーマット: ヘッダーなし、col0=品番, col2=品名
- */
 export function parseJkpSheet1(wb: XLSX.WorkBook): JkpItem[] {
   const ws = findSheet(wb, 'Sheet1', 'sheet1', 'Sheet 1');
   if (!ws) {
@@ -102,7 +96,6 @@ export function parseJkpSheet1(wb: XLSX.WorkBook): JkpItem[] {
   const items: JkpItem[] = [];
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    // col0 or col1 に品番、col2 or col3 に品名（柔軟に検索）
     let partNumber = '';
     let itemName = '';
     for (let c = 0; c < Math.min(row.length, 5); c++) {
@@ -134,7 +127,6 @@ export function parseJkpVolume(wb: XLSX.WorkBook): Map<string, JkpVolume> {
   const map = new Map<string, JkpVolume>();
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    // col1に品番がある行を探す
     const partNumber = String(row[1] || '').trim();
     if (!partNumber || !is3tgCode(partNumber)) continue;
     map.set(partNumber, {
@@ -150,8 +142,16 @@ export function parseJkpVolume(wb: XLSX.WorkBook): Map<string, JkpVolume> {
 }
 
 // ──────────────────────────────────────────────────────────
-// updata シートパース（自動構造検出）
+// updata シートパース
 // ──────────────────────────────────────────────────────────
+// 構造:
+//   Row10(Excel) = row9(0-indexed): 納品日 — 日付ヘッダー ("3/18", "3/19", ...)
+//   Row8(Excel)  = row7(0-indexed): 年マーカー (2025, 2026, ...)
+//   Row12+(Excel)= row11+(0-indexed): データ行
+//     3行1組: [N列="納入指示", B列=3TGコード] / [N列="日産数", B列=品名] / [N列="残数"]
+//   N列(col13) = "納入指示" の行のみ対象
+//   B列(col1)  = 気高コード
+//   O列(col14)以降 = 日付ごとの納入数量
 
 export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
   const sheetName = Object.keys(wb.Sheets).find(s =>
@@ -168,7 +168,7 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
   const maxCol = Math.min(range.e.c, 3800);
   const getCell = cellReader(ws);
 
-  // ──── Step 1: 日付行を自動検出（"M/D" パターンが3つ以上連続する行） ────
+  // ── 日付行を自動検出（"M/D" パターンが3つ以上連続する行） ──
   let dateRow = -1;
   for (let r = 0; r <= Math.min(range.e.r, 20); r++) {
     let consecutive = 0;
@@ -187,12 +187,12 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
     console.warn('[JKP] 日付行が見つかりません');
     return [];
   }
-  console.log(`[JKP] 日付行: row${dateRow}`);
+  console.log(`[JKP] 日付行: row${dateRow} (Excel row${dateRow + 1})`);
 
-  // ──── Step 2: 年マーカー行を自動検出（dateRowより上で2014-2030の数値がある行） ────
+  // ── 年マーカー行を自動検出（dateRowより上、高い列番号帯で検索） ──
   let yearRow = -1;
-  for (let r = 0; r < dateRow; r++) {
-    for (let c = 3; c <= maxCol; c++) {
+  for (let r = dateRow - 1; r >= 0; r--) {
+    for (let c = maxCol; c >= Math.max(maxCol - 500, 3); c--) {
       const v = getCell(r, c);
       if (typeof v === 'number' && v >= 2014 && v <= 2030) {
         yearRow = r;
@@ -201,100 +201,60 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
     }
     if (yearRow >= 0) break;
   }
-  console.log(`[JKP] 年マーカー行: ${yearRow >= 0 ? 'row' + yearRow : '見つからず (デフォルト使用)'}`);
+  console.log(`[JKP] 年マーカー行: ${yearRow >= 0 ? 'row' + yearRow : '見つからず'}`);
 
-  // ──── Step 3: 列→日付マッピング構築 ────
+  // ── 列→日付マッピング構築（O列=col14以降のみ） ──
   let currentYear = new Date().getFullYear();
   const colDateMap = new Map<number, string>();
 
-  for (let c = 3; c <= maxCol; c++) {
-    // 年マーカーを更新
+  for (let c = 14; c <= maxCol; c++) {
     if (yearRow >= 0) {
       const yr = getCell(yearRow, c);
       if (typeof yr === 'number' && yr >= 2014 && yr <= 2030) {
         currentYear = yr;
       }
     }
-    // 日付セルを読み取り
     const dv = String(getCell(dateRow, c)).trim();
     const dm = dv.match(/^(\d{1,2})\/(\d{1,2})$/);
     if (dm) {
       const month = Number(dm[1]);
       const day = Number(dm[2]);
       if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-        const dateStr = `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        colDateMap.set(c, dateStr);
+        colDateMap.set(c, `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
       }
     }
   }
   console.log(`[JKP] 日付列: ${colDateMap.size}列検出`);
 
-  // ──── Step 4: データ開始行を自動検出（3TGコードが初めて出現する行） ────
-  let dataStartRow = dateRow + 1;
-  for (let r = dateRow + 1; r <= Math.min(range.e.r, dateRow + 20); r++) {
-    const c1 = String(getCell(r, 1)).trim();
-    if (is3tgCode(c1)) {
-      dataStartRow = r;
-      break;
-    }
-  }
-  console.log(`[JKP] データ開始行: row${dataStartRow}`);
-
-  // ──── Step 5: データ行をパース ────
-  // 3行1組パターン: [3TGコード行, 品名行, 内部コード行]
-  // 数量はどの行にも出現しうる → 3TGコードをキーに集約
-  const shipmentMap = new Map<string, JkpShipment>();
-  let currentPartNumber = '';
-  let currentItemName = '';
+  // ── データ行パース: N列(col13)="納入指示" の行のみ ──
+  const dataStartRow = dateRow + 2; // row11(0-indexed) = Excel row12
+  const shipments: JkpShipment[] = [];
 
   for (let r = dataStartRow; r <= range.e.r; r++) {
-    const col1 = String(getCell(r, 1)).trim();
-    if (!col1) continue;
+    const nCol = String(getCell(r, 13)).trim();
+    if (nCol !== '納入指示') continue;
 
-    // 3TGコード行 → 新しい品目の開始
-    if (is3tgCode(col1)) {
-      currentPartNumber = col1;
-      currentItemName = '';
-      continue;
-    }
+    const partNumber = String(getCell(r, 1)).trim();
+    if (!partNumber) continue;
 
-    // 品名行の判定（3TGコードの直後、JKP/JPI/JRI/JPB/JPV/JPK/JPD/JPC/JPT/JRIで始まるか英字で始まる）
-    if (currentPartNumber && !currentItemName) {
-      currentItemName = col1;
-      // この品番をまだ登録していなければ登録
-      if (!shipmentMap.has(currentPartNumber)) {
-        shipmentMap.set(currentPartNumber, {
-          partNumber: currentPartNumber,
-          itemName: currentItemName,
-          schedule: new Map(),
-        });
-      }
-    }
+    // 品名: 次の行(N列="日産数")のB列
+    const itemName = String(getCell(r + 1, 1)).trim();
 
-    // 数量データを収集（この行に数値があれば現在の品番に紐付け）
-    if (!currentPartNumber) continue;
-    const shipment = shipmentMap.get(currentPartNumber);
-    if (!shipment) continue;
-
+    // O列(col14)以降の日付列から数量を収集
+    const schedule = new Map<string, number | string>();
     colDateMap.forEach((dateStr, col) => {
       const val = getCell(r, col);
       if (typeof val === 'number' && !isNaN(val) && val > 0) {
-        // 既存値があれば合算（複数行にまたがる場合）
-        const existing = shipment.schedule.get(dateStr);
-        if (typeof existing === 'number') {
-          shipment.schedule.set(dateStr, existing + val);
-        } else {
-          shipment.schedule.set(dateStr, val);
-        }
-      } else if (typeof val === 'string' && val.trim() && !shipment.schedule.has(dateStr)) {
-        shipment.schedule.set(dateStr, val.trim());
+        schedule.set(dateStr, val);
       }
     });
+
+    if (schedule.size > 0) {
+      shipments.push({ partNumber, itemName, schedule });
+    }
   }
 
-  // スケジュールが空の品目を除外
-  const shipments = Array.from(shipmentMap.values()).filter(s => s.schedule.size > 0);
-  console.log(`[JKP] updata: ${shipments.length}品目 (うちスケジュールあり)`);
+  console.log(`[JKP] updata: ${shipments.length}品目 (納入指示行でスケジュールあり)`);
   return shipments;
 }
 
@@ -310,6 +270,19 @@ export function findNearestScheduleDate(shipments: JkpShipment[], today: string)
   }
   if (allDates.size === 0) return null;
   return Array.from(allDates).sort()[0];
+}
+
+/** 今日〜2週間先の全出荷日を返す */
+export function getScheduleDatesInRange(shipments: JkpShipment[], startDate: string, endDate: string): string[] {
+  const dates = new Set<string>();
+  for (const s of shipments) {
+    s.schedule.forEach((val, date) => {
+      if (typeof val === 'number' && val > 0 && date >= startDate && date <= endDate) {
+        dates.add(date);
+      }
+    });
+  }
+  return Array.from(dates).sort();
 }
 
 /** JKP → ContainerItem[]に変換（スケジュール数量付き） */
@@ -343,10 +316,10 @@ export function jkpToContainerItems(
     const qty = qtyMap.get(pn);
     if (!qty || qty <= 0) continue;
 
-    // 品名: Sheet1 → updata → 体積シートの順で取得
+    // 品名: updata → Sheet1 → 体積シートの順で取得
     const s1 = sheet1Items.find(it => it.partNumber === pn);
     const vol = volumeMap.get(pn);
-    const itemName = s1?.itemName || nameMap.get(pn) || vol?.itemName || pn;
+    const itemName = nameMap.get(pn) || s1?.itemName || vol?.itemName || pn;
     const size = detectNabeSize(itemName);
     const measurements = vol?.measMm ? mmToCmMeas(vol.measMm) : undefined;
     const packingQty = vol?.packingQty || 0;

@@ -21,7 +21,7 @@ import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
-import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, findNearestScheduleDate } from '@/lib/jkpParser';
+import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
 import * as XLSX from 'xlsx';
 
 type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
@@ -255,46 +255,65 @@ export default function Home() {
         const sheet1Items = parseJkpSheet1(wb);
         // 体積Ｍ３: CBM・箱寸
         const volumeMap = parseJkpVolume(wb);
-        // updata: 出荷スケジュール
+        // updata: 出荷スケジュール（N列="納入指示"の行のみ）
         const shipments = parseJkpUpdata(wb);
         setJkpShipments(shipments);
 
-        // 今日または最も近い未来の出荷日を特定
+        // 今日〜2週間先の日付範囲でデータがある日を特定
         const today = new Date().toISOString().slice(0, 10);
-        const targetDate = findNearestScheduleDate(shipments, today) || today;
+        const twoWeeksLater = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+        const scheduleDates = getScheduleDatesInRange(shipments, today, twoWeeksLater);
 
-        // JKP → ContainerItem[] 変換（対象日の数量付き）
-        setLoadingMsg(`出荷日 ${targetDate} のデータを変換中...`);
-        const nabeItems = jkpToContainerItems(sheet1Items, volumeMap, shipments, targetDate);
-
-        if (nabeItems.length === 0) {
-          setLoadingMsg(`対象日(${targetDate})の出荷データがありません (Sheet1:${sheet1Items.length}件, updata:${shipments.length}件)`);
+        if (scheduleDates.length === 0) {
+          setLoadingMsg(`${today}〜${twoWeeksLater}の出荷データがありません (updata:${shipments.length}件)`);
           await new Promise((r) => setTimeout(r, 3000));
           return;
         }
 
+        setLoadingMsg(`${scheduleDates.length}日分のデータ検出。変換中...`);
+
+        // 日付ごとにContainerを作成: "タイガー鍋(3/25)" 形式
+        const containers = [];
+        let totalItems = 0;
+        for (const date of scheduleDates) {
+          const items = jkpToContainerItems(sheet1Items, volumeMap, shipments, date);
+          if (items.length === 0) continue;
+          const dateLabel = date.slice(5).replace('-', '/');
+          containers.push({
+            date,
+            containerNo: `タイガー鍋(${dateLabel})`,
+            items,
+          });
+          totalItems += items.length;
+        }
+
+        if (containers.length === 0) {
+          setLoadingMsg('対象日の出荷データが0件です');
+          await new Promise((r) => setTimeout(r, 2000));
+          return;
+        }
+
         // GitHubから最新マスタを取得してリンク
-        setLoadingMsg(`${nabeItems.length}品目検出。マスタデータを取得中...`);
+        setLoadingMsg(`${containers.length}日分 ${totalItems}品目検出。マスタデータを取得中...`);
         const masterItems = await fetchMasterData();
         if (masterItems.length > 0) {
           loadMaster(masterItems);
         }
 
-        setLoadingMsg(`マスタデータと紐付中... (${nabeItems.length}品目 × マスタ${masterItems.length}件)`);
-        const { linkedItems, linked, total } = linkItemsWithMaster(nabeItems, masterItems);
+        // 各コンテナの品目をマスタと紐付
+        setLoadingMsg(`マスタデータと紐付中... (${totalItems}品目 × マスタ${masterItems.length}件)`);
+        let linkedTotal = 0;
+        for (const c of containers) {
+          const { linkedItems, linked } = linkItemsWithMaster(c.items, masterItems);
+          c.items = linkedItems;
+          linkedTotal += linked;
+        }
 
-        // Container オブジェクトを作成
-        const container = {
-          date: targetDate,
-          containerNo: `JKP-${targetDate.slice(5).replace('-', '/')}`,
-          items: linkedItems,
-        };
-
-        setLoadingMsg(`紐付完了: ${linked}/${total}件  作業シートを表示中...`);
-        loadData([container]);
+        setLoadingMsg(`紐付完了: ${linkedTotal}/${totalItems}件  作業シートを表示中...`);
+        loadData(containers);
 
         // 紐付済みなのでuseEffectの再紐付をスキップ
-        linkedRef.current = `${container.containerNo}-0`;
+        linkedRef.current = `${containers[0].containerNo}-0`;
 
         await new Promise((r) => setTimeout(r, 500));
       } catch (e) {
