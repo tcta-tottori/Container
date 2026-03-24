@@ -139,6 +139,7 @@ export function useSpeech() {
     if (typeCounts['ポリカバー']) typeNames.push(`ポリカバー${typeCounts['ポリカバー']}品`);
     if (typeCounts['箱']) typeNames.push(`箱${typeCounts['箱']}品`);
     if (typeCounts['部品']) typeNames.push(`部品${typeCounts['部品']}品`);
+    if (typeCounts['鍋']) typeNames.push(`鍋${typeCounts['鍋']}品`);
     if (typeCounts['その他']) typeNames.push(`その他${typeCounts['その他']}品`);
     if (typeNames.length > 0) {
       text += typeNames.join('、') + '。';
@@ -192,6 +193,7 @@ export function useSpeech() {
     if (typeCounts['ポリカバー']) parts.push(`ポリカバー${typeCounts['ポリカバー']}`);
     if (typeCounts['箱']) parts.push(`箱${typeCounts['箱']}`);
     if (typeCounts['部品']) parts.push(`部品${typeCounts['部品']}`);
+    if (typeCounts['鍋']) parts.push(`鍋${typeCounts['鍋']}`);
     if (typeCounts['その他']) parts.push(`その他${typeCounts['その他']}`);
     if (parts.length > 0) {
       text += `内訳、${parts.join('、')}。`;

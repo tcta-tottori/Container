@@ -218,7 +218,7 @@ export default function ItemDetailPanel({
 
   // リスト行の背景色（メニューカラーと統一・ダーク系）
   const TYPE_ROW_BG: Record<string, string> = {
-    'ポリカバー': '#162218', '箱': '#151e2c', '部品': '#1c1628', 'その他': '#1a1a1e',
+    'ポリカバー': '#162218', '箱': '#151e2c', '部品': '#1c1628', '鍋': '#1e1518', 'その他': '#1a1a1e',
   };
 
   // CSS変数でaccent色を渡す

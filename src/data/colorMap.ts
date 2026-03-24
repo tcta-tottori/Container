@@ -28,6 +28,13 @@ export const COLOR_MAP: Record<ItemType | 'その他', {
     gradient: 'linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%)',
     glow: 'rgba(139, 92, 246, 0.1)',
   },
+  '鍋': {
+    bg: '#fef2f2',
+    text: '#991b1b',
+    accent: '#ef4444',
+    gradient: 'linear-gradient(135deg, #fef2f2 0%, #fecaca 100%)',
+    glow: 'rgba(239, 68, 68, 0.1)',
+  },
   'その他': {
     bg: '#f9fafb',
     text: '#374151',

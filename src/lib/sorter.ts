@@ -5,7 +5,8 @@ const TYPE_ORDER: Record<ItemType, number> = {
   'ポリカバー': 1,
   '箱': 2,
   '部品': 3,
-  'その他': 4,
+  '鍋': 4,
+  'その他': 5,
 };
 
 /**

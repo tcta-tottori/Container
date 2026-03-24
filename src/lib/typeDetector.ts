@@ -118,17 +118,22 @@ export function detectItemType(
     }
   }
 
-  // 4. 箱キーワードマッチ
+  // 4. 鍋判定（ジャーポット系 = 鍋）
+  if (/^JP[A-Z]/.test(name) || name.includes('ジャーポット') || name.includes('鍋')) {
+    return '鍋';
+  }
+
+  // 5. 箱キーワードマッチ
   for (const kw of BOX_KEYWORDS) {
     if (name.includes(kw)) return '箱';
   }
 
-  // 5. 部品キーワードマッチ
+  // 6. 部品キーワードマッチ
   for (const kw of PARTS_KEYWORDS) {
     if (name.includes(kw)) return '部品';
   }
 
-  // 6. 品番パターンによる判定
+  // 7. 品番パターンによる判定
   if (pn) {
     const codeMatch = pn.match(/^3TG\d{3}([APKE])/);
     if (codeMatch) {
