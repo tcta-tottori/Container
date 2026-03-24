@@ -43,7 +43,7 @@ body {
   .detail-panel { width: 50%; height: 100%; }
   .detail-panel .detail-upper { height: 100%; border-radius: 0; }
   .detail-panel .detail-list-section { display: none; }
-  .list-panel-side { width: 50%; height: 100%; border-left: 1px solid rgba(0,0,0,0.08); }
+  .list-panel-side { width: 50%; height: 100%; border-left: 1px solid rgba(255,255,255,0.08); }
 }
 @media (orientation: portrait) {
   .detail-panel { width: 100%; height: 100%; }

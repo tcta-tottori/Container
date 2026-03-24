@@ -16,6 +16,7 @@ import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 import ActionBar from '@/components/ActionBar';
 import VoiceFeedback from '@/components/VoiceFeedback';
+import ManualPage from '@/components/ManualPage';
 
 type ViewMode = 'work' | 'list' | 'edit';
 
@@ -49,6 +50,7 @@ export default function Home() {
   const loadedContainerRef = useRef<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('work');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
 
   // 品目切替時の自動アナウンス
   useEffect(() => {
@@ -274,6 +276,7 @@ export default function Home() {
 
   return (
     <>
+      {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
 
       {/* メニューオーバーレイ */}
@@ -300,8 +303,15 @@ export default function Home() {
               管理
             </button>
             <div className="menu-divider" />
+            <button className="menu-item" onClick={() => { setManualOpen(true); setMenuOpen(false); }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              マニュアル
+            </button>
+            <div className="menu-divider" />
             <div className="menu-version">
-              CNS Ver 1.0
+              CNS Ver 1.2
             </div>
           </div>
         </div>
