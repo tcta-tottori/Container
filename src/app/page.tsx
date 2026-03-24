@@ -175,9 +175,10 @@ export default function Home() {
       for (const file of files) {
         const buffer = await file.arrayBuffer();
         const aqssMap = parseAqssExcel(buffer);
-        // 現在のコンテナ品目とマスタ品目にAQSSデータをマージ
+        // AQSSのキーは新建高コード → partNumber(気高)とnewPartNumber(新建高)の両方で検索
         state.items.forEach((item, idx) => {
-          const aqss = aqssMap.get(item.partNumber);
+          const aqss = aqssMap.get(item.partNumber)
+            || (item.newPartNumber ? aqssMap.get(item.newPartNumber) : undefined);
           if (aqss) updateItem(idx, aqss);
         });
       }

@@ -147,15 +147,16 @@ export async function fetchMasterData(): Promise<ContainerItem[]> {
 /**
  * マスタデータとコンテナ品目を紐付する（同期処理）
  *
- * 紐付キー:
- *   1. 気高コード(partNumber) → マスタの partNumber (B列) で完全一致
- *   2. 新建高コード → マスタの newPartNumber (A列) で完全一致
- *   （AQSS04Lファイルでは partNumber が新建高コードの場合がある）
+ * ※ AQSS04Lファイルの品番は「すべて新建高コード」
  *
- * 紐付されるフィールド:
- *   newPartNumber, newPartNumberKetaka, itemNameKetaka, linkStatus,
- *   itemNameContainer, representModelContainer, packingQtyContainer,
- *   qtyPerPalletContainer, description, modelNo, grossWeight, cbm, measurements
+ * 紐付キー（優先順位）:
+ *   1. 新建高コード → マスタの newPartNumber (A列) で完全一致 ★優先
+ *   2. 気高コード   → マスタの partNumber   (B列) で完全一致（フォールバック）
+ *
+ * 紐付後:
+ *   - partNumber   = マスタの気高コード（B列）に書き換え
+ *   - newPartNumber = マスタの新建高コード（A列）をセット
+ *   - その他マスタ情報を全コピー
  *
  * @returns 紐付後のアイテム配列（新しい配列を返す）と紐付結果ログ
  */
@@ -167,22 +168,22 @@ export function linkItemsWithMaster(
     return { linkedItems: items, linked: 0, unlinked: items.length, total: items.length };
   }
 
-  // マスタの検索用Map（気高コード→マスタ, 新建高コード→マスタ）
-  const byPartNumber = new Map<string, ContainerItem>();
-  const byNewPartNumber = new Map<string, ContainerItem>();
+  // マスタの検索用Map
+  const byNewPartNumber = new Map<string, ContainerItem>(); // 新建高コード(A列)→マスタ
+  const byPartNumber = new Map<string, ContainerItem>();    // 気高コード(B列)→マスタ
   for (const m of masterItems) {
-    if (m.partNumber) byPartNumber.set(m.partNumber, m);
     if (m.newPartNumber) byNewPartNumber.set(m.newPartNumber, m);
+    if (m.partNumber) byPartNumber.set(m.partNumber, m);
   }
 
   let linked = 0;
   const linkedItems = items.map((item) => {
-    // 1. 気高コードで検索
-    let master = byPartNumber.get(item.partNumber);
+    // 1. 新建高コードとして検索（AQSS04Lは全て新建高コード）★優先
+    let master = byNewPartNumber.get(item.partNumber);
 
-    // 2. 見つからなければ新建高コードとして検索
+    // 2. 見つからなければ気高コードとして検索（フォールバック）
     if (!master) {
-      master = byNewPartNumber.get(item.partNumber);
+      master = byPartNumber.get(item.partNumber);
     }
 
     if (!master) return item;
@@ -190,16 +191,12 @@ export function linkItemsWithMaster(
     linked++;
     const updated = { ...item };
 
-    // 気高コードでマッチした場合: マスタのpartNumberが気高コード
-    // 新建高コードでマッチした場合: itemのpartNumberが新建高コード → マスタのpartNumberを気高コードとして設定
-    if (master.partNumber !== item.partNumber) {
-      // 新建高コードでマッチ → マスタのpartNumberが本来の気高コード
-      updated.newPartNumber = item.partNumber; // 元のコードが新建高
-      updated.partNumber = master.partNumber;  // マスタの気高コードを正とする
-    }
+    // 気高コード = マスタのpartNumber(B列)を正とする
+    updated.partNumber = master.partNumber;
+    // 新建高コード = マスタのnewPartNumber(A列)をセット
+    if (master.newPartNumber) updated.newPartNumber = master.newPartNumber;
 
     // マスタから全フィールドをコピー
-    if (master.newPartNumber) updated.newPartNumber = master.newPartNumber;
     if (master.newPartNumberKetaka) updated.newPartNumberKetaka = master.newPartNumberKetaka;
     if (master.itemNameKetaka) updated.itemNameKetaka = master.itemNameKetaka;
     if (master.linkStatus) updated.linkStatus = master.linkStatus;
