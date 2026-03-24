@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
-import PalletDiagram from './PalletDiagram';
+import PalletDiagram, { calculateStackLayers } from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
 interface ItemDetailPanelProps {
@@ -472,6 +472,12 @@ export default function ItemDetailPanel({
               textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
             }}>{fmtNum(item.palletCount)}</span>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
+              {(() => {
+                const st = calculateStackLayers(item.type, item.itemName, item.qtyPerPallet, item.measurements);
+                return st > 0 ? (
+                  <span className="detail-sf-at" style={{ color: `${colors.accent}cc`, lineHeight: 1 }}>{st}ST</span>
+                ) : null;
+              })()}
               {item.qtyPerPallet > 0 && (
                 <span className="detail-sf-at" style={{ color: `${colors.accent}cc`, lineHeight: 1 }}>@{item.qtyPerPallet}</span>
               )}

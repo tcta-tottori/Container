@@ -33,7 +33,55 @@ function parseMeasurements(s: string): [number, number, number] | null {
 
 /* ===== Jar-pot detection ===== */
 function isJarPot(name: string): boolean {
-  return /^JP[A-Z]/.test(name) || name.includes('ジャーポット');
+  return /^(PDR|PDU|PVW)/.test(name) || name.includes('ジャーポット');
+}
+
+/* ===== Size detection helpers ===== */
+function getJarPotSize(itemName: string): number {
+  const m = itemName.match(/(30|40|50)/);
+  if (m) return parseInt(m[1]);
+  return 30; // default → 5 layers
+}
+
+function getPolycoverNabeSize(itemName: string): number {
+  if (itemName.includes('180')) return 180;
+  if (itemName.includes('100')) return 100;
+  return 100; // default → 5 layers
+}
+
+/* ===== Stack layers calculation (exported for ItemDetailPanel) ===== */
+export function calculateStackLayers(
+  type: ItemType,
+  itemName: string,
+  qtyPerPallet: number,
+  measurements?: string,
+): number {
+  // Jar pot: 30/40 → 5, 50 → 4
+  if (type === 'ジャーポット' || isJarPot(itemName)) {
+    const size = getJarPotSize(itemName);
+    return size >= 50 ? 4 : 5;
+  }
+
+  // Polycover / Nabe: 100 → 5, 180 → 4
+  if (type === 'ポリカバー' || type === '鍋') {
+    const size = getPolycoverNabeSize(itemName);
+    return size >= 180 ? 4 : 5;
+  }
+
+  // General: calculate from measurements and qtyPerPallet
+  if (measurements && qtyPerPallet > 0) {
+    const dims = parseMeasurements(measurements);
+    if (dims) {
+      const [wCm, dCm] = dims;
+      const PALLET_CM = 110;
+      const cols = Math.max(1, Math.floor(PALLET_CM / wCm));
+      const rows = Math.max(1, Math.floor(PALLET_CM / dCm));
+      const perLayer = cols * rows;
+      return Math.max(1, Math.ceil(qtyPerPallet / perLayer));
+    }
+  }
+
+  return 0; // unknown
 }
 
 /* ===== Solid Cardboard Box (3 faces + white tape cross) ===== */
@@ -176,117 +224,43 @@ function PalletBase({ x, y, z, w, d, h }: {
   );
 }
 
-/* ===== Laminate Bundle (for JarPot items) ===== */
-function LaminateBundle({ x, y, z, cw, cd, h, horizontal, ghost, accent }: {
-  x: number; y: number; z: number;
-  cw: number; cd: number; h: number;
-  horizontal: boolean;
-  ghost: boolean; accent: string;
+/* ===== JarPot Stack (2×2 box grid per layer) ===== */
+function JarPotStack({ ox, oy, filled, accent, layers }: {
+  ox: number; oy: number; filled: number; accent: string; layers: number;
 }) {
-  const bw = horizontal ? cw * 2 : cd;
-  const bd = horizontal ? cd : cw * 2;
+  const PS = 22, PH = 3;
+  const gap = 0.4;
+  const edgeGap = 0.3;
+  const boxW = (PS - edgeGap * 2 - gap) / 2;
+  const boxD = (PS - edgeGap * 2 - gap) / 2;
+  const boxH = 4.5;
 
-  if (ghost) {
-    const q = [iso(x, y, z), iso(x + bw, y, z), iso(x + bw, y + bd, z), iso(x, y + bd, z)] as [number, number][];
-    return <polygon points={pts(...q)} fill="none" stroke={accent} strokeWidth={0.1} strokeDasharray="1,1" opacity={0.1} />;
-  }
+  const perLayer = 4; // 2×2
+  const totalSlots = perLayer * layers;
 
-  const ig = 0.15;
-  const cases: React.ReactElement[] = [];
-  if (horizontal) {
-    cases.push(<Box key="c0" x={x} y={y} z={z} w={cw - ig} d={cd} h={h} ghost={false} accent={accent} />);
-    cases.push(<Box key="c1" x={x + cw} y={y} z={z} w={cw - ig} d={cd} h={h} ghost={false} accent={accent} />);
-  } else {
-    cases.push(<Box key="c0" x={x} y={y} z={z} w={cd} d={cw - ig} h={h} ghost={false} accent={accent} />);
-    cases.push(<Box key="c1" x={x} y={y + cw} z={z} w={cd} d={cw - ig} h={h} ghost={false} accent={accent} />);
-  }
-
-  const m = 0.08;
-  const wx = x - m, wy = y - m, ww = bw + m * 2, wd = bd + m * 2, wh = h + m;
-  const wrapLeft = [iso(wx, wy, z + wh), iso(wx, wy + wd, z + wh), iso(wx, wy + wd, z), iso(wx, wy, z)] as [number, number][];
-  const wrapFront = [iso(wx, wy, z + wh), iso(wx + ww, wy, z + wh), iso(wx + ww, wy, z), iso(wx, wy, z)] as [number, number][];
-  const wrapTop = [iso(wx, wy, z + wh), iso(wx + ww, wy, z + wh), iso(wx + ww, wy + wd, z + wh), iso(wx, wy + wd, z + wh)] as [number, number][];
-
-  const bandH = 0.4;
-  const bands: React.ReactElement[] = [];
-  for (const pct of [0.25, 0.72]) {
-    const bz = z + h * pct;
-    const bf = [iso(wx, wy, bz + bandH), iso(wx + ww, wy, bz + bandH), iso(wx + ww, wy, bz), iso(wx, wy, bz)] as [number, number][];
-    bands.push(<polygon key={`bf${pct}`} points={pts(...bf)} fill="rgba(200,230,255,0.22)" stroke="none" />);
-    const bl = [iso(wx, wy, bz + bandH), iso(wx, wy + wd, bz + bandH), iso(wx, wy + wd, bz), iso(wx, wy, bz)] as [number, number][];
-    bands.push(<polygon key={`bl${pct}`} points={pts(...bl)} fill="rgba(180,210,240,0.18)" stroke="none" />);
-  }
-
-  const refY = z + h * 0.5;
-  const ref = [
-    iso(wx + ww * 0.1, wy, refY + 0.2), iso(wx + ww * 0.7, wy, refY + 0.2),
-    iso(wx + ww * 0.7, wy, refY), iso(wx + ww * 0.1, wy, refY),
-  ] as [number, number][];
-
-  return (
-    <g>
-      {cases}
-      <polygon points={pts(...wrapLeft)} fill="rgba(180,215,250,0.12)" stroke="rgba(150,190,230,0.35)" strokeWidth={0.3} strokeLinejoin="round" />
-      <polygon points={pts(...wrapFront)} fill="rgba(190,220,250,0.1)" stroke="rgba(150,190,230,0.35)" strokeWidth={0.3} strokeLinejoin="round" />
-      <polygon points={pts(...wrapTop)} fill="rgba(220,240,255,0.08)" stroke="rgba(150,190,230,0.35)" strokeWidth={0.3} strokeLinejoin="round" />
-      {bands}
-      <polygon points={pts(...ref)} fill="rgba(255,255,255,0.15)" stroke="none" />
-    </g>
-  );
-}
-
-/* ===== JarPot Stack ===== */
-interface BundleSlot {
-  x: number; y: number; z: number;
-  horizontal: boolean;
-  fillIdx: number;
-}
-
-function buildJarPotSlots(PH: number): BundleSlot[] {
-  const PW = 22, PD = 22;
-  const gOuter = 0.3;
-  const cw = (PW - 3 * gOuter) / 4;
-  const cd = (PD - 6 * gOuter) / 5;
-  const bh = 5.5;
-
-  const slots: BundleSlot[] = [];
+  // Build slots: 2×2 grid per layer
+  const slots: BoxSlot[] = [];
   let idx = 0;
-
-  const z0 = PH;
-  for (let r = 4; r >= 0; r--) {
-    for (let c = 0; c < 2; c++) {
-      const x = gOuter + c * (2 * cw + gOuter);
-      const y = gOuter + r * (cd + gOuter);
-      slots.push({ x, y, z: z0, horizontal: true, fillIdx: idx++ });
+  for (let layer = 0; layer < layers; layer++) {
+    const z = PH + layer * boxH;
+    for (let r = 1; r >= 0; r--) {
+      for (let c = 0; c < 2; c++) {
+        const x = edgeGap + c * (boxW + gap);
+        const y = edgeGap + r * (boxD + gap);
+        slots.push({ x, y, z, fillIdx: idx++ });
+      }
     }
   }
 
-  const z1 = PH + bh;
-  for (let r = 1; r >= 0; r--) {
-    for (let c = 0; c < 5; c++) {
-      const x = gOuter + c * (cd + gOuter);
-      const y = gOuter + r * (2 * cw + gOuter);
-      slots.push({ x, y, z: z1, horizontal: false, fillIdx: idx++ });
-    }
+  // For fraction: only show needed layers
+  let slotsToRender = totalSlots;
+  if (filled < totalSlots) {
+    const layersNeeded = Math.min(layers, Math.ceil(filled / perLayer) + 1);
+    slotsToRender = Math.min(totalSlots, Math.max(layersNeeded, 1) * perLayer);
   }
+  const renderSlots = slots.slice(0, slotsToRender);
 
-  return slots;
-}
-
-function JarPotStack({ ox, oy, filled, accent }: {
-  ox: number; oy: number; filled: number; accent: string;
-}) {
-  const PW = 22, PD = 22, PH = 3;
-  const gOuter = 0.3;
-  const cw = (PW - 3 * gOuter) / 4;
-  const cd = (PD - 6 * gOuter) / 5;
-  const bh = 5.5;
-
-  const allSlots = buildJarPotSlots(PH);
-  const maxLayer0 = 10;
-  const slotsToShow = filled > maxLayer0 ? allSlots.length : maxLayer0;
-  const renderSlots = allSlots.slice(0, slotsToShow);
-
+  // Sort for proper occlusion: z asc, y desc, x desc
   const sorted = [...renderSlots].sort((a, b) => {
     if (a.z !== b.z) return a.z - b.z;
     if (a.y !== b.y) return b.y - a.y;
@@ -294,14 +268,13 @@ function JarPotStack({ ox, oy, filled, accent }: {
   });
 
   const elems: React.ReactElement[] = [];
-  elems.push(<PalletBase key="pl" x={0} y={0} z={0} w={PW} d={PD} h={PH} />);
+  elems.push(<PalletBase key="pl" x={0} y={0} z={0} w={PS} d={PS} h={PH} />);
 
   for (const s of sorted) {
     elems.push(
-      <LaminateBundle key={`b${s.fillIdx}`}
+      <Box key={`b${s.fillIdx}`}
         x={s.x} y={s.y} z={s.z}
-        cw={cw} cd={cd} h={bh}
-        horizontal={s.horizontal}
+        w={boxW} d={boxD} h={boxH}
         ghost={s.fillIdx >= filled} accent={accent} />
     );
   }
@@ -433,19 +406,22 @@ export default function PalletDiagram({
 }: PalletDiagramProps) {
   const colors = COLOR_MAP[type] || COLOR_MAP['その他'];
   const hasFrac = fraction > 0;
-  const jarPot = isJarPot(itemName || '');
+  const jarPot = type === 'ジャーポット' || isJarPot(itemName || '');
+
+  // Calculate stack layers using type-specific rules
+  const stackLayers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements);
 
   const layout = jarPot ? null : calculateLayout(measurements, qtyPerPallet);
-  const maxSlots = jarPot ? 20 : (layout ? layout.totalSlots : 18);
+  const jpLayers = jarPot ? (stackLayers || 5) : 0;
+  const maxSlots = jarPot ? 4 * jpLayers : (layout ? layout.totalSlots : 18);
 
   const mapFrac = (n: number) => {
-    if (jarPot) return Math.min(Math.ceil(n / 2), 20);
     return Math.min(Math.ceil(n), maxSlots);
   };
 
   const PW = 22, PD = 22, PH = 3;
-  const layerH = jarPot ? 5.5 : (layout ? layout.boxH : 6);
-  const layers = jarPot ? 2 : (layout ? layout.layers : 3);
+  const layerH = jarPot ? 4.5 : (layout ? layout.boxH : 6);
+  const layers = jarPot ? jpLayers : (layout ? layout.layers : 3);
   const totalZ = PH + layers * layerH;
   const xL = -PD * CS;
   const xR = PW * CS;
@@ -471,7 +447,7 @@ export default function PalletDiagram({
         {/* Full pallet diagram */}
         {palletCount > 0 && (
           jarPot ? (
-            <JarPotStack ox={0} oy={0} filled={maxSlots} accent={colors.accent} />
+            <JarPotStack ox={0} oy={0} filled={maxSlots} accent={colors.accent} layers={jpLayers} />
           ) : (
             <GenericStack ox={0} oy={0} filled={maxSlots}
               accent={colors.accent} measurements={measurements}
@@ -499,7 +475,7 @@ export default function PalletDiagram({
           <g transform={`translate(${mainW + labelW + sp}, ${(oneH - oneH * 0.7) / 2 - 2}) scale(0.7)`}>
             {jarPot ? (
               <JarPotStack ox={0} oy={0}
-                filled={mapFrac(fraction)} accent={colors.accent} />
+                filled={mapFrac(fraction)} accent={colors.accent} layers={jpLayers} />
             ) : (
               <GenericStack ox={0} oy={0}
                 filled={mapFrac(fraction)} accent={colors.accent}
