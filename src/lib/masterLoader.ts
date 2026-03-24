@@ -23,7 +23,12 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
 
     const itemName = v(2);
     const qtyPerPallet = n(8);
-    const type = (v(3) as ItemType) || detectItemType(itemName, qtyPerPallet, 0, partNumber);
+    // 入数が「10/箱」のような形式 → ポリカバーとして判定
+    const packingRaw = v(5);
+    const hasBoxPackingFormat = /^\d+\/箱/.test(packingRaw);
+    const storedType = v(3) as ItemType;
+    const type = hasBoxPackingFormat ? 'ポリカバー' as ItemType
+      : storedType || detectItemType(itemName, qtyPerPallet, 0, partNumber);
 
     items.push({
       id: `master-${i}`,

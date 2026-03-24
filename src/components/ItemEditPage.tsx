@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { ContainerItem, ItemType } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { saveToGitHub, getStoredToken, storeToken } from '@/lib/githubSave';
@@ -229,7 +229,11 @@ export default function ItemEditPage({
   const [tokenInput, setTokenInput] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
   const [saving, setSaving] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const importRef = useRef<HTMLInputElement>(null);
+
+  // refreshKeyが変わるとfiltered/sortedFilteredが再計算される
+  void refreshKey;
 
   const filtered = items.filter((item) => {
     if (filterType !== 'all' && item.type !== filterType) return false;
@@ -526,7 +530,6 @@ export default function ItemEditPage({
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
         {sortedFiltered.map((item, sortIdx) => {
           const realIdx = items.indexOf(item);
-          const isEditing = editingIdx === realIdx;
           const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
           const isContainerMatch = containerPartNumbers?.has(item.partNumber) ?? false;
           // コンテナ対象/非対象の境界線
@@ -535,12 +538,9 @@ export default function ItemEditPage({
 
           return (
             <div key={item.id}>
-              <EditRow item={item} isEditing={isEditing} colors={colors}
+              <EditRow item={item} colors={colors}
                 isContainerMatch={isContainerMatch}
-                onStartEdit={() => { setEditingIdx(isEditing ? null : realIdx); setShowAddForm(false); }}
-                onUpdate={(updates) => onUpdateItem(realIdx, updates)}
-                onDelete={() => handleDeleteItem(realIdx, item.itemName)}
-                onGoDetail={() => onSelectAndGoDetail(realIdx)} />
+                onStartEdit={() => { setEditingIdx(realIdx); setShowAddForm(false); }} />
               {isLastMatch && (
                 <div style={{
                   height: 2, background: 'linear-gradient(90deg, rgba(251,191,36,0.4), transparent)',
@@ -556,6 +556,21 @@ export default function ItemEditPage({
           </div>
         )}
       </div>
+
+      {/* 詳細ポップアップ */}
+      {editingIdx !== null && items[editingIdx] && (
+        <EditModal
+          item={items[editingIdx]}
+          onClose={() => setEditingIdx(null)}
+          onUpdate={(updates) => {
+            onUpdateItem(editingIdx, updates);
+            // 保存後、テーブルが自動リフレッシュされるよう再フィルタのきっかけを作成
+            setRefreshKey((k) => k + 1);
+          }}
+          onDelete={() => { handleDeleteItem(editingIdx, items[editingIdx].itemName); setEditingIdx(null); }}
+          onGoDetail={() => { onSelectAndGoDetail(editingIdx); setEditingIdx(null); }}
+        />
+      )}
     </div>
   );
 }
@@ -730,12 +745,10 @@ function SectionHeader({ title, color }: { title: string; color: string }) {
   );
 }
 
-/* ===== 編集行 ===== */
-function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpdate, onDelete, onGoDetail }: {
-  item: ContainerItem; isEditing: boolean;
-  colors: { accent: string; text: string };
-  isContainerMatch?: boolean;
-  onStartEdit: () => void;
+/* ===== 詳細ポップアップモーダル ===== */
+function EditModal({ item, onClose, onUpdate, onDelete, onGoDetail }: {
+  item: ContainerItem;
+  onClose: () => void;
   onUpdate: (updates: Partial<ContainerItem>) => void;
   onDelete: () => void;
   onGoDetail: () => void;
@@ -755,6 +768,24 @@ function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpd
   const [editCbm, setEditCbm] = useState(String(item.cbm || ''));
   const [editMeasurements, setEditMeasurements] = useState(item.measurements || '');
 
+  // アイテムが変わったらフォームリセット
+  useEffect(() => {
+    setEditType(item.type);
+    setEditQtyPerPallet(String(item.qtyPerPallet));
+    setEditNewPN(item.newPartNumber || '');
+    setEditPartNumber(item.partNumber);
+    setEditItemName(item.itemName);
+    setEditRepresentModel(item.representModel);
+    setEditDescription(item.description || '');
+    setEditModelNo(item.modelNo || '');
+    setEditPackingQty(String(item.packingQty));
+    setEditTotalQty(String(item.totalQty));
+    setEditCaseCount(String(item.caseCount));
+    setEditGrossWeight(String(item.grossWeight || ''));
+    setEditCbm(String(item.cbm || ''));
+    setEditMeasurements(item.measurements || '');
+  }, [item]);
+
   const handleSave = useCallback(() => {
     onUpdate({
       partNumber: editPartNumber.trim(),
@@ -772,161 +803,244 @@ function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpd
       cbm: Number(editCbm) || undefined,
       measurements: editMeasurements.trim() || undefined,
     });
-    onStartEdit();
-  }, [editPartNumber, editItemName, editRepresentModel, editType, editPackingQty, editTotalQty, editCaseCount, editQtyPerPallet, editNewPN, editDescription, editModelNo, editGrossWeight, editCbm, editMeasurements, onUpdate, onStartEdit]);
+    onClose();
+  }, [editPartNumber, editItemName, editRepresentModel, editType, editPackingQty, editTotalQty, editCaseCount, editQtyPerPallet, editNewPN, editDescription, editModelNo, editGrossWeight, editCbm, editMeasurements, onUpdate, onClose]);
 
-  if (isEditing) {
-    return (
-      <div style={{
-        padding: '14px 16px', background: '#1e2235',
-        borderBottom: '1px solid rgba(255,255,255,0.08)',
+  const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
+  const selectedColors = COLOR_MAP[editType] || COLOR_MAP['その他'];
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(12px)',
+    }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: '#1e2235', border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 20, width: '94%', maxWidth: 540, maxHeight: '90vh',
+        overflow: 'auto', WebkitOverflowScrolling: 'touch',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
       }}>
-        {/* ===== ベース情報 ===== */}
-        <SectionHeader title="ベース情報" color="#60a5fa" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
-          <div>
-            <div style={labelStyle}>気高コード</div>
-            <input value={editPartNumber} onChange={(e) => setEditPartNumber(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+        {/* ヘッダー: 品名+コード */}
+        <div style={{
+          padding: '20px 20px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background: `linear-gradient(135deg, ${colors.accent}12 0%, transparent 60%)`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 10, color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)',
+            }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: colors.accent }} />
+              {item.partNumber}
+              {item.newPartNumber && <span style={{ color: '#a78bfa' }}>/ {item.newPartNumber}</span>}
+            </span>
+            <button onClick={onClose} style={{
+              width: 28, height: 28, borderRadius: 8, border: 'none', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+            }}>✕</button>
           </div>
-          <div style={{ gridColumn: 'span 2' }}>
-            <div style={labelStyle}>規格</div>
-            <input value={editItemName} onChange={(e) => setEditItemName(e.target.value)} style={inputStyle} />
-          </div>
-          <div>
-            <div style={labelStyle}>新建高コード</div>
-            <input value={editNewPN} onChange={(e) => setEditNewPN(e.target.value)} placeholder="2TG35401"
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
-          <div>
-            <div style={labelStyle}>代表機種</div>
-            <input value={editRepresentModel} onChange={(e) => setEditRepresentModel(e.target.value)} style={inputStyle} />
-          </div>
-          <div>
-            <div style={labelStyle}>種類</div>
-            <select value={editType} onChange={(e) => setEditType(e.target.value as ItemType)}
-              style={{ ...inputStyle, cursor: 'pointer' }}>
-              {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={labelStyle}>入数</div>
-            <input type="number" inputMode="numeric" value={editPackingQty} onChange={(e) => setEditPackingQty(e.target.value)}
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
-          <div>
-            <div style={labelStyle}>総数</div>
-            <input type="number" inputMode="numeric" value={editTotalQty} onChange={(e) => setEditTotalQty(e.target.value)}
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
-          <div>
-            <div style={labelStyle}>ケース数</div>
-            <input type="number" inputMode="numeric" value={editCaseCount} onChange={(e) => setEditCaseCount(e.target.value)}
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
-          <div>
-            <div style={labelStyle}>1P数</div>
-            <input type="number" inputMode="numeric" value={editQtyPerPallet} onChange={(e) => setEditQtyPerPallet(e.target.value)}
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
+          <div style={{
+            fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.2,
+            textShadow: `0 0 20px ${colors.accent}30`,
+          }}>{item.itemName}</div>
+          {item.representModel && (
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>{item.representModel}</div>
+          )}
         </div>
 
-        {/* ===== 气高编号（参照・読取専用） ===== */}
-        <SectionHeader title="气高编号" color="#a78bfa" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
-          <div>
-            <div style={labelStyle}>新建高コード</div>
-            <div style={roStyle}>{item.newPartNumberKetaka || '—'}</div>
-          </div>
-          <div style={{ gridColumn: 'span 2' }}>
-            <div style={labelStyle}>規格</div>
-            <div style={roStyle}>{item.itemNameKetaka || '—'}</div>
-          </div>
-          <div>
-            <div style={labelStyle}>紐付状態</div>
+        <div style={{ padding: '16px 20px' }}>
+          {/* ===== 種類変更（最も目立つ） ===== */}
+          <div style={{
+            marginBottom: 16, padding: 14, borderRadius: 14,
+            background: `linear-gradient(135deg, ${selectedColors.accent}18 0%, ${selectedColors.accent}08 100%)`,
+            border: `2px solid ${selectedColors.accent}40`,
+          }}>
             <div style={{
-              ...roStyle,
-              color: item.linkStatus === '✓' ? '#4ade80' : 'rgba(255,255,255,0.3)',
-              fontWeight: 600,
-            }}>{item.linkStatus || '—'}</div>
+              fontSize: 11, fontWeight: 700, letterSpacing: 1, color: selectedColors.accent,
+              marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{ width: 4, height: 14, borderRadius: 3, background: selectedColors.accent }} />
+              種類
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {ITEM_TYPES.map((t) => {
+                const tc = COLOR_MAP[t];
+                const sel = editType === t;
+                return (
+                  <button key={t} onClick={() => setEditType(t)} style={{
+                    flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer',
+                    fontSize: 13, fontWeight: sel ? 800 : 500,
+                    background: sel ? `${tc.accent}30` : 'rgba(255,255,255,0.04)',
+                    border: sel ? `2px solid ${tc.accent}` : '2px solid rgba(255,255,255,0.06)',
+                    color: sel ? tc.accent : 'rgba(255,255,255,0.5)',
+                    transform: sel ? 'scale(1.05)' : 'scale(1)',
+                    transition: 'all 0.15s ease',
+                    boxShadow: sel ? `0 0 16px ${tc.accent}30` : 'none',
+                  }}>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                      <span style={{
+                        width: 8, height: 8, borderRadius: '50%', background: tc.accent,
+                        boxShadow: sel ? `0 0 6px ${tc.accent}` : 'none',
+                      }} />
+                      {t}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* ===== コンテナ日程（参照・読取専用） ===== */}
-        <SectionHeader title="コンテナ日程" color="#fbbf24" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
-          <div style={{ gridColumn: 'span 2' }}>
-            <div style={labelStyle}>規格</div>
-            <div style={roStyle}>{item.itemNameContainer || '—'}</div>
+          {/* ===== ベース情報 ===== */}
+          <SectionHeader title="ベース情報" color="#60a5fa" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
+            <div>
+              <div style={labelStyle}>気高コード</div>
+              <input value={editPartNumber} onChange={(e) => setEditPartNumber(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <div style={labelStyle}>規格</div>
+              <input value={editItemName} onChange={(e) => setEditItemName(e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <div style={labelStyle}>新建高コード</div>
+              <input value={editNewPN} onChange={(e) => setEditNewPN(e.target.value)} placeholder="2TG35401"
+                style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            </div>
           </div>
-          <div>
-            <div style={labelStyle}>代表機種</div>
-            <div style={roStyle}>{item.representModelContainer || '—'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8, marginBottom: 6 }}>
+            <div>
+              <div style={labelStyle}>代表機種</div>
+              <input value={editRepresentModel} onChange={(e) => setEditRepresentModel(e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <div style={labelStyle}>入数</div>
+              <input type="number" inputMode="numeric" value={editPackingQty} onChange={(e) => setEditPackingQty(e.target.value)}
+                style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            </div>
+            <div>
+              <div style={labelStyle}>総数</div>
+              <input type="number" inputMode="numeric" value={editTotalQty} onChange={(e) => setEditTotalQty(e.target.value)}
+                style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            </div>
+            <div>
+              <div style={labelStyle}>ケース数</div>
+              <input type="number" inputMode="numeric" value={editCaseCount} onChange={(e) => setEditCaseCount(e.target.value)}
+                style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            </div>
+            <div>
+              <div style={labelStyle}>1P数</div>
+              <input type="number" inputMode="numeric" value={editQtyPerPallet} onChange={(e) => setEditQtyPerPallet(e.target.value)}
+                style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            </div>
           </div>
-          <div>
-            <div style={labelStyle}>入数</div>
-            <div style={roStyle}>{item.packingQtyContainer ?? '—'}</div>
-          </div>
-          <div>
-            <div style={labelStyle}>1P数</div>
-            <div style={roStyle}>{item.qtyPerPalletContainer ?? '—'}</div>
-          </div>
-        </div>
 
-        {/* ===== AQSS（編集可能） ===== */}
-        <SectionHeader title="AQSS" color="#34d399" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
-          <div style={{ gridColumn: 'span 2' }}>
-            <div style={labelStyle}>ITEM DESCRIPTION</div>
-            <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="UPPER LID ASSY" style={inputStyle} />
+          {/* ===== 气高编号（参照・読取専用） ===== */}
+          <SectionHeader title="气高编号" color="#a78bfa" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
+            <div>
+              <div style={labelStyle}>新建高コード</div>
+              <div style={roStyle}>{item.newPartNumberKetaka || '—'}</div>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <div style={labelStyle}>規格</div>
+              <div style={roStyle}>{item.itemNameKetaka || '—'}</div>
+            </div>
+            <div>
+              <div style={labelStyle}>紐付状態</div>
+              <div style={{
+                ...roStyle,
+                color: item.linkStatus === '✓' ? '#4ade80' : 'rgba(255,255,255,0.3)',
+                fontWeight: 600,
+              }}>{item.linkStatus || '—'}</div>
+            </div>
           </div>
-          <div style={{ gridColumn: 'span 2' }}>
-            <div style={labelStyle}>MODEL NO.</div>
-            <input value={editModelNo} onChange={(e) => setEditModelNo(e.target.value)} style={inputStyle} />
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, marginBottom: 12 }}>
-          <div>
-            <div style={labelStyle}>G.W. (per carton)</div>
-            <input type="number" inputMode="decimal" step="0.01" value={editGrossWeight} onChange={(e) => setEditGrossWeight(e.target.value)}
-              placeholder="14.0000" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
-          <div>
-            <div style={labelStyle}>CBM</div>
-            <input type="number" inputMode="decimal" step="0.01" value={editCbm} onChange={(e) => setEditCbm(e.target.value)}
-              placeholder="0.40" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
-          <div>
-            <div style={labelStyle}>Meas.</div>
-            <input value={editMeasurements} onChange={(e) => setEditMeasurements(e.target.value)}
-              placeholder="55*38*38" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
-        </div>
 
-        {/* ボタン */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onGoDetail} style={{
-            flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa',
-          }}>詳細</button>
-          <button onClick={onDelete} style={{
-            flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171',
-          }}>削除</button>
-          <button onClick={onStartEdit} style={{
-            flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)',
-          }}>キャンセル</button>
-          <button onClick={handleSave} style={{
-            flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', color: '#4ade80',
-          }}>保存</button>
+          {/* ===== コンテナ日程（参照・読取専用） ===== */}
+          <SectionHeader title="コンテナ日程" color="#fbbf24" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <div style={labelStyle}>規格</div>
+              <div style={roStyle}>{item.itemNameContainer || '—'}</div>
+            </div>
+            <div>
+              <div style={labelStyle}>代表機種</div>
+              <div style={roStyle}>{item.representModelContainer || '—'}</div>
+            </div>
+            <div>
+              <div style={labelStyle}>入数</div>
+              <div style={roStyle}>{item.packingQtyContainer ?? '—'}</div>
+            </div>
+            <div>
+              <div style={labelStyle}>1P数</div>
+              <div style={roStyle}>{item.qtyPerPalletContainer ?? '—'}</div>
+            </div>
+          </div>
+
+          {/* ===== AQSS（編集可能） ===== */}
+          <SectionHeader title="AQSS" color="#34d399" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <div style={labelStyle}>ITEM DESCRIPTION</div>
+              <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="UPPER LID ASSY" style={inputStyle} />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <div style={labelStyle}>MODEL NO.</div>
+              <input value={editModelNo} onChange={(e) => setEditModelNo(e.target.value)} style={inputStyle} />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, marginBottom: 16 }}>
+            <div>
+              <div style={labelStyle}>G.W. (per carton)</div>
+              <input type="number" inputMode="decimal" step="0.01" value={editGrossWeight} onChange={(e) => setEditGrossWeight(e.target.value)}
+                placeholder="14.0000" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            </div>
+            <div>
+              <div style={labelStyle}>CBM</div>
+              <input type="number" inputMode="decimal" step="0.01" value={editCbm} onChange={(e) => setEditCbm(e.target.value)}
+                placeholder="0.40" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            </div>
+            <div>
+              <div style={labelStyle}>Meas.</div>
+              <input value={editMeasurements} onChange={(e) => setEditMeasurements(e.target.value)}
+                placeholder="55*38*38" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            </div>
+          </div>
+
+          {/* ボタン */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onGoDetail} style={{
+              flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)', color: '#60a5fa',
+            }}>詳細</button>
+            <button onClick={onDelete} style={{
+              flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171',
+            }}>削除</button>
+            <button onClick={onClose} style={{
+              flex: 1, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.5)',
+            }}>閉じる</button>
+            <button onClick={handleSave} style={{
+              flex: 1.3, padding: '10px 0', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              background: 'linear-gradient(135deg, rgba(34,197,94,0.25), rgba(34,197,94,0.15))',
+              border: '1px solid rgba(34,197,94,0.4)', color: '#4ade80',
+            }}>保存</button>
+          </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
+/* ===== テーブル行（タップでポップアップ） ===== */
+function EditRow({ item, colors, isContainerMatch, onStartEdit }: {
+  item: ContainerItem;
+  colors: { accent: string; text: string };
+  isContainerMatch?: boolean;
+  onStartEdit: () => void;
+}) {
   return (
     <button onClick={onStartEdit} className="edit-grid-row" style={{
       width: '100%', padding: '12px 16px',
