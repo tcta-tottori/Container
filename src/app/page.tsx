@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
+import { fetchMasterData, parseAqssExcel } from '@/lib/masterLoader';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useTimer, useClock } from '@/hooks/useTimer';
 import { useSpeech } from '@/hooks/useSpeech';
@@ -26,6 +27,7 @@ export default function Home() {
     currentItem,
     relatedItems,
     loadData,
+    loadMaster,
     selectContainer,
     selectItem,
     moveNext,
@@ -48,9 +50,19 @@ export default function Home() {
 
   const prevItemRef = useRef<string | null>(null);
   const loadedContainerRef = useRef<string | null>(null);
+  const masterLoadedRef = useRef(false);
   const [viewMode, setViewMode] = useState<ViewMode>('work');
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+
+  // CNS品目一覧マスタデータを自動読込
+  useEffect(() => {
+    if (masterLoadedRef.current) return;
+    masterLoadedRef.current = true;
+    fetchMasterData().then((items) => {
+      if (items.length > 0) loadMaster(items);
+    });
+  }, [loadMaster]);
 
   // 品目切替時の自動アナウンス
   useEffect(() => {
@@ -78,7 +90,7 @@ export default function Home() {
 
   const handleFileLoaded = useCallback(
     async (file: File) => {
-      loadedContainerRef.current = null; // リセットして再アナウンス
+      loadedContainerRef.current = null;
       const result = await parseExcelFile(file);
       if (result.containers.length > 0) {
         loadData(result.containers);
@@ -87,6 +99,21 @@ export default function Home() {
       }
     },
     [loadData]
+  );
+
+  const handleAqssLoaded = useCallback(
+    async (files: File[]) => {
+      for (const file of files) {
+        const buffer = await file.arrayBuffer();
+        const aqssMap = parseAqssExcel(buffer);
+        // 現在のコンテナ品目とマスタ品目にAQSSデータをマージ
+        state.items.forEach((item, idx) => {
+          const aqss = aqssMap.get(item.partNumber);
+          if (aqss) updateItem(idx, aqss);
+        });
+      }
+    },
+    [state.items, updateItem]
   );
 
   const handleAnnounce = useCallback(() => {
@@ -245,7 +272,7 @@ export default function Home() {
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
   if (state.containers.length === 0) {
-    return <FileDropZone onFileLoaded={handleFileLoaded} />;
+    return <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} />;
   }
 
   if (state.items.length === 0) {
@@ -366,7 +393,12 @@ export default function Home() {
           {viewMode === 'edit' && (
             <div className="full-panel">
               <ItemEditPage
-                items={state.items}
+                items={(() => {
+                  // コンテナ品目 + マスタ品目（重複排除）を統合
+                  const containerParts = new Set(state.items.map((it) => it.partNumber));
+                  const masterOnly = state.masterItems.filter((it) => !containerParts.has(it.partNumber));
+                  return [...state.items, ...masterOnly];
+                })()}
                 containerNo={state.containers[state.selectedContainerIdx]?.containerNo || ''}
                 containerPartNumbers={new Set(state.items.map((it) => it.partNumber))}
                 onUpdateItem={updateItem}

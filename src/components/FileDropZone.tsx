@@ -5,9 +5,10 @@ import { getRecentFiles, base64ToFile, RecentFile } from '@/lib/recentFiles';
 
 interface FileDropZoneProps {
   onFileLoaded: (file: File) => void;
+  onAqssLoaded?: (files: File[]) => void;
 }
 
-const APP_VERSION = '1.1';
+const APP_VERSION = '1.2';
 // icon: ✨=新機能, 🔧=修正, 🎨=デザイン, 📦=機能追加, 🔄=改善
 const CHANGELOG = [
   { ver: '1.1', date: '2026-03-24', changes: [
@@ -26,30 +27,22 @@ const CHANGELOG = [
   ]},
 ];
 
-/* ===== CNSロゴSVG ===== */
+/* ===== CNSロゴSVG（シンプル版） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* 箱 */}
-      <g transform="translate(100,90)">
-        <polygon points="0,-55 58,-25 0,5 -58,-25" fill="rgba(255,255,255,0.25)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
-        <polygon points="-58,-25 0,5 0,64 -58,34" fill="rgba(255,255,255,0.15)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
-        <polygon points="58,-25 0,5 0,64 58,34" fill="rgba(255,255,255,0.1)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(50,48)">
+        <polygon points="0,-30 32,-14 0,2 -32,-14" fill="rgba(255,255,255,0.3)" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/>
+        <polygon points="-32,-14 0,2 0,36 -32,20" fill="rgba(255,255,255,0.18)" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/>
+        <polygon points="32,-14 0,2 0,36 32,20" fill="rgba(255,255,255,0.1)" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/>
       </g>
-      {/* 矢印 */}
-      <g stroke="#fff" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        <path d="M115,72 C125,55 135,45 155,33"/>
-        <polygon points="150,22 163,32 152,42" fill="#fff" stroke="none"/>
-      </g>
-      {/* フック */}
-      <g fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round">
-        <path d="M78,118 C63,128 55,145 65,160 C75,175 95,172 105,153 C113,138 108,122 93,112 L135,88"/>
-      </g>
+      <path d="M60,34 C66,24 74,18 84,14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+      <polygon points="81,8 88,13 82,19" fill="#fff"/>
     </svg>
   );
 }
 
-export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
+export default function FileDropZone({ onFileLoaded, onAqssLoaded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
@@ -207,16 +200,50 @@ export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
               <line x1="9" y1="15" x2="12" y2="12"/><line x1="15" y1="15" x2="12" y2="12"/>
             </svg>
           </div>
-          <p style={{ color: '#fff', fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>
-            Excelファイルをドラッグ＆ドロップ
+          <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>
+            コンテナExcel（内容シート）
           </p>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, margin: 0 }}>
-            またはタップして選択（.xlsx / .xls）
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>
+            ドラッグ＆ドロップ or タップ（.xlsx / .xls）
           </p>
           <input ref={inputRef} type="file" accept=".xlsx,.xls"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
             className="hidden" />
         </div>
+
+        {/* AQSS ファイル */}
+        {onAqssLoaded && (
+          <div
+            onClick={() => {
+              const inp = document.createElement('input');
+              inp.type = 'file'; inp.accept = '.xlsx,.xls'; inp.multiple = true;
+              inp.onchange = (ev) => {
+                const files = Array.from((ev.target as HTMLInputElement).files || []);
+                if (files.length > 0) onAqssLoaded(files);
+              };
+              inp.click();
+            }}
+            style={{
+              marginTop: 10, border: '1.5px dashed rgba(139,92,246,0.3)',
+              borderRadius: 12, padding: '14px 16px', textAlign: 'center', cursor: 'pointer',
+              background: 'rgba(139,92,246,0.04)', transition: 'all 0.2s ease',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
+                <line x1="9" y1="15" x2="12" y2="12"/><line x1="15" y1="15" x2="12" y2="12"/>
+              </svg>
+              <span style={{ color: '#a78bfa', fontSize: 12, fontWeight: 600 }}>
+                AQSS04L / 05L ファイル追加（任意）
+              </span>
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, margin: '4px 0 0' }}>
+              DESCRIPTION・MODEL NO.・G.W.・CBM・Meas.を補完
+            </p>
+          </div>
+        )}
 
         {/* 最近のファイル */}
         {recentFiles.length > 0 && (

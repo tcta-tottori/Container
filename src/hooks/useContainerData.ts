@@ -13,6 +13,7 @@ export interface ContainerState {
   containers: Container[];
   selectedContainerIdx: number;
   items: ContainerItem[];
+  masterItems: ContainerItem[];
   currentItemIdx: number;
   originalValues: Map<string, OriginalValues>;
   modifiedValues: Map<string, Partial<OriginalValues>>;
@@ -23,6 +24,7 @@ export interface ContainerState {
 
 export type Action =
   | { type: 'LOAD_DATA'; containers: Container[] }
+  | { type: 'LOAD_MASTER'; items: ContainerItem[] }
   | { type: 'SELECT_CONTAINER'; idx: number }
   | { type: 'SELECT_ITEM'; idx: number }
   | { type: 'MOVE_NEXT' }
@@ -41,6 +43,7 @@ const initialState: ContainerState = {
   containers: [],
   selectedContainerIdx: 0,
   items: [],
+  masterItems: [],
   currentItemIdx: 0,
   originalValues: new Map(),
   modifiedValues: new Map(),
@@ -78,6 +81,10 @@ function reducer(state: ContainerState, action: Action): ContainerState {
         completedIds: new Set(),
         itemStartTime: Date.now(),
       };
+    }
+
+    case 'LOAD_MASTER': {
+      return { ...state, masterItems: action.items };
     }
 
     case 'SELECT_CONTAINER': {
@@ -287,6 +294,10 @@ export function useContainerData() {
     (containers: Container[]) => dispatch({ type: 'LOAD_DATA', containers }),
     []
   );
+  const loadMaster = useCallback(
+    (items: ContainerItem[]) => dispatch({ type: 'LOAD_MASTER', items }),
+    []
+  );
   const selectContainer = useCallback(
     (idx: number) => dispatch({ type: 'SELECT_CONTAINER', idx }),
     []
@@ -341,6 +352,7 @@ export function useContainerData() {
     currentContainer,
     relatedItems,
     loadData,
+    loadMaster,
     selectContainer,
     selectItem,
     moveNext,
