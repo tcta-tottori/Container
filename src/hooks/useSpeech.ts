@@ -137,6 +137,7 @@ export function useSpeech() {
     // 種類内訳
     const typeNames: string[] = [];
     if (typeCounts['ポリカバー']) typeNames.push(`ポリカバー${typeCounts['ポリカバー']}品`);
+    if (typeCounts['ジャーポット']) typeNames.push(`ジャーポット${typeCounts['ジャーポット']}品`);
     if (typeCounts['箱']) typeNames.push(`箱${typeCounts['箱']}品`);
     if (typeCounts['部品']) typeNames.push(`部品${typeCounts['部品']}品`);
     if (typeCounts['鍋']) typeNames.push(`鍋${typeCounts['鍋']}品`);
@@ -191,6 +192,7 @@ export function useSpeech() {
     }
     const parts: string[] = [];
     if (typeCounts['ポリカバー']) parts.push(`ポリカバー${typeCounts['ポリカバー']}`);
+    if (typeCounts['ジャーポット']) parts.push(`ジャーポット${typeCounts['ジャーポット']}`);
     if (typeCounts['箱']) parts.push(`箱${typeCounts['箱']}`);
     if (typeCounts['部品']) parts.push(`部品${typeCounts['部品']}`);
     if (typeCounts['鍋']) parts.push(`鍋${typeCounts['鍋']}`);

@@ -14,6 +14,13 @@ export const COLOR_MAP: Record<ItemType | 'その他', {
     gradient: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
     glow: 'rgba(34, 197, 94, 0.1)',
   },
+  'ジャーポット': {
+    bg: '#fdf2f8',
+    text: '#9d174d',
+    accent: '#ec4899',
+    gradient: 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)',
+    glow: 'rgba(236, 72, 153, 0.1)',
+  },
   '箱': {
     bg: '#fff7ed',
     text: '#9a3412',

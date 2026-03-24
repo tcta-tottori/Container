@@ -3,10 +3,11 @@ import { ContainerItem, ItemType } from './types';
 /** 種類の優先順位 */
 const TYPE_ORDER: Record<ItemType, number> = {
   'ポリカバー': 1,
-  '箱': 2,
-  '部品': 3,
-  '鍋': 4,
-  'その他': 5,
+  'ジャーポット': 2,
+  '箱': 3,
+  '部品': 4,
+  '鍋': 5,
+  'その他': 6,
 };
 
 /**

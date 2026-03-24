@@ -23,14 +23,13 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
 
     const itemName = v(2);
     const qtyPerPallet = n(8);
-    // 入数が「10/箱」のような形式 → D列が空ならポリカバーとして判定
-    const packingRaw = v(5);
-    const hasBoxPackingFormat = /^\d+\/箱/.test(packingRaw);
     const storedType = v(3) as ItemType;
+    const description = v(16) || undefined;  // ITEM DESCRIPTION (Q列)
+    const itemNameKetaka = v(10) || undefined;  // 規格(气高编号) (K列)
+    // D列に値があればそれを最優先、なければ自動判定
     const type = storedType
       ? storedType
-      : hasBoxPackingFormat ? 'ポリカバー' as ItemType
-      : detectItemType(itemName, qtyPerPallet, 0, partNumber);
+      : detectItemType(itemName, qtyPerPallet, 0, partNumber, description, itemNameKetaka);
 
     items.push({
       id: `master-${i}`,

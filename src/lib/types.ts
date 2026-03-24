@@ -1,5 +1,5 @@
 /** 品目の種類 */
-export type ItemType = 'ポリカバー' | '箱' | '部品' | '鍋' | 'その他';
+export type ItemType = 'ポリカバー' | 'ジャーポット' | '箱' | '部品' | '鍋' | 'その他';
 
 /** コンテナ内の1品目 */
 export interface ContainerItem {

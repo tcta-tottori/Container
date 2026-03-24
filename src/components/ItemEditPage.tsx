@@ -19,7 +19,7 @@ interface ItemEditPageProps {
   onMasterReload?: () => void;
 }
 
-const ITEM_TYPES: ItemType[] = ['ポリカバー', '箱', '部品', '鍋', 'その他'];
+const ITEM_TYPES: ItemType[] = ['ポリカバー', 'ジャーポット', '箱', '部品', '鍋', 'その他'];
 
 /* saveMasterExcel は githubSave.ts に移動済み */
 

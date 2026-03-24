@@ -55,7 +55,7 @@ function ProgressBar({ value, max, color, label, subLabel }: {
 
 /* ===== 種類分布バー ===== */
 function TypeDistribution({ items, completedIds }: { items: ContainerItem[]; completedIds: Set<string> }) {
-  const types = ['ポリカバー', '箱', '部品', '鍋', 'その他'] as const;
+  const types = ['ポリカバー', 'ジャーポット', '箱', '部品', '鍋', 'その他'] as const;
   const counts: Record<string, { total: number; done: number }> = {};
   for (const t of types) counts[t] = { total: 0, done: 0 };
   for (const it of items) {

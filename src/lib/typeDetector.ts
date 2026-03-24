@@ -1,158 +1,94 @@
 import { ItemType } from './types';
 
 /**
- * ポリカバー製品のプレフィックス
- * JRI, JPI, JPK, JPV, JPH, JPG, JPD, JPC, JPT, JPX, JPW, JPM 等の
- * 炊飯器・ポット製品のプレフィックスにマッチ → すべてポリカバー
- */
-const POLYCOVER_PREFIXES = [
-  'JRI-', 'JRI+', 'JPI-', 'JPI+',
-  'JPK-', 'JPK+', 'JPV-', 'JPV+',
-  'JPH-', 'JPH+', 'JPG-', 'JPG+',
-  'JPD-', 'JPD+', 'JPC-', 'JPC+',
-  'JPT-', 'JPT+', 'JPX-', 'JPX+',
-  'JPW-', 'JPW+', 'JPM-', 'JPM+',
-  'SR-JW', 'SR-FCC',
-];
-
-/**
- * 箱・半完成品のプレフィックス
- */
-const BOX_PREFIXES = [
-  'PDRS', 'PDU+', 'PDU-', 'PDUA', 'PDUB',
-  'PVW+', 'PVW-', 'PVWB',
-  'PDN',
-];
-
-/**
- * 部品キーワード（品名に含まれる場合に部品と判定）
- */
-const PARTS_KEYWORDS = [
-  'ﾌﾀﾚﾊﾞ', 'レバー', 'ﾚﾊﾞ',
-  'ﾎｳﾈﾂｲﾀ', 'ホウネツイタ', '放熱板', '放热板',
-  'ｽﾄｯﾊﾟｰ', 'ストッパー',
-  'ﾎｷｮｳｲﾀ', '補強板',
-  'ｽｲﾘｮｳｶﾊﾞｰ',
-  'ﾊﾟｯｷﾝ', 'パッキン',
-  'ﾘﾝｸ', 'リンク',
-  'ｾﾞﾂｴﾝｼｰﾄ', 'ゼツエンシート',
-  'ｶﾝｾｲﾍﾞﾝ', '完成弁',
-  'ﾏｸﾞﾈｯﾄ', 'マグネット',
-  'ﾀｰﾐﾅﾙ', 'ターミナル',
-  'ﾋｭｰｽﾞ', 'ヒューズ',
-  'ｽｲｯﾁ', 'スイッチ',
-  'ﾌﾟﾗｸﾞ', 'プラグ',
-  'ﾎﾞﾙﾄ', 'ボルト',
-  'ｼｬﾌﾄ', 'シャフト',
-  'ﾊﾞｯﾃﾘｰ', 'バッテリー',
-  'LED',
-  'POP',
-  'ﾃﾞﾝｹﾞﾝｺｰﾄﾞ', '電源コード',
-  'ﾋｰﾀｰ', 'ヒーター',
-  'ｶﾞｲｼ', 'ガイシ',
-  'ﾏｲｶ', 'マイカ',
-  'ｵﾓﾘ',
-  'ﾊﾟﾝﾁﾝｸﾞ',
-  'ﾌﾛ-ﾄ', 'フロート',
-  'ﾌｳﾁｶﾊﾞｰ',
-  'ｳﾁﾌﾀｶﾊﾞｰ',
-  'ﾌｱﾂﾍﾞﾝ',
-];
-
-/**
- * 箱（ハコ）キーワード
- */
-const BOX_KEYWORDS = [
-  'ﾊｺ', 'ハコ', '箱',
-  'ﾊﾝｶﾝｾｲ', '半完成',
-  '容器組立',
-  '電源BOX',
-];
-
-/**
- * 品名・品番の情報から種類を自動判定する
+ * ===== 種類の自動分類ルール =====
  *
- * 判定順序:
- * 1. 品名に「ポリカバー」を含む → 'ポリカバー'
- * 2. 品名がポリカバー製品のプレフィックスで始まる → 'ポリカバー'
- *    (ただし部品/箱キーワードが含まれる場合はそちらを優先)
- * 3. 品名に箱プレフィックス/キーワードを含む → '箱'
- * 4. 品名に部品キーワードを含む → '部品'
- * 5. 品番パターンで判定
- * 6. パレット情報による判定
- * 7. 上記以外 → 'その他'
+ * 判定優先順位:
+ *   1. AQSS04L の ITEM DESCRIPTION（最優先）→ detectTypeByDescription
+ *   2. 气高编号の規格（先頭一致）→ detectTypeByItemName
+ *   3. どちらも情報がない場合 → 'その他'
+ *
+ * 鍋（ｳﾁﾅﾍﾞ）はどの段階でも品名に含まれていれば優先判定
+ */
+
+/**
+ * ルール① AQSS04L の ITEM DESCRIPTION で判定
+ */
+export function detectTypeByDescription(description: string): ItemType | null {
+  if (!description) return null;
+  const desc = description.toUpperCase().trim();
+  if (!desc) return null;
+
+  if (desc.includes('UPPER LID ASSY')) return 'ポリカバー';
+  if (desc.includes('JAR POT')) return 'ジャーポット';
+  if (desc.includes('CARTON BOX')) return '箱';
+  // ITEM DESCRIPTIONがあるが上記に該当しない → 部品
+  return '部品';
+}
+
+/**
+ * ルール② 气高编号の規格（品名）で判定 — 先頭一致
+ */
+export function detectTypeByItemName(itemName: string): ItemType {
+  const name = itemName.trim();
+
+  // 鍋判定（品名にｳﾁﾅﾍﾞ・ウチナベ・内鍋を含む）
+  if (name.includes('ｳﾁﾅﾍﾞ') || name.includes('ウチナベ') || name.includes('内鍋')) {
+    return '鍋';
+  }
+
+  // ポリカバー: JP*, JRI*, JKX*, SR* で始まる
+  if (/^(JP[A-Z]|JRI|JKX|SR)/.test(name)) return 'ポリカバー';
+
+  // ジャーポット: PDR*, PDU*, PVW* で始まる
+  if (/^(PDR|PDU|PVW)/.test(name)) return 'ジャーポット';
+
+  // 箱: 彩盒 で始まる
+  if (name.startsWith('彩盒')) return '箱';
+
+  // それ以外 → 部品
+  return '部品';
+}
+
+/**
+ * 品名・品番の情報から種類を自動判定する（マスタにD列が無い場合のフォールバック）
+ *
+ * 判定フロー:
+ * 1. descriptionがあれば → ルール①（AQSS04L ITEM DESCRIPTION）
+ * 2. itemName/itemNameKetakaがあれば → ルール②（規格の先頭パターン）
+ * 3. 両方なし → 'その他'
  */
 export function detectItemType(
   itemName: string,
   qtyPerPallet: number,
   palletCount: number,
-  partNumber?: string
+  partNumber?: string,
+  description?: string,
+  itemNameKetaka?: string,
 ): ItemType {
-  const name = itemName.trim();
-  const pn = (partNumber || '').trim();
+  void qtyPerPallet;
+  void palletCount;
+  void partNumber;
 
-  // 1. ポリカバー（品名に含まれる場合）
-  if (name.includes('ポリカバー') || name.includes('ﾎﾟﾘｶﾊﾞｰ')) {
-    return 'ポリカバー';
-  }
-
-  // 2. ポリカバー製品プレフィックス（JRI-, JPI-, JPK- 等はすべてポリカバー）
-  for (const prefix of POLYCOVER_PREFIXES) {
-    if (name.startsWith(prefix) || name.includes(prefix)) {
-      // 部品キーワードが含まれている場合は部品
-      for (const kw of PARTS_KEYWORDS) {
-        if (name.includes(kw)) return '部品';
-      }
-      // 箱キーワードが含まれている場合は箱
-      for (const kw of BOX_KEYWORDS) {
-        if (name.includes(kw)) return '箱';
-      }
-      return 'ポリカバー';
-    }
-  }
-
-  // 3. 箱製品（プレフィックスマッチ）
-  for (const prefix of BOX_PREFIXES) {
-    if (name.startsWith(prefix) || name.includes(prefix)) {
-      return '箱';
-    }
-  }
-
-  // 4. 鍋判定（品名に「ｳﾁﾅﾍﾞ」「ウチナベ」「内鍋」を含む）
-  if (name.includes('ｳﾁﾅﾍﾞ') || name.includes('ウチナベ') || name.includes('内鍋')) {
+  // 鍋は最優先（品名のどこかにｳﾁﾅﾍﾞが含まれる）
+  const allNames = [itemName, itemNameKetaka || ''].join('');
+  if (allNames.includes('ｳﾁﾅﾍﾞ') || allNames.includes('ウチナベ') || allNames.includes('内鍋')) {
     return '鍋';
   }
 
-  // 5. 箱キーワードマッチ
-  for (const kw of BOX_KEYWORDS) {
-    if (name.includes(kw)) return '箱';
+  // ルール① AQSS04L ITEM DESCRIPTION（最優先）
+  if (description) {
+    const result = detectTypeByDescription(description);
+    if (result) return result;
   }
 
-  // 6. 部品キーワードマッチ
-  for (const kw of PARTS_KEYWORDS) {
-    if (name.includes(kw)) return '部品';
+  // ルール② 气高编号の規格 or 品名（先頭一致）
+  const nameForRule2 = itemNameKetaka || itemName;
+  if (nameForRule2) {
+    return detectTypeByItemName(nameForRule2);
   }
 
-  // 7. 品番パターンによる判定
-  if (pn) {
-    const codeMatch = pn.match(/^3TG\d{3}([APKE])/);
-    if (codeMatch) {
-      const typeCode = codeMatch[1];
-      if (typeCode === 'P') return '部品';
-      if (typeCode === 'K') return '箱';
-      if (typeCode === 'A') {
-        // A = Assembly → ポリカバー
-        if (qtyPerPallet > 0) return 'ポリカバー';
-        return '箱';
-      }
-      if (typeCode === 'E') return '部品';
-    }
-  }
-
-  // 7. パレット情報による判定
-  if (qtyPerPallet === 0 && palletCount === 0) return '部品';
-
-  // 8. デフォルト
+  // 両方なし
   return 'その他';
 }
 
