@@ -45,7 +45,7 @@ function MarqueeText({ text, className, style }: {
   );
 }
 
-/* ===== 数値フォーマット（小数点2桁切り上げ） ===== */
+/* ===== 数値フォーマット ===== */
 function fmtNum(v: number): string {
   if (Number.isInteger(v)) return String(v);
   return String(Math.ceil(v * 100) / 100);
@@ -160,32 +160,33 @@ export default function ItemDetailPanel({
   const doneItems = allItems.filter((it) => completedIds.has(it.id));
   const sortedItems = [...activeItems, ...doneItems];
 
-  // 品名からポリカバーを省く
   const displayItemName = item.itemName.replace(/ポリカバー/g, '').replace(/^[\s\-]+|[\s\-]+$/g, '') || item.itemName;
 
-  // 種類別カウント
   const typeCounts = new Map<string, number>();
   for (const it of allItems) {
     typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
   }
 
-  // 少し明るめの黒ベース + accent色グラデーション
   const heroBg = `linear-gradient(135deg, #121620 0%, #161b28 35%, #141824 65%, #181d2c 100%)`;
 
+  // リスト行の背景色（メニューカラーと統一・ダーク系）
+  const TYPE_ROW_BG: Record<string, string> = {
+    'ポリカバー': '#162218', '箱': '#151e2c', '部品': '#1c1628', 'その他': '#1a1a1e',
+  };
+
   return (
-    <div className="detail-root">
+    <div className="detail-root" style={{ background: colors.accent + '12' }}>
       {/* === 上半分（黒ベース + accent色グロー） === */}
       <div className="detail-upper" style={{
         background: heroBg,
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* accent色グロー: 右上から大きく差し込む光 */}
+        {/* accent色グロー */}
         <div style={{
           position: 'absolute', top: '-40%', right: '-20%', width: '80%', height: '180%',
           background: `radial-gradient(ellipse at 70% 40%, ${colors.accent}38 0%, ${colors.accent}18 40%, transparent 70%)`,
           pointerEvents: 'none',
         }} />
-        {/* 左下の補助グロー */}
         <div style={{
           position: 'absolute', bottom: '-20%', left: '-10%', width: '50%', height: '60%',
           background: `radial-gradient(ellipse, ${colors.accent}15 0%, transparent 55%)`,
@@ -233,7 +234,7 @@ export default function ItemDetailPanel({
           </span>
         </div>
 
-        {/* 気高コード + 新建高コード（最上レイヤー・大きく見やすく） */}
+        {/* 気高コード + 新建高コード（最上レイヤー） */}
         <div style={{ position: 'relative', zIndex: 4, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {item.partNumber && (
             <span style={{
@@ -256,7 +257,7 @@ export default function ItemDetailPanel({
           )}
         </div>
 
-        {/* 品名（上レイヤー・パレット図より上に表示） */}
+        {/* 品名（上レイヤー） */}
         <div style={{ position: 'relative', zIndex: 3 }}>
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
@@ -265,7 +266,7 @@ export default function ItemDetailPanel({
             }} />
         </div>
 
-        {/* パレット図（品名の下2/3領域に制限、品名に被らない） */}
+        {/* パレット図（品名下部に制限） */}
         <div className="detail-pallet-area" style={{ zIndex: 1, maxHeight: '35%', marginTop: 0 }}>
           {item.qtyPerPallet > 0 && (
             <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
@@ -273,16 +274,21 @@ export default function ItemDetailPanel({
           )}
         </div>
 
-        {/* 数量（下揃え） */}
+        {/* 数量（PL / CT表記） */}
         <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2 }}>
-          <div className="detail-sf-item">
-            <span className="detail-sf-num" style={{
-              color: colors.accent,
-              textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
-            }}>{fmtNum(item.palletCount)}</span>
-            <div className="detail-sf-labels">
-              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>パレット</span>
-              {item.qtyPerPallet > 0 && <span className="detail-sf-sub" style={{ color: 'rgba(255,255,255,0.4)' }}>@{item.qtyPerPallet}</span>}
+          <div className="detail-sf-item" style={{ flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+            {item.qtyPerPallet > 0 && (
+              <span style={{
+                fontSize: 13, fontWeight: 700, color: `${colors.accent}cc`,
+                fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
+              }}>@{item.qtyPerPallet}</span>
+            )}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+              <span className="detail-sf-num" style={{
+                color: colors.accent,
+                textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
+              }}>{fmtNum(item.palletCount)}</span>
+              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>PL</span>
             </div>
           </div>
           <div className="detail-sf-item">
@@ -290,7 +296,7 @@ export default function ItemDetailPanel({
               color: '#e8e8e8',
               textShadow: `0 0 16px ${colors.accent}30, 0 2px 4px rgba(0,0,0,0.6)`,
             }}>{fmtNum(item.fraction)}</span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>ケース</span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>CT</span>
           </div>
           <div className="detail-sf-item detail-sf-total">
             <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
@@ -300,11 +306,16 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 似た品目 */}
+        {/* 類似品 */}
         {similarItems.length > 0 && (
           <div className="detail-similar-warn" style={{ background: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' }}>
-            <span style={{ fontSize: 14 }}>⚠</span>
-            <span className="detail-similar-label" style={{ color: '#fbbf24' }}>似た品目:</span>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 20, height: 20, borderRadius: 4, flexShrink: 0,
+              background: '#f59e0b', color: '#000', fontSize: 13, fontWeight: 900,
+              lineHeight: 1,
+            }}>!</span>
+            <span className="detail-similar-label" style={{ color: '#fbbf24' }}>類似品:</span>
             <span className="detail-similar-names" style={{ color: '#fde68a' }}>
               {similarItems.map((s) => {
                 const c2 = extractColor(s.itemName);
@@ -324,12 +335,12 @@ export default function ItemDetailPanel({
       </div>
 
       {/* === 下半分リスト === */}
-      <div className="detail-list-section">
-        <div className="detail-list-header">
-          <span className="detail-list-h-name">品名</span>
-          <span className="detail-list-h-num">PL</span>
-          <span className="detail-list-h-num">CS</span>
-          <span className="detail-list-h-num detail-list-h-total">PCS</span>
+      <div className="detail-list-section" style={{ background: colors.accent + '08' }}>
+        <div className="detail-list-header" style={{ background: colors.accent + '18' }}>
+          <span className="detail-list-h-name" style={{ color: 'rgba(255,255,255,0.6)' }}>品名</span>
+          <span className="detail-list-h-num" style={{ color: 'rgba(255,255,255,0.6)' }}>PL</span>
+          <span className="detail-list-h-num" style={{ color: 'rgba(255,255,255,0.6)' }}>CS</span>
+          <span className="detail-list-h-num detail-list-h-total" style={{ color: 'rgba(255,255,255,0.6)' }}>PCS</span>
         </div>
         <div className="detail-list-scroll">
           {sortedItems.map((it) => {
@@ -338,25 +349,21 @@ export default function ItemDetailPanel({
             const isDone = completedIds.has(it.id);
             const displayName = shortenName(it.itemName);
             const origIdx = allItems.findIndex((a) => a.id === it.id);
-            // ライトテーマ: 種類別の濃い背景色
-            const TYPE_BG: Record<string, string> = {
-              'ポリカバー': '#e6f4ea', '箱': '#e3f0fd', '部品': '#ede5f5', 'その他': '#ececec',
-            };
-            const typeBg = TYPE_BG[it.type] || TYPE_BG['その他'];
-            const rowBg = isActive ? '#fff3e0' : typeBg;
+            const typeBg = TYPE_ROW_BG[it.type] || TYPE_ROW_BG['その他'];
+            const rowBg = isDone ? '#1e1e22' : isActive ? '#2a1f10' : typeBg;
 
             const content = (
               <>
-                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#999' : c.accent }} />
+                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#555' : c.accent }} />
                 <MarqueeText text={displayName}
                   className="detail-list-name"
                   style={isDone
-                    ? { color: '#999', textDecoration: 'line-through' }
-                    : isActive ? { fontWeight: 700, color: '#e65100' } : { color: '#1a1a2e' }
+                    ? { color: '#666', textDecoration: 'line-through' }
+                    : isActive ? { fontWeight: 700, color: '#ff9800' } : { color: 'rgba(255,255,255,0.85)' }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e65100' : c.text }}>{fmtNum(it.palletCount)}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e65100' : '#333' }}>{fmtNum(it.fraction)}</span>
-                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#999' : '#888' }}>
+                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : c.accent, fontWeight: 600 }}>{fmtNum(it.palletCount)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : 'rgba(255,255,255,0.7)' }}>{fmtNum(it.fraction)}</span>
+                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#555' : 'rgba(255,255,255,0.55)' }}>
                   {Math.ceil(it.totalQty).toLocaleString()}
                 </span>
               </>
@@ -368,7 +375,7 @@ export default function ItemDetailPanel({
                   onSwipe={() => onUncompleteItem?.(it.id)}
                   onClick={() => onUncompleteItem?.(it.id)}
                   className="detail-list-row"
-                  style={{ background: '#e0e0e0', borderLeftColor: '#bbb', borderLeftWidth: 3 }}
+                  style={{ background: rowBg, borderLeftColor: '#444', borderLeftWidth: 3 }}
                 >{content}</UndoSwipeRow>
               );
             }

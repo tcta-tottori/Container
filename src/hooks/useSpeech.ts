@@ -68,7 +68,7 @@ export function useSpeech() {
         const names = similarItems.map((s) => {
           return itemNameForSpeech(s.itemName);
         }).join('、');
-        text += `注意、似た品目があります。${names}。`;
+        text += `注意、類似品があります。${names}。`;
       }
     }
 
