@@ -181,7 +181,7 @@ export default function ItemDetailPanel({
   } as React.CSSProperties;
 
   return (
-    <div className="detail-root" style={{ background: colors.accent + '12' }}>
+    <div className="detail-root" style={{ background: '#1a1d2e' }}>
       {/* === 上半分（アニメーショングラデーション） === */}
       <div className="detail-upper hero-animated" style={{
         position: 'relative', overflow: 'hidden', ...heroVars,
@@ -237,36 +237,35 @@ export default function ItemDetailPanel({
           </span>
         </div>
 
-        {/* 気高コード + 新建高コード（最上レイヤー） */}
-        <div style={{ position: 'relative', zIndex: 4, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {/* 品名 + 気高コード（右揃え） */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, position: 'relative', zIndex: 3 }}>
+          <MarqueeText text={displayItemName} className="detail-item-name"
+            style={{
+              color: '#f0f0f0', flex: 1, minWidth: 0,
+              textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
+            }} />
+        </div>
+
+        {/* KTE (気高コード) / KEN (新建高コード) — 右揃え */}
+        <div style={{ position: 'relative', zIndex: 4, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
           {item.partNumber && (
             <span style={{
-              fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)',
-              letterSpacing: 0.8, background: 'rgba(255,255,255,0.1)', padding: '3px 10px',
-              borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)',
-              textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+              fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.75)', fontFamily: 'var(--font-mono)',
+              letterSpacing: 0.5,
             }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: colors.accent, letterSpacing: 1, marginRight: 4 }}>KTE</span>
               {item.partNumber}
             </span>
           )}
           {item.newPartNumber && (
             <span style={{
-              fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-mono)',
-              letterSpacing: 0.5, background: 'rgba(255,255,255,0.05)', padding: '2px 8px',
-              borderRadius: 5, border: '1px solid rgba(255,255,255,0.08)',
+              fontSize: 11, fontWeight: 500, color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-mono)',
+              letterSpacing: 0.3,
             }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.35)', letterSpacing: 1, marginRight: 4 }}>KEN</span>
               {item.newPartNumber}
             </span>
           )}
-        </div>
-
-        {/* 品名（上レイヤー） */}
-        <div style={{ position: 'relative', zIndex: 3 }}>
-          <MarqueeText text={displayItemName} className="detail-item-name"
-            style={{
-              color: '#f0f0f0',
-              textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
-            }} />
         </div>
 
         {/* パレット図（品名下部に制限） */}
@@ -374,8 +373,8 @@ export default function ItemDetailPanel({
       </div>
 
       {/* === 下半分リスト === */}
-      <div className="detail-list-section" style={{ background: colors.accent + '08' }}>
-        <div className="detail-list-header" style={{ background: colors.accent + '18' }}>
+      <div className="detail-list-section" style={{ background: '#1a1d2e' }}>
+        <div className="detail-list-header" style={{ background: '#1e2130' }}>
           <span className="detail-list-h-name" style={{ color: 'rgba(255,255,255,0.6)' }}>品名</span>
           <span className="detail-list-h-num" style={{ color: 'rgba(255,255,255,0.6)' }}>PL</span>
           <span className="detail-list-h-num" style={{ color: 'rgba(255,255,255,0.6)' }}>CS</span>
