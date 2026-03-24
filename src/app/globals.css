@@ -268,6 +268,20 @@ body {
   100% { background-position: 0% center; }
 }
 
+/* ===== Logo gradient animation ===== */
+@keyframes logo-gradient-rotate {
+  0% { --logo-angle: 135deg; }
+  25% { --logo-angle: 225deg; }
+  50% { --logo-angle: 315deg; }
+  75% { --logo-angle: 45deg; }
+  100% { --logo-angle: 135deg; }
+}
+@keyframes logo-hue-shift {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(30deg); }
+  100% { filter: hue-rotate(0deg); }
+}
+
 /* ===== Detail panel ===== */
 .detail-root { display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden; }
 .detail-upper {
