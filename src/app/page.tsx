@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
 import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel } from '@/lib/masterLoader';
 import { useContainerData } from '@/hooks/useContainerData';
-import { useTimer, useWorkTimer } from '@/hooks/useTimer';
+import { useWorkTimer } from '@/hooks/useTimer';
 import { useSpeech } from '@/hooks/useSpeech';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
@@ -49,7 +49,6 @@ export default function Home() {
     resetWorkTimer,
   } = useContainerData();
 
-  const elapsed = useTimer(state.itemStartTime);
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
   const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceOk, announceProgress } =
@@ -589,7 +588,6 @@ export default function Home() {
           onFileReload={handleFileLoaded}
           workElapsed={workElapsed}
           workRawSeconds={workRawSeconds}
-          elapsed={elapsed}
           autoAnnounce={state.autoAnnounce}
           onToggleAutoAnnounce={toggleAutoAnnounce}
           onMenuToggle={() => setMenuOpen(!menuOpen)}

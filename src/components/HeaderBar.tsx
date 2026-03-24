@@ -16,7 +16,6 @@ interface HeaderBarProps {
   onFileReload: (file: File) => void;
   workElapsed: string;
   workRawSeconds: number;
-  elapsed: string;
   autoAnnounce: boolean;
   onToggleAutoAnnounce: () => void;
   onMenuToggle: () => void;
@@ -31,7 +30,6 @@ export default function HeaderBar({
   onFileReload,
   workElapsed,
   workRawSeconds,
-  elapsed,
   autoAnnounce,
   onToggleAutoAnnounce,
   onMenuToggle,
@@ -95,8 +93,6 @@ export default function HeaderBar({
       >
         {workElapsed}
       </span>
-      <span className="header-elapsed">{elapsed}</span>
-
       <button onClick={onToggleAutoAnnounce} className="header-btn"
         style={{
           background: autoAnnounce ? 'rgba(34,197,94,0.1)' : undefined,

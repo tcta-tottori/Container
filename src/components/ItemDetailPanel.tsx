@@ -500,8 +500,8 @@ export default function ItemDetailPanel({
         {/* 関連 */}
         {relatedItems.length > 0 && (
           <div className="detail-related" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
-            <span className="detail-related-label" style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>関連:</span>
-            <MarqueeText text={relatedText} className="detail-related-text" style={{ color: 'rgba(255,255,255,0.8)' }} />
+            <span className="detail-related-label" style={{ color: '#fff', fontWeight: 600 }}>関連:</span>
+            <MarqueeText text={relatedText} className="detail-related-text" style={{ color: '#fff' }} />
           </div>
         )}
       </div>

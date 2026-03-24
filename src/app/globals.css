@@ -90,7 +90,6 @@ body {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.08); }
 }
-.header-elapsed { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; color: #f59e0b; font-weight: 700; }
 
 /* ===== Menu ===== */
 .menu-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.18); backdrop-filter: blur(3px); }
@@ -421,8 +420,8 @@ body {
   font-size: 11px; flex-shrink: 0; min-width: 0; padding: 3px 0;
   border-top: 1px solid var(--border-subtle);
 }
-.detail-related-label { color: rgba(255,255,255,0.75); white-space: nowrap; flex-shrink: 0; font-weight: 600; }
-.detail-related-text { flex: 1; min-width: 0; opacity: 0.85; color: rgba(255,255,255,0.8); }
+.detail-related-label { color: #fff; white-space: nowrap; flex-shrink: 0; font-weight: 600; }
+.detail-related-text { flex: 1; min-width: 0; color: #fff; }
 
 /* === リスト === */
 .detail-list-section {
