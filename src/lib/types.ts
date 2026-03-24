@@ -27,6 +27,14 @@ export interface ContainerItem {
   qtyPerPallet: number;
   /** 新建高コード（手動入力） */
   newPartNumber?: string;
+  /** ITEM DESCRIPTION（品目説明） */
+  description?: string;
+  /** G.W.（総重量 KGS） */
+  grossWeight?: number;
+  /** CBM（容積 立方メートル） */
+  cbm?: number;
+  /** Meas.（外寸 例: 55*38*38） */
+  measurements?: string;
 }
 
 /** 1コンテナ分のデータ */

@@ -32,6 +32,8 @@ export type Action =
   | { type: 'DELETE_CURRENT' }
   | { type: 'TOGGLE_AUTO_ANNOUNCE' }
   | { type: 'UPDATE_ITEM'; idx: number; updates: Partial<ContainerItem> }
+  | { type: 'ADD_ITEM'; item: ContainerItem }
+  | { type: 'DELETE_ITEM'; idx: number }
   | { type: 'COMPLETE_ITEM'; id: string }
   | { type: 'UNCOMPLETE_ITEM'; id: string };
 
@@ -246,6 +248,19 @@ function reducer(state: ContainerState, action: Action): ContainerState {
       return { ...state, items: newItems };
     }
 
+    case 'ADD_ITEM': {
+      const newItems = [...state.items, action.item];
+      return { ...state, items: newItems };
+    }
+
+    case 'DELETE_ITEM': {
+      const { idx } = action;
+      if (idx < 0 || idx >= state.items.length) return state;
+      const newItems = state.items.filter((_, i) => i !== idx);
+      const newIdx = newItems.length === 0 ? 0 : Math.min(state.currentItemIdx, newItems.length - 1);
+      return { ...state, items: newItems, currentItemIdx: newIdx };
+    }
+
     default:
       return state;
   }
@@ -306,6 +321,14 @@ export function useContainerData() {
       dispatch({ type: 'UPDATE_ITEM', idx, updates }),
     []
   );
+  const addItem = useCallback(
+    (item: ContainerItem) => dispatch({ type: 'ADD_ITEM', item }),
+    []
+  );
+  const deleteItem = useCallback(
+    (idx: number) => dispatch({ type: 'DELETE_ITEM', idx }),
+    []
+  );
   const completeItem = useCallback(
     (id: string) => dispatch({ type: 'COMPLETE_ITEM', id }),
     []
@@ -330,6 +353,8 @@ export function useContainerData() {
     deleteCurrent,
     toggleAutoAnnounce,
     updateItem,
+    addItem,
+    deleteItem,
     completeItem,
     uncompleteItem,
   };

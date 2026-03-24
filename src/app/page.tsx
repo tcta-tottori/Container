@@ -34,6 +34,8 @@ export default function Home() {
     deleteCurrent,
     toggleAutoAnnounce,
     updateItem,
+    addItem,
+    deleteItem,
     completeItem,
     uncompleteItem,
   } = useContainerData();
@@ -288,7 +290,14 @@ export default function Home() {
 
           {viewMode === 'edit' && (
             <div className="full-panel">
-              <ItemEditPage items={state.items} onUpdateItem={updateItem} onSelectAndGoDetail={handleSelectAndGoDetail} />
+              <ItemEditPage
+                items={state.items}
+                containerNo={state.containers[state.selectedContainerIdx]?.containerNo || ''}
+                onUpdateItem={updateItem}
+                onAddItem={addItem}
+                onDeleteItem={deleteItem}
+                onSelectAndGoDetail={handleSelectAndGoDetail}
+              />
             </div>
           )}
         </div>
