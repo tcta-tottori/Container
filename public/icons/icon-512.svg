@@ -1,28 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3b82f6"/>
-      <stop offset="100%" stop-color="#8b5cf6"/>
+      <stop offset="0%" stop-color="#4f6ef7"/>
+      <stop offset="100%" stop-color="#9b6dfa"/>
     </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <rect width="512" height="512" rx="80" fill="url(#bg)"/>
-  <g transform="translate(256,230)">
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <!-- キューブ（ワイヤーフレーム） -->
+  <g transform="translate(270,240)" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="6" stroke-linejoin="round" filter="url(#glow)">
     <!-- 上面 -->
-    <polygon points="0,-108 115,-50 0,8 -115,-50" fill="rgba(255,255,255,0.25)" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+    <polygon points="0,-100 105,-48 0,4 -105,-48"/>
     <!-- 左面 -->
-    <polygon points="-115,-50 0,8 0,124 -115,66" fill="rgba(255,255,255,0.15)" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+    <polygon points="-105,-48 0,4 0,112 -105,60"/>
     <!-- 右面 -->
-    <polygon points="115,-50 0,8 0,124 115,66" fill="rgba(255,255,255,0.1)" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+    <polygon points="105,-48 0,4 0,112 105,60"/>
   </g>
-  <!-- 矢印 -->
-  <g fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M280,175 C300,140 320,120 360,95"/>
-    <polygon points="350,75 372,90 355,105" fill="#fff" stroke="none"/>
+  <!-- 矢印（左に出る） -->
+  <g fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+    <path d="M165,240 L100,240"/>
+    <polyline points="128,215 100,240 128,265"/>
   </g>
-  <!-- フック -->
-  <g fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round">
-    <path d="M200,280 C170,300 150,330 165,360 C180,385 215,380 230,355 C242,335 237,310 215,295 L290,255"/>
-  </g>
-  <!-- テキスト -->
-  <text x="256" y="445" text-anchor="middle" font-family="Inter,sans-serif" font-size="42" font-weight="800" fill="#fff" letter-spacing="2">CNS</text>
 </svg>

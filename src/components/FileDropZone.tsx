@@ -85,17 +85,19 @@ const CHANGELOG = [
 /* ===== CNSロゴSVG（段ボール箱・正方形に見えるアイソメトリック） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 72" fill="none" xmlns="http://www.w3.org/2000/svg"
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={{ display: 'block' }}>
-      {/* 上面 */}
-      <polygon points="32,8 54,18 32,28 10,18" fill="rgba(255,255,255,0.35)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
-      {/* 左面（高さを増して正方形に） */}
-      <polygon points="10,18 32,28 32,58 10,48" fill="rgba(255,255,255,0.2)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
-      {/* 右面 */}
-      <polygon points="54,18 32,28 32,58 54,48" fill="rgba(255,255,255,0.12)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
-      {/* テープ（上面中央線+前面中央線） */}
-      <line x1="32" y1="8" x2="32" y2="28" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
-      <line x1="32" y1="28" x2="32" y2="58" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
+      {/* ワイヤーフレームキューブ */}
+      <g transform="translate(36,30)" stroke="rgba(255,255,255,0.9)" strokeWidth="1.8" strokeLinejoin="round" fill="none">
+        <polygon points="0,-18 19,-9 0,1 -19,-9"/>
+        <polygon points="-19,-9 0,1 0,21 -19,11"/>
+        <polygon points="19,-9 0,1 0,21 19,11"/>
+      </g>
+      {/* 矢印 */}
+      <g stroke="rgba(255,255,255,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none">
+        <path d="M17,30 L9,30"/>
+        <polyline points="13,26 9,30 13,34"/>
+      </g>
     </svg>
   );
 }
