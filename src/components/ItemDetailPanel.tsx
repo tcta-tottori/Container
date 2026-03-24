@@ -167,30 +167,33 @@ export default function ItemDetailPanel({
     typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
   }
 
-  const heroBg = `linear-gradient(135deg, #121620 0%, #161b28 35%, #141824 65%, #181d2c 100%)`;
-
   // リスト行の背景色（メニューカラーと統一・ダーク系）
   const TYPE_ROW_BG: Record<string, string> = {
     'ポリカバー': '#162218', '箱': '#151e2c', '部品': '#1c1628', 'その他': '#1a1a1e',
   };
 
+  // CSS変数でaccent色を渡す
+  const heroVars = {
+    '--hero-c1': colors.accent + '30',
+    '--hero-c2': colors.accent + '18',
+    '--hero-c3': colors.accent + '10',
+    '--hero-c4': colors.accent + '22',
+  } as React.CSSProperties;
+
   return (
     <div className="detail-root" style={{ background: colors.accent + '12' }}>
-      {/* === 上半分（黒ベース + accent色グロー） === */}
-      <div className="detail-upper" style={{
-        background: heroBg,
-        position: 'relative', overflow: 'hidden',
+      {/* === 上半分（アニメーショングラデーション） === */}
+      <div className="detail-upper hero-animated" style={{
+        position: 'relative', overflow: 'hidden', ...heroVars,
       }}>
-        {/* accent色グロー */}
-        <div style={{
-          position: 'absolute', top: '-40%', right: '-20%', width: '80%', height: '180%',
-          background: `radial-gradient(ellipse at 70% 40%, ${colors.accent}38 0%, ${colors.accent}18 40%, transparent 70%)`,
-          pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '-20%', left: '-10%', width: '50%', height: '60%',
-          background: `radial-gradient(ellipse, ${colors.accent}15 0%, transparent 55%)`,
-          pointerEvents: 'none',
+        {/* アニメーション背景レイヤー */}
+        <div className="hero-glow-layer" style={{
+          background: `
+            radial-gradient(ellipse 80% 60% at 20% 80%, var(--hero-c1) 0%, transparent 60%),
+            radial-gradient(ellipse 70% 80% at 80% 20%, var(--hero-c2) 0%, transparent 55%),
+            radial-gradient(ellipse 50% 50% at 50% 50%, var(--hero-c3) 0%, transparent 50%),
+            radial-gradient(ellipse 60% 70% at 70% 70%, var(--hero-c4) 0%, transparent 60%)
+          `,
         }} />
 
         {/* 1行目: 種目バッジ + 色柄 + 品目数 */}

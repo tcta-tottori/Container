@@ -244,6 +244,39 @@ body {
   border-radius: 18px;
   height: 50%; flex-shrink: 0; overflow: hidden;
 }
+.hero-animated {
+  background: linear-gradient(135deg, #0c0e18 0%, #10131e 40%, #0e1118 70%, #121620 100%);
+}
+.hero-glow-layer {
+  position: absolute; inset: -60% -40%;
+  width: 180%; height: 220%;
+  pointer-events: none; z-index: 0;
+  animation: heroGlow 12s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+  opacity: 0.9;
+}
+@keyframes heroGlow {
+  0% {
+    transform: translate(0%, 0%) rotate(0deg) scale(1);
+    opacity: 0.85;
+  }
+  25% {
+    transform: translate(8%, -6%) rotate(3deg) scale(1.05);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-5%, 8%) rotate(-2deg) scale(0.98);
+    opacity: 0.75;
+  }
+  75% {
+    transform: translate(6%, 4%) rotate(4deg) scale(1.08);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-3%, -5%) rotate(-1deg) scale(1.02);
+    opacity: 0.85;
+  }
+}
 .detail-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .detail-part-no { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-left: auto; letter-spacing: 0.3px; }
 
