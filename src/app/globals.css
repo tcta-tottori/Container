@@ -264,33 +264,68 @@ body {
   background: linear-gradient(135deg, #0c0e18 0%, #10131e 40%, #0e1118 70%, #121620 100%);
 }
 .hero-glow-layer {
-  position: absolute; inset: -60% -40%;
-  width: 180%; height: 220%;
+  position: absolute; inset: -80% -60%;
+  width: 220%; height: 260%;
   pointer-events: none; z-index: 0;
-  animation: heroGlow 12s ease-in-out infinite alternate;
+  animation: heroMist1 8s ease-in-out infinite alternate;
   will-change: transform, opacity;
-  opacity: 0.9;
+  opacity: 1;
+  filter: blur(30px);
 }
-@keyframes heroGlow {
+/* 2層目の靄 */
+.hero-animated::after {
+  content: '';
+  position: absolute; inset: -60% -50%;
+  width: 200%; height: 220%;
+  pointer-events: none; z-index: 0;
+  background: inherit;
+  animation: heroMist2 11s ease-in-out infinite alternate-reverse;
+  filter: blur(40px);
+  opacity: 0.7;
+  mix-blend-mode: screen;
+}
+@keyframes heroMist1 {
   0% {
     transform: translate(0%, 0%) rotate(0deg) scale(1);
-    opacity: 0.85;
+    opacity: 0.9;
   }
-  25% {
-    transform: translate(8%, -6%) rotate(3deg) scale(1.05);
+  20% {
+    transform: translate(12%, -8%) rotate(5deg) scale(1.12);
     opacity: 1;
   }
-  50% {
-    transform: translate(-5%, 8%) rotate(-2deg) scale(0.98);
-    opacity: 0.75;
+  40% {
+    transform: translate(-8%, 10%) rotate(-3deg) scale(0.95);
+    opacity: 0.7;
   }
-  75% {
-    transform: translate(6%, 4%) rotate(4deg) scale(1.08);
-    opacity: 0.95;
+  60% {
+    transform: translate(10%, 6%) rotate(6deg) scale(1.15);
+    opacity: 1;
+  }
+  80% {
+    transform: translate(-6%, -10%) rotate(-4deg) scale(1.05);
+    opacity: 0.8;
   }
   100% {
-    transform: translate(-3%, -5%) rotate(-1deg) scale(1.02);
+    transform: translate(5%, -3%) rotate(2deg) scale(1.08);
+    opacity: 0.95;
+  }
+}
+@keyframes heroMist2 {
+  0% {
+    transform: translate(5%, 5%) rotate(3deg) scale(1.05);
+    opacity: 0.6;
+  }
+  33% {
+    transform: translate(-10%, -5%) rotate(-5deg) scale(1.15);
     opacity: 0.85;
+  }
+  66% {
+    transform: translate(8%, -8%) rotate(4deg) scale(0.95);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(-5%, 10%) rotate(-2deg) scale(1.1);
+    opacity: 0.75;
   }
 }
 .detail-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -320,23 +355,26 @@ body {
   display: flex; align-items: flex-end; justify-content: center;
   gap: 24px; padding: 4px 0 2px; flex-shrink: 0;
 }
-.detail-sf-item { display: flex; align-items: baseline; gap: 5px; }
+.detail-sf-item { display: flex; align-items: flex-end; gap: 4px; }
 .detail-sf-num {
   font-family: var(--font-mono); font-size: 64px;
   font-weight: 900; font-variant-numeric: tabular-nums;
-  letter-spacing: -2px; line-height: 1;
+  letter-spacing: -2px; line-height: 0.78;
 }
 .detail-sf-num-sm {
   font-family: var(--font-mono); font-size: 28px;
   font-weight: 700; font-variant-numeric: tabular-nums;
+  line-height: 0.78;
 }
-.detail-sf-labels { display: flex; flex-direction: column; gap: 0; }
 .detail-sf-label {
-  font-family: var(--font-body); font-size: 12px;
-  color: var(--text-muted); font-weight: 600; line-height: 1.3;
-  letter-spacing: 0.3px;
+  font-family: var(--font-body); font-size: 13px;
+  color: var(--text-muted); font-weight: 700; line-height: 1;
+  letter-spacing: 0.3px; padding-bottom: 2px;
 }
-.detail-sf-sub { font-size: 11px; color: var(--text-muted); opacity: 0.5; font-family: var(--font-mono); line-height: 1; }
+.detail-sf-at {
+  font-size: 13px; font-weight: 700; font-family: var(--font-mono);
+  letter-spacing: 0.3px; line-height: 1; padding-bottom: 2px;
+}
 .detail-sf-total { opacity: 1; }
 
 /* 似た品目 */

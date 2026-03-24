@@ -323,22 +323,17 @@ export default function ItemDetailPanel({
           )}
         </div>
 
-        {/* 数量（PL / CT表記） */}
+        {/* 数量（PL / CT / pcs 下揃え） */}
         <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2 }}>
-          <div className="detail-sf-item" style={{ alignItems: 'baseline', gap: 5 }}>
+          <div className="detail-sf-item">
             <span className="detail-sf-num" style={{
               color: colors.accent,
               textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
             }}>{fmtNum(item.palletCount)}</span>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
-              {item.qtyPerPallet > 0 && (
-                <span style={{
-                  fontSize: 11, fontWeight: 700, color: `${colors.accent}cc`,
-                  fontFamily: 'var(--font-mono)', letterSpacing: 0.3, lineHeight: 1,
-                }}>@{item.qtyPerPallet}</span>
-              )}
-              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>PL</span>
-            </div>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>PL</span>
+            {item.qtyPerPallet > 0 && (
+              <span className="detail-sf-at" style={{ color: `${colors.accent}cc` }}>@{item.qtyPerPallet}</span>
+            )}
           </div>
           <div className="detail-sf-item">
             <span className="detail-sf-num" style={{

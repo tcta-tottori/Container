@@ -70,7 +70,7 @@ function Box({ x, y, z, w, d, h, ghost, accent }: {
   );
 }
 
-/* ===== パレット台（参照画像準拠: ダークグレー+フォーク穴+上面模様） ===== */
+/* ===== パレット台（正方形・シンプル・見栄えの良いアイソメトリック） ===== */
 function PalletBase({ x, y, z, w, d, h }: {
   x: number; y: number; z: number; w: number; d: number; h: number;
 }) {
@@ -84,7 +84,7 @@ function PalletBase({ x, y, z, w, d, h }: {
   const forkFront = [0.15, 0.58].map((pct, i) => {
     const hx = x + w * pct;
     const q = [iso(hx, y, hz + hh), iso(hx + hw, y, hz + hh), iso(hx + hw, y, hz), iso(hx, y, hz)] as [number, number][];
-    return <polygon key={`ff${i}`} points={pts(...q)} fill="#1a1e24" stroke={sk} strokeWidth={0.4} rx="1" />;
+    return <polygon key={`ff${i}`} points={pts(...q)} fill="#1a1e24" stroke={sk} strokeWidth={0.4} />;
   });
   const forkLeft = [0.15, 0.58].map((pct, i) => {
     const hy = y + d * pct;
@@ -93,31 +93,14 @@ function PalletBase({ x, y, z, w, d, h }: {
     return <polygon key={`fl${i}`} points={pts(...q)} fill="#1a1e24" stroke={sk} strokeWidth={0.4} />;
   });
 
-  // 上面の模様 (X字パターン4分割)
-  const cx = x + w / 2, cy = y + d / 2;
-  const topPattern = (
-    <g opacity={0.15} stroke="#3a4050" strokeWidth={0.25} fill="none">
-      <line {...lp(iso(x + 1, y + 1, z + h), iso(cx, cy, z + h))} />
-      <line {...lp(iso(x + w - 1, y + 1, z + h), iso(cx, cy, z + h))} />
-      <line {...lp(iso(x + 1, y + d - 1, z + h), iso(cx, cy, z + h))} />
-      <line {...lp(iso(x + w - 1, y + d - 1, z + h), iso(cx, cy, z + h))} />
-    </g>
-  );
-
   return (
     <g>
       <polygon points={pts(...front)} fill="#555d68" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
       <polygon points={pts(...top)}   fill="#6b7280" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
       <polygon points={pts(...left)}  fill="#444c56" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
-      {topPattern}
       {forkFront}{forkLeft}
     </g>
   );
-}
-
-/* line points helper */
-function lp(a: [number, number], b: [number, number]) {
-  return { x1: a[0], y1: a[1], x2: b[0], y2: b[1] };
 }
 
 /* ===== ラミネートバンドル（2ケース1まとまり） ===== */
@@ -271,44 +254,42 @@ function JarPotStack({ ox, oy, filled, accent }: {
   return <g transform={`translate(${ox},${oy})`}>{elems}</g>;
 }
 
-/* ===== 汎用ボックス位置定義 (5+4パターン) ===== */
+/* ===== 汎用ボックス位置定義 (4+4パターン・正方形パレット) ===== */
 interface BoxSlot { x: number; y: number; z: number; }
 
 function buildGenericSlots(PH: number): BoxSlot[] {
-  const bw = 6.8, bd = 6.5, bh = 6.2;
-  const PW = 22, PD = 16;
-  const gx = (PW - 3 * bw) / 4;
-  const fx = [gx, gx + bw + gx, gx + 2 * (bw + gx)];
-  const gxb = (PW - 2 * bw) / 3;
-  const bx = [gxb, gxb + bw + gxb];
-  const gy = (PD - 2 * bd) / 3;
-  const fy = gy, by = gy + bd + gy;
+  const bw = 7, bd = 7, bh = 6;
+  const PS = 22; // 正方形パレット
+  const g = (PS - 3 * bw) / 4;
+  const cols3 = [g, g + bw + g, g + 2 * (bw + g)];
+  const g2 = (PS - 2 * bd) / 3;
+  const rows2 = [g2, g2 + bd + g2];
 
   const slots: BoxSlot[] = [];
-  const addLayer5 = (z: number) => {
-    for (const x of bx) slots.push({ x, y: by, z });
-    for (const x of fx) slots.push({ x, y: fy, z });
+  // Layer0: 3×2=6個
+  const addLayer6 = (z: number) => {
+    for (const y of rows2) for (const x of cols3) slots.push({ x, y, z });
   };
+  // Layer1: 2×2=4個（交互配置）
   const addLayer4 = (z: number) => {
-    for (const x of bx) slots.push({ x, y: by, z });
-    slots.push({ x: fx[0], y: fy, z });
-    slots.push({ x: fx[2], y: fy, z });
+    const g3 = (PS - 2 * bw) / 3;
+    const cx = [g3, g3 + bw + g3];
+    for (const y of rows2) for (const x of cx) slots.push({ x, y, z });
   };
 
-  addLayer5(PH);
+  addLayer6(PH);
   addLayer4(PH + bh);
-  addLayer5(PH + bh * 2);
-  addLayer4(PH + bh * 3);
+  addLayer6(PH + bh * 2);
   return slots;
 }
 
 function GenericStack({ ox, oy, filled, accent }: {
   ox: number; oy: number; filled: number; accent: string;
 }) {
-  const PW = 22, PD = 16, PH = 3;
-  const bw = 6.8, bd = 6.5, bh = 6.2;
+  const PS = 22, PH = 3;
+  const bw = 7, bd = 7, bh = 6;
   const allSlots = buildGenericSlots(PH);
-  const layerCaps = [5, 4, 5, 4];
+  const layerCaps = [6, 4, 6];
   let maxLayer = 0, acc = 0;
   for (let l = 0; l < layerCaps.length; l++) {
     acc += layerCaps[l];
@@ -316,7 +297,7 @@ function GenericStack({ ox, oy, filled, accent }: {
   }
   const slotsToRender = layerCaps.slice(0, maxLayer + 1).reduce((a, b) => a + b, 0);
   const elems: JSX.Element[] = [];
-  elems.push(<PalletBase key="pl" x={0} y={0} z={0} w={PW} d={PD} h={PH} />);
+  elems.push(<PalletBase key="pl" x={0} y={0} z={0} w={PS} d={PS} h={PH} />);
   const indexed = allSlots.slice(0, slotsToRender).map((s, i) => ({ ...s, fillIdx: i }));
   indexed.sort((a, b) => {
     if (a.z !== b.z) return a.z - b.z;
@@ -345,16 +326,16 @@ export default function PalletDiagram({
   const jarPot = isJarPot(itemName || '');
 
   // スロット数
-  const maxSlots = jarPot ? 20 : 18;
+  const maxSlots = jarPot ? 20 : 16;
   // ジャーポット: 端数をバンドル数に変換 (2ケース=1バンドル)
   const mapFrac = (n: number) => {
     if (jarPot) return Math.min(Math.ceil(n / 2), maxSlots);
     return Math.min(Math.ceil(n), maxSlots);
   };
 
-  // 投影範囲
-  const PW = 22, PD = jarPot ? 22 : 16, PH = 3;
-  const layerH = jarPot ? 5.5 : 6.2;
+  // 投影範囲（汎用も正方形パレット22×22）
+  const PW = 22, PD = 22, PH = 3;
+  const layerH = jarPot ? 5.5 : 6;
   const totalZ = PH + 2 * layerH;
   const xL = -PD * CS;
   const xR = PW * CS;
