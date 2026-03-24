@@ -118,8 +118,8 @@ export function detectItemType(
     }
   }
 
-  // 4. 鍋判定（ジャーポット系 = 鍋）
-  if (/^JP[A-Z]/.test(name) || name.includes('ジャーポット') || name.includes('鍋')) {
+  // 4. 鍋判定（品名に「ｳﾁﾅﾍﾞ」「ウチナベ」「内鍋」を含む）
+  if (name.includes('ｳﾁﾅﾍﾞ') || name.includes('ウチナベ') || name.includes('内鍋')) {
     return '鍋';
   }
 
