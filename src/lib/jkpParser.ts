@@ -3,17 +3,17 @@ import { ContainerItem } from './types';
 
 /** JKP Sheet1: 鍋品目リスト */
 export interface JkpItem {
-  partNumber: string;  // 気高コード (col1)
-  itemName: string;    // 品名 (col3)
+  partNumber: string;  // 気高コード
+  itemName: string;    // 品名
 }
 
 /** JKP 体積Ｍ３シート */
 export interface JkpVolume {
-  partNumber: string;  // 気高コード (col1)
-  itemName: string;    // 品名 (col2)
-  measMm: string;      // 箱寸mm (col3)
-  packingQty: number;  // 入数 (col4)
-  cbmPerPc: number;    // M³/PC (col5)
+  partNumber: string;  // 気高コード
+  itemName: string;    // 品名
+  measMm: string;      // 箱寸mm
+  packingQty: number;  // 入数
+  cbmPerPc: number;    // M³/PC
 }
 
 /** JKP updata: 出荷予定 */
@@ -33,52 +33,110 @@ export function detectNabeSize(itemName: string): string {
 
 /** mm箱寸をcm Meas.文字列に変換 */
 function mmToCmMeas(mmStr: string): string {
-  // "460460290" → "460*460*290" → "46*46*29"
-  // or "460*460*290" → "46*46*29"
   const cleaned = mmStr.replace(/\s/g, '');
   const m = cleaned.match(/(\d+)[*×xX](\d+)[*×xX](\d+)/);
   if (m) {
     return `${Math.round(Number(m[1]) / 10)}*${Math.round(Number(m[2]) / 10)}*${Math.round(Number(m[3]) / 10)}`;
   }
-  // 区切りなし: 3桁ずつ分割を試行
-  if (/^\d{9,}$/.test(cleaned)) {
-    const digits = cleaned;
-    // 3桁×3 = 9桁
-    if (digits.length === 9) {
-      const w = Number(digits.slice(0, 3));
-      const d = Number(digits.slice(3, 6));
-      const h = Number(digits.slice(6, 9));
-      return `${Math.round(w / 10)}*${Math.round(d / 10)}*${Math.round(h / 10)}`;
-    }
+  if (/^\d{9,}$/.test(cleaned) && cleaned.length === 9) {
+    const w = Number(cleaned.slice(0, 3));
+    const d = Number(cleaned.slice(3, 6));
+    const h = Number(cleaned.slice(6, 9));
+    return `${Math.round(w / 10)}*${Math.round(d / 10)}*${Math.round(h / 10)}`;
   }
   return mmStr;
 }
 
-/** JKP Sheet1 パース */
+/** シート名を柔軟に検索（大文字小文字・空白・全角半角を無視） */
+function findSheet(wb: XLSX.WorkBook, ...candidates: string[]): XLSX.WorkSheet | null {
+  const names = Object.keys(wb.Sheets);
+  // 完全一致優先
+  for (const cand of candidates) {
+    if (wb.Sheets[cand]) return wb.Sheets[cand];
+  }
+  // 正規化一致
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/[\s\u3000]/g, '').replace(/[Ｍｍ]/g, 'm').replace(/[３3]/g, '3');
+  for (const cand of candidates) {
+    const nc = normalize(cand);
+    const found = names.find(n => normalize(n) === nc);
+    if (found) return wb.Sheets[found];
+  }
+  // 部分一致
+  for (const cand of candidates) {
+    const nc = normalize(cand);
+    const found = names.find(n => normalize(n).includes(nc));
+    if (found) return wb.Sheets[found];
+  }
+  return null;
+}
+
+/** セルヘルパー */
+function cellReader(ws: XLSX.WorkSheet) {
+  return (r: number, c: number): string | number => {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    const cell = ws[addr];
+    return cell ? (cell.v ?? '') : '';
+  };
+}
+
+/** 3TG気高コードか判定 */
+function is3tgCode(val: string): boolean {
+  return /^3TG\d{3}[A-Z]\d{5}$/i.test(val);
+}
+
+// ──────────────────────────────────────────────────────────
+// Sheet1 パース
+// ──────────────────────────────────────────────────────────
+
+/** JKP Sheet1 パース
+ *  実際のフォーマット: ヘッダーなし、col0=品番, col2=品名
+ */
 export function parseJkpSheet1(wb: XLSX.WorkBook): JkpItem[] {
-  const ws = wb.Sheets['Sheet1'];
-  if (!ws) return [];
+  const ws = findSheet(wb, 'Sheet1', 'sheet1', 'Sheet 1');
+  if (!ws) {
+    console.warn('[JKP] Sheet1が見つかりません。シート一覧:', Object.keys(wb.Sheets));
+    return [];
+  }
   const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1, defval: '' });
   const items: JkpItem[] = [];
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    const partNumber = String(row[1] || '').trim();
-    const itemName = String(row[3] || '').trim();
+    // col0 or col1 に品番、col2 or col3 に品名（柔軟に検索）
+    let partNumber = '';
+    let itemName = '';
+    for (let c = 0; c < Math.min(row.length, 5); c++) {
+      const val = String(row[c] || '').trim();
+      if (!val) continue;
+      if (!partNumber && is3tgCode(val)) {
+        partNumber = val;
+      } else if (partNumber && !itemName && val) {
+        itemName = val;
+      }
+    }
     if (partNumber) items.push({ partNumber, itemName });
   }
+  console.log(`[JKP] Sheet1: ${items.length}品目検出`);
   return items;
 }
 
-/** JKP 体積Ｍ３ パース */
+// ──────────────────────────────────────────────────────────
+// 体積Ｍ３ パース
+// ──────────────────────────────────────────────────────────
+
 export function parseJkpVolume(wb: XLSX.WorkBook): Map<string, JkpVolume> {
-  const ws = wb.Sheets['体積Ｍ３'];
-  if (!ws) return new Map();
+  const ws = findSheet(wb, '体積Ｍ３', '体積M3', '体積m3');
+  if (!ws) {
+    console.warn('[JKP] 体積シートが見つかりません。シート一覧:', Object.keys(wb.Sheets));
+    return new Map();
+  }
   const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1, defval: '' });
   const map = new Map<string, JkpVolume>();
-  for (let i = 2; i < rows.length; i++) {
+  for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
+    // col1に品番がある行を探す
     const partNumber = String(row[1] || '').trim();
-    if (!partNumber) continue;
+    if (!partNumber || !is3tgCode(partNumber)) continue;
     map.set(partNumber, {
       partNumber,
       itemName: String(row[2] || '').trim(),
@@ -87,73 +145,156 @@ export function parseJkpVolume(wb: XLSX.WorkBook): Map<string, JkpVolume> {
       cbmPerPc: Number(row[5]) || 0,
     });
   }
+  console.log(`[JKP] 体積M3: ${map.size}品目検出`);
   return map;
 }
 
-/** JKP updataシート: 日付列マッピング構築 + スケジュール抽出 */
+// ──────────────────────────────────────────────────────────
+// updata シートパース（自動構造検出）
+// ──────────────────────────────────────────────────────────
+
 export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
-  const sheetName = Object.keys(wb.Sheets).find(s => s.includes('updata'));
-  if (!sheetName) return [];
+  const sheetName = Object.keys(wb.Sheets).find(s =>
+    s.toLowerCase().includes('updata')
+  );
+  if (!sheetName) {
+    console.warn('[JKP] updataシートが見つかりません。シート一覧:', Object.keys(wb.Sheets));
+    return [];
+  }
   const ws = wb.Sheets[sheetName];
   if (!ws) return [];
 
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-  const maxCol = Math.min(range.e.c, 3800); // 列数制限
+  const maxCol = Math.min(range.e.c, 3800);
+  const getCell = cellReader(ws);
 
-  // ヘッダー行を読み取り: row0, row1, row2
-  const getCell = (r: number, c: number): string | number => {
-    const addr = XLSX.utils.encode_cell({ r, c });
-    const cell = ws[addr];
-    return cell ? (cell.v ?? '') : '';
-  };
+  // ──── Step 1: 日付行を自動検出（"M/D" パターンが3つ以上連続する行） ────
+  let dateRow = -1;
+  for (let r = 0; r <= Math.min(range.e.r, 20); r++) {
+    let consecutive = 0;
+    for (let c = 10; c <= Math.min(maxCol, 50); c++) {
+      const v = String(getCell(r, c)).trim();
+      if (/^\d{1,2}\/\d{1,2}$/.test(v)) {
+        consecutive++;
+        if (consecutive >= 3) { dateRow = r; break; }
+      } else {
+        consecutive = 0;
+      }
+    }
+    if (dateRow >= 0) break;
+  }
+  if (dateRow < 0) {
+    console.warn('[JKP] 日付行が見つかりません');
+    return [];
+  }
+  console.log(`[JKP] 日付行: row${dateRow}`);
 
-  // 年月日マッピングを構築
-  // row0: 年マーカー (2019, 2020, ...)
-  // row2: 日付文字列 ("3/24", "6/1" 等)
-  let currentYear = 2026;
-  const colDateMap = new Map<number, string>(); // col → "YYYY-MM-DD"
+  // ──── Step 2: 年マーカー行を自動検出（dateRowより上で2014-2030の数値がある行） ────
+  let yearRow = -1;
+  for (let r = 0; r < dateRow; r++) {
+    for (let c = 3; c <= maxCol; c++) {
+      const v = getCell(r, c);
+      if (typeof v === 'number' && v >= 2014 && v <= 2030) {
+        yearRow = r;
+        break;
+      }
+    }
+    if (yearRow >= 0) break;
+  }
+  console.log(`[JKP] 年マーカー行: ${yearRow >= 0 ? 'row' + yearRow : '見つからず (デフォルト使用)'}`);
+
+  // ──── Step 3: 列→日付マッピング構築 ────
+  let currentYear = new Date().getFullYear();
+  const colDateMap = new Map<number, string>();
 
   for (let c = 3; c <= maxCol; c++) {
-    const r0 = getCell(0, c);
-    if (typeof r0 === 'number' && r0 >= 2014 && r0 <= 2030) {
-      currentYear = r0;
+    // 年マーカーを更新
+    if (yearRow >= 0) {
+      const yr = getCell(yearRow, c);
+      if (typeof yr === 'number' && yr >= 2014 && yr <= 2030) {
+        currentYear = yr;
+      }
     }
-
-    const r2 = String(getCell(2, c)).trim();
-    const dateMatch = r2.match(/^(\d{1,2})\/(\d{1,2})$/);
-    if (dateMatch) {
-      const month = Number(dateMatch[1]);
-      const day = Number(dateMatch[2]);
+    // 日付セルを読み取り
+    const dv = String(getCell(dateRow, c)).trim();
+    const dm = dv.match(/^(\d{1,2})\/(\d{1,2})$/);
+    if (dm) {
+      const month = Number(dm[1]);
+      const day = Number(dm[2]);
       if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
         const dateStr = `${currentYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         colDateMap.set(c, dateStr);
       }
     }
   }
+  console.log(`[JKP] 日付列: ${colDateMap.size}列検出`);
 
-  // データ行をパース
-  const shipments: JkpShipment[] = [];
-  for (let r = 3; r <= range.e.r; r++) {
-    const partNumber = String(getCell(r, 1)).trim();
-    const itemName = String(getCell(r, 2)).trim();
-    if (!partNumber) continue;
-
-    const schedule = new Map<string, number | string>();
-    colDateMap.forEach((dateStr, col) => {
-      const val = getCell(r, col);
-      if (val === '' || val === null || val === undefined) return;
-      if (typeof val === 'number' && !isNaN(val) && val > 0) {
-        schedule.set(dateStr, val);
-      } else if (typeof val === 'string' && val.trim()) {
-        schedule.set(dateStr, val.trim());
-      }
-    });
-
-    if (schedule.size > 0) {
-      shipments.push({ partNumber, itemName, schedule });
+  // ──── Step 4: データ開始行を自動検出（3TGコードが初めて出現する行） ────
+  let dataStartRow = dateRow + 1;
+  for (let r = dateRow + 1; r <= Math.min(range.e.r, dateRow + 20); r++) {
+    const c1 = String(getCell(r, 1)).trim();
+    if (is3tgCode(c1)) {
+      dataStartRow = r;
+      break;
     }
   }
+  console.log(`[JKP] データ開始行: row${dataStartRow}`);
 
+  // ──── Step 5: データ行をパース ────
+  // 3行1組パターン: [3TGコード行, 品名行, 内部コード行]
+  // 数量はどの行にも出現しうる → 3TGコードをキーに集約
+  const shipmentMap = new Map<string, JkpShipment>();
+  let currentPartNumber = '';
+  let currentItemName = '';
+
+  for (let r = dataStartRow; r <= range.e.r; r++) {
+    const col1 = String(getCell(r, 1)).trim();
+    if (!col1) continue;
+
+    // 3TGコード行 → 新しい品目の開始
+    if (is3tgCode(col1)) {
+      currentPartNumber = col1;
+      currentItemName = '';
+      continue;
+    }
+
+    // 品名行の判定（3TGコードの直後、JKP/JPI/JRI/JPB/JPV/JPK/JPD/JPC/JPT/JRIで始まるか英字で始まる）
+    if (currentPartNumber && !currentItemName) {
+      currentItemName = col1;
+      // この品番をまだ登録していなければ登録
+      if (!shipmentMap.has(currentPartNumber)) {
+        shipmentMap.set(currentPartNumber, {
+          partNumber: currentPartNumber,
+          itemName: currentItemName,
+          schedule: new Map(),
+        });
+      }
+    }
+
+    // 数量データを収集（この行に数値があれば現在の品番に紐付け）
+    if (!currentPartNumber) continue;
+    const shipment = shipmentMap.get(currentPartNumber);
+    if (!shipment) continue;
+
+    colDateMap.forEach((dateStr, col) => {
+      const val = getCell(r, col);
+      if (typeof val === 'number' && !isNaN(val) && val > 0) {
+        // 既存値があれば合算（複数行にまたがる場合）
+        const existing = shipment.schedule.get(dateStr);
+        if (typeof existing === 'number') {
+          shipment.schedule.set(dateStr, existing + val);
+        } else {
+          shipment.schedule.set(dateStr, val);
+        }
+      } else if (typeof val === 'string' && val.trim() && !shipment.schedule.has(dateStr)) {
+        shipment.schedule.set(dateStr, val.trim());
+      }
+    });
+  }
+
+  // スケジュールが空の品目を除外
+  const shipments = Array.from(shipmentMap.values()).filter(s => s.schedule.size > 0);
+  console.log(`[JKP] updata: ${shipments.length}品目 (うちスケジュールあり)`);
   return shipments;
 }
 
@@ -178,42 +319,59 @@ export function jkpToContainerItems(
   shipments: JkpShipment[],
   targetDate: string,
 ): ContainerItem[] {
-  // 品番→出荷数量マップ
+  // 品番→出荷数量マップ（updataから）
   const qtyMap = new Map<string, number>();
+  const nameMap = new Map<string, string>();
   for (const s of shipments) {
     const val = s.schedule.get(targetDate);
     if (typeof val === 'number' && val > 0) {
       qtyMap.set(s.partNumber, val);
+      nameMap.set(s.partNumber, s.itemName);
     }
   }
 
-  return sheet1Items
-    .filter((item) => qtyMap.has(item.partNumber))
-    .map((item, idx) => {
-      const vol = volumeMap.get(item.partNumber);
-      const size = detectNabeSize(item.itemName);
-      const measurements = vol?.measMm ? mmToCmMeas(vol.measMm) : undefined;
-      const totalQty = qtyMap.get(item.partNumber) || 0;
-      const packingQty = vol?.packingQty || 0;
-      const caseCount = packingQty > 0 ? Math.ceil(totalQty / packingQty) : 0;
+  // Sheet1の品目と結合（Sheet1にない品目もupdataから追加）
+  const sheet1PartNumbers = new Set(sheet1Items.map(it => it.partNumber));
+  const allPartNumbers: string[] = [];
+  sheet1PartNumbers.forEach(pn => allPartNumbers.push(pn));
+  qtyMap.forEach((_v, pn) => { if (!sheet1PartNumbers.has(pn)) allPartNumbers.push(pn); });
 
-      return {
-        id: `jkp-${idx}`,
-        partNumber: item.partNumber,
-        itemName: item.itemName,
-        representModel: '',
-        type: '鍋' as const,
-        size: size || undefined,
-        packingQty,
-        totalQty,
-        caseCount,
-        palletCount: 0,
-        fraction: caseCount,
-        qtyPerPallet: 0,
-        cbm: vol?.cbmPerPc || undefined,
-        measurements,
-      };
+  const items: ContainerItem[] = [];
+  let idx = 0;
+
+  for (const pn of allPartNumbers) {
+    const qty = qtyMap.get(pn);
+    if (!qty || qty <= 0) continue;
+
+    // 品名: Sheet1 → updata → 体積シートの順で取得
+    const s1 = sheet1Items.find(it => it.partNumber === pn);
+    const vol = volumeMap.get(pn);
+    const itemName = s1?.itemName || nameMap.get(pn) || vol?.itemName || pn;
+    const size = detectNabeSize(itemName);
+    const measurements = vol?.measMm ? mmToCmMeas(vol.measMm) : undefined;
+    const packingQty = vol?.packingQty || 0;
+    const caseCount = packingQty > 0 ? Math.ceil(qty / packingQty) : 0;
+
+    items.push({
+      id: `jkp-${idx++}`,
+      partNumber: pn,
+      itemName,
+      representModel: '',
+      type: '鍋' as const,
+      size: size || undefined,
+      packingQty,
+      totalQty: qty,
+      caseCount,
+      palletCount: 0,
+      fraction: caseCount,
+      qtyPerPallet: 0,
+      cbm: vol?.cbmPerPc || undefined,
+      measurements,
     });
+  }
+
+  console.log(`[JKP] ContainerItems: ${items.length}品目 (日付: ${targetDate})`);
+  return items;
 }
 
 /** 日付範囲でスケジュールをフィルタ */

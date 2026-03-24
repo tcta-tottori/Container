@@ -307,7 +307,7 @@ export default function ItemEditPage({
 
   // Sort: first by containerFirst, then by sortColumn
   const sortedFiltered = useMemo(() => {
-    let result = [...filtered];
+    const result = [...filtered];
     // Column sort
     if (sortColumn) {
       const col = FILTER_COLUMNS.find((c) => c.key === sortColumn);
@@ -388,25 +388,6 @@ export default function ItemEditPage({
     });
   }, []);
 
-  const handleDeselectAll = useCallback((colKey: string) => {
-    // Select nothing — but we need at least something, so just clear
-    // Actually for "deselect all" we set an empty set which means show nothing
-    // But that's weird UX, so toggle: if all selected -> deselect all (show first only), if partially -> select all
-    const filterSet = columnFilters[colKey];
-    const allValues = columnUniqueValues[colKey];
-    if (!allValues) return;
-
-    if (!filterSet || filterSet.size === 0) {
-      // Currently all selected — do nothing (selectAll checkbox will handle)
-      return;
-    }
-    // Clear filter = select all
-    setColumnFilters((prev) => {
-      const next = { ...prev };
-      delete next[colKey];
-      return next;
-    });
-  }, [columnFilters, columnUniqueValues]);
 
   const handleSort = useCallback((colKey: string, direction: 'asc' | 'desc') => {
     setSortColumn(colKey);

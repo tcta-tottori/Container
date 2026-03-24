@@ -268,37 +268,39 @@ export default function Home() {
         const nabeItems = jkpToContainerItems(sheet1Items, volumeMap, shipments, targetDate);
 
         if (nabeItems.length === 0) {
-          setLoadingMsg('対象日の出荷データがありません');
-          await new Promise((r) => setTimeout(r, 1500));
+          setLoadingMsg(`対象日(${targetDate})の出荷データがありません (Sheet1:${sheet1Items.length}件, updata:${shipments.length}件)`);
+          await new Promise((r) => setTimeout(r, 3000));
           return;
         }
 
         // GitHubから最新マスタを取得してリンク
-        setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+        setLoadingMsg(`${nabeItems.length}品目検出。マスタデータを取得中...`);
         const masterItems = await fetchMasterData();
         if (masterItems.length > 0) {
           loadMaster(masterItems);
         }
 
-        setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
+        setLoadingMsg(`マスタデータと紐付中... (${nabeItems.length}品目 × マスタ${masterItems.length}件)`);
         const { linkedItems, linked, total } = linkItemsWithMaster(nabeItems, masterItems);
 
         // Container オブジェクトを作成
         const container = {
           date: targetDate,
-          containerNo: 'JKP',
+          containerNo: `JKP-${targetDate.slice(5).replace('-', '/')}`,
           items: linkedItems,
         };
 
-        setLoadingMsg(`紐付完了: ${linked}/${total}件  データを表示中...`);
+        setLoadingMsg(`紐付完了: ${linked}/${total}件  作業シートを表示中...`);
         loadData([container]);
 
         // 紐付済みなのでuseEffectの再紐付をスキップ
         linkedRef.current = `${container.containerNo}-0`;
 
-        await new Promise((r) => setTimeout(r, 200));
+        await new Promise((r) => setTimeout(r, 500));
       } catch (e) {
         console.error('JKP parse error:', e);
+        setLoadingMsg(`JKP読込エラー: ${e instanceof Error ? e.message : String(e)}`);
+        await new Promise((r) => setTimeout(r, 3000));
       } finally {
         setLoadingMsg(null);
       }
