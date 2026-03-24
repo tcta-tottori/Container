@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
-import { fetchMasterData, parseAqssExcel } from '@/lib/masterLoader';
+import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel } from '@/lib/masterLoader';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useTimer, useClock } from '@/hooks/useTimer';
 import { useSpeech } from '@/hooks/useSpeech';
@@ -57,7 +57,7 @@ export default function Home() {
   const [manualOpen, setManualOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
 
-  // CNS品目一覧マスタデータを自動読込
+  // CNS品目一覧マスタデータを起動時に自動読込
   useEffect(() => {
     if (masterLoadedRef.current) return;
     masterLoadedRef.current = true;
@@ -66,35 +66,31 @@ export default function Home() {
     });
   }, [loadMaster]);
 
-  // コンテナ品目にマスタデータを自動紐付（気高コード→新建高コード等）
+  // コンテナ品目にマスタデータを自動紐付（気高コード＋新建高コード両方で検索）
   useEffect(() => {
     if (state.items.length === 0 || state.masterItems.length === 0) return;
-    // コンテナが変わった時だけ紐付を実行
     const container = state.containers[state.selectedContainerIdx];
     const key = container ? `${container.containerNo}-${state.selectedContainerIdx}` : '';
     if (linkedRef.current === key) return;
     linkedRef.current = key;
 
-    const masterMap = new Map(state.masterItems.map((m) => [m.partNumber, m]));
-    state.items.forEach((item, idx) => {
-      if (item.newPartNumber) return; // 既に紐付済み
-      const master = masterMap.get(item.partNumber);
-      if (!master) return;
-      const updates: Partial<typeof item> = {};
-      if (master.newPartNumber) updates.newPartNumber = master.newPartNumber;
-      if (master.newPartNumberKetaka) updates.newPartNumberKetaka = master.newPartNumberKetaka;
-      if (master.itemNameKetaka) updates.itemNameKetaka = master.itemNameKetaka;
-      if (master.linkStatus) updates.linkStatus = master.linkStatus;
-      if (master.itemNameContainer) updates.itemNameContainer = master.itemNameContainer;
-      if (master.representModelContainer) updates.representModelContainer = master.representModelContainer;
-      if (master.packingQtyContainer !== undefined) updates.packingQtyContainer = master.packingQtyContainer;
-      if (master.qtyPerPalletContainer !== undefined) updates.qtyPerPalletContainer = master.qtyPerPalletContainer;
-      if (master.description) updates.description = master.description;
-      if (master.modelNo) updates.modelNo = master.modelNo;
-      if (master.grossWeight !== undefined) updates.grossWeight = master.grossWeight;
-      if (master.cbm !== undefined) updates.cbm = master.cbm;
-      if (master.measurements) updates.measurements = master.measurements;
-      if (Object.keys(updates).length > 0) updateItem(idx, updates);
+    // linkItemsWithMaster で一括紐付
+    const { linkedItems } = linkItemsWithMaster(state.items, state.masterItems);
+    linkedItems.forEach((linked, idx) => {
+      const orig = state.items[idx];
+      // 変更があったアイテムだけ更新
+      if (linked.newPartNumber !== orig.newPartNumber ||
+          linked.partNumber !== orig.partNumber ||
+          linked.description !== orig.description) {
+        const updates: Partial<typeof orig> = {};
+        for (const k of Object.keys(linked) as (keyof typeof linked)[]) {
+          if (linked[k] !== orig[k]) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (updates as any)[k] = linked[k];
+          }
+        }
+        if (Object.keys(updates).length > 0) updateItem(idx, updates);
+      }
     });
   }, [state.items, state.masterItems, state.containers, state.selectedContainerIdx, updateItem]);
 
@@ -128,20 +124,50 @@ export default function Home() {
       linkedRef.current = null;
       setLoadingMsg('Excelファイルを読み込み中...');
       try {
+        // 1. 作業ファイルをパース
         const result = await parseExcelFile(file);
-        if (result.containers.length > 0) {
-          setLoadingMsg('マスタデータと紐付中...');
-          loadData(result.containers);
-          const totalItems = result.containers.reduce((sum, c) => sum + c.items.length, 0);
-          saveRecentFile(file, result.containers.length, totalItems);
-          // 紐付処理完了を待つ
-          await new Promise((r) => setTimeout(r, 300));
+        if (result.containers.length === 0) return;
+
+        // 2. GitHubから最新マスタを確実に取得
+        setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+        const masterItems = await fetchMasterData();
+        if (masterItems.length > 0) {
+          loadMaster(masterItems);
         }
+
+        // 3. マスタと紐付（気高コード＋新建高コード両方で検索）
+        setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
+        const allItems = result.containers.flatMap(c => c.items);
+        const { linkedItems, linked, total } = linkItemsWithMaster(allItems, masterItems);
+
+        // 4. 紐付済みアイテムをコンテナに書き戻す
+        let offset = 0;
+        for (const c of result.containers) {
+          const count = c.items.length;
+          c.items = linkedItems.slice(offset, offset + count);
+          offset += count;
+        }
+
+        setLoadingMsg(`紐付完了: ${linked}/${total}件  データを表示中...`);
+
+        // 5. データをロード（紐付済みの状態で表示）
+        loadData(result.containers);
+        const totalItems = result.containers.reduce((sum, c) => sum + c.items.length, 0);
+        saveRecentFile(file, result.containers.length, totalItems);
+
+        // 紐付済みなのでuseEffectの再紐付をスキップさせる
+        const container = result.containers[0];
+        if (container) {
+          linkedRef.current = `${container.containerNo}-0`;
+        }
+
+        // 表示完了まで少し待機
+        await new Promise((r) => setTimeout(r, 200));
       } finally {
         setLoadingMsg(null);
       }
     },
-    [loadData]
+    [loadData, loadMaster]
   );
 
   const handleAqssLoaded = useCallback(
@@ -478,14 +504,36 @@ export default function Home() {
                 onAddItem={addItem}
                 onDeleteItem={deleteItem}
                 onSelectAndGoDetail={handleSelectAndGoDetail}
-                onMasterReload={() => {
-                  masterLoadedRef.current = false;
-                  fetchMasterData().then((items) => {
-                    if (items.length > 0) {
-                      loadMaster(items);
+                onMasterReload={async () => {
+                  setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+                  try {
+                    masterLoadedRef.current = false;
+                    const { masterItems: newMaster, linkedItems, linked: linkedCount, total } =
+                      await fetchAndLinkMaster(state.items);
+                    if (newMaster.length > 0) {
+                      loadMaster(newMaster);
+                      // 紐付結果を反映
+                      linkedItems.forEach((updatedItem, idx) => {
+                        const orig = state.items[idx];
+                        if (!orig) return;
+                        const updates: Partial<typeof orig> = {};
+                        for (const k of Object.keys(updatedItem) as (keyof typeof updatedItem)[]) {
+                          if (updatedItem[k] !== orig[k]) {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            (updates as any)[k] = updatedItem[k];
+                          }
+                        }
+                        if (Object.keys(updates).length > 0) updateItem(idx, updates);
+                      });
                       linkedRef.current = null;
+                      setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件`);
+                    } else {
+                      setLoadingMsg('マスタデータの取得に失敗しました');
                     }
-                  });
+                    await new Promise((r) => setTimeout(r, 1500));
+                  } finally {
+                    setLoadingMsg(null);
+                  }
                 }}
               />
             </div>

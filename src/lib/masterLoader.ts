@@ -143,3 +143,110 @@ export async function fetchMasterData(): Promise<ContainerItem[]> {
     return [];
   }
 }
+
+/**
+ * マスタデータとコンテナ品目を紐付する（同期処理）
+ *
+ * 紐付キー:
+ *   1. 気高コード(partNumber) → マスタの partNumber (B列) で完全一致
+ *   2. 新建高コード → マスタの newPartNumber (A列) で完全一致
+ *   （AQSS04Lファイルでは partNumber が新建高コードの場合がある）
+ *
+ * 紐付されるフィールド:
+ *   newPartNumber, newPartNumberKetaka, itemNameKetaka, linkStatus,
+ *   itemNameContainer, representModelContainer, packingQtyContainer,
+ *   qtyPerPalletContainer, description, modelNo, grossWeight, cbm, measurements
+ *
+ * @returns 紐付後のアイテム配列（新しい配列を返す）と紐付結果ログ
+ */
+export function linkItemsWithMaster(
+  items: ContainerItem[],
+  masterItems: ContainerItem[],
+): { linkedItems: ContainerItem[]; linked: number; unlinked: number; total: number } {
+  if (masterItems.length === 0) {
+    return { linkedItems: items, linked: 0, unlinked: items.length, total: items.length };
+  }
+
+  // マスタの検索用Map（気高コード→マスタ, 新建高コード→マスタ）
+  const byPartNumber = new Map<string, ContainerItem>();
+  const byNewPartNumber = new Map<string, ContainerItem>();
+  for (const m of masterItems) {
+    if (m.partNumber) byPartNumber.set(m.partNumber, m);
+    if (m.newPartNumber) byNewPartNumber.set(m.newPartNumber, m);
+  }
+
+  let linked = 0;
+  const linkedItems = items.map((item) => {
+    // 1. 気高コードで検索
+    let master = byPartNumber.get(item.partNumber);
+
+    // 2. 見つからなければ新建高コードとして検索
+    if (!master) {
+      master = byNewPartNumber.get(item.partNumber);
+    }
+
+    if (!master) return item;
+
+    linked++;
+    const updated = { ...item };
+
+    // 気高コードでマッチした場合: マスタのpartNumberが気高コード
+    // 新建高コードでマッチした場合: itemのpartNumberが新建高コード → マスタのpartNumberを気高コードとして設定
+    if (master.partNumber !== item.partNumber) {
+      // 新建高コードでマッチ → マスタのpartNumberが本来の気高コード
+      updated.newPartNumber = item.partNumber; // 元のコードが新建高
+      updated.partNumber = master.partNumber;  // マスタの気高コードを正とする
+    }
+
+    // マスタから全フィールドをコピー
+    if (master.newPartNumber) updated.newPartNumber = master.newPartNumber;
+    if (master.newPartNumberKetaka) updated.newPartNumberKetaka = master.newPartNumberKetaka;
+    if (master.itemNameKetaka) updated.itemNameKetaka = master.itemNameKetaka;
+    if (master.linkStatus) updated.linkStatus = master.linkStatus;
+    if (master.itemNameContainer) updated.itemNameContainer = master.itemNameContainer;
+    if (master.representModelContainer) updated.representModelContainer = master.representModelContainer;
+    if (master.packingQtyContainer !== undefined) updated.packingQtyContainer = master.packingQtyContainer;
+    if (master.qtyPerPalletContainer !== undefined) updated.qtyPerPalletContainer = master.qtyPerPalletContainer;
+    if (master.description) updated.description = master.description;
+    if (master.modelNo) updated.modelNo = master.modelNo;
+    if (master.grossWeight !== undefined) updated.grossWeight = master.grossWeight;
+    if (master.cbm !== undefined) updated.cbm = master.cbm;
+    if (master.measurements) updated.measurements = master.measurements;
+
+    // 1P数がマスタにあり、作業データにない場合はマスタから補完
+    if (master.qtyPerPallet > 0 && updated.qtyPerPallet === 0) {
+      updated.qtyPerPallet = master.qtyPerPallet;
+    }
+    // 入数もマスタから補完
+    if (master.packingQty > 0 && updated.packingQty === 0) {
+      updated.packingQty = master.packingQty;
+    }
+
+    return updated;
+  });
+
+  return {
+    linkedItems,
+    linked,
+    unlinked: items.length - linked,
+    total: items.length,
+  };
+}
+
+/**
+ * マスタデータの取得 → 紐付を一括で行うヘルパー
+ * 読込実行時に呼ぶ。確実にマスタを取得してから紐付を行う。
+ */
+export async function fetchAndLinkMaster(
+  items: ContainerItem[],
+): Promise<{
+  masterItems: ContainerItem[];
+  linkedItems: ContainerItem[];
+  linked: number;
+  unlinked: number;
+  total: number;
+}> {
+  const masterItems = await fetchMasterData();
+  const result = linkItemsWithMaster(items, masterItems);
+  return { masterItems, ...result };
+}
