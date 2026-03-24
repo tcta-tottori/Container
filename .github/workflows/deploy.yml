@@ -2,7 +2,10 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [claude/init-container-app-0RJFr]
+    branches:
+      - claude/init-container-app-0RJFr
+      - claude/timer-ui-updates-DBaNV
+      - master
 
 permissions:
   contents: read
