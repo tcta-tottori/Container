@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
 import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel } from '@/lib/masterLoader';
 import { useContainerData } from '@/hooks/useContainerData';
-import { useTimer, useClock } from '@/hooks/useTimer';
+import { useTimer, useWorkTimer } from '@/hooks/useTimer';
 import { useSpeech } from '@/hooks/useSpeech';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForSpeech } from '@/lib/typeDetector';
 import { saveRecentFile } from '@/lib/recentFiles';
 import FileDropZone from '@/components/FileDropZone';
-import HeaderBar from '@/components/HeaderBar';
+import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
@@ -46,10 +46,12 @@ export default function Home() {
     deleteItem,
     completeItem,
     uncompleteItem,
+    resetWorkTimer,
   } = useContainerData();
 
   const elapsed = useTimer(state.itemStartTime);
-  const clock = useClock();
+  const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
+  const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
   const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceOk, announceProgress } =
     useSpeech();
 
@@ -265,6 +267,16 @@ export default function Home() {
     if (!currentItem) return;
     if (currentItem.palletCount <= 0 && currentItem.fraction <= 0) return;
 
+    // 消費時間を記録
+    if (state.itemStartTime) {
+      const elapsed = Math.floor((Date.now() - state.itemStartTime) / 1000);
+      setItemTimeLogs(prev => [...prev, {
+        itemName: currentItem.itemName,
+        elapsed,
+        timestamp: Date.now(),
+      }]);
+    }
+
     // パレットがあればパレット1つ減らす
     if (currentItem.palletCount > 0) {
       decreaseQty();
@@ -293,7 +305,7 @@ export default function Home() {
         setTimeout(() => announceAllComplete(), 1500);
       }
     }
-  }, [currentItem, decreaseQty, completeItem, state.items, state.completedIds, announceOk, announceAllComplete]);
+  }, [currentItem, decreaseQty, completeItem, state.items, state.completedIds, state.itemStartTime, announceOk, announceAllComplete]);
 
   const handleIncrease = useCallback(() => {
     increaseQty();
@@ -307,15 +319,37 @@ export default function Home() {
   }, [increaseQty, announcePalletChange]);
 
   const handleDecrease = useCallback(() => {
+    if (!currentItem) return;
     decreaseQty();
+    // 消費時間を記録（パレット減少）
+    if (state.itemStartTime) {
+      const elapsed = Math.floor((Date.now() - state.itemStartTime) / 1000);
+      setItemTimeLogs(prev => [...prev, {
+        itemName: currentItem.itemName,
+        elapsed,
+        timestamp: Date.now(),
+      }]);
+    }
     setTimeout(() => {
       const el = document.querySelector('[data-pallet-count]');
       if (el) {
         const p = Number(el.getAttribute('data-pallet-count'));
-        announcePalletChange(p);
+        const fraction = currentItem.fraction;
+        const fractionCeil = fraction % 1 !== 0 ? Math.ceil(fraction) : fraction;
+        let qtyText = '';
+        if (p > 0 && fractionCeil > 0) {
+          qtyText = `残り${p}パレットと${fractionCeil}ケース`;
+        } else if (p > 0) {
+          qtyText = `残り${p}パレット`;
+        } else if (fractionCeil > 0) {
+          qtyText = `残り${fractionCeil}ケース`;
+        } else {
+          qtyText = '残りなし';
+        }
+        speak(qtyText);
       }
     }, 50);
-  }, [decreaseQty, announcePalletChange]);
+  }, [currentItem, decreaseQty, speak, state.itemStartTime]);
 
   const handleComplete = useCallback(() => {
     if (!currentItem) return;
@@ -553,11 +587,14 @@ export default function Home() {
           selectedIdx={state.selectedContainerIdx}
           onSelectContainer={selectContainer}
           onFileReload={handleFileLoaded}
-          clock={clock}
+          workElapsed={workElapsed}
+          workRawSeconds={workRawSeconds}
           elapsed={elapsed}
           autoAnnounce={state.autoAnnounce}
           onToggleAutoAnnounce={toggleAutoAnnounce}
           onMenuToggle={() => setMenuOpen(!menuOpen)}
+          onResetWorkTimer={() => { resetWorkTimer(); setItemTimeLogs([]); }}
+          itemTimeLogs={itemTimeLogs}
         />
 
         {/* メインエリア */}
@@ -668,12 +705,9 @@ export default function Home() {
         {/* 操作バー (作業モード時のみ) */}
         {viewMode === 'work' && (
           <ActionBar
-            onPrev={() => { movePrev(); setViewMode('work'); }}
-            onNext={() => { moveNext(); setViewMode('work'); }}
             onIncrease={handleIncrease}
             onDecrease={handleDecrease}
             onAnnounce={handleAnnounce}
-            onComplete={handleComplete}
             onContainerSummary={handleContainerSummary}
             hasItems={state.items.length > 0}
             isListening={isListening}

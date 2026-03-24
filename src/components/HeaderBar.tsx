@@ -1,18 +1,27 @@
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Container } from '@/lib/types';
+
+export interface ItemTimeLog {
+  itemName: string;
+  elapsed: number; // seconds
+  timestamp: number;
+}
 
 interface HeaderBarProps {
   containers: Container[];
   selectedIdx: number;
   onSelectContainer: (idx: number) => void;
   onFileReload: (file: File) => void;
-  clock: string;
+  workElapsed: string;
+  workRawSeconds: number;
   elapsed: string;
   autoAnnounce: boolean;
   onToggleAutoAnnounce: () => void;
   onMenuToggle: () => void;
+  onResetWorkTimer: () => void;
+  itemTimeLogs: ItemTimeLog[];
 }
 
 export default function HeaderBar({
@@ -20,13 +29,27 @@ export default function HeaderBar({
   selectedIdx,
   onSelectContainer,
   onFileReload,
-  clock,
+  workElapsed,
+  workRawSeconds,
   elapsed,
   autoAnnounce,
   onToggleAutoAnnounce,
   onMenuToggle,
+  onResetWorkTimer,
+  itemTimeLogs,
 }: HeaderBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [isFlashing, setIsFlashing] = useState(false);
+
+  // 5分ごとに経過時間を拡大表示（3秒間）
+  useEffect(() => {
+    if (workRawSeconds > 0 && workRawSeconds % 300 === 0) {
+      setIsFlashing(true);
+      const timer = setTimeout(() => setIsFlashing(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [workRawSeconds]);
 
   return (
     <div className="app-header">
@@ -64,7 +87,14 @@ export default function HeaderBar({
 
       <div className="flex-1" />
 
-      <span className="header-time">{clock}</span>
+      {/* 作業経過時間（タップでポップアップ） */}
+      <span
+        className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
+        onClick={() => setPopupOpen(true)}
+        style={{ cursor: 'pointer' }}
+      >
+        {workElapsed}
+      </span>
       <span className="header-elapsed">{elapsed}</span>
 
       <button onClick={onToggleAutoAnnounce} className="header-btn"
@@ -82,6 +112,81 @@ export default function HeaderBar({
           )}
         </svg>
       </button>
+
+      {/* 経過時間ポップアップ */}
+      {popupOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setPopupOpen(false)}>
+          <div style={{
+            background: '#1e2130', border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 16, padding: '20px 24px', minWidth: 280, maxWidth: '90vw',
+            maxHeight: '70vh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+          }} onClick={e => e.stopPropagation()}>
+            {/* 経過時間表示 */}
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>作業経過時間</div>
+              <div style={{ fontSize: 32, fontWeight: 900, color: '#f59e0b', fontFamily: 'var(--font-mono)' }}>
+                {workElapsed}
+              </div>
+            </div>
+
+            {/* リセットボタン */}
+            <button
+              onClick={() => { onResetWorkTimer(); setPopupOpen(false); }}
+              style={{
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
+                borderRadius: 10, padding: '10px 16px', color: '#ef4444',
+                fontWeight: 600, fontSize: 13, cursor: 'pointer', marginBottom: 16,
+              }}
+            >
+              経過時間をリセット
+            </button>
+
+            {/* 品名別消費時間 */}
+            {itemTimeLogs.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 8 }}>品名別消費時間</div>
+                <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                  {itemTimeLogs.map((log, i) => {
+                    const m = Math.floor(log.elapsed / 60);
+                    const s = log.elapsed % 60;
+                    return (
+                      <div key={i} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        fontSize: 12,
+                      }}>
+                        <span style={{ color: 'rgba(255,255,255,0.8)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>
+                          {log.itemName}
+                        </span>
+                        <span style={{ color: '#f59e0b', fontFamily: 'var(--font-mono)', fontWeight: 600, flexShrink: 0 }}>
+                          {m > 0 ? `${m}分${String(s).padStart(2, '0')}秒` : `${s}秒`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* 閉じるボタン */}
+            <button
+              onClick={() => setPopupOpen(false)}
+              style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 10, padding: '10px 16px', color: 'rgba(255,255,255,0.7)',
+                fontWeight: 500, fontSize: 13, cursor: 'pointer', marginTop: 12,
+              }}
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

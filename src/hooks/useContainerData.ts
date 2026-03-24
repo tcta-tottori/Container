@@ -19,6 +19,7 @@ export interface ContainerState {
   modifiedValues: Map<string, Partial<OriginalValues>>;
   completedIds: Set<string>;
   itemStartTime: number | null;
+  workStartTime: number | null;
   autoAnnounce: boolean;
 }
 
@@ -37,7 +38,8 @@ export type Action =
   | { type: 'ADD_ITEM'; item: ContainerItem }
   | { type: 'DELETE_ITEM'; idx: number }
   | { type: 'COMPLETE_ITEM'; id: string }
-  | { type: 'UNCOMPLETE_ITEM'; id: string };
+  | { type: 'UNCOMPLETE_ITEM'; id: string }
+  | { type: 'RESET_WORK_TIMER' };
 
 const initialState: ContainerState = {
   containers: [],
@@ -49,6 +51,7 @@ const initialState: ContainerState = {
   modifiedValues: new Map(),
   completedIds: new Set(),
   itemStartTime: null,
+  workStartTime: null,
   autoAnnounce: true,
 };
 
@@ -80,6 +83,7 @@ function reducer(state: ContainerState, action: Action): ContainerState {
         modifiedValues: new Map(),
         completedIds: new Set(),
         itemStartTime: Date.now(),
+        workStartTime: Date.now(),
       };
     }
 
@@ -100,6 +104,7 @@ function reducer(state: ContainerState, action: Action): ContainerState {
         modifiedValues: new Map(),
         completedIds: new Set(),
         itemStartTime: Date.now(),
+        workStartTime: Date.now(),
       };
     }
 
@@ -265,6 +270,9 @@ function reducer(state: ContainerState, action: Action): ContainerState {
       return { ...state, items: newItems, currentItemIdx: newIdx };
     }
 
+    case 'RESET_WORK_TIMER':
+      return { ...state, workStartTime: Date.now() };
+
     default:
       return state;
   }
@@ -345,6 +353,10 @@ export function useContainerData() {
     (id: string) => dispatch({ type: 'UNCOMPLETE_ITEM', id }),
     []
   );
+  const resetWorkTimer = useCallback(
+    () => dispatch({ type: 'RESET_WORK_TIMER' }),
+    []
+  );
 
   return {
     state,
@@ -366,5 +378,6 @@ export function useContainerData() {
     deleteItem,
     completeItem,
     uncompleteItem,
+    resetWorkTimer,
   };
 }
