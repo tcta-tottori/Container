@@ -42,13 +42,15 @@ export default function Home() {
 
   const elapsed = useTimer(state.itemStartTime);
   const clock = useClock();
-  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining } =
+  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceOk } =
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
+  const loadedContainerRef = useRef<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('work');
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // 品目切替時の自動アナウンス
   useEffect(() => {
     if (!currentItem || !state.autoAnnounce) return;
     if (prevItemRef.current !== currentItem.id) {
@@ -57,12 +59,27 @@ export default function Home() {
     }
   }, [currentItem, state.autoAnnounce, announceItem, state.items]);
 
+  // コンテナ読み込み時の概要アナウンス（初回のみ）
+  useEffect(() => {
+    if (state.containers.length === 0 || state.items.length === 0) return;
+    const container = state.containers[state.selectedContainerIdx];
+    if (!container) return;
+    const key = `${container.containerNo}-${state.selectedContainerIdx}`;
+    if (loadedContainerRef.current === key) return;
+    loadedContainerRef.current = key;
+    // 少し遅延して概要アナウンス
+    const timer = setTimeout(() => {
+      announceContainerSummary(state.items, container.containerNo);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
+
   const handleFileLoaded = useCallback(
     async (file: File) => {
+      loadedContainerRef.current = null; // リセットして再アナウンス
       const result = await parseExcelFile(file);
       if (result.containers.length > 0) {
         loadData(result.containers);
-        // メモリーに保存
         const totalItems = result.containers.reduce((sum, c) => sum + c.items.length, 0);
         saveRecentFile(file, result.containers.length, totalItems);
       }
@@ -73,6 +90,48 @@ export default function Home() {
   const handleAnnounce = useCallback(() => {
     if (currentItem) announceItem(currentItem, state.items);
   }, [currentItem, announceItem, state.items]);
+
+  const handleContainerSummary = useCallback(() => {
+    const container = state.containers[state.selectedContainerIdx];
+    if (container) {
+      announceContainerSummary(state.items, container.containerNo);
+    }
+  }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
+
+  /** OKコマンド: パレット1つ消費、なくなったら自動完了 */
+  const handleConfirmOk = useCallback(() => {
+    if (!currentItem) return;
+    if (currentItem.palletCount <= 0 && currentItem.fraction <= 0) return;
+
+    // パレットがあればパレット1つ減らす
+    if (currentItem.palletCount > 0) {
+      decreaseQty();
+      const newPallet = currentItem.palletCount - 1;
+      if (newPallet <= 0 && currentItem.fraction <= 0) {
+        // パレットもケースもなくなった→自動完了
+        setTimeout(() => {
+          const name = currentItem.itemName;
+          const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
+          completeItem(currentItem.id);
+          announceOk(name, 0);
+          if (remaining <= 0) {
+            setTimeout(() => announceAllComplete(), 1500);
+          }
+        }, 100);
+      } else {
+        announceOk(currentItem.itemName, newPallet);
+      }
+    } else {
+      // パレット0でケースのみの場合は完了
+      const name = currentItem.itemName;
+      const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
+      completeItem(currentItem.id);
+      announceOk(name, 0);
+      if (remaining <= 0) {
+        setTimeout(() => announceAllComplete(), 1500);
+      }
+    }
+  }, [currentItem, decreaseQty, completeItem, state.items, state.completedIds, announceOk, announceAllComplete]);
 
   const handleIncrease = useCallback(() => {
     increaseQty();
@@ -169,9 +228,15 @@ export default function Home() {
         case 'QUERY_FRACTION':
           if (currentItem) speak(`端数${currentItem.fraction}ケースです。`);
           break;
+        case 'CONFIRM_OK':
+          handleConfirmOk();
+          break;
+        case 'CONTAINER_SUMMARY':
+          handleContainerSummary();
+          break;
       }
     },
-    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items.length, speak]
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items.length, speak, handleConfirmOk, handleContainerSummary]
   );
 
   const { isListening, isSupported, lastTranscript, toggleListening } =
@@ -312,6 +377,7 @@ export default function Home() {
             onDecrease={handleDecrease}
             onAnnounce={handleAnnounce}
             onComplete={handleComplete}
+            onContainerSummary={handleContainerSummary}
             hasItems={state.items.length > 0}
             isListening={isListening}
             isVoiceSupported={isSupported}

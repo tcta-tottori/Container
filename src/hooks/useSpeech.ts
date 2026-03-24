@@ -94,6 +94,74 @@ export function useSpeech() {
     speak(`残り${count}品目です。`);
   }, []);
 
+  /** コンテナ概要アナウンス（読み込み時・手動コール用） */
+  const announceContainerSummary = useCallback((items: ContainerItem[], containerNo: string) => {
+    if (items.length === 0) return;
+
+    // 種類別カウント
+    const typeCounts: Record<string, number> = {};
+    let hasJarPot = false;
+    const similarPairs: string[] = [];
+
+    for (const it of items) {
+      typeCounts[it.type] = (typeCounts[it.type] || 0) + 1;
+      if (/^JP[A-Z]/.test(it.itemName) || it.itemName.includes('ジャーポット')) {
+        hasJarPot = true;
+      }
+    }
+
+    // 類似品チェック
+    const checked = new Set<string>();
+    for (const a of items) {
+      for (const b of items) {
+        if (a.id >= b.id) continue;
+        const key = `${a.id}:${b.id}`;
+        if (checked.has(key)) continue;
+        checked.add(key);
+        if (areSimilarItems(a.itemName, b.itemName)) {
+          const nameA = itemNameForSpeech(a.itemName);
+          const nameB = itemNameForSpeech(b.itemName);
+          similarPairs.push(`${nameA}と${nameB}`);
+        }
+      }
+    }
+
+    let text = `コンテナ${containerNo}。合計${items.length}品目。`;
+
+    // 種類内訳
+    const typeNames: string[] = [];
+    if (typeCounts['ポリカバー']) typeNames.push(`ポリカバー${typeCounts['ポリカバー']}品`);
+    if (typeCounts['箱']) typeNames.push(`箱${typeCounts['箱']}品`);
+    if (typeCounts['部品']) typeNames.push(`部品${typeCounts['部品']}品`);
+    if (typeCounts['その他']) typeNames.push(`その他${typeCounts['その他']}品`);
+    if (typeNames.length > 0) {
+      text += typeNames.join('、') + '。';
+    }
+
+    if (hasJarPot) {
+      text += 'ジャーポットあり。';
+    }
+
+    if (similarPairs.length > 0) {
+      text += `注意、類似品が${similarPairs.length}組あります。`;
+      if (similarPairs.length <= 3) {
+        text += similarPairs.join('、') + '。';
+      }
+    }
+
+    text += '作業を開始します。';
+    speak(text);
+  }, []);
+
+  /** OK確認アナウンス */
+  const announceOk = useCallback((itemName: string, remainingPallets: number) => {
+    if (remainingPallets > 0) {
+      speak(`OK。${itemNameForSpeech(itemName)}、残り${remainingPallets}パレット。`);
+    } else {
+      speak(`OK。${itemNameForSpeech(itemName)}、完了。`);
+    }
+  }, []);
+
   return {
     speak,
     announceItem,
@@ -101,5 +169,7 @@ export function useSpeech() {
     announceComplete,
     announceAllComplete,
     announceRemaining,
+    announceContainerSummary,
+    announceOk,
   };
 }

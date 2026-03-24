@@ -9,7 +9,9 @@ export type VoiceAction =
   | 'QUERY_CURRENT_QTY'
   | 'QUERY_REMAINING'
   | 'QUERY_PALLET'
-  | 'QUERY_FRACTION';
+  | 'QUERY_FRACTION'
+  | 'CONFIRM_OK'
+  | 'CONTAINER_SUMMARY';
 
 /** キーワード → アクション マッピング */
 const VOICE_COMMANDS: [string, VoiceAction][] = [
@@ -37,6 +39,16 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
   ['ぱれっと', 'QUERY_PALLET'],
   ['端数', 'QUERY_FRACTION'],
   ['はすう', 'QUERY_FRACTION'],
+  ['okです', 'CONFIRM_OK'],
+  ['ok', 'CONFIRM_OK'],
+  ['オッケー', 'CONFIRM_OK'],
+  ['おっけー', 'CONFIRM_OK'],
+  ['オーケー', 'CONFIRM_OK'],
+  ['おーけー', 'CONFIRM_OK'],
+  ['概要', 'CONTAINER_SUMMARY'],
+  ['がいよう', 'CONTAINER_SUMMARY'],
+  ['コンテナ', 'CONTAINER_SUMMARY'],
+  ['こんてな', 'CONTAINER_SUMMARY'],
 ];
 
 /**
@@ -45,6 +57,7 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
  */
 export function matchVoiceCommand(transcript: string): VoiceAction | null {
   const text = transcript.trim().toLowerCase();
+  // 「okです」を先にチェック（「ok」より長いマッチ優先）
   for (const [keyword, action] of VOICE_COMMANDS) {
     if (text.includes(keyword)) {
       return action;
