@@ -25,14 +25,13 @@ function exportToExcel(items: ContainerItem[]) {
     '規格': it.itemName,
     '種類': it.type,
     '代表機種': it.representModel,
-    'DESCRIPTION': it.description || '',
     '入数': it.packingQty,
     '総数': it.totalQty,
     'ケース数': it.caseCount,
-    'パレット枚数': it.palletCount,
-    '端数': it.fraction,
     '1P数': it.qtyPerPallet,
-    'G.W.(KGS)': it.grossWeight || '',
+    'ITEM DESCRIPTION': it.description || '',
+    'MODEL NO.': it.modelNo || '',
+    'G.W.': it.grossWeight || '',
     'CBM': it.cbm || '',
     'Meas.': it.measurements || '',
   }));
@@ -41,9 +40,9 @@ function exportToExcel(items: ContainerItem[]) {
   XLSX.utils.book_append_sheet(wb, ws, '品目一覧');
   ws['!cols'] = [
     { wch: 14 }, { wch: 16 }, { wch: 30 }, { wch: 10 },
-    { wch: 12 }, { wch: 20 }, { wch: 8 }, { wch: 10 },
-    { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
-    { wch: 10 }, { wch: 8 }, { wch: 14 },
+    { wch: 16 }, { wch: 8 }, { wch: 10 }, { wch: 10 },
+    { wch: 8 }, { wch: 20 }, { wch: 14 }, { wch: 10 },
+    { wch: 8 }, { wch: 14 },
   ];
   XLSX.writeFile(wb, `CNS_品目一覧_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
@@ -244,8 +243,8 @@ export default function ItemEditPage({
         <span>品名</span>
         <span style={{ textAlign: 'center' }}>Description</span>
         <span style={{ textAlign: 'center' }}>種類</span>
-        <span style={{ textAlign: 'center' }}>PL</span>
         <span style={{ textAlign: 'center' }}>CS</span>
+        <span style={{ textAlign: 'center' }}>1P</span>
         <span style={{ textAlign: 'center' }}>PCS</span>
         <span style={{ textAlign: 'center' }}>G.W.</span>
         <span style={{ textAlign: 'right' }}>CBM</span>
@@ -291,10 +290,9 @@ function AddItemForm({ containerNo, itemCount, onAdd, onCancel }: {
   const [packingQty, setPackingQty] = useState('');
   const [totalQty, setTotalQty] = useState('');
   const [caseCount, setCaseCount] = useState('');
-  const [palletCount, setPalletCount] = useState('');
-  const [fraction, setFraction] = useState('');
   const [qtyPerPallet, setQtyPerPallet] = useState('');
   const [newPartNumber, setNewPartNumber] = useState('');
+  const [modelNo, setModelNo] = useState('');
   const [grossWeight, setGrossWeight] = useState('');
   const [cbm, setCbm] = useState('');
   const [measurements, setMeasurements] = useState('');
@@ -302,7 +300,7 @@ function AddItemForm({ containerNo, itemCount, onAdd, onCancel }: {
   const handleSubmit = () => {
     if (!itemName.trim()) return;
     const detectedType = partNumber
-      ? detectItemType(itemName, Number(qtyPerPallet) || 0, Number(palletCount) || 0, partNumber)
+      ? detectItemType(itemName, Number(qtyPerPallet) || 0, Number(caseCount) || 0, partNumber)
       : type;
     const item: ContainerItem = {
       id: `${containerNo}-new-${itemCount}-${Date.now()}`,
@@ -313,11 +311,10 @@ function AddItemForm({ containerNo, itemCount, onAdd, onCancel }: {
       packingQty: Number(packingQty) || 0,
       totalQty: Number(totalQty) || 0,
       caseCount: Number(caseCount) || 0,
-      palletCount: Number(palletCount) || 0,
-      fraction: Number(fraction) || 0,
       qtyPerPallet: Number(qtyPerPallet) || 0,
       newPartNumber: newPartNumber.trim() || undefined,
       description: description.trim() || undefined,
+      modelNo: modelNo.trim() || undefined,
       grossWeight: Number(grossWeight) || undefined,
       cbm: Number(cbm) || undefined,
       measurements: measurements.trim() || undefined,
@@ -385,21 +382,17 @@ function AddItemForm({ containerNo, itemCount, onAdd, onCancel }: {
           <input type="number" inputMode="numeric" value={caseCount} onChange={(e) => setCaseCount(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
         </div>
         <div>
-          <div style={labelStyle}>パレット枚</div>
-          <input type="number" inputMode="numeric" value={palletCount} onChange={(e) => setPalletCount(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-        </div>
-        <div>
-          <div style={labelStyle}>端数</div>
-          <input type="number" inputMode="numeric" value={fraction} onChange={(e) => setFraction(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-        </div>
-        <div>
           <div style={labelStyle}>1P数</div>
           <input type="number" inputMode="numeric" value={qtyPerPallet} onChange={(e) => setQtyPerPallet(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
         </div>
       </div>
 
-      {/* 重量・寸法 */}
+      {/* MODEL NO.・重量・寸法 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, marginBottom: 12 }}>
+        <div>
+          <div style={labelStyle}>MODEL NO.</div>
+          <input value={modelNo} onChange={(e) => setModelNo(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+        </div>
         <div>
           <div style={labelStyle}>G.W. (KGS)</div>
           <input type="number" inputMode="decimal" step="0.01" value={grossWeight} onChange={(e) => setGrossWeight(e.target.value)} placeholder="405.00" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
@@ -441,13 +434,12 @@ function EditRow({ item, isEditing, colors, onStartEdit, onUpdate, onDelete, onG
 }) {
   const [editType, setEditType] = useState(item.type);
   const [editQtyPerPallet, setEditQtyPerPallet] = useState(String(item.qtyPerPallet));
-  const [editPalletCount, setEditPalletCount] = useState(String(item.palletCount));
-  const [editFraction, setEditFraction] = useState(String(item.fraction));
   const [editNewPN, setEditNewPN] = useState(item.newPartNumber || '');
   const [editPartNumber, setEditPartNumber] = useState(item.partNumber);
   const [editItemName, setEditItemName] = useState(item.itemName);
   const [editRepresentModel, setEditRepresentModel] = useState(item.representModel);
   const [editDescription, setEditDescription] = useState(item.description || '');
+  const [editModelNo, setEditModelNo] = useState(item.modelNo || '');
   const [editPackingQty, setEditPackingQty] = useState(String(item.packingQty));
   const [editTotalQty, setEditTotalQty] = useState(String(item.totalQty));
   const [editCaseCount, setEditCaseCount] = useState(String(item.caseCount));
@@ -465,16 +457,15 @@ function EditRow({ item, isEditing, colors, onStartEdit, onUpdate, onDelete, onG
       totalQty: Number(editTotalQty) || 0,
       caseCount: Number(editCaseCount) || 0,
       qtyPerPallet: Number(editQtyPerPallet) || 0,
-      palletCount: Number(editPalletCount) || 0,
-      fraction: Number(editFraction) || 0,
       newPartNumber: editNewPN || undefined,
       description: editDescription.trim() || undefined,
+      modelNo: editModelNo.trim() || undefined,
       grossWeight: Number(editGrossWeight) || undefined,
       cbm: Number(editCbm) || undefined,
       measurements: editMeasurements.trim() || undefined,
     });
     onStartEdit();
-  }, [editPartNumber, editItemName, editRepresentModel, editType, editPackingQty, editTotalQty, editCaseCount, editQtyPerPallet, editPalletCount, editFraction, editNewPN, editDescription, editGrossWeight, editCbm, editMeasurements, onUpdate, onStartEdit]);
+  }, [editPartNumber, editItemName, editRepresentModel, editType, editPackingQty, editTotalQty, editCaseCount, editQtyPerPallet, editNewPN, editDescription, editModelNo, editGrossWeight, editCbm, editMeasurements, onUpdate, onStartEdit]);
 
   if (isEditing) {
     return (
@@ -536,24 +527,19 @@ function EditRow({ item, isEditing, colors, onStartEdit, onUpdate, onDelete, onG
               style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
           </div>
           <div>
-            <div style={labelStyle}>パレット枚</div>
-            <input type="number" inputMode="numeric" value={editPalletCount} onChange={(e) => setEditPalletCount(e.target.value)}
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
-          <div>
-            <div style={labelStyle}>端数</div>
-            <input type="number" inputMode="numeric" value={editFraction} onChange={(e) => setEditFraction(e.target.value)}
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
-          </div>
-          <div>
             <div style={labelStyle}>1P数</div>
             <input type="number" inputMode="numeric" value={editQtyPerPallet} onChange={(e) => setEditQtyPerPallet(e.target.value)}
               style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
           </div>
         </div>
 
-        {/* 重量・寸法 */}
+        {/* MODEL NO.・重量・寸法 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, marginBottom: 12 }}>
+          <div>
+            <div style={labelStyle}>MODEL NO.</div>
+            <input value={editModelNo} onChange={(e) => setEditModelNo(e.target.value)}
+              style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+          </div>
           <div>
             <div style={labelStyle}>G.W. (KGS)</div>
             <input type="number" inputMode="decimal" step="0.01" value={editGrossWeight} onChange={(e) => setEditGrossWeight(e.target.value)}
@@ -619,8 +605,8 @@ function EditRow({ item, isEditing, colors, onStartEdit, onUpdate, onDelete, onG
           {item.type}
         </span>
       </span>
-      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{fmtNum(item.palletCount)}</span>
-      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{fmtNum(item.fraction)}</span>
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{fmtNum(item.caseCount)}</span>
+      <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{item.qtyPerPallet || '-'}</span>
       <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{item.totalQty.toLocaleString()}</span>
       <span style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 10, color: item.grossWeight ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)' }}>
         {item.grossWeight ? item.grossWeight.toFixed(1) : '---'}

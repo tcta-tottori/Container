@@ -85,7 +85,7 @@ const BOX_KEYWORDS = [
 export function detectItemType(
   itemName: string,
   qtyPerPallet: number,
-  palletCount: number,
+  caseCount: number,
   partNumber?: string
 ): ItemType {
   const name = itemName.trim();
@@ -145,7 +145,7 @@ export function detectItemType(
   }
 
   // 7. パレット情報による判定
-  if (qtyPerPallet === 0 && palletCount === 0) return '部品';
+  if (qtyPerPallet === 0 && caseCount === 0) return '部品';
 
   // 8. デフォルト
   return 'その他';

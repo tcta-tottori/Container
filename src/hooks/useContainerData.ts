@@ -5,7 +5,6 @@ import { Container, ContainerItem } from '@/lib/types';
 
 interface OriginalValues {
   totalQty: number;
-  palletCount: number;
   caseCount: number;
 }
 
@@ -54,7 +53,6 @@ function buildOriginalValues(items: ContainerItem[]): Map<string, OriginalValues
   for (const item of items) {
     map.set(item.id, {
       totalQty: item.totalQty,
-      palletCount: item.palletCount,
       caseCount: item.caseCount,
     });
   }
@@ -131,27 +129,21 @@ function reducer(state: ContainerState, action: Action): ContainerState {
       if (state.items.length === 0) return state;
       const item = state.items[state.currentItemIdx];
       const original = state.originalValues.get(item.id);
-      if (!original || item.qtyPerPallet === 0) return state;
+      if (!original) return state;
 
-      const newPallet = item.palletCount + 1;
-      const newTotal = item.totalQty + item.qtyPerPallet;
+      const newCase = item.caseCount + 1;
 
       // 上限チェック
-      if (newPallet > original.palletCount) return state;
-      if (newTotal > original.totalQty) return state;
+      if (newCase > original.caseCount) return state;
 
       const newItems = [...state.items];
       newItems[state.currentItemIdx] = {
         ...item,
-        palletCount: newPallet,
-        totalQty: newTotal,
+        caseCount: newCase,
       };
 
       const modified = new Map(state.modifiedValues);
-      modified.set(item.id, {
-        palletCount: newPallet,
-        totalQty: newTotal,
-      });
+      modified.set(item.id, { caseCount: newCase });
 
       return { ...state, items: newItems, modifiedValues: modified };
     }
@@ -159,26 +151,20 @@ function reducer(state: ContainerState, action: Action): ContainerState {
     case 'DECREASE_QTY': {
       if (state.items.length === 0) return state;
       const item = state.items[state.currentItemIdx];
-      if (item.qtyPerPallet === 0) return state;
 
-      const newPallet = item.palletCount - 1;
-      const newTotal = item.totalQty - item.qtyPerPallet;
+      const newCase = item.caseCount - 1;
 
       // 下限チェック
-      if (newPallet < 0 || newTotal < 0) return state;
+      if (newCase < 0) return state;
 
       const newItems = [...state.items];
       newItems[state.currentItemIdx] = {
         ...item,
-        palletCount: newPallet,
-        totalQty: newTotal,
+        caseCount: newCase,
       };
 
       const modified = new Map(state.modifiedValues);
-      modified.set(item.id, {
-        palletCount: newPallet,
-        totalQty: newTotal,
-      });
+      modified.set(item.id, { caseCount: newCase });
 
       return { ...state, items: newItems, modifiedValues: modified };
     }

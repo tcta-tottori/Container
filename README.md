@@ -27,23 +27,22 @@ Excelファイルから品目データを読み込み、リアルタイムの作
 
 ### データ項目
 
-| フィールド | 説明 | ソース |
+| 列 | フィールド | 説明 |
 |---|---|---|
-| 品番 (partNumber) | 気高コード | Excel C列 |
-| 品名 (itemName) | 製品名 | Excel D列 |
-| 代表機種 (representModel) | 機種名 | Excel E列 |
-| 種類 (type) | ポリカバー/箱/部品/その他（自動判定） | 名称パターン |
-| 入数 (packingQty) | 個/ケース | Excel F列 |
-| 総数 (totalQty) | 入荷数量 | Excel G列 |
-| ケース数 (caseCount) | カートン数 | Excel H列 |
-| パレット枚数 (palletCount) | パレット数 | Excel I列 |
-| 端数 (fraction) | 端数ケース | Excel J列 |
-| 1P数 (qtyPerPallet) | 1パレットあたりケース数 | Excel K列 |
-| 新建高コード (newPartNumber) | 新しい品番 | 手動入力/Import |
-| ITEM DESCRIPTION | 品目説明 (例: UPPER LID ASSY) | 手動入力 |
-| G.W. (grossWeight) | 総重量 KGS | 手動入力 |
-| CBM (cbm) | 容積 立方メートル | 手動入力 |
-| Meas. (measurements) | 外寸 (例: 55\*38\*38) | 手動入力 |
+| A | 新建高コード (newPartNumber) | 新しい品番コード |
+| B | 気高コード (partNumber) | 品番 |
+| C | 規格 (itemName) | 製品名 |
+| D | 種類 (type) | ポリカバー/箱/部品/その他（自動判定） |
+| E | 代表機種 (representModel) | 機種名 |
+| F | 入数 (packingQty) | 個/ケース |
+| G | 総数 (totalQty) | 入荷数量 |
+| H | ケース数 (caseCount) | カートン数 |
+| I | 1P数 (qtyPerPallet) | 1パレットあたりケース数 |
+| J | ITEM DESCRIPTION (description) | 品目説明 |
+| K | MODEL NO. (modelNo) | モデル番号 |
+| L | G.W. (grossWeight) | 総重量 KGS |
+| M | CBM (cbm) | 容積 立方メートル |
+| N | Meas. (measurements) | 外寸 (例: 55\*38\*38) |
 
 ## 技術スタック
 
@@ -144,5 +143,6 @@ npm run build && npm start
 
 ## バージョン履歴
 
+- **v1.2** (2026-03-24): データ項目をCNS品目一覧に統一（A-N列）。palletCount/fraction廃止→caseCountベースに変更。MODEL NO.フィールド追加
 - **v1.1** (2026-03-24): 品目マスタ管理機能の拡張、新フィールド追加（Description, G.W., CBM, Meas.）、Excel Import/Export
 - **v1.0** (2026-03-24): 初期リリース。パレット図、品目合算、音声操作、ダークテーマ
