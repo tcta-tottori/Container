@@ -69,21 +69,22 @@ export function useSpeech() {
         const nameItems = similarItems.filter(s => getSimilarityReason(item.itemName, s.itemName) === 'name');
 
         if (colorItems.length > 0) {
-          // 色違いの数量を読み上げ
+          // 色違い: 品名は言わず数量のみ読み上げ
           const descs = colorItems.map(s => {
-            const name = itemNameForSpeech(s.itemName);
             const fractionCeil = s.fraction % 1 !== 0 ? Math.ceil(s.fraction) : s.fraction;
             let qty = '';
             if (s.palletCount > 0 && fractionCeil > 0) {
-              qty = `${s.palletCount}パレットと${fractionCeil}ケース`;
+              qty = `${s.palletCount}パレット${fractionCeil}ケース`;
             } else if (s.palletCount > 0) {
               qty = `${s.palletCount}パレット`;
             } else if (fractionCeil > 0) {
               qty = `${fractionCeil}ケース`;
             }
-            return qty ? `${name}が${qty}` : name;
-          }).join('、');
-          text += `注意、色違いが${descs}ありますので注意してください。`;
+            return qty;
+          }).filter(Boolean).join('、');
+          text += descs
+            ? `注意、色違いが${descs}あります。`
+            : '注意、色違いがあります。';
         }
 
         if (nameItems.length > 0) {
@@ -116,7 +117,7 @@ export function useSpeech() {
             }
             return qty ? `${label}が${qty}` : label;
           }).join('、');
-          text += `注意、類似品で${descs}あります。`;
+          text += `注意、品名違いで${descs}あります。`;
         }
       }
     }

@@ -418,26 +418,28 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 箱イメージ（背景レイヤー：KENコード下〜PL数上の固定エリア） */}
+        {/* 箱イメージ + パレット図（KENコード下〜PL数上の固定エリア） */}
         <div className="detail-pallet-area" style={{
           position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0, overflow: 'hidden',
         }}>
-          {/* 箱3Dイメージ — 背景レイヤー（テキストの下） */}
+          {/* 箱3Dイメージ — 背景レイヤー（左寄せ、テキストの下） */}
           {(item.measurements || item.cbm) && (
             <div style={{
               position: 'absolute', inset: 0, zIndex: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: 0.7,
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
+              opacity: 0.7, paddingLeft: 8,
             }}>
-              <SizeDiagram measurements={item.measurements} cbm={item.cbm}
-                type={item.type} maxContainerDim={maxContainerDim} />
+              <div style={{ width: '45%', height: '100%' }}>
+                <SizeDiagram measurements={item.measurements} cbm={item.cbm}
+                  type={item.type} maxContainerDim={maxContainerDim} />
+              </div>
             </div>
           )}
 
-          {/* mean寸法テキスト — 右揃えオーバーレイ */}
+          {/* mean寸法テキスト — 左揃えオーバーレイ */}
           {currentDims && (
             <div style={{
-              position: 'absolute', top: 4, right: 0, zIndex: 2,
+              position: 'absolute', bottom: 2, left: 0, zIndex: 2,
               fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 11,
               color: colors.accent,
               textShadow: '0 1px 4px rgba(0,0,0,0.8)',
@@ -446,7 +448,7 @@ export default function ItemDetailPanel({
             </div>
           )}
 
-          {/* パレット図 — 前面レイヤー */}
+          {/* パレット図 — 前面レイヤー（右寄せ） */}
           {item.qtyPerPallet > 0 && (
             <div style={{
               position: 'relative', zIndex: 1, width: '100%', height: '100%',
@@ -467,10 +469,12 @@ export default function ItemDetailPanel({
               color: colors.accent,
               textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
             }}>{fmtNum(item.palletCount)}</span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>PL</span>
-            {item.qtyPerPallet > 0 && (
-              <span className="detail-sf-at" style={{ color: `${colors.accent}cc` }}>@{item.qtyPerPallet}</span>
-            )}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
+              {item.qtyPerPallet > 0 && (
+                <span className="detail-sf-at" style={{ color: `${colors.accent}cc`, lineHeight: 1 }}>@{item.qtyPerPallet}</span>
+              )}
+              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>PL</span>
+            </div>
           </div>
           <div className="detail-sf-item">
             <span className="detail-sf-num" style={{
