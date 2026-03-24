@@ -27,17 +27,22 @@ const CHANGELOG = [
   ]},
 ];
 
-/* ===== CNSロゴSVG（シンプル版） ===== */
+/* ===== CNSロゴSVG（箱+矢印+フック） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <g transform="translate(50,48)">
-        <polygon points="0,-30 32,-14 0,2 -32,-14" fill="rgba(255,255,255,0.3)" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/>
-        <polygon points="-32,-14 0,2 0,36 -32,20" fill="rgba(255,255,255,0.18)" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/>
-        <polygon points="32,-14 0,2 0,36 32,20" fill="rgba(255,255,255,0.1)" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round"/>
+    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g transform="translate(100,90)">
+        <polygon points="0,-55 58,-25 0,5 -58,-25" fill="rgba(255,255,255,0.25)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
+        <polygon points="-58,-25 0,5 0,64 -58,34" fill="rgba(255,255,255,0.15)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
+        <polygon points="58,-25 0,5 0,64 58,34" fill="rgba(255,255,255,0.1)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
       </g>
-      <path d="M60,34 C66,24 74,18 84,14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
-      <polygon points="81,8 88,13 82,19" fill="#fff"/>
+      <g stroke="#fff" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
+        <path d="M115,72 C125,55 135,45 155,33"/>
+        <polygon points="150,22 163,32 152,42" fill="#fff" stroke="none"/>
+      </g>
+      <g fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round">
+        <path d="M78,118 C63,128 55,145 65,160 C75,175 95,172 105,153 C113,138 108,122 93,112 L135,88"/>
+      </g>
     </svg>
   );
 }
