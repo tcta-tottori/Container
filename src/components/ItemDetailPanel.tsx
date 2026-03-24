@@ -422,27 +422,28 @@ export default function ItemDetailPanel({
         <div className="detail-pallet-area" style={{
           position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0, overflow: 'hidden',
         }}>
-          {/* 箱3Dイメージ — 背景レイヤー（左寄せ、テキストの下） */}
+          {/* 箱3Dイメージ — 背景レイヤー（左寄せ、寄り表示） */}
           {(item.measurements || item.cbm) && (
             <div style={{
               position: 'absolute', inset: 0, zIndex: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
-              opacity: 0.7, paddingLeft: 8,
+              paddingLeft: 4,
             }}>
-              <div style={{ width: '45%', height: '100%' }}>
+              <div style={{ width: '60%', height: '120%' }}>
                 <SizeDiagram measurements={item.measurements} cbm={item.cbm}
                   type={item.type} maxContainerDim={maxContainerDim} />
               </div>
             </div>
           )}
 
-          {/* mean寸法テキスト — 左揃えオーバーレイ */}
+          {/* 寸法テキスト — 箱に被せるオーバーレイ */}
           {currentDims && (
             <div style={{
-              position: 'absolute', bottom: 2, left: 0, zIndex: 2,
-              fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: 11,
+              position: 'absolute', bottom: 0, left: 4, zIndex: 2,
+              fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 15,
               color: colors.accent,
-              textShadow: '0 1px 4px rgba(0,0,0,0.8)',
+              textShadow: `0 0 8px rgba(0,0,0,0.9), 0 1px 6px rgba(0,0,0,0.7), 0 0 20px ${colors.accent}40`,
+              letterSpacing: '-0.5px',
             }}>
               {currentDims[0]}×{currentDims[1]}×{currentDims[2]}
             </div>
