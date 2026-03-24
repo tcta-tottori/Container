@@ -761,6 +761,7 @@ export default function Home() {
                 })()}
                 containerNo={state.containers[state.selectedContainerIdx]?.containerNo || ''}
                 containerPartNumbers={new Set(state.items.map((it) => it.partNumber))}
+                loadingMsg={loadingMsg}
                 onUpdateItem={(idx, updates) => {
                   // Container items are first in the merged list, master-only items follow
                   if (idx < state.items.length) {

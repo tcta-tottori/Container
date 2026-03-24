@@ -7,6 +7,9 @@ import { saveToGitHub, getStoredToken, storeToken } from '@/lib/githubSave';
 import { detectItemType } from '@/lib/typeDetector';
 import * as XLSX from 'xlsx';
 
+/** 環境変数からフォールバック GitHub トークンを取得（.env.local で設定） */
+const FALLBACK_GITHUB_TOKEN = process.env.NEXT_PUBLIC_GITHUB_TOKEN || '';
+
 interface ItemEditPageProps {
   items: ContainerItem[];
   containerNo: string;
@@ -17,6 +20,8 @@ interface ItemEditPageProps {
   onDeleteItem: (idx: number) => void;
   onSelectAndGoDetail: (idx: number) => void;
   onMasterReload?: () => void;
+  /** 読込中メッセージ（ポップアップ表示用） */
+  loadingMsg?: string | null;
 }
 
 const ITEM_TYPES: ItemType[] = ['ポリカバー', 'ジャーポット', '箱', '部品', '鍋', 'ヤーマン部品', 'その他'];
@@ -216,19 +221,20 @@ const labelStyle: React.CSSProperties = {
 
 /* ===== メインコンポーネント ===== */
 export default function ItemEditPage({
-  items, containerNo, containerPartNumbers, onUpdateItem, onAddItem, onDeleteItem, onSelectAndGoDetail, onMasterReload,
+  items, containerNo, containerPartNumbers, onUpdateItem, onAddItem, onDeleteItem, onSelectAndGoDetail, onMasterReload, loadingMsg,
 }: ItemEditPageProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [importMsg, setImportMsg] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
-  const [containerFirst, setContainerFirst] = useState(true);
+  const containerFirst = false; // CN優先ソートは廃止（列フィルターで対応）
   const [showSubMenu, setShowSubMenu] = useState(false);
   const [showTokenDialog, setShowTokenDialog] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
   const [saving, setSaving] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [savedMsg, setSavedMsg] = useState('');
   const importRef = useRef<HTMLInputElement>(null);
 
   // Excel-like column filter/sort state
@@ -426,11 +432,23 @@ export default function ItemEditPage({
   }, [onAddItem]);
 
   const handleGitHubSave = useCallback(async () => {
-    const token = getStoredToken();
-    if (!token) { setShowTokenDialog(true); setTokenInput(''); return; }
+    let token = getStoredToken();
+    if (!token) {
+      // フォールバックトークンを自動保存して使用
+      token = FALLBACK_GITHUB_TOKEN;
+      storeToken(token);
+    }
     setSaving(true);
     setSaveMsg('');
     const result = await saveToGitHub(items, token, (msg) => setSaveMsg(msg));
+    if (!result.success && (result.message.includes('401') || result.message.includes('403'))) {
+      // トークンが無効/期限切れ → 再入力ダイアログを表示
+      setSaving(false);
+      setSaveMsg('トークンが無効です。新しいトークンを入力してください。');
+      setShowTokenDialog(true);
+      setTokenInput('');
+      return;
+    }
     setSaveMsg(result.message);
     setSaving(false);
     setTimeout(() => setSaveMsg(''), 5000);
@@ -538,21 +556,40 @@ export default function ItemEditPage({
             {importMsg}
           </div>
         )}
-        {/* CN優先トグル */}
-        {containerPartNumbers && containerPartNumbers.size > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button onClick={() => setContainerFirst(!containerFirst)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
-                borderRadius: 16, fontSize: 11, fontWeight: 500, cursor: 'pointer',
-                background: containerFirst ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.05)',
-                color: containerFirst ? '#fbbf24' : 'rgba(255,255,255,0.6)',
-                border: `1px solid ${containerFirst ? 'rgba(251,191,36,0.4)' : 'transparent'}`,
+        {/* フィルター状態表示 + クリアボタン */}
+        {(Object.keys(columnFilters).length > 0 || sortColumn) && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {sortColumn && (
+              <span style={{
+                display: 'flex', alignItems: 'center', gap: 3, padding: '3px 8px',
+                borderRadius: 12, fontSize: 10, fontWeight: 500,
+                background: 'rgba(96,165,250,0.12)', color: '#60a5fa',
+                border: '1px solid rgba(96,165,250,0.3)',
               }}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="3 6 9 6 9 6"/><polyline points="3 12 15 12"/><polyline points="3 18 21 18"/>
-              </svg>
-              CN優先
+                並替: {FILTER_COLUMNS.find(c => c.key === sortColumn)?.label} {sortDirection === 'asc' ? '↑' : '↓'}
+              </span>
+            )}
+            {Object.entries(columnFilters).map(([key, filterSet]) => {
+              const col = FILTER_COLUMNS.find(c => c.key === key);
+              if (!col || !filterSet || filterSet.size === 0) return null;
+              return (
+                <span key={key} style={{
+                  display: 'flex', alignItems: 'center', gap: 3, padding: '3px 8px',
+                  borderRadius: 12, fontSize: 10, fontWeight: 500,
+                  background: 'rgba(96,165,250,0.12)', color: '#60a5fa',
+                  border: '1px solid rgba(96,165,250,0.3)',
+                }}>
+                  {col.label}: {filterSet.size}件
+                </span>
+              );
+            })}
+            <button onClick={() => { setColumnFilters({}); setSortColumn(null); }} style={{
+              display: 'flex', alignItems: 'center', gap: 3, padding: '3px 8px',
+              borderRadius: 12, fontSize: 10, fontWeight: 500, cursor: 'pointer',
+              background: 'rgba(239,68,68,0.1)', color: '#f87171',
+              border: '1px solid rgba(239,68,68,0.3)',
+            }}>
+              ✕ クリア
             </button>
           </div>
         )}
@@ -567,6 +604,47 @@ export default function ItemEditPage({
           borderBottom: '1px solid rgba(255,255,255,0.04)',
         }}>
           {saveMsg}
+        </div>
+      )}
+
+      {/* 品目保存確認メッセージ */}
+      {savedMsg && (
+        <div style={{
+          padding: '6px 16px', fontSize: 12, fontWeight: 600, flexShrink: 0,
+          background: 'rgba(34,197,94,0.15)', color: '#4ade80',
+          borderBottom: '1px solid rgba(255,255,255,0.04)',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+          {savedMsg}
+        </div>
+      )}
+
+      {/* 読込中ポップアップ */}
+      {loadingMsg && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+        }}>
+          <div style={{
+            background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 20, padding: '32px 40px', textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{
+              width: 40, height: 40, margin: '0 auto 16px',
+              border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6',
+              borderRadius: '50%', animation: 'spin 1s linear infinite',
+            }} />
+            <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>
+              {loadingMsg}
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>
+              しばらくお待ちください
+            </p>
+          </div>
         </div>
       )}
 
@@ -815,6 +893,10 @@ export default function ItemEditPage({
           onClose={() => setEditingIdx(null)}
           onUpdate={(updates) => {
             onUpdateItem(editingIdx, updates);
+            // 保存確認メッセージを表示
+            const itemName = items[editingIdx]?.itemName || '';
+            setSavedMsg(`「${itemName}」を保存しました`);
+            setTimeout(() => setSavedMsg(''), 3000);
             // 保存後、テーブルが自動リフレッシュされるよう再フィルタのきっかけを作成
             setRefreshKey((k) => k + 1);
           }}
