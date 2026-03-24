@@ -74,7 +74,7 @@ export default function ItemListPanel({
               }}>{fmtNum(item.palletCount)}</span>
               <span className="detail-list-num" style={{
                 color: isActive ? '#ff9800' : 'rgba(255,255,255,0.7)',
-              }}>{fmtNum(item.fraction)}</span>
+              }}>{item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : fmtNum(item.fraction)}</span>
               <span className="detail-list-num list-col-extra" style={{
                 width: 46, fontSize: 11, color: item.cbm ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
               }}>{item.cbm ? item.cbm.toFixed(2) : '—'}</span>

@@ -36,24 +36,24 @@ export function useSpeech() {
     const spokenName = itemNameForSpeech(item.itemName);
     const isPolycover = item.type === 'ポリカバー';
 
-    // パレットと端数の読み上げ
+    // パレットと端数の読み上げ（小数点がある場合は切り上げ）
+    const fractionCeil = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
     let qtyText = '';
-    if (item.palletCount > 0 && item.fraction > 0) {
-      qtyText = `${item.palletCount}パレットと${item.fraction}ケース`;
+    if (item.palletCount > 0 && fractionCeil > 0) {
+      qtyText = `${item.palletCount}パレットと${fractionCeil}ケース`;
     } else if (item.palletCount > 0) {
       qtyText = `${item.palletCount}パレット`;
-    } else if (item.fraction > 0) {
-      qtyText = `${item.fraction}ケース`;
+    } else if (fractionCeil > 0) {
+      qtyText = `${fractionCeil}ケース`;
     } else {
       qtyText = `${item.totalQty}個`;
     }
 
     let text = `${spokenName}。${qtyText}。`;
 
-    // ポリカバーは検査で1ケース抜く
+    // ポリカバーは検査で1ケース抜く（端数から1引く）
     if (isPolycover) {
-      const totalCases = item.palletCount * item.qtyPerPallet + item.fraction;
-      const afterInspection = totalCases - 1;
+      const afterInspection = fractionCeil - 1;
       if (afterInspection >= 0) {
         text += `検査を抜いて${afterInspection}ケース。`;
       }

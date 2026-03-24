@@ -435,7 +435,7 @@ export default function ItemDetailPanel({
             <span className="detail-sf-num" style={{
               color: '#e8e8e8',
               textShadow: `0 0 16px ${colors.accent}30, 0 2px 4px rgba(0,0,0,0.6)`,
-            }}>{fmtNum(item.fraction)}</span>
+            }}>{item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : fmtNum(item.fraction)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>CT</span>
           </div>
           <div className="detail-sf-item detail-sf-total">

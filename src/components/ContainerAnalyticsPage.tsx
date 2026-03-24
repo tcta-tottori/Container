@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 
@@ -10,10 +11,10 @@ interface ContainerAnalyticsPageProps {
 }
 
 /* ===== コンテナスペック ===== */
-const CONTAINERS: Record<string, { name: string; cbm: number; maxKg: number; innerL: number; innerW: number; innerH: number }> = {
-  '20FT': { name: "20' DRY", cbm: 33.2, maxKg: 21770, innerL: 590, innerW: 235, innerH: 239 },
-  '40FT': { name: "40' DRY", cbm: 67.7, maxKg: 26680, innerL: 1203, innerW: 235, innerH: 239 },
-  '40HQ': { name: "40' HIGH CUBE", cbm: 76.3, maxKg: 26460, innerL: 1203, innerW: 235, innerH: 269 },
+const CONTAINERS: Record<string, { name: string; cbm: number; maxKg: number; heightRatio: number }> = {
+  '20FT': { name: "20' DRY", cbm: 33.2, maxKg: 21770, heightRatio: 0.72 },
+  '40FT': { name: "40' DRY", cbm: 67.7, maxKg: 26680, heightRatio: 0.82 },
+  '40HQ': { name: "40' HIGH CUBE", cbm: 76.3, maxKg: 26460, heightRatio: 1.0 },
 };
 
 /* ===== 寸法パース ===== */
@@ -23,6 +24,44 @@ function parseMeas(meas: string): [number, number, number] | null {
   return [Number(m[1]), Number(m[2]), Number(m[3])];
 }
 
+/* ===== アニメーション付きカウント ===== */
+function AnimatedNumber({ value, color, size = 36, delay = 0 }: {
+  value: number; color: string; size?: number; delay?: number;
+}) {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef<number>(0);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const start = ref.current;
+      const diff = value - start;
+      if (diff === 0) return;
+      const duration = 600;
+      const startTime = performance.now();
+      const animate = (now: number) => {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const current = Math.round(start + diff * eased);
+        setDisplay(current);
+        ref.current = current;
+        if (progress < 1) requestAnimationFrame(animate);
+      };
+      requestAnimationFrame(animate);
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [value, delay]);
+
+  return (
+    <span style={{
+      fontSize: size, fontWeight: 900, fontFamily: 'var(--font-mono)', color,
+      textShadow: `0 0 20px ${color}40`,
+    }}>
+      {display}
+    </span>
+  );
+}
+
 /* ===== プログレスバー ===== */
 function ProgressBar({ value, max, color, label, subLabel }: {
   value: number; max: number; color: string; label: string; subLabel?: string;
@@ -30,7 +69,7 @@ function ProgressBar({ value, max, color, label, subLabel }: {
   const pct = max > 0 ? Math.min(value / max * 100, 100) : 0;
   const isOver = value > max;
   return (
-    <div style={{ marginBottom: 12 }}>
+    <div style={{ marginBottom: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>{label}</span>
         <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700, color: isOver ? '#ef4444' : color }}>
@@ -43,63 +82,11 @@ function ProgressBar({ value, max, color, label, subLabel }: {
         <div style={{
           height: '100%', borderRadius: 4, width: `${pct}%`,
           background: isOver ? '#ef4444' : `linear-gradient(90deg, ${color}88, ${color})`,
-          transition: 'width 0.4s ease',
+          transition: 'width 0.8s ease',
         }} />
       </div>
       <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2, textAlign: 'right' }}>
         {pct.toFixed(1)}%
-      </div>
-    </div>
-  );
-}
-
-/* ===== 種類分布バー ===== */
-function TypeDistribution({ items, completedIds }: { items: ContainerItem[]; completedIds: Set<string> }) {
-  const types = ['ポリカバー', 'ジャーポット', '箱', '部品', '鍋', 'その他'] as const;
-  const counts: Record<string, { total: number; done: number }> = {};
-  for (const t of types) counts[t] = { total: 0, done: 0 };
-  for (const it of items) {
-    const key = counts[it.type] ? it.type : 'その他';
-    counts[key].total++;
-    if (completedIds.has(it.id)) counts[key].done++;
-  }
-  const total = items.length || 1;
-
-  return (
-    <div>
-      {/* 積み上げバー */}
-      <div style={{ display: 'flex', height: 24, borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
-        {types.map((t) => {
-          const c = COLOR_MAP[t];
-          const pct = counts[t].total / total * 100;
-          if (pct === 0) return null;
-          return (
-            <div key={t} style={{
-              width: `${pct}%`, background: c.accent, position: 'relative',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 9, fontWeight: 700, color: '#fff', overflow: 'hidden',
-              transition: 'width 0.4s ease',
-            }}>
-              {pct > 8 && `${counts[t].total}`}
-            </div>
-          );
-        })}
-      </div>
-      {/* 凡例 */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-        {types.map((t) => {
-          const c = COLOR_MAP[t];
-          if (counts[t].total === 0) return null;
-          return (
-            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: c.accent }} />
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{t}</span>
-              <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 700, color: c.accent }}>
-                {counts[t].done}/{counts[t].total}
-              </span>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
@@ -118,7 +105,7 @@ function ProgressRing({ done, total, color }: { done: number; total: number; col
         <circle cx={50} cy={50} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke} />
         <circle cx={50} cy={50} r={r} fill="none" stroke={color} strokeWidth={stroke}
           strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset}
-          transform="rotate(-90 50 50)" style={{ transition: 'stroke-dashoffset 0.6s ease' }} />
+          transform="rotate(-90 50 50)" style={{ transition: 'stroke-dashoffset 0.8s ease' }} />
       </svg>
       <div style={{
         position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
@@ -128,6 +115,205 @@ function ProgressRing({ done, total, color }: { done: number; total: number; col
           {Math.round(pct * 100)}
         </span>
         <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginTop: -2 }}>%</span>
+      </div>
+    </div>
+  );
+}
+
+/* ===== コンテナトラック + 種類分布 ===== */
+function ContainerTruckDistribution({ items, completedIds, containerType }: {
+  items: ContainerItem[]; completedIds: Set<string>; containerType: string;
+}) {
+  const types = ['ポリカバー', 'ジャーポット', '箱', '部品', '鍋', 'その他'] as const;
+  const counts: Record<string, { total: number; done: number }> = {};
+  for (const t of types) counts[t] = { total: 0, done: 0 };
+  for (const it of items) {
+    const key = counts[it.type] ? it.type : 'その他';
+    counts[key].total++;
+    if (completedIds.has(it.id)) counts[key].done++;
+  }
+  const total = items.length || 1;
+
+  // コンテナの高さ比率でサイズ調整
+  const spec = CONTAINERS[containerType] || CONTAINERS['40HQ'];
+  const containerHeight = Math.round(70 * spec.heightRatio);
+
+  // ポリカバーは扉側（右側＝運転席の反対）に配置するため、右から並べる
+  // 分布セグメントを扉側（右）からポリカバー→ジャーポット→箱→部品→鍋→その他の順で
+  const orderedTypes = types.filter(t => counts[t].total > 0);
+
+  // セグメントの%とラベル位置を計算
+  const segments = orderedTypes.map(t => ({
+    type: t,
+    pct: counts[t].total / total * 100,
+    count: counts[t].total,
+    color: COLOR_MAP[t].accent,
+  }));
+
+  return (
+    <div>
+      {/* コンテナサイズ表示 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{
+          fontSize: 13, fontWeight: 800, color: '#60a5fa',
+          textShadow: '0 0 12px rgba(96,165,250,0.3)',
+        }}>
+          {spec.name}
+        </span>
+        <span style={{
+          fontSize: 9, padding: '2px 8px', borderRadius: 4,
+          background: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontWeight: 700,
+        }}>推定</span>
+      </div>
+
+      {/* トラックSVG（走行アニメーション付き） */}
+      <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
+        <svg viewBox="0 0 400 140" style={{ width: '100%', height: 'auto' }}>
+          {/* 道路 */}
+          <rect x="0" y="120" width="400" height="20" fill="#1a1d2e" rx="2" />
+          <line x1="0" y1="130" x2="400" y2="130" stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="12 8">
+            <animate attributeName="stroke-dashoffset" values="0;-20" dur="0.8s" repeatCount="indefinite" />
+          </line>
+
+          {/* トラック本体グループ */}
+          <g>
+            {/* 車台フレーム */}
+            <rect x="30" y={120 - 12} width="340" height="12" rx="2" fill="#2a2d3e" />
+
+            {/* キャビン（左=運転席側） */}
+            <g>
+              <rect x="30" y={120 - 12 - 45} width="55" height="45" rx="4" fill="#4a5568" />
+              <rect x="32" y={120 - 12 - 43} width="30" height="22" rx="3" fill="#1a2332" opacity="0.8" />
+              {/* フロントガラス */}
+              <rect x="32" y={120 - 12 - 43} width="30" height="18" rx="2" fill="rgba(100,150,220,0.25)" />
+              {/* バンパー */}
+              <rect x="26" y={120 - 12 - 5} width="6" height="8" rx="1" fill="#666" />
+              {/* ミラー */}
+              <rect x="26" y={120 - 12 - 38} width="4" height="8" rx="1" fill="#555" />
+            </g>
+
+            {/* コンテナ部分 */}
+            <g>
+              <rect x="90" y={120 - 12 - containerHeight}
+                width="270" height={containerHeight} rx="3"
+                fill="#2d3244" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+
+              {/* コンテナ内の種類分布（右=扉側からポリカバー順） */}
+              {(() => {
+                let x = 90 + 270; // 右端から開始
+                return segments.map((seg, i) => {
+                  const w = (seg.pct / 100) * 270;
+                  x -= w;
+                  const showInside = w > 28;
+                  const pctStr = `${seg.pct.toFixed(0)}%`;
+                  return (
+                    <g key={seg.type}>
+                      <rect x={x} y={120 - 12 - containerHeight + 1}
+                        width={Math.max(w, 1)} height={containerHeight - 2}
+                        fill={seg.color} opacity={0.85}
+                        rx={i === 0 ? 2 : i === segments.length - 1 ? 2 : 0}
+                      />
+                      {showInside ? (
+                        <text x={x + w / 2} y={120 - 12 - containerHeight / 2 + 1}
+                          textAnchor="middle" dominantBaseline="middle"
+                          fontSize="10" fontWeight="800" fill="#fff"
+                          style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
+                          {pctStr}
+                        </text>
+                      ) : (
+                        /* 飛び出し線 */
+                        <g>
+                          <line x1={x + w / 2} y1={120 - 12 - containerHeight - 2}
+                            x2={x + w / 2} y2={120 - 12 - containerHeight - 14}
+                            stroke={seg.color} strokeWidth="1" opacity="0.7" />
+                          <text x={x + w / 2} y={120 - 12 - containerHeight - 17}
+                            textAnchor="middle" fontSize="8" fontWeight="700" fill={seg.color}>
+                            {pctStr}
+                          </text>
+                        </g>
+                      )}
+                    </g>
+                  );
+                });
+              })()}
+
+              {/* コンテナ扉の線（右端） */}
+              <line x1={90 + 270 - 1} y1={120 - 12 - containerHeight + 4}
+                x2={90 + 270 - 1} y2={120 - 16} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
+              <line x1={90 + 270 - 4} y1={120 - 12 - containerHeight + 4}
+                x2={90 + 270 - 4} y2={120 - 16} stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
+
+              {/* コンテナの縦リブ */}
+              {Array.from({ length: 10 }, (_, i) => (
+                <line key={i}
+                  x1={90 + 27 * (i + 1) - 13} y1={120 - 12 - containerHeight + 2}
+                  x2={90 + 27 * (i + 1) - 13} y2={120 - 14}
+                  stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+              ))}
+            </g>
+
+            {/* タイヤ */}
+            {[52, 72, 310, 335, 355].map((cx, i) => (
+              <g key={i}>
+                <circle cx={cx} cy={120} r="10" fill="#222" stroke="#444" strokeWidth="1.5" />
+                <circle cx={cx} cy={120} r="4" fill="#555" />
+                {/* ホイールスポーク回転 */}
+                <g>
+                  <animateTransform attributeName="transform" type="rotate"
+                    values={`0 ${cx} 120;360 ${cx} 120`} dur="1.2s" repeatCount="indefinite" />
+                  <line x1={cx} y1={120 - 3} x2={cx} y2={120 + 3} stroke="#666" strokeWidth="1" />
+                  <line x1={cx - 3} y1={120} x2={cx + 3} y2={120} stroke="#666" strokeWidth="1" />
+                </g>
+              </g>
+            ))}
+          </g>
+        </svg>
+
+        {/* 扉ラベル */}
+        <div style={{
+          position: 'absolute', right: 12, top: 8,
+          fontSize: 8, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.5px',
+        }}>
+          DOOR →
+        </div>
+      </div>
+
+      {/* 凡例 */}
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+        {orderedTypes.map((t) => {
+          const c = COLOR_MAP[t];
+          return (
+            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: c.accent }} />
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{t}</span>
+              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 800, color: c.accent }}>
+                {counts[t].done}/{counts[t].total}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ===== サマリカード ===== */
+function SummaryCard({ label, value, unit, color }: {
+  label: string; value: string; unit: string; color: string;
+}) {
+  return (
+    <div style={{
+      background: `${color}0a`, border: `1px solid ${color}20`,
+      borderRadius: 12, padding: '12px 14px',
+      transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    }}>
+      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginBottom: 6 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+        <span style={{
+          fontSize: 24, fontWeight: 900, fontFamily: 'var(--font-mono)', color,
+          textShadow: `0 0 16px ${color}30`,
+        }}>{value}</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{unit}</span>
       </div>
     </div>
   );
@@ -159,6 +345,7 @@ export default function ContainerAnalyticsPage({
 
   // コンテナタイプ自動推定
   const bestContainer = totalCbm <= 33 ? '20FT' : totalCbm <= 67 ? '40FT' : '40HQ';
+  const bestSpec = CONTAINERS[bestContainer];
 
   return (
     <div style={{
@@ -172,7 +359,7 @@ export default function ContainerAnalyticsPage({
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>
-            📊 コンテナ分析
+            コンテナ分析
           </span>
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-mono)' }}>
             {containerNo}
@@ -186,30 +373,24 @@ export default function ContainerAnalyticsPage({
           background: '#1e2130', borderRadius: 14, padding: 16,
           border: '1px solid rgba(255,255,255,0.06)',
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 14 }}>
             進捗状況
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
             <ProgressRing done={doneItems.length} total={items.length} color="#22c55e" />
             <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 20, marginBottom: 10 }}>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>完了</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'var(--font-mono)', color: '#22c55e' }}>
-                    {doneItems.length}
-                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>完了</div>
+                  <AnimatedNumber value={doneItems.length} color="#22c55e" size={32} delay={100} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>残り</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'var(--font-mono)', color: '#f59e0b' }}>
-                    {activeItems.length}
-                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>残り</div>
+                  <AnimatedNumber value={activeItems.length} color="#f59e0b" size={32} delay={200} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>合計</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, fontFamily: 'var(--font-mono)', color: 'rgba(255,255,255,0.7)' }}>
-                    {items.length}
-                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginBottom: 2 }}>合計</div>
+                  <AnimatedNumber value={items.length} color="rgba(255,255,255,0.7)" size={32} delay={300} />
                 </div>
               </div>
               {hasCbm && (
@@ -226,67 +407,66 @@ export default function ContainerAnalyticsPage({
           </div>
         </div>
 
-        {/* === 種類分布 === */}
+        {/* === 種類分布（コンテナトラック） === */}
         <div style={{
           background: '#1e2130', borderRadius: 14, padding: 16,
           border: '1px solid rgba(255,255,255,0.06)',
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
             種類分布
           </div>
-          <TypeDistribution items={items} completedIds={completedIds} />
+          <ContainerTruckDistribution items={items} completedIds={completedIds} containerType={bestContainer} />
         </div>
 
-        {/* === コンテナ積載率 === */}
+        {/* === コンテナ積載率（推定サイズのみ） === */}
         {hasCbm && (
           <div style={{
             background: '#1e2130', borderRadius: 14, padding: 16,
             border: '1px solid rgba(255,255,255,0.06)',
           }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>
-              コンテナ積載率
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>
+                コンテナ積載率
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 800, color: '#60a5fa',
+                fontFamily: 'var(--font-mono)',
+              }}>
+                {bestSpec.name}
+              </span>
             </div>
-            {Object.entries(CONTAINERS).map(([key, spec]) => {
-              const isBest = key === bestContainer;
-              return (
-                <div key={key} style={{
-                  marginBottom: 14, padding: isBest ? '10px 12px' : 0,
-                  borderRadius: isBest ? 10 : 0,
-                  background: isBest ? 'rgba(59,130,246,0.08)' : 'transparent',
-                  border: isBest ? '1px solid rgba(59,130,246,0.2)' : 'none',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isBest ? '#60a5fa' : 'rgba(255,255,255,0.6)' }}>
-                      {spec.name}
-                    </span>
-                    {isBest && (
-                      <span style={{
-                        fontSize: 9, padding: '1px 6px', borderRadius: 4,
-                        background: 'rgba(59,130,246,0.2)', color: '#60a5fa', fontWeight: 700,
-                      }}>推定</span>
-                    )}
-                  </div>
-                  <ProgressBar
-                    value={totalCbm} max={spec.cbm}
-                    color={isBest ? '#3b82f6' : '#6b7280'}
-                    label="容積 (CBM)"
-                    subLabel="m³"
-                  />
-                  {totalWeight > 0 && (
-                    <ProgressBar
-                      value={totalWeight / 1000} max={spec.maxKg / 1000}
-                      color={isBest ? '#8b5cf6' : '#6b7280'}
-                      label="重量"
-                      subLabel="t"
-                    />
-                  )}
-                </div>
-              );
-            })}
+            <ProgressBar
+              value={totalCbm} max={bestSpec.cbm}
+              color="#3b82f6"
+              label="容積 (CBM)"
+              subLabel="m³"
+            />
+            {totalWeight > 0 && (
+              <ProgressBar
+                value={totalWeight / 1000} max={bestSpec.maxKg / 1000}
+                color="#8b5cf6"
+                label="重量"
+                subLabel="t"
+              />
+            )}
+            {/* 大きな積載率表示 */}
+            <div style={{
+              display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: 4,
+              padding: '10px 0 4px',
+            }}>
+              <span style={{
+                fontSize: 40, fontWeight: 900, fontFamily: 'var(--font-mono)',
+                color: totalCbm / bestSpec.cbm > 1 ? '#ef4444' : '#3b82f6',
+                textShadow: `0 0 24px ${totalCbm / bestSpec.cbm > 1 ? 'rgba(239,68,68,0.3)' : 'rgba(59,130,246,0.3)'}`,
+              }}>
+                {Math.min(totalCbm / bestSpec.cbm * 100, 999).toFixed(1)}
+              </span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.4)' }}>%</span>
+            </div>
           </div>
         )}
 
-        {/* === CBM/重量サマリ === */}
+        {/* === 全体サマリ === */}
         <div style={{
           background: '#1e2130', borderRadius: 14, padding: 16,
           border: '1px solid rgba(255,255,255,0.06)',
@@ -334,7 +514,7 @@ export default function ContainerAnalyticsPage({
                       textDecoration: isDone ? 'line-through' : 'none',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>{name}</span>
-                    <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700, color: c.accent }}>
+                    <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 800, color: c.accent }}>
                       {itemCbm.toFixed(2)}
                     </span>
                     <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>m³</span>
@@ -343,24 +523,6 @@ export default function ContainerAnalyticsPage({
               })}
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-/* ===== サマリカード ===== */
-function SummaryCard({ label, value, unit, color }: {
-  label: string; value: string; unit: string; color: string;
-}) {
-  return (
-    <div style={{
-      background: `${color}08`, border: `1px solid ${color}20`,
-      borderRadius: 10, padding: '10px 12px',
-    }}>
-      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-        <span style={{ fontSize: 20, fontWeight: 900, fontFamily: 'var(--font-mono)', color }}>{value}</span>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{unit}</span>
       </div>
     </div>
   );
