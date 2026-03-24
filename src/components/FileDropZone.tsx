@@ -26,6 +26,29 @@ const CHANGELOG = [
   ]},
 ];
 
+/* ===== CNSロゴSVG ===== */
+function CnsLogo({ size = 56 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* 箱 */}
+      <g transform="translate(100,90)">
+        <polygon points="0,-55 58,-25 0,5 -58,-25" fill="rgba(255,255,255,0.25)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
+        <polygon points="-58,-25 0,5 0,64 -58,34" fill="rgba(255,255,255,0.15)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
+        <polygon points="58,-25 0,5 0,64 58,34" fill="rgba(255,255,255,0.1)" stroke="#fff" strokeWidth="3" strokeLinejoin="round"/>
+      </g>
+      {/* 矢印 */}
+      <g stroke="#fff" strokeWidth="5.5" strokeLinecap="round" strokeLinejoin="round" fill="none">
+        <path d="M115,72 C125,55 135,45 155,33"/>
+        <polygon points="150,22 163,32 152,42" fill="#fff" stroke="none"/>
+      </g>
+      {/* フック */}
+      <g fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round">
+        <path d="M78,118 C63,128 55,145 65,160 C75,175 95,172 105,153 C113,138 108,122 93,112 L135,88"/>
+      </g>
+    </svg>
+  );
+}
+
 export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
@@ -100,10 +123,7 @@ export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
                     background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.5">
-                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                      <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-                    </svg>
+                    <CnsLogo size={30} />
                   </div>
                   <div>
                     <p style={{ color: '#fff', fontSize: 14, fontWeight: 700, margin: 0 }}>CNS</p>
@@ -150,14 +170,11 @@ export default function FileDropZone({ onFileLoaded }: FileDropZoneProps) {
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 56, height: 56, borderRadius: 16,
+            width: 80, height: 80, borderRadius: 20,
             background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
             marginBottom: 12, boxShadow: '0 8px 24px rgba(59,130,246,0.3)',
           }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
+            <CnsLogo size={64} />
           </div>
           <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif' }}>
             Container Navigation System

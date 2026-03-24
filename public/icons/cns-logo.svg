@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <!-- 箱（アイソメトリック） -->
+  <g transform="translate(100,95)" fill="#1e3a5f" stroke="#c8ddf0" stroke-width="2.5" stroke-linejoin="round">
+    <!-- 上面 -->
+    <polygon points="0,-52 55,-24 0,4 -55,-24" fill="#264a6e" stroke="#c8ddf0"/>
+    <!-- 左面 -->
+    <polygon points="-55,-24 0,4 0,60 -55,32" fill="#1e3a5f" stroke="#c8ddf0"/>
+    <!-- 右面 -->
+    <polygon points="55,-24 0,4 0,60 55,32" fill="#153050" stroke="#c8ddf0"/>
+  </g>
+  <!-- 矢印（右上へ） -->
+  <g fill="none" stroke="#1e3a5f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M110,80 C120,60 130,50 150,38"/>
+    <polygon points="145,28 158,36 148,45" fill="#1e3a5f" stroke="none"/>
+  </g>
+  <!-- フック（前面の曲線） -->
+  <g fill="none" stroke="#c8ddf0" stroke-width="4.5" stroke-linecap="round">
+    <path d="M75,115 C60,125 50,140 60,155 C70,168 90,165 100,148 C108,135 105,118 90,108 L130,85"/>
+  </g>
+  <!-- テキスト不要（アイコン用） -->
+</svg>

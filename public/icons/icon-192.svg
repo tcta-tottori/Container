@@ -1,5 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <rect width="192" height="192" rx="20" fill="#1a1a2e"/>
-  <text x="50%" y="45%" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="67.19999999999999" fill="white">📦</text>
-  <text x="50%" y="75%" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="19.200000000000003" fill="#ccc">コンテナ</text>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="32" fill="url(#bg)"/>
+  <g transform="translate(96,82)">
+    <polygon points="0,-42 44,-19 0,3 -44,-19" fill="rgba(255,255,255,0.25)" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="-44,-19 0,3 0,48 -44,26" fill="rgba(255,255,255,0.15)" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+    <polygon points="44,-19 0,3 0,48 44,26" fill="rgba(255,255,255,0.1)" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M106,60 C114,48 122,42 138,33"/>
+    <polygon points="134,24 144,32 136,38" fill="#fff" stroke="none"/>
+  </g>
+  <g fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round">
+    <path d="M74,105 C63,112 57,125 63,137 C69,147 83,145 88,135 C93,127 91,118 82,112 L110,97"/>
+  </g>
+  <text x="96" y="172" text-anchor="middle" font-family="Inter,sans-serif" font-size="18" font-weight="800" fill="#fff" letter-spacing="1">CNS</text>
 </svg>

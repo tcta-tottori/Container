@@ -1,5 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="20" fill="#1a1a2e"/>
-  <text x="50%" y="45%" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="179.2" fill="white">📦</text>
-  <text x="50%" y="75%" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="51.2" fill="#ccc">コンテナ</text>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="80" fill="url(#bg)"/>
+  <g transform="translate(256,230)">
+    <!-- 上面 -->
+    <polygon points="0,-108 115,-50 0,8 -115,-50" fill="rgba(255,255,255,0.25)" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+    <!-- 左面 -->
+    <polygon points="-115,-50 0,8 0,124 -115,66" fill="rgba(255,255,255,0.15)" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+    <!-- 右面 -->
+    <polygon points="115,-50 0,8 0,124 115,66" fill="rgba(255,255,255,0.1)" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+  </g>
+  <!-- 矢印 -->
+  <g fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M280,175 C300,140 320,120 360,95"/>
+    <polygon points="350,75 372,90 355,105" fill="#fff" stroke="none"/>
+  </g>
+  <!-- フック -->
+  <g fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round">
+    <path d="M200,280 C170,300 150,330 165,360 C180,385 215,380 230,355 C242,335 237,310 215,295 L290,255"/>
+  </g>
+  <!-- テキスト -->
+  <text x="256" y="445" text-anchor="middle" font-family="Inter,sans-serif" font-size="42" font-weight="800" fill="#fff" letter-spacing="2">CNS</text>
 </svg>
