@@ -143,17 +143,31 @@ export function useSpeech() {
     speak(`残り${count}品目です。`);
   }, []);
 
-  /** コンテナ概要アナウンス（読み込み時・手動コール用） */
-  const announceContainerSummary = useCallback((items: ContainerItem[], containerNo: string) => {
+  /** コンテナ概要アナウンス（読み込み時・手動コール用）
+   *  completedIds / elapsedSeconds を渡すと進捗情報も読み上げる */
+  const announceContainerSummary = useCallback((
+    items: ContainerItem[],
+    containerNo: string,
+    completedIds?: Set<string>,
+    elapsedSeconds?: number,
+  ) => {
     if (items.length === 0) return;
 
-    // 種類別カウント
+    const done = completedIds ? items.filter((it) => completedIds.has(it.id)).length : 0;
+    const remaining = items.length - done;
+    const pct = items.length > 0 ? Math.round(done / items.length * 100) : 0;
+
+    // 種類別カウント（残りのみ）
     const typeCounts: Record<string, number> = {};
+    const totalTypeCounts: Record<string, number> = {};
     let hasJarPot = false;
     const similarPairs: string[] = [];
 
     for (const it of items) {
-      typeCounts[it.type] = (typeCounts[it.type] || 0) + 1;
+      totalTypeCounts[it.type] = (totalTypeCounts[it.type] || 0) + 1;
+      if (!completedIds || !completedIds.has(it.id)) {
+        typeCounts[it.type] = (typeCounts[it.type] || 0) + 1;
+      }
       if (/^JP[A-Z]/.test(it.itemName) || it.itemName.includes('ジャーポット')) {
         hasJarPot = true;
       }
@@ -177,17 +191,35 @@ export function useSpeech() {
 
     let text = `コンテナ${containerNo}。合計${items.length}品目。`;
 
-    // 種類内訳
+    // 進捗情報（completedIdsがある場合）
+    if (completedIds && done > 0) {
+      text += `進捗${pct}パーセント、${done}品完了、残り${remaining}品。`;
+    }
+
+    // 経過時間
+    if (elapsedSeconds && elapsedSeconds > 0) {
+      const m = Math.floor(elapsedSeconds / 60);
+      const s = elapsedSeconds % 60;
+      if (m > 0) {
+        text += `経過時間${m}分${s > 0 ? `${s}秒` : ''}。`;
+      } else {
+        text += `経過時間${s}秒。`;
+      }
+    }
+
+    // 種類内訳（残り）
+    const useRemaining = completedIds && done > 0;
+    const counts = useRemaining ? typeCounts : totalTypeCounts;
     const typeNames: string[] = [];
-    if (typeCounts['ポリカバー']) typeNames.push(`ポリカバー${typeCounts['ポリカバー']}品`);
-    if (typeCounts['ジャーポット']) typeNames.push(`ジャーポット${typeCounts['ジャーポット']}品`);
-    if (typeCounts['箱']) typeNames.push(`箱${typeCounts['箱']}品`);
-    if (typeCounts['部品']) typeNames.push(`部品${typeCounts['部品']}品`);
-    if (typeCounts['鍋']) typeNames.push(`鍋${typeCounts['鍋']}品`);
-    if (typeCounts['ヤーマン部品']) typeNames.push(`ヤーマン${typeCounts['ヤーマン部品']}品`);
-    if (typeCounts['その他']) typeNames.push(`その他${typeCounts['その他']}品`);
+    if (counts['ポリカバー']) typeNames.push(`ポリカバー${counts['ポリカバー']}品`);
+    if (counts['ジャーポット']) typeNames.push(`ジャーポット${counts['ジャーポット']}品`);
+    if (counts['箱']) typeNames.push(`箱${counts['箱']}品`);
+    if (counts['部品']) typeNames.push(`部品${counts['部品']}品`);
+    if (counts['鍋']) typeNames.push(`鍋${counts['鍋']}品`);
+    if (counts['ヤーマン部品']) typeNames.push(`ヤーマン${counts['ヤーマン部品']}品`);
+    if (counts['その他']) typeNames.push(`その他${counts['その他']}品`);
     if (typeNames.length > 0) {
-      text += typeNames.join('、') + '。';
+      text += (useRemaining ? '残り内訳、' : '') + typeNames.join('、') + '。';
     }
 
     if (hasJarPot) {
@@ -201,7 +233,10 @@ export function useSpeech() {
       }
     }
 
-    text += '作業を開始します。';
+    if (completedIds && remaining === 0) {
+      text += '全品目完了です。お疲れ様でした。';
+    }
+
     speak(text);
   }, []);
 

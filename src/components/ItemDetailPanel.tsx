@@ -440,44 +440,43 @@ export default function ItemDetailPanel({
         <div className="detail-pallet-area" style={{
           position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0,
         }}>
-          {/* 箱3Dイメージ — 背景レイヤー（左寄せ、寄り表示） */}
-          {(item.measurements || item.cbm) && (
+          {/* パレット図 — 左側メインレイヤー */}
+          {item.qtyPerPallet > 0 && (
             <div style={{
-              position: 'absolute', inset: 0, zIndex: 0,
+              position: 'relative', zIndex: 1, width: '100%', height: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
-              paddingLeft: 4,
             }}>
-              <div style={{ width: '33%', height: '120%' }}>
-                <SizeDiagram measurements={item.measurements} cbm={item.cbm}
-                  type={item.type} maxContainerDim={maxContainerDim} />
+              <div style={{ width: '65%', height: '100%' }}>
+                <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
+                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+                  measurements={item.measurements} />
               </div>
             </div>
           )}
 
-          {/* 寸法テキスト — 箱に被せるオーバーレイ */}
+          {/* 箱3Dイメージ — 右1/3に配置 */}
+          {(item.measurements || item.cbm) && (
+            <div style={{
+              position: 'absolute', top: 0, right: 0, bottom: 0,
+              width: '33%', zIndex: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden',
+            }}>
+              <SizeDiagram measurements={item.measurements} cbm={item.cbm}
+                type={item.type} maxContainerDim={maxContainerDim} />
+            </div>
+          )}
+
+          {/* 寸法テキスト — 右下オーバーレイ */}
           {currentDims && (
             <div style={{
-              position: 'absolute', bottom: 0, left: 4, zIndex: 2,
-              fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 15,
+              position: 'absolute', bottom: 0, right: 4, zIndex: 2,
+              fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13,
               color: colors.accent,
               textShadow: `0 0 8px rgba(0,0,0,0.9), 0 1px 6px rgba(0,0,0,0.7), 0 0 20px ${colors.accent}40`,
               letterSpacing: '-0.5px',
             }}>
               {currentDims[0]}×{currentDims[1]}×{currentDims[2]}
-            </div>
-          )}
-
-          {/* パレット図 — 前面レイヤー（右寄せ） */}
-          {item.qtyPerPallet > 0 && (
-            <div style={{
-              position: 'relative', zIndex: 1, width: '100%', height: '100%',
-              display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-            }}>
-              <div style={{ width: '55%', height: '100%' }}>
-                <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
-                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-                  measurements={item.measurements} />
-              </div>
             </div>
           )}
         </div>

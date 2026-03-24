@@ -17,12 +17,12 @@ interface HeaderBarProps {
   onFileReload: (file: File) => void;
   workElapsed: string;
   workRawSeconds: number;
-  autoAnnounce: boolean;
-  onToggleAutoAnnounce: () => void;
   onMenuToggle: () => void;
   onResetWorkTimer: () => void;
   itemTimeLogs: ItemTimeLog[];
   completionLog: CompletionLogEntry[];
+  onContainerAnnounce: () => void;
+  hasItems: boolean;
 }
 
 export default function HeaderBar({
@@ -32,12 +32,12 @@ export default function HeaderBar({
   onFileReload,
   workElapsed,
   workRawSeconds,
-  autoAnnounce,
-  onToggleAutoAnnounce,
   onMenuToggle,
   onResetWorkTimer,
   itemTimeLogs,
   completionLog,
+  onContainerAnnounce,
+  hasItems,
 }: HeaderBarProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [popupOpen, setPopupOpen] = useState(false);
@@ -96,19 +96,17 @@ export default function HeaderBar({
       >
         {workElapsed}
       </span>
-      <button onClick={onToggleAutoAnnounce} className="header-btn"
+      <button onClick={onContainerAnnounce} disabled={!hasItems} className="header-btn"
         style={{
-          background: autoAnnounce ? 'rgba(34,197,94,0.1)' : undefined,
-          borderColor: autoAnnounce ? 'rgba(34,197,94,0.25)' : undefined,
-          color: autoAnnounce ? '#16a34a' : undefined,
+          background: 'rgba(251,191,36,0.08)',
+          borderColor: 'rgba(251,191,36,0.2)',
+          color: '#d97706',
+          opacity: hasItems ? 1 : 0.4,
+          flexShrink: 0,
         }}
-        title={autoAnnounce ? '自動読上げ ON' : '自動読上げ OFF'}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {autoAnnounce ? (
-            <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></>
-          ) : (
-            <><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></>
-          )}
+        title="コンテナ案内">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
         </svg>
       </button>
 

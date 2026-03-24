@@ -55,25 +55,27 @@ body {
 /* ===== Header ===== */
 .app-header {
   display: flex; align-items: center;
-  height: 48px; padding: 0 10px;
+  height: 48px; padding: 0 6px;
   background: #1a1d2e;
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  gap: 8px; flex-shrink: 0;
+  gap: 4px; flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  overflow: hidden;
 }
 .header-btn {
   display: flex; align-items: center; justify-content: center;
-  min-width: 36px; min-height: 34px; border-radius: 10px;
+  min-width: 32px; width: 32px; height: 32px; border-radius: 8px;
   background: transparent; border: 1px solid rgba(255,255,255,0.1);
   color: rgba(255,255,255,0.6); transition: all 0.15s ease;
-  cursor: pointer; font-size: 13px;
+  cursor: pointer; font-size: 13px; flex-shrink: 0;
 }
 .header-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
 .header-select {
   background: #252838; border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px; color: #e0e0e0;
-  padding: 4px 10px; font-size: 13px; min-height: 34px; cursor: pointer;
+  border-radius: 8px; color: #e0e0e0;
+  padding: 4px 8px; font-size: 12px; min-height: 32px; cursor: pointer;
   font-family: var(--font-mono); font-weight: 500;
+  min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis;
 }
 .header-work-elapsed {
   font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums;

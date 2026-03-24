@@ -40,7 +40,6 @@ export default function Home() {
     increaseQty,
     decreaseQty,
     deleteCurrent,
-    toggleAutoAnnounce,
     updateItem,
     updateMasterItem,
     addItem,
@@ -334,9 +333,9 @@ export default function Home() {
   const handleContainerSummary = useCallback(() => {
     const container = state.containers[state.selectedContainerIdx];
     if (container) {
-      announceContainerSummary(state.items, container.containerNo);
+      announceContainerSummary(state.items, container.containerNo, state.completedIds, workRawSeconds);
     }
-  }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
+  }, [state.containers, state.selectedContainerIdx, state.items, state.completedIds, workRawSeconds, announceContainerSummary]);
 
   const handleProgress = useCallback(() => {
     announceProgress(state.items, state.completedIds);
@@ -708,12 +707,12 @@ export default function Home() {
           onFileReload={handleFileLoaded}
           workElapsed={workElapsed}
           workRawSeconds={workRawSeconds}
-          autoAnnounce={state.autoAnnounce}
-          onToggleAutoAnnounce={toggleAutoAnnounce}
           onMenuToggle={() => setMenuOpen(!menuOpen)}
           onResetWorkTimer={() => { resetWorkTimer(); setItemTimeLogs([]); }}
           itemTimeLogs={itemTimeLogs}
           completionLog={state.completionLog}
+          onContainerAnnounce={handleContainerSummary}
+          hasItems={state.items.length > 0}
         />
 
         {/* メインエリア */}
@@ -843,7 +842,6 @@ export default function Home() {
             onIncrease={handleIncrease}
             onDecrease={handleDecrease}
             onAnnounce={handleAnnounce}
-            onContainerSummary={handleContainerSummary}
             hasItems={state.items.length > 0}
             isListening={isListening}
             isVoiceSupported={isSupported}

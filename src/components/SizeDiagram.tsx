@@ -19,6 +19,7 @@ export function parseMeas(meas: string): [number, number, number] | null {
 
 /**
  * リアルな段ボール質感の3Dボックス。CSS 3D transformでゆっくり回転。
+ * シールラベル付き（縦4cm×横2cm相当、前面左上配置）
  */
 export default function SizeDiagram({ measurements, cbm, type, maxContainerDim }: SizeDiagramProps) {
   const dims = measurements ? parseMeas(measurements) : null;
@@ -26,12 +27,19 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim }
 
   const [w, d, h] = dims || [40, 30, 30];
 
-  // maxContainerDimを基準にスケーリング
+  // maxContainerDimを基準にスケーリング — コンテナ内に収まるよう制限
   const refDim = maxContainerDim || Math.max(w, d, h, 1);
   const baseScale = 1.0 / refDim;
-  const sw = w * baseScale * 120;
-  const sd = d * baseScale * 120;
-  const sh = h * baseScale * 120;
+  const rawSw = w * baseScale * 100;
+  const rawSd = d * baseScale * 100;
+  const rawSh = h * baseScale * 100;
+
+  // 最大サイズを制限して枠内に収める
+  const maxPx = 90;
+  const scaleFactor = Math.min(1, maxPx / Math.max(rawSw, rawSd, rawSh, 1));
+  const sw = rawSw * scaleFactor;
+  const sd = rawSd * scaleFactor;
+  const sh = rawSh * scaleFactor;
 
   // ユニークID（SVGパターン用）
   const uid = `cb-${type}-${w}-${d}-${h}`;
@@ -39,11 +47,18 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim }
   // アニメーション名
   const animName = `spin-${uid}`;
 
+  // シールサイズ（実物 縦4cm×横2cm → 箱比率で計算、最小ピクセル保証）
+  const sealW = Math.max(sw * (2 / w), 10);  // 横2cm
+  const sealH = Math.max(sh * (4 / h), 16);  // 縦4cm
+  // テキストサイズ（実物 約2cm角 → 箱比率で計算）
+  const textSize = Math.max(Math.min(sealW * 0.7, sealH * 0.22), 5);
+
   return (
     <div style={{
       width: '100%', height: '100%',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       perspective: 400,
+      overflow: 'hidden',
     }}>
       <style>{`
         @keyframes ${animName} {
@@ -62,7 +77,36 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim }
           position: 'absolute', width: sw, height: sh,
           transform: `translateZ(${sd / 2}px)`,
           ...cardboardFace('front', uid, 0.55),
-        }} />
+        }}>
+          {/* シールラベル（前面左上） */}
+          <div style={{
+            position: 'absolute', top: 3, left: 3,
+            width: sealW, height: sealH,
+            background: 'rgba(255,255,255,0.85)',
+            border: '0.5px solid rgba(0,0,0,0.2)',
+            borderRadius: 1,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden', padding: 1,
+            backfaceVisibility: 'hidden',
+          }}>
+            <span style={{
+              fontSize: textSize, fontWeight: 900,
+              color: '#1a1a1a', lineHeight: 1,
+              textAlign: 'center', letterSpacing: '-0.5px',
+            }}>要</span>
+            <span style={{
+              fontSize: textSize, fontWeight: 900,
+              color: '#1a1a1a', lineHeight: 1,
+              textAlign: 'center', letterSpacing: '-0.5px',
+            }}>安全</span>
+            <span style={{
+              fontSize: textSize * 0.7, fontWeight: 600,
+              color: '#555', lineHeight: 1.1,
+              textAlign: 'center',
+            }}>部</span>
+          </div>
+        </div>
         {/* 背面 */}
         <div style={{
           position: 'absolute', width: sw, height: sh,
