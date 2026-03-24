@@ -37,19 +37,20 @@ const CHANGELOG = [
   ]},
 ];
 
-/* ===== CNSロゴSVG（段ボール箱・正方形） ===== */
+/* ===== CNSロゴSVG（段ボール箱・正方形に見えるアイソメトリック） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size} height={size} viewBox="0 0 64 72" fill="none" xmlns="http://www.w3.org/2000/svg"
+      style={{ display: 'block' }}>
       {/* 上面 */}
-      <polygon points="32,10 56,22 32,34 8,22" fill="rgba(255,255,255,0.35)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
-      {/* 左面 */}
-      <polygon points="8,22 32,34 32,56 8,44" fill="rgba(255,255,255,0.2)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
+      <polygon points="32,8 54,18 32,28 10,18" fill="rgba(255,255,255,0.35)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
+      {/* 左面（高さを増して正方形に） */}
+      <polygon points="10,18 32,28 32,58 10,48" fill="rgba(255,255,255,0.2)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
       {/* 右面 */}
-      <polygon points="56,22 32,34 32,56 56,44" fill="rgba(255,255,255,0.12)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
+      <polygon points="54,18 32,28 32,58 54,48" fill="rgba(255,255,255,0.12)" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
       {/* テープ（上面中央線+前面中央線） */}
-      <line x1="32" y1="10" x2="32" y2="34" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
-      <line x1="32" y1="34" x2="32" y2="56" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
+      <line x1="32" y1="8" x2="32" y2="28" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
+      <line x1="32" y1="28" x2="32" y2="58" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
     </svg>
   );
 }
@@ -108,10 +109,12 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded }: FileDropZon
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <button onClick={() => setShowChangelog(true)}
             style={{
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 20, padding: '4px 14px', cursor: 'pointer',
-              color: 'rgba(255,255,255,0.5)', fontSize: 11, fontFamily: 'var(--font-mono)',
-              fontWeight: 500, letterSpacing: 0.5,
+              background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.2))',
+              border: '1px solid rgba(139,92,246,0.4)',
+              borderRadius: 20, padding: '5px 18px', cursor: 'pointer',
+              color: '#a78bfa', fontSize: 12, fontFamily: 'var(--font-mono)',
+              fontWeight: 700, letterSpacing: 0.8,
+              boxShadow: '0 0 12px rgba(139,92,246,0.15)',
             }}>
             Ver {APP_VERSION}
           </button>
@@ -189,7 +192,14 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded }: FileDropZon
           }}>
             <CnsLogo size={64} />
           </div>
-          <h1 style={{ color: '#fff', fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif' }}>
+          <h1 style={{
+            fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif',
+            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 40%, #f472b6 70%, #60a5fa 100%)',
+            backgroundSize: '200% auto',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            animation: 'title-shimmer 4s ease-in-out infinite',
+          }}>
             Container Navigation System
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 4 }}>
