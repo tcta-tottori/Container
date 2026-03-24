@@ -77,12 +77,43 @@ function exportToExcel(items: ContainerItem[]) {
   XLSX.writeFile(wb, `CNS_品目一覧_全集約版.xlsx`);
 }
 
-/* ===== Excel Import（CNS品目一覧 全集約版フォーマット） ===== */
+/* ===== 行データからマスタ情報を抽出 ===== */
+function extractMasterFromRow(r: unknown[]) {
+  const v = (col: number) => r[col] != null ? String(r[col]).trim() : '';
+  const n = (col: number) => { const x = Number(r[col]); return isNaN(x) ? undefined : x; };
+  return {
+    newPartNumber: v(0) || undefined,
+    partNumber: v(1),
+    itemName: v(2),
+    type: (v(3) || undefined) as ItemType | undefined,
+    representModel: v(4),
+    packingQty: n(5) ?? 0,
+    totalQty: n(6) ?? 0,
+    caseCount: n(7) ?? 0,
+    qtyPerPallet: n(8) ?? 0,
+    newPartNumberKetaka: v(9) || undefined,
+    itemNameKetaka: v(10) || undefined,
+    linkStatus: v(11) || undefined,
+    itemNameContainer: v(12) || undefined,
+    representModelContainer: v(13) || undefined,
+    packingQtyContainer: n(14),
+    qtyPerPalletContainer: n(15),
+    description: v(16) || undefined,
+    modelNo: v(17) || undefined,
+    grossWeight: n(18),
+    cbm: n(19),
+    measurements: v(20) || undefined,
+  };
+}
+
+/* ===== Excel Import（CNS品目一覧 全集約版 — 全品目追加） ===== */
 function importFromExcel(
   file: File,
   items: ContainerItem[],
-  onUpdate: (idx: number, updates: Partial<ContainerItem>) => void
-): Promise<number> {
+  containerNo: string,
+  onUpdate: (idx: number, updates: Partial<ContainerItem>) => void,
+  onAdd: (item: ContainerItem) => void,
+): Promise<{ updated: number; added: number }> {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -91,47 +122,77 @@ function importFromExcel(
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
 
-      // ヘッダー行をスキップ（行0=グループ、行1=カラム名）
       let updated = 0;
+      let added = 0;
+      const existingParts = new Set(items.map((it) => it.partNumber));
+
       for (let i = 2; i < rows.length; i++) {
         const r = rows[i];
         if (!r || !Array.isArray(r)) continue;
-        const partNumber = String(r[1] || '').trim(); // B列: 気高コード
-        if (!partNumber) continue;
-        const idx = items.findIndex((it) => it.partNumber === partNumber);
-        if (idx < 0) continue;
+        const master = extractMasterFromRow(r);
+        if (!master.partNumber) continue;
 
-        const updates: Partial<ContainerItem> = {};
-        const v = (col: number) => r[col] != null ? String(r[col]).trim() : '';
-        const n = (col: number) => { const x = Number(r[col]); return isNaN(x) ? undefined : x; };
-
-        if (v(0)) updates.newPartNumber = v(0);
-        if (v(3)) updates.type = v(3) as ItemType;
-        if (v(4)) updates.representModel = v(4);
-        if (n(5) !== undefined) updates.packingQty = n(5)!;
-        if (n(8) !== undefined) updates.qtyPerPallet = n(8)!;
-        // 气高编号
-        if (v(9)) updates.newPartNumberKetaka = v(9);
-        if (v(10)) updates.itemNameKetaka = v(10);
-        if (v(11)) updates.linkStatus = v(11);
-        // コンテナ日程
-        if (v(12)) updates.itemNameContainer = v(12);
-        if (v(13)) updates.representModelContainer = v(13);
-        if (n(14) !== undefined) updates.packingQtyContainer = n(14)!;
-        if (n(15) !== undefined) updates.qtyPerPalletContainer = n(15)!;
-        // AQSS
-        if (v(16)) updates.description = v(16);
-        if (v(17)) updates.modelNo = v(17);
-        if (n(18) !== undefined) updates.grossWeight = n(18)!;
-        if (n(19) !== undefined) updates.cbm = n(19)!;
-        if (v(20)) updates.measurements = v(20);
-
-        if (Object.keys(updates).length > 0) {
-          onUpdate(idx, updates);
-          updated++;
+        const idx = items.findIndex((it) => it.partNumber === master.partNumber);
+        if (idx >= 0) {
+          // 既存品目を更新
+          const updates: Partial<ContainerItem> = {};
+          if (master.newPartNumber) updates.newPartNumber = master.newPartNumber;
+          if (master.type) updates.type = master.type;
+          if (master.representModel) updates.representModel = master.representModel;
+          if (master.packingQty) updates.packingQty = master.packingQty;
+          if (master.qtyPerPallet) updates.qtyPerPallet = master.qtyPerPallet;
+          if (master.newPartNumberKetaka) updates.newPartNumberKetaka = master.newPartNumberKetaka;
+          if (master.itemNameKetaka) updates.itemNameKetaka = master.itemNameKetaka;
+          if (master.linkStatus) updates.linkStatus = master.linkStatus;
+          if (master.itemNameContainer) updates.itemNameContainer = master.itemNameContainer;
+          if (master.representModelContainer) updates.representModelContainer = master.representModelContainer;
+          if (master.packingQtyContainer !== undefined) updates.packingQtyContainer = master.packingQtyContainer;
+          if (master.qtyPerPalletContainer !== undefined) updates.qtyPerPalletContainer = master.qtyPerPalletContainer;
+          if (master.description) updates.description = master.description;
+          if (master.modelNo) updates.modelNo = master.modelNo;
+          if (master.grossWeight !== undefined) updates.grossWeight = master.grossWeight;
+          if (master.cbm !== undefined) updates.cbm = master.cbm;
+          if (master.measurements) updates.measurements = master.measurements;
+          if (Object.keys(updates).length > 0) {
+            onUpdate(idx, updates);
+            updated++;
+          }
+        } else if (!existingParts.has(master.partNumber)) {
+          // 新規品目を追加（マスタデータのみ、パレット/端数は0）
+          existingParts.add(master.partNumber);
+          const detectedType = master.type || detectItemType(
+            master.itemName, master.qtyPerPallet, 0, master.partNumber
+          );
+          onAdd({
+            id: `master-${containerNo}-${i}`,
+            partNumber: master.partNumber,
+            itemName: master.itemName,
+            representModel: master.representModel,
+            type: detectedType,
+            packingQty: master.packingQty,
+            totalQty: master.totalQty,
+            caseCount: master.caseCount,
+            palletCount: 0,
+            fraction: 0,
+            qtyPerPallet: master.qtyPerPallet,
+            newPartNumber: master.newPartNumber,
+            newPartNumberKetaka: master.newPartNumberKetaka,
+            itemNameKetaka: master.itemNameKetaka,
+            linkStatus: master.linkStatus,
+            itemNameContainer: master.itemNameContainer,
+            representModelContainer: master.representModelContainer,
+            packingQtyContainer: master.packingQtyContainer,
+            qtyPerPalletContainer: master.qtyPerPalletContainer,
+            description: master.description,
+            modelNo: master.modelNo,
+            grossWeight: master.grossWeight,
+            cbm: master.cbm,
+            measurements: master.measurements,
+          });
+          added++;
         }
       }
-      resolve(updated);
+      resolve({ updated, added });
     };
     reader.readAsArrayBuffer(file);
   });
@@ -189,11 +250,14 @@ export default function ItemEditPage({
   const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const count = await importFromExcel(file, items, onUpdateItem);
-    setImportMsg(`${count}件のマスタデータを更新しました`);
-    setTimeout(() => setImportMsg(''), 3000);
+    const result = await importFromExcel(file, items, containerNo, onUpdateItem, onAddItem);
+    const msgs: string[] = [];
+    if (result.updated > 0) msgs.push(`${result.updated}件更新`);
+    if (result.added > 0) msgs.push(`${result.added}件追加`);
+    setImportMsg(msgs.length > 0 ? `${msgs.join('、')}しました（合計${items.length + result.added}件）` : '変更なし');
+    setTimeout(() => setImportMsg(''), 4000);
     e.target.value = '';
-  }, [items, onUpdateItem]);
+  }, [items, containerNo, onUpdateItem, onAddItem]);
 
   const handleAddItem = useCallback((item: ContainerItem) => {
     onAddItem(item);

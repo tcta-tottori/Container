@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
-import { itemNameForSpeech, areSimilarItems } from '@/lib/typeDetector';
+import { itemNameForSpeech, areSimilarItems, getSimilarityReason, extractColor } from '@/lib/typeDetector';
 
 function speak(text: string): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -65,10 +65,16 @@ export function useSpeech() {
         (other) => other.id !== item.id && areSimilarItems(item.itemName, other.itemName)
       );
       if (similarItems.length > 0) {
-        const names = similarItems.map((s) => {
-          return itemNameForSpeech(s.itemName);
-        }).join('、');
-        text += `注意、類似品があります。${names}。`;
+        const descs = similarItems.map((s) => {
+          const reason = getSimilarityReason(item.itemName, s.itemName);
+          const name = itemNameForSpeech(s.itemName);
+          if (reason === 'color') {
+            const c = extractColor(s.itemName);
+            return c ? `${name}、色違い${c}` : `${name}、色違い`;
+          }
+          return `${name}、品名類似`;
+        }).join('。');
+        text += `注意、類似品があります。${descs}。`;
       }
     }
 

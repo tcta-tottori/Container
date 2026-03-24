@@ -197,6 +197,30 @@ export function itemNameForSpeech(itemName: string): string {
   return name;
 }
 
+/** 類似の理由 */
+export type SimilarityReason = 'color' | 'name' | null;
+
+/**
+ * 2つの品名の類似理由を返す
+ */
+export function getSimilarityReason(name1: string, name2: string): SimilarityReason {
+  if (name1 === name2) return null;
+  const base1 = name1.replace(/\([^)]*\)/g, '').replace(/ポリカバー/g, '').trim();
+  const base2 = name2.replace(/\([^)]*\)/g, '').replace(/ポリカバー/g, '').trim();
+  if (base1 === base2) return 'color';
+  if (Math.abs(base1.length - base2.length) <= 1) {
+    const longer = base1.length >= base2.length ? base1 : base2;
+    const shorter = base1.length < base2.length ? base1 : base2;
+    let diffs = 0, si = 0;
+    for (let li = 0; li < longer.length && diffs <= 1; li++) {
+      if (si < shorter.length && longer[li] === shorter[si]) { si++; }
+      else { diffs++; if (longer.length === shorter.length) si++; }
+    }
+    if (diffs <= 1) return 'name';
+  }
+  return null;
+}
+
 /**
  * 2つの品名の類似度を判定（色違いや1文字違い）
  */

@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
-import { extractColor, areSimilarItems } from '@/lib/typeDetector';
+import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 import PalletDiagram from './PalletDiagram';
 
 interface ItemDetailPanelProps {
@@ -311,20 +311,56 @@ export default function ItemDetailPanel({
 
         {/* 類似品 */}
         {similarItems.length > 0 && (
-          <div className="detail-similar-warn" style={{ background: 'rgba(245,158,11,0.15)', borderColor: 'rgba(245,158,11,0.3)' }}>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: 20, height: 20, borderRadius: 4, flexShrink: 0,
-              background: '#f59e0b', color: '#000', fontSize: 13, fontWeight: 900,
-              lineHeight: 1,
-            }}>!</span>
-            <span className="detail-similar-label" style={{ color: '#fbbf24' }}>類似品:</span>
-            <span className="detail-similar-names" style={{ color: '#fde68a' }}>
-              {similarItems.map((s) => {
-                const c2 = extractColor(s.itemName);
-                return c2 ? `${s.itemName}(${c2})` : s.itemName;
-              }).join(' / ')}
-            </span>
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 4,
+            background: 'rgba(245,158,11,0.1)', borderRadius: 8,
+            padding: '6px 10px', border: '1px solid rgba(245,158,11,0.25)',
+            flexShrink: 0, position: 'relative', zIndex: 2,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 20, height: 20, borderRadius: 4, flexShrink: 0,
+                background: '#f59e0b', color: '#000', fontSize: 13, fontWeight: 900, lineHeight: 1,
+              }}>!</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24' }}>類似品 ({similarItems.length}件)</span>
+            </div>
+            {similarItems.map((s) => {
+              const reason = getSimilarityReason(item.itemName, s.itemName);
+              const c2 = extractColor(s.itemName);
+              const myColor = extractColor(item.itemName);
+              return (
+                <div key={s.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  paddingLeft: 26, fontSize: 11,
+                }}>
+                  {reason === 'color' ? (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                      background: 'rgba(239,68,68,0.25)', fontSize: 10,
+                    }}>🎨</span>
+                  ) : (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                      background: 'rgba(59,130,246,0.25)', fontSize: 10,
+                    }}>Aa</span>
+                  )}
+                  <span style={{ color: '#fde68a', fontWeight: 600 }}>
+                    {s.itemName.replace(/ポリカバー/g, '').trim() || s.itemName}
+                  </span>
+                  <span style={{
+                    fontSize: 9, color: 'rgba(255,255,255,0.45)', fontWeight: 500,
+                    background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 3,
+                  }}>
+                    {reason === 'color'
+                      ? `色違い${myColor && c2 ? ` (${myColor}↔${c2})` : ''}`
+                      : '品名類似'}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 
