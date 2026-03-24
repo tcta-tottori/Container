@@ -159,12 +159,15 @@ export type SimilarityReason = 'color' | 'name' | null;
 
 /**
  * 2つの品名の類似理由を返す
+ * 数字の違い（10 vs 18等）は類似とみなさない
  */
 export function getSimilarityReason(name1: string, name2: string): SimilarityReason {
   if (name1 === name2) return null;
   const base1 = name1.replace(/\([^)]*\)/g, '').replace(/ポリカバー/g, '').trim();
   const base2 = name2.replace(/\([^)]*\)/g, '').replace(/ポリカバー/g, '').trim();
   if (base1 === base2) return 'color';
+  // 数字の違いは類似とみなさない
+  if (base1.replace(/\d/g, '') === base2.replace(/\d/g, '') && base1 !== base2) return null;
   if (Math.abs(base1.length - base2.length) <= 1) {
     const longer = base1.length >= base2.length ? base1 : base2;
     const shorter = base1.length < base2.length ? base1 : base2;
@@ -190,6 +193,9 @@ export function areSimilarItems(name1: string, name2: string): boolean {
 
   // 色だけ違う場合
   if (base1 === base2) return true;
+
+  // 数字の違いは類似とみなさない（10 vs 18等）
+  if (base1.replace(/\d/g, '') === base2.replace(/\d/g, '') && base1 !== base2) return false;
 
   // 1文字だけ違う場合
   if (Math.abs(base1.length - base2.length) <= 1) {

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
-import { itemNameForSpeech, areSimilarItems, getSimilarityReason, extractColor } from '@/lib/typeDetector';
+import { itemNameForSpeech, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 
 function speak(text: string): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -65,16 +65,23 @@ export function useSpeech() {
         (other) => other.id !== item.id && areSimilarItems(item.itemName, other.itemName)
       );
       if (similarItems.length > 0) {
-        const descs = similarItems.map((s) => {
-          const reason = getSimilarityReason(item.itemName, s.itemName);
-          const name = itemNameForSpeech(s.itemName);
-          if (reason === 'color') {
-            const c = extractColor(s.itemName);
-            return c ? `${name}、色違い${c}` : `${name}、色違い`;
-          }
-          return `${name}、品名類似`;
-        }).join('。');
-        text += `注意、類似品があります。${descs}。`;
+        const hasColorVariant = similarItems.some(
+          (s) => getSimilarityReason(item.itemName, s.itemName) === 'color'
+        );
+        const hasNameSimilar = similarItems.some(
+          (s) => getSimilarityReason(item.itemName, s.itemName) === 'name'
+        );
+        if (hasColorVariant && hasNameSimilar) {
+          text += '注意、類似品で色違いがあります。品名類似もあります。';
+        } else if (hasColorVariant) {
+          text += '注意、類似品で色違いがあります。';
+        } else {
+          const descs = similarItems.map((s) => {
+            const name = itemNameForSpeech(s.itemName);
+            return `${name}、品名類似`;
+          }).join('。');
+          text += `注意、類似品があります。${descs}。`;
+        }
       }
     }
 

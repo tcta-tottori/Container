@@ -17,6 +17,31 @@ interface ItemDetailPanelProps {
   onUncompleteItem?: (id: string) => void;
 }
 
+/* ===== 類似品アイコン ===== */
+function NameSimilarIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+      <rect x="1" y="1" width="14" height="14" rx="2" fill="#fff" stroke="#333" strokeWidth="1" />
+      <text x="8" y="11.5" textAnchor="middle" fontSize="10" fontWeight="800" fill="#000">A</text>
+    </svg>
+  );
+}
+
+function ColorVariantIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" style={{ flexShrink: 0 }}>
+      <defs>
+        <clipPath id="cv-top"><polygon points="0,0 16,0 16,16" /></clipPath>
+        <clipPath id="cv-bot"><polygon points="0,0 0,16 16,16" /></clipPath>
+      </defs>
+      <rect x="1" y="1" width="14" height="14" rx="2" fill="#fff" clipPath="url(#cv-top)" />
+      <rect x="1" y="1" width="14" height="14" rx="2" fill="#222" clipPath="url(#cv-bot)" />
+      <rect x="1" y="1" width="14" height="14" rx="2" fill="none" stroke="#666" strokeWidth="1" />
+      <line x1="1" y1="15" x2="15" y2="1" stroke="#666" strokeWidth="1" />
+    </svg>
+  );
+}
+
 /* ===== 類似品名の差異ハイライト ===== */
 function HighlightDiff({ base, target }: { base: string; target: string }) {
   // 括弧部分を分離
@@ -89,6 +114,68 @@ function MarqueeText({ text, className, style }: {
       <div className={overflow ? 'marquee-scroll' : ''}>
         <span ref={innerRef} className="marquee-text">{text}</span>
         {overflow && <span className="marquee-text marquee-dup" aria-hidden="true">{text}</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ===== 類似品マーキー ===== */
+function SimilarItemsMarquee({ item, similarItems }: {
+  item: ContainerItem; similarItems: ContainerItem[];
+}) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [overflow, setOverflow] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      if (outerRef.current && innerRef.current) {
+        setOverflow(innerRef.current.scrollWidth > outerRef.current.clientWidth + 2);
+      }
+    };
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, [item.id, similarItems.length]);
+
+  const content = similarItems.map((s, i) => {
+    const reason = getSimilarityReason(item.itemName, s.itemName);
+    return (
+      <span key={s.id} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        fontSize: 12, fontWeight: 700, color: '#fff',
+      }}>
+        {i > 0 && <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 4px' }}>|</span>}
+        {reason === 'color' ? <ColorVariantIcon size={14} /> : <NameSimilarIcon size={14} />}
+        <HighlightDiff base={item.itemName} target={s.itemName} />
+      </span>
+    );
+  });
+
+  return (
+    <div className="similar-warn-blink" style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      borderRadius: 6, padding: '4px 10px',
+      flexShrink: 0, position: 'relative', zIndex: 2,
+      overflow: 'hidden', whiteSpace: 'nowrap',
+    }}>
+      <span style={{
+        fontSize: 11, fontWeight: 800, color: '#fbbf24', whiteSpace: 'nowrap', flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 3,
+      }}>
+        <span style={{ fontSize: 13 }}>&#x26A0;&#xFE0F;</span>類似品:
+      </span>
+      <div ref={outerRef} style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
+        <div className={overflow ? 'marquee-scroll' : ''} style={{ display: 'inline-flex', alignItems: 'center' }}>
+          <div ref={innerRef} style={{ display: 'inline-flex', alignItems: 'center' }}>
+            {content}
+          </div>
+          {overflow && (
+            <div aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 40 }}>
+              {content}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -359,36 +446,9 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 類似品（琥珀枠点滅・白文字・アイコン+品名・差異赤太字） */}
+        {/* 類似品（琥珀枠点滅・白文字・アイコン+品名・差異赤太字・マーキー対応） */}
         {similarItems.length > 0 && (
-          <div className="similar-warn-blink" style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            borderRadius: 6, padding: '4px 10px',
-            flexShrink: 0, position: 'relative', zIndex: 2,
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-          }}>
-            <span style={{
-              fontSize: 11, fontWeight: 800, color: '#fbbf24', whiteSpace: 'nowrap', flexShrink: 0,
-              display: 'flex', alignItems: 'center', gap: 3,
-            }}>
-              <span style={{ fontSize: 13 }}>⚠️</span>類似品:
-            </span>
-            {similarItems.map((s, i) => {
-              const reason = getSimilarityReason(item.itemName, s.itemName);
-              const icon = reason === 'color' ? '🎨' : '🔤';
-              return (
-                <span key={s.id} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 3,
-                  fontSize: 12, fontWeight: 700, color: '#fff',
-                }}>
-                  {i > 0 && <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 2px' }}>|</span>}
-                  <span style={{ fontSize: 13 }}>{icon}</span>
-                  <HighlightDiff base={item.itemName} target={s.itemName} />
-                </span>
-              );
-            })}
-          </div>
+          <SimilarItemsMarquee item={item} similarItems={similarItems} />
         )}
 
         {/* 関連 */}
