@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
-import { itemNameForSpeech, areSimilarItems } from '@/lib/typeDetector';
+import { itemNameForSpeech, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 
 function speak(text: string): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -65,10 +65,32 @@ export function useSpeech() {
         (other) => other.id !== item.id && areSimilarItems(item.itemName, other.itemName)
       );
       if (similarItems.length > 0) {
-        const currentName = itemNameForSpeech(item.itemName);
-        const similarNames = similarItems.map((s) => itemNameForSpeech(s.itemName));
-        const allNames = [currentName, ...similarNames].join('と');
-        text += `注意、${allNames}があります。`;
+        const colorItems = similarItems.filter(s => getSimilarityReason(item.itemName, s.itemName) === 'color');
+        const nameItems = similarItems.filter(s => getSimilarityReason(item.itemName, s.itemName) === 'name');
+
+        if (colorItems.length > 0) {
+          // 色違いの数量を読み上げ
+          const descs = colorItems.map(s => {
+            const name = itemNameForSpeech(s.itemName);
+            const fractionCeil = s.fraction % 1 !== 0 ? Math.ceil(s.fraction) : s.fraction;
+            let qty = '';
+            if (s.palletCount > 0 && fractionCeil > 0) {
+              qty = `${s.palletCount}パレットと${fractionCeil}ケース`;
+            } else if (s.palletCount > 0) {
+              qty = `${s.palletCount}パレット`;
+            } else if (fractionCeil > 0) {
+              qty = `${fractionCeil}ケース`;
+            }
+            return qty ? `${name}が${qty}` : name;
+          }).join('、');
+          text += `注意、色違いが${descs}ありますので注意してください。`;
+        }
+
+        if (nameItems.length > 0) {
+          const currentName = itemNameForSpeech(item.itemName);
+          const names = nameItems.map(s => itemNameForSpeech(s.itemName));
+          text += `注意、${currentName}と${names.join('と')}があります。`;
+        }
       }
     }
 
