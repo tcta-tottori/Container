@@ -26,17 +26,34 @@ export interface ContainerItem {
   /** 1パレットあたりケース数 — 「内容」シート K列 */
   qtyPerPallet: number;
   // --- 以下はCNS品目一覧マスタデータ ---
-  /** 新建高コード (CNS品目一覧 A列) */
+  /** 新建高コード (A列) */
   newPartNumber?: string;
-  /** ITEM DESCRIPTION (CNS品目一覧 J列) */
+  // -- 气高编号 参照 --
+  /** 新建高コード/气高编号 (J列) */
+  newPartNumberKetaka?: string;
+  /** 規格/气高编号 (K列) */
+  itemNameKetaka?: string;
+  /** 紐付状態 (L列: ✓ or —) */
+  linkStatus?: string;
+  // -- コンテナ日程 参照 --
+  /** 規格/コンテナ (M列) */
+  itemNameContainer?: string;
+  /** 代表機種/コンテナ (N列) */
+  representModelContainer?: string;
+  /** 入数/コンテナ (O列) */
+  packingQtyContainer?: number;
+  /** 1P数/コンテナ (P列) */
+  qtyPerPalletContainer?: number;
+  // -- AQSS --
+  /** ITEM DESCRIPTION (Q列) */
   description?: string;
-  /** MODEL NO. (CNS品目一覧 K列) */
+  /** MODEL NO. (R列) */
   modelNo?: string;
-  /** G.W.（総重量 KGS） (CNS品目一覧 L列) */
+  /** G.W. per carton (S列) */
   grossWeight?: number;
-  /** CBM（容積 立方メートル） (CNS品目一覧 M列) */
+  /** CBM (T列) */
   cbm?: number;
-  /** Meas.（外寸 例: 55*38*38） (CNS品目一覧 N列) */
+  /** Meas. (U列) */
   measurements?: string;
 }
 

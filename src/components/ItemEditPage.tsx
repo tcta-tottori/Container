@@ -19,37 +19,65 @@ interface ItemEditPageProps {
 
 const ITEM_TYPES: ItemType[] = ['ポリカバー', '箱', '部品', 'その他'];
 
-/* ===== Excel Export ===== */
+/* ===== Excel Export（CNS品目一覧 全集約版フォーマット） ===== */
 function exportToExcel(items: ContainerItem[]) {
-  const data = items.map((it) => ({
-    '新建高コード': it.newPartNumber || '',
-    '気高コード': it.partNumber,
-    '規格': it.itemName,
-    '種類': it.type,
-    '代表機種': it.representModel,
-    '入数': it.packingQty,
-    '総数': it.totalQty,
-    'ケース数': it.caseCount,
-    '1P数': it.qtyPerPallet,
-    'ITEM DESCRIPTION': it.description || '',
-    'MODEL NO.': it.modelNo || '',
-    'G.W.': it.grossWeight || '',
-    'CBM': it.cbm || '',
-    'Meas.': it.measurements || '',
-  }));
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '品目一覧');
-  ws['!cols'] = [
-    { wch: 14 }, { wch: 16 }, { wch: 30 }, { wch: 10 },
-    { wch: 16 }, { wch: 8 }, { wch: 10 }, { wch: 10 },
-    { wch: 8 }, { wch: 20 }, { wch: 14 }, { wch: 10 },
-    { wch: 8 }, { wch: 14 },
+  // ヘッダー行0（グループ行）
+  const groupRow = [
+    'ベース情報', '', '', '', '', '', '', '', '',
+    '气高编号', '', '',
+    'コンテナ日程', '', '', '',
+    '', '', '', '', '',
   ];
-  XLSX.writeFile(wb, `CNS_品目一覧_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  // ヘッダー行1
+  const headerRow = [
+    '新建高コード', '気高コード', '規格', '種類', '代表機種', '入数', '総数', 'ケース数', '1P数',
+    '新建高コード\n(气高编号)', '規格\n(气高编号)', '紐付状態',
+    '規格\n(コンテナ)', '代表機種\n(コンテナ)', '入数\n(コンテナ)', '1P数\n(コンテナ)',
+    'ITEM\nDESCRIPTION', 'MODEL NO.', 'G.W.\n(per carton)', 'CBM', 'Meas.',
+  ];
+  const dataRows = items.map((it) => [
+    it.newPartNumber || '',
+    it.partNumber,
+    it.itemName,
+    it.type || '',
+    it.representModel,
+    it.packingQty || '',
+    it.totalQty || '',
+    it.caseCount || '',
+    it.qtyPerPallet || '',
+    it.newPartNumberKetaka || '',
+    it.itemNameKetaka || '',
+    it.linkStatus || '',
+    it.itemNameContainer || '',
+    it.representModelContainer || '',
+    it.packingQtyContainer || '',
+    it.qtyPerPalletContainer || '',
+    it.description || '',
+    it.modelNo || '',
+    it.grossWeight || '',
+    it.cbm || '',
+    it.measurements || '',
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet([groupRow, headerRow, ...dataRows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '品目一覧（全集約）');
+  ws['!cols'] = [
+    { wch: 14 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 22 },
+    { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 6 },
+    { wch: 14 }, { wch: 28 }, { wch: 8 },
+    { wch: 28 }, { wch: 22 }, { wch: 6 }, { wch: 6 },
+    { wch: 22 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 14 },
+  ];
+  // ヘッダーグループのマージ
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },   // ベース情報
+    { s: { r: 0, c: 9 }, e: { r: 0, c: 11 } },   // 气高编号
+    { s: { r: 0, c: 12 }, e: { r: 0, c: 15 } },  // コンテナ日程
+  ];
+  XLSX.writeFile(wb, `CNS_品目一覧_全集約版.xlsx`);
 }
 
-/* ===== Excel Import ===== */
+/* ===== Excel Import（CNS品目一覧 全集約版フォーマット） ===== */
 function importFromExcel(
   file: File,
   items: ContainerItem[],
@@ -61,15 +89,45 @@ function importFromExcel(
       const data = new Uint8Array(e.target?.result as ArrayBuffer);
       const wb = XLSX.read(data, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws);
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
+
+      // ヘッダー行をスキップ（行0=グループ、行1=カラム名）
       let updated = 0;
-      for (const row of rows) {
-        const partNumber = String(row['気高コード'] || '');
-        const newPN = String(row['新建高コード'] || '');
+      for (let i = 2; i < rows.length; i++) {
+        const r = rows[i];
+        if (!r || !Array.isArray(r)) continue;
+        const partNumber = String(r[1] || '').trim(); // B列: 気高コード
         if (!partNumber) continue;
         const idx = items.findIndex((it) => it.partNumber === partNumber);
-        if (idx >= 0 && newPN) {
-          onUpdate(idx, { newPartNumber: newPN });
+        if (idx < 0) continue;
+
+        const updates: Partial<ContainerItem> = {};
+        const v = (col: number) => r[col] != null ? String(r[col]).trim() : '';
+        const n = (col: number) => { const x = Number(r[col]); return isNaN(x) ? undefined : x; };
+
+        if (v(0)) updates.newPartNumber = v(0);
+        if (v(3)) updates.type = v(3) as ItemType;
+        if (v(4)) updates.representModel = v(4);
+        if (n(5) !== undefined) updates.packingQty = n(5)!;
+        if (n(8) !== undefined) updates.qtyPerPallet = n(8)!;
+        // 气高编号
+        if (v(9)) updates.newPartNumberKetaka = v(9);
+        if (v(10)) updates.itemNameKetaka = v(10);
+        if (v(11)) updates.linkStatus = v(11);
+        // コンテナ日程
+        if (v(12)) updates.itemNameContainer = v(12);
+        if (v(13)) updates.representModelContainer = v(13);
+        if (n(14) !== undefined) updates.packingQtyContainer = n(14)!;
+        if (n(15) !== undefined) updates.qtyPerPalletContainer = n(15)!;
+        // AQSS
+        if (v(16)) updates.description = v(16);
+        if (v(17)) updates.modelNo = v(17);
+        if (n(18) !== undefined) updates.grossWeight = n(18)!;
+        if (n(19) !== undefined) updates.cbm = n(19)!;
+        if (v(20)) updates.measurements = v(20);
+
+        if (Object.keys(updates).length > 0) {
+          onUpdate(idx, updates);
           updated++;
         }
       }
@@ -132,7 +190,7 @@ export default function ItemEditPage({
     const file = e.target.files?.[0];
     if (!file) return;
     const count = await importFromExcel(file, items, onUpdateItem);
-    setImportMsg(`${count}件の新建高コードを更新しました`);
+    setImportMsg(`${count}件のマスタデータを更新しました`);
     setTimeout(() => setImportMsg(''), 3000);
     e.target.value = '';
   }, [items, onUpdateItem]);
@@ -465,6 +523,26 @@ function AddItemForm({ containerNo, itemCount, onAdd, onCancel }: {
   );
 }
 
+/* ===== 読み取り専用フィールド ===== */
+const roStyle: React.CSSProperties = {
+  background: '#0d0f16', border: '1px solid rgba(255,255,255,0.04)',
+  borderRadius: 8, color: 'rgba(255,255,255,0.55)', padding: '7px 10px', fontSize: 13,
+  width: '100%', fontFamily: 'var(--font-mono)',
+};
+
+/* ===== セクションヘッダ ===== */
+function SectionHeader({ title, color }: { title: string; color: string }) {
+  return (
+    <div style={{
+      fontSize: 10, fontWeight: 600, letterSpacing: 0.5, color,
+      marginBottom: 6, marginTop: 8, display: 'flex', alignItems: 'center', gap: 6,
+    }}>
+      <span style={{ width: 3, height: 10, borderRadius: 2, background: color }} />
+      {title}
+    </div>
+  );
+}
+
 /* ===== 編集行 ===== */
 function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpdate, onDelete, onGoDetail }: {
   item: ContainerItem; isEditing: boolean;
@@ -516,29 +594,24 @@ function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpd
         padding: '14px 16px', background: '#1e2235',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
       }}>
-        {/* 基本情報 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 10 }}>
+        {/* ===== ベース情報 ===== */}
+        <SectionHeader title="ベース情報" color="#60a5fa" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
           <div>
-            <div style={labelStyle}>品番</div>
+            <div style={labelStyle}>気高コード</div>
             <input value={editPartNumber} onChange={(e) => setEditPartNumber(e.target.value)} style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
           </div>
           <div style={{ gridColumn: 'span 2' }}>
-            <div style={labelStyle}>品名</div>
+            <div style={labelStyle}>規格</div>
             <input value={editItemName} onChange={(e) => setEditItemName(e.target.value)} style={inputStyle} />
           </div>
           <div>
             <div style={labelStyle}>新建高コード</div>
-            <input value={editNewPN} onChange={(e) => setEditNewPN(e.target.value)} placeholder="0108230313"
+            <input value={editNewPN} onChange={(e) => setEditNewPN(e.target.value)} placeholder="2TG35401"
               style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
           </div>
         </div>
-
-        {/* 説明・機種・種類 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 10 }}>
-          <div style={{ gridColumn: 'span 2' }}>
-            <div style={labelStyle}>ITEM DESCRIPTION</div>
-            <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="UPPER LID ASSY" style={inputStyle} />
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
           <div>
             <div style={labelStyle}>代表機種</div>
             <input value={editRepresentModel} onChange={(e) => setEditRepresentModel(e.target.value)} style={inputStyle} />
@@ -550,10 +623,6 @@ function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpd
               {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
-        </div>
-
-        {/* 数量 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8, marginBottom: 10 }}>
           <div>
             <div style={labelStyle}>入数</div>
             <input type="number" inputMode="numeric" value={editPackingQty} onChange={(e) => setEditPackingQty(e.target.value)}
@@ -576,25 +645,73 @@ function EditRow({ item, isEditing, colors, isContainerMatch, onStartEdit, onUpd
           </div>
         </div>
 
-        {/* MODEL NO.・重量・寸法 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, marginBottom: 12 }}>
+        {/* ===== 气高编号（参照・読取専用） ===== */}
+        <SectionHeader title="气高编号" color="#a78bfa" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
           <div>
-            <div style={labelStyle}>MODEL NO.</div>
-            <input value={editModelNo} onChange={(e) => setEditModelNo(e.target.value)}
-              style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+            <div style={labelStyle}>新建高コード</div>
+            <div style={roStyle}>{item.newPartNumberKetaka || '—'}</div>
+          </div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <div style={labelStyle}>規格</div>
+            <div style={roStyle}>{item.itemNameKetaka || '—'}</div>
           </div>
           <div>
-            <div style={labelStyle}>G.W. (KGS)</div>
+            <div style={labelStyle}>紐付状態</div>
+            <div style={{
+              ...roStyle,
+              color: item.linkStatus === '✓' ? '#4ade80' : 'rgba(255,255,255,0.3)',
+              fontWeight: 600,
+            }}>{item.linkStatus || '—'}</div>
+          </div>
+        </div>
+
+        {/* ===== コンテナ日程（参照・読取専用） ===== */}
+        <SectionHeader title="コンテナ日程" color="#fbbf24" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
+          <div style={{ gridColumn: 'span 2' }}>
+            <div style={labelStyle}>規格</div>
+            <div style={roStyle}>{item.itemNameContainer || '—'}</div>
+          </div>
+          <div>
+            <div style={labelStyle}>代表機種</div>
+            <div style={roStyle}>{item.representModelContainer || '—'}</div>
+          </div>
+          <div>
+            <div style={labelStyle}>入数</div>
+            <div style={roStyle}>{item.packingQtyContainer ?? '—'}</div>
+          </div>
+          <div>
+            <div style={labelStyle}>1P数</div>
+            <div style={roStyle}>{item.qtyPerPalletContainer ?? '—'}</div>
+          </div>
+        </div>
+
+        {/* ===== AQSS（編集可能） ===== */}
+        <SectionHeader title="AQSS" color="#34d399" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8, marginBottom: 6 }}>
+          <div style={{ gridColumn: 'span 2' }}>
+            <div style={labelStyle}>ITEM DESCRIPTION</div>
+            <input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="UPPER LID ASSY" style={inputStyle} />
+          </div>
+          <div style={{ gridColumn: 'span 2' }}>
+            <div style={labelStyle}>MODEL NO.</div>
+            <input value={editModelNo} onChange={(e) => setEditModelNo(e.target.value)} style={inputStyle} />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 8, marginBottom: 12 }}>
+          <div>
+            <div style={labelStyle}>G.W. (per carton)</div>
             <input type="number" inputMode="decimal" step="0.01" value={editGrossWeight} onChange={(e) => setEditGrossWeight(e.target.value)}
-              placeholder="405.00" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+              placeholder="14.0000" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
           </div>
           <div>
             <div style={labelStyle}>CBM</div>
             <input type="number" inputMode="decimal" step="0.01" value={editCbm} onChange={(e) => setEditCbm(e.target.value)}
-              placeholder="2.38" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
+              placeholder="0.40" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
           </div>
           <div>
-            <div style={labelStyle}>Meas. (寸法)</div>
+            <div style={labelStyle}>Meas.</div>
             <input value={editMeasurements} onChange={(e) => setEditMeasurements(e.target.value)}
               placeholder="55*38*38" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} />
           </div>
