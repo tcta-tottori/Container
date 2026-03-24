@@ -5,6 +5,7 @@ import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 import PalletDiagram from './PalletDiagram';
+import SizeDiagram from './SizeDiagram';
 
 interface ItemDetailPanelProps {
   item: ContainerItem;
@@ -315,11 +316,19 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* パレット図（赤枠範囲に限定・コンパクト） */}
-        <div className="detail-pallet-area" style={{ zIndex: 1 }}>
+        {/* パレット図 + サイズ図 */}
+        <div className="detail-pallet-area" style={{ zIndex: 1, display: 'flex', gap: 4 }}>
           {item.qtyPerPallet > 0 && (
-            <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
-              qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
+            <div style={{ flex: 1, minWidth: 0, height: '100%' }}>
+              <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
+                qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
+            </div>
+          )}
+          {(item.measurements || item.cbm) && (
+            <div style={{ flex: item.qtyPerPallet > 0 ? '0 0 38%' : 1, minWidth: 0, height: '100%' }}>
+              <SizeDiagram measurements={item.measurements} cbm={item.cbm}
+                grossWeight={item.grossWeight} type={item.type} />
+            </div>
           )}
         </div>
 

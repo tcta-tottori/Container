@@ -18,8 +18,9 @@ import ItemEditPage from '@/components/ItemEditPage';
 import ActionBar from '@/components/ActionBar';
 import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
+import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 
-type ViewMode = 'work' | 'list' | 'edit';
+type ViewMode = 'work' | 'list' | 'edit' | 'analytics';
 
 export default function Home() {
   const {
@@ -45,7 +46,7 @@ export default function Home() {
 
   const elapsed = useTimer(state.itemStartTime);
   const clock = useClock();
-  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceOk } =
+  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceOk, announceProgress } =
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
@@ -218,6 +219,10 @@ export default function Home() {
     }
   }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
 
+  const handleProgress = useCallback(() => {
+    announceProgress(state.items, state.completedIds);
+  }, [state.items, state.completedIds, announceProgress]);
+
   /** OKコマンド: パレット1つ消費、なくなったら自動完了 */
   const handleConfirmOk = useCallback(() => {
     if (!currentItem) return;
@@ -354,9 +359,12 @@ export default function Home() {
         case 'CONTAINER_SUMMARY':
           handleContainerSummary();
           break;
+        case 'QUERY_PROGRESS':
+          handleProgress();
+          break;
       }
     },
-    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items.length, speak, handleConfirmOk, handleContainerSummary]
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items.length, speak, handleConfirmOk, handleContainerSummary, handleProgress]
   );
 
   const { isListening, isSupported, lastTranscript, toggleListening } =
@@ -450,6 +458,12 @@ export default function Home() {
               </svg>
               管理
             </button>
+            <button className={`menu-item ${viewMode === 'analytics' ? 'active' : ''}`} onClick={() => switchView('analytics')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+              分析
+            </button>
             <div className="menu-divider" />
             <button className="menu-item" onClick={() => { setManualOpen(true); setMenuOpen(false); }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -508,6 +522,16 @@ export default function Home() {
           {viewMode === 'list' && (
             <div className="full-panel">
               <ItemListPanel items={state.items} currentIdx={state.currentItemIdx} onSelect={handleSelectItem} />
+            </div>
+          )}
+
+          {viewMode === 'analytics' && (
+            <div className="full-panel">
+              <ContainerAnalyticsPage
+                items={state.items}
+                completedIds={state.completedIds}
+                containerNo={state.containers[state.selectedContainerIdx]?.containerNo || ''}
+              />
             </div>
           )}
 

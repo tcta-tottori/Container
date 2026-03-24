@@ -159,6 +159,53 @@ export function useSpeech() {
     speak(text);
   }, []);
 
+  /** 進捗状況アナウンス（完了率・残りCBM等） */
+  const announceProgress = useCallback((items: ContainerItem[], completedIds: Set<string>) => {
+    const total = items.length;
+    const done = items.filter((it) => completedIds.has(it.id)).length;
+    const remaining = total - done;
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+
+    let text = `進捗${pct}パーセント。${done}品目完了、残り${remaining}品目。`;
+
+    // CBM情報があれば残り容積もアナウンス
+    let totalCbm = 0, remainCbm = 0;
+    for (const it of items) {
+      if (it.cbm) {
+        const vol = it.cbm * (it.caseCount || 1);
+        totalCbm += vol;
+        if (!completedIds.has(it.id)) remainCbm += vol;
+      }
+    }
+    if (totalCbm > 0) {
+      text += `残り容積約${remainCbm.toFixed(1)}立方メートル。`;
+    }
+
+    // 種類別残り
+    const typeCounts: Record<string, number> = {};
+    for (const it of items) {
+      if (!completedIds.has(it.id)) {
+        typeCounts[it.type] = (typeCounts[it.type] || 0) + 1;
+      }
+    }
+    const parts: string[] = [];
+    if (typeCounts['ポリカバー']) parts.push(`ポリカバー${typeCounts['ポリカバー']}`);
+    if (typeCounts['箱']) parts.push(`箱${typeCounts['箱']}`);
+    if (typeCounts['部品']) parts.push(`部品${typeCounts['部品']}`);
+    if (typeCounts['その他']) parts.push(`その他${typeCounts['その他']}`);
+    if (parts.length > 0) {
+      text += `内訳、${parts.join('、')}。`;
+    }
+
+    if (remaining === 0) {
+      text += '全品目完了です。お疲れ様でした。';
+    } else if (pct >= 75) {
+      text += 'もう少しです、頑張りましょう。';
+    }
+
+    speak(text);
+  }, []);
+
   /** OK確認アナウンス */
   const announceOk = useCallback((itemName: string, remainingPallets: number) => {
     if (remainingPallets > 0) {
@@ -177,5 +224,6 @@ export function useSpeech() {
     announceRemaining,
     announceContainerSummary,
     announceOk,
+    announceProgress,
   };
 }

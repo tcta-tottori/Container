@@ -28,7 +28,7 @@ export default function ItemListPanel({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#141720' }}>
       {/* ヘッダー */}
-      <div style={{
+      <div className="list-header-row" style={{
         display: 'flex', alignItems: 'center', gap: 4,
         padding: '5px 12px', flexShrink: 0,
         background: 'rgba(255,255,255,0.06)',
@@ -40,6 +40,8 @@ export default function ItemListPanel({
         <span style={{ flex: 1 }}>品名</span>
         <span style={{ width: 38, textAlign: 'center' }}>PL</span>
         <span style={{ width: 38, textAlign: 'center' }}>CS</span>
+        <span className="list-col-extra" style={{ width: 46, textAlign: 'center' }}>CBM</span>
+        <span className="list-col-extra" style={{ width: 70, textAlign: 'center' }}>Meas.</span>
         <span style={{ width: 50, textAlign: 'right' }}>PCS</span>
       </div>
 
@@ -73,6 +75,12 @@ export default function ItemListPanel({
               <span className="detail-list-num" style={{
                 color: isActive ? '#ff9800' : 'rgba(255,255,255,0.7)',
               }}>{fmtNum(item.fraction)}</span>
+              <span className="detail-list-num list-col-extra" style={{
+                width: 46, fontSize: 11, color: item.cbm ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)',
+              }}>{item.cbm ? item.cbm.toFixed(2) : '—'}</span>
+              <span className="detail-list-num list-col-extra" style={{
+                width: 70, fontSize: 9, color: item.measurements ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.15)',
+              }}>{item.measurements || '—'}</span>
               <span className="detail-list-num detail-list-total" style={{
                 color: 'rgba(255,255,255,0.55)',
               }}>{Math.ceil(item.totalQty).toLocaleString()}</span>

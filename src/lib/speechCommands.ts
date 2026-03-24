@@ -11,7 +11,8 @@ export type VoiceAction =
   | 'QUERY_PALLET'
   | 'QUERY_FRACTION'
   | 'CONFIRM_OK'
-  | 'CONTAINER_SUMMARY';
+  | 'CONTAINER_SUMMARY'
+  | 'QUERY_PROGRESS';
 
 /** キーワード → アクション マッピング */
 const VOICE_COMMANDS: [string, VoiceAction][] = [
@@ -49,6 +50,10 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
   ['がいよう', 'CONTAINER_SUMMARY'],
   ['コンテナ', 'CONTAINER_SUMMARY'],
   ['こんてな', 'CONTAINER_SUMMARY'],
+  ['進捗', 'QUERY_PROGRESS'],
+  ['しんちょく', 'QUERY_PROGRESS'],
+  ['状況', 'QUERY_PROGRESS'],
+  ['じょうきょう', 'QUERY_PROGRESS'],
 ];
 
 /**
