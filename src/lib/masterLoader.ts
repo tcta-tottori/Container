@@ -23,12 +23,14 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
 
     const itemName = v(2);
     const qtyPerPallet = n(8);
-    // 入数が「10/箱」のような形式 → ポリカバーとして判定
+    // 入数が「10/箱」のような形式 → D列が空ならポリカバーとして判定
     const packingRaw = v(5);
     const hasBoxPackingFormat = /^\d+\/箱/.test(packingRaw);
     const storedType = v(3) as ItemType;
-    const type = hasBoxPackingFormat ? 'ポリカバー' as ItemType
-      : storedType || detectItemType(itemName, qtyPerPallet, 0, partNumber);
+    const type = storedType
+      ? storedType
+      : hasBoxPackingFormat ? 'ポリカバー' as ItemType
+      : detectItemType(itemName, qtyPerPallet, 0, partNumber);
 
     items.push({
       id: `master-${i}`,
@@ -238,6 +240,10 @@ export function linkItemsWithMaster(
     if (master.cbm !== undefined) updated.cbm = master.cbm;
     if (master.measurements) updated.measurements = master.measurements;
 
+    // 種類をマスタから反映（マスタのD列が正）
+    if (master.type) {
+      updated.type = master.type;
+    }
     // 1P数がマスタにあり、作業データにない場合はマスタから補完
     if (master.qtyPerPallet > 0 && updated.qtyPerPallet === 0) {
       updated.qtyPerPallet = master.qtyPerPallet;
