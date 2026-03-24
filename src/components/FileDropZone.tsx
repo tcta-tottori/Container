@@ -44,8 +44,16 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.6';
 const CHANGELOG = [
+  { ver: '1.6', date: '2026-03-25', changes: [
+    { icon: '🍲', text: 'JKPパーサー全面修正（N列=納入指示フィルタ対応）' },
+    { icon: '📅', text: 'JKP日別コンテナ作成（タイガー鍋(3/25)形式）' },
+    { icon: '📊', text: '進捗20%刻み詳細アナウンス（種類別残り内訳）' },
+    { icon: '📈', text: '分析ページ種類別残り進捗バー表示' },
+    { icon: '🎨', text: 'アイコン刷新（ワイヤーフレームキューブ+矢印）' },
+    { icon: '📱', text: 'PWAアイコン・ファビコン統一、アプリ名CNS' },
+  ]},
   { ver: '1.4', date: '2026-03-24', changes: [
     { icon: '🔄', text: '統合ドロップゾーン（全ファイル自動判別）' },
     { icon: '🍲', text: 'JKP出荷予定表示（日付範囲指定）' },

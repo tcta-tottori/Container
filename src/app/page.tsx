@@ -693,7 +693,7 @@ export default function Home() {
             </button>
             <div className="menu-divider" />
             <div className="menu-version">
-              CNS Ver 1.4
+              CNS Ver 1.6
             </div>
           </div>
         </div>

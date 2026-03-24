@@ -272,7 +272,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>✕</button>
         <span style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>操作マニュアル</span>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginLeft: 'auto', fontFamily: 'var(--font-mono)' }}>CNS v1.2</span>
+        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginLeft: 'auto', fontFamily: 'var(--font-mono)' }}>CNS v1.6</span>
       </div>
 
       {/* タブ */}
