@@ -851,7 +851,7 @@ function EditModal({ item, onClose, onUpdate, onDelete, onGoDetail }: {
         </div>
 
         <div style={{ padding: '16px 20px' }}>
-          {/* ===== 種類変更（最も目立つ） ===== */}
+          {/* ===== 種類変更 ===== */}
           <div style={{
             marginBottom: 16, padding: 14, borderRadius: 14,
             background: `linear-gradient(135deg, ${selectedColors.accent}18 0%, ${selectedColors.accent}08 100%)`,
@@ -864,25 +864,26 @@ function EditModal({ item, onClose, onUpdate, onDelete, onGoDetail }: {
               <span style={{ width: 4, height: 14, borderRadius: 3, background: selectedColors.accent }} />
               種類
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6,
+            }}>
               {ITEM_TYPES.map((t) => {
                 const tc = COLOR_MAP[t];
                 const sel = editType === t;
                 return (
                   <button key={t} onClick={() => setEditType(t)} style={{
-                    flex: 1, padding: '10px 0', borderRadius: 10, cursor: 'pointer',
-                    fontSize: 13, fontWeight: sel ? 800 : 500,
+                    padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
+                    fontSize: 11, fontWeight: sel ? 800 : 500,
                     background: sel ? `${tc.accent}30` : 'rgba(255,255,255,0.04)',
-                    border: sel ? `2px solid ${tc.accent}` : '2px solid rgba(255,255,255,0.06)',
+                    border: sel ? `2px solid ${tc.accent}` : '1.5px solid rgba(255,255,255,0.06)',
                     color: sel ? tc.accent : 'rgba(255,255,255,0.5)',
-                    transform: sel ? 'scale(1.05)' : 'scale(1)',
                     transition: 'all 0.15s ease',
-                    boxShadow: sel ? `0 0 16px ${tc.accent}30` : 'none',
+                    boxShadow: sel ? `0 0 12px ${tc.accent}25` : 'none',
                   }}>
                     <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
                       <span style={{
-                        width: 8, height: 8, borderRadius: '50%', background: tc.accent,
-                        boxShadow: sel ? `0 0 6px ${tc.accent}` : 'none',
+                        width: 6, height: 6, borderRadius: '50%', background: tc.accent,
+                        flexShrink: 0,
                       }} />
                       {t}
                     </span>

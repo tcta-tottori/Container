@@ -166,103 +166,191 @@ function ContainerTruckDistribution({ items, completedIds, containerType }: {
         }}>推定</span>
       </div>
 
-      {/* トラックSVG（走行アニメーション付き） */}
+      {/* トラックSVG（リアルな描写・コンテナ固定・トラック上下） */}
       <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
-        <svg viewBox="0 0 400 140" style={{ width: '100%', height: 'auto' }}>
+        <svg viewBox="0 0 400 160" style={{ width: '100%', height: 'auto' }}>
+          <defs>
+            <linearGradient id="truck-body" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#5a6378" />
+              <stop offset="100%" stopColor="#3d4556" />
+            </linearGradient>
+            <linearGradient id="container-side" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#384058" />
+              <stop offset="40%" stopColor="#2d3244" />
+              <stop offset="100%" stopColor="#252838" />
+            </linearGradient>
+            <linearGradient id="road-surface" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#2a2d3e" />
+              <stop offset="100%" stopColor="#1a1d2e" />
+            </linearGradient>
+            <linearGradient id="windshield" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="rgba(140,180,240,0.45)" />
+              <stop offset="100%" stopColor="rgba(80,120,180,0.2)" />
+            </linearGradient>
+          </defs>
+
           {/* 道路 */}
-          <rect x="0" y="120" width="400" height="20" fill="#1a1d2e" rx="2" />
-          <line x1="0" y1="130" x2="400" y2="130" stroke="rgba(255,255,255,0.08)" strokeWidth="1" strokeDasharray="12 8">
-            <animate attributeName="stroke-dashoffset" values="0;-20" dur="0.8s" repeatCount="indefinite" />
+          <rect x="0" y="135" width="400" height="25" fill="url(#road-surface)" />
+          <line x1="0" y1="147" x2="400" y2="147" stroke="rgba(255,255,255,0.06)" strokeWidth="1.5" strokeDasharray="14 10">
+            <animate attributeName="stroke-dashoffset" values="0;-24" dur="0.8s" repeatCount="indefinite" />
           </line>
+          {/* 路肩線 */}
+          <line x1="0" y1="136" x2="400" y2="136" stroke="rgba(255,255,255,0.03)" strokeWidth="0.5" />
 
-          {/* トラック本体グループ */}
+          {/* === トラック部分（キャビン+シャーシ）上下バウンスアニメーション === */}
           <g>
-            {/* 車台フレーム */}
-            <rect x="30" y={120 - 12} width="340" height="12" rx="2" fill="#2a2d3e" />
+            <animateTransform attributeName="transform" type="translate"
+              values="0,0;0,-1.2;0,0;0,-0.5;0,0" dur="1.5s" repeatCount="indefinite" />
 
-            {/* キャビン（左=運転席側） */}
-            <g>
-              <rect x="30" y={120 - 12 - 45} width="55" height="45" rx="4" fill="#4a5568" />
-              <rect x="32" y={120 - 12 - 43} width="30" height="22" rx="3" fill="#1a2332" opacity="0.8" />
-              {/* フロントガラス */}
-              <rect x="32" y={120 - 12 - 43} width="30" height="18" rx="2" fill="rgba(100,150,220,0.25)" />
-              {/* バンパー */}
-              <rect x="26" y={120 - 12 - 5} width="6" height="8" rx="1" fill="#666" />
-              {/* ミラー */}
-              <rect x="26" y={120 - 12 - 38} width="4" height="8" rx="1" fill="#555" />
-            </g>
+            {/* シャーシフレーム */}
+            <rect x="28" y="123" width="60" height="6" rx="1" fill="#333840" />
+            <rect x="28" y="129" width="60" height="3" rx="1" fill="#2a2e38" />
 
-            {/* コンテナ部分 */}
-            <g>
-              <rect x="90" y={120 - 12 - containerHeight}
-                width="270" height={containerHeight} rx="3"
-                fill="#2d3244" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+            {/* キャビン本体 */}
+            <rect x="30" y="75" width="56" height="48" rx="5" fill="url(#truck-body)" />
+            {/* キャビン側面ディテール */}
+            <rect x="30" y="118" width="56" height="6" rx="0" fill="#4a5060" />
+            {/* フロントグリル */}
+            <rect x="26" y="107" width="4" height="16" rx="1" fill="#444c5a" />
+            {Array.from({length: 4}, (_, i) => (
+              <line key={`grill-${i}`} x1="27" y1={109 + i * 3} x2="29" y2={109 + i * 3}
+                stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
+            ))}
+            {/* ウインドシールド */}
+            <path d="M34,79 L62,79 Q65,79 65,82 L65,95 L34,95 Z" fill="url(#windshield)" />
+            {/* ウインドシールドフレーム */}
+            <path d="M34,79 L62,79 Q65,79 65,82 L65,95 L34,95 Z" fill="none"
+              stroke="rgba(255,255,255,0.15)" strokeWidth="0.8" />
+            {/* ワイパー */}
+            <line x1="45" y1="94" x2="55" y2="84" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+            {/* バンパー */}
+            <rect x="24" y="121" width="8" height="6" rx="1.5" fill="#555d6a" />
+            {/* ヘッドライト */}
+            <rect x="25" y="107" width="3" height="4" rx="1" fill="#eab308" opacity="0.7" />
+            <rect x="25" y="113" width="3" height="2" rx="0.5" fill="#f59e0b" opacity="0.4" />
+            {/* サイドミラー */}
+            <rect x="24" y="80" width="5" height="9" rx="1.5" fill="#4a5060" />
+            <rect x="24.5" y="81" width="4" height="6" rx="1" fill="rgba(100,140,200,0.2)" />
+            {/* ドア */}
+            <rect x="46" y="84" width="36" height="34" rx="2" fill="none"
+              stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
+            <circle cx="48" cy="101" r="1" fill="rgba(255,255,255,0.12)" />
 
-              {/* コンテナ内の種類分布（右=扉側からポリカバー順） */}
-              {(() => {
-                let x = 90 + 270; // 右端から開始
-                return segments.map((seg, i) => {
-                  const w = (seg.pct / 100) * 270;
-                  x -= w;
-                  const showInside = w > 28;
-                  const pctStr = `${seg.pct.toFixed(0)}%`;
-                  return (
-                    <g key={seg.type}>
-                      <rect x={x} y={120 - 12 - containerHeight + 1}
-                        width={Math.max(w, 1)} height={containerHeight - 2}
-                        fill={seg.color} opacity={0.85}
-                        rx={i === 0 ? 2 : i === segments.length - 1 ? 2 : 0}
-                      />
-                      {showInside ? (
-                        <text x={x + w / 2} y={120 - 12 - containerHeight / 2 + 1}
-                          textAnchor="middle" dominantBaseline="middle"
-                          fontSize="10" fontWeight="800" fill="#fff"
-                          style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
-                          {pctStr}
-                        </text>
-                      ) : (
-                        /* 飛び出し線 */
-                        <g>
-                          <line x1={x + w / 2} y1={120 - 12 - containerHeight - 2}
-                            x2={x + w / 2} y2={120 - 12 - containerHeight - 14}
-                            stroke={seg.color} strokeWidth="1" opacity="0.7" />
-                          <text x={x + w / 2} y={120 - 12 - containerHeight - 17}
-                            textAnchor="middle" fontSize="8" fontWeight="700" fill={seg.color}>
-                            {pctStr}
-                          </text>
-                        </g>
-                      )}
-                    </g>
-                  );
-                });
-              })()}
-
-              {/* コンテナ扉の線（右端） */}
-              <line x1={90 + 270 - 1} y1={120 - 12 - containerHeight + 4}
-                x2={90 + 270 - 1} y2={120 - 16} stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" />
-              <line x1={90 + 270 - 4} y1={120 - 12 - containerHeight + 4}
-                x2={90 + 270 - 4} y2={120 - 16} stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
-
-              {/* コンテナの縦リブ */}
-              {Array.from({ length: 10 }, (_, i) => (
-                <line key={i}
-                  x1={90 + 27 * (i + 1) - 13} y1={120 - 12 - containerHeight + 2}
-                  x2={90 + 27 * (i + 1) - 13} y2={120 - 14}
-                  stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
-              ))}
-            </g>
-
-            {/* タイヤ */}
-            {[52, 72, 310, 335, 355].map((cx, i) => (
-              <g key={i}>
-                <circle cx={cx} cy={120} r="10" fill="#222" stroke="#444" strokeWidth="1.5" />
-                <circle cx={cx} cy={120} r="4" fill="#555" />
-                {/* ホイールスポーク回転 */}
+            {/* 前輪 */}
+            {[46, 68].map((cx, i) => (
+              <g key={`fw-${i}`}>
+                <circle cx={cx} cy="135" r="11" fill="#1a1c22" stroke="#3a3e48" strokeWidth="2" />
+                <circle cx={cx} cy="135" r="7" fill="#2a2e36" stroke="#444" strokeWidth="0.5" />
+                <circle cx={cx} cy="135" r="3" fill="#555d68" />
                 <g>
                   <animateTransform attributeName="transform" type="rotate"
-                    values={`0 ${cx} 120;360 ${cx} 120`} dur="1.2s" repeatCount="indefinite" />
-                  <line x1={cx} y1={120 - 3} x2={cx} y2={120 + 3} stroke="#666" strokeWidth="1" />
-                  <line x1={cx - 3} y1={120} x2={cx + 3} y2={120} stroke="#666" strokeWidth="1" />
+                    values={`0 ${cx} 135;360 ${cx} 135`} dur="1s" repeatCount="indefinite" />
+                  {[0, 60, 120].map((angle) => (
+                    <line key={angle}
+                      x1={cx + 3.5 * Math.cos(angle * Math.PI / 180)}
+                      y1={135 + 3.5 * Math.sin(angle * Math.PI / 180)}
+                      x2={cx + 6.5 * Math.cos(angle * Math.PI / 180)}
+                      y2={135 + 6.5 * Math.sin(angle * Math.PI / 180)}
+                      stroke="#555" strokeWidth="1.2" />
+                  ))}
+                </g>
+              </g>
+            ))}
+          </g>
+
+          {/* === コンテナ部分（固定） === */}
+          <g>
+            {/* コンテナ台座 */}
+            <rect x="88" y="122" width="275" height="8" rx="1" fill="#333840" />
+
+            {/* コンテナ本体 */}
+            <rect x="90" y={130 - 8 - containerHeight}
+              width="270" height={containerHeight} rx="2"
+              fill="url(#container-side)" stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+
+            {/* コンテナ上面ハイライト */}
+            <rect x="90" y={130 - 8 - containerHeight}
+              width="270" height="3" rx="2"
+              fill="rgba(255,255,255,0.06)" />
+
+            {/* コンテナの縦リブ（波板風） */}
+            {Array.from({ length: 18 }, (_, i) => (
+              <line key={i}
+                x1={90 + 15 * (i + 1)} y1={130 - 8 - containerHeight + 3}
+                x2={90 + 15 * (i + 1)} y2={122}
+                stroke="rgba(255,255,255,0.025)" strokeWidth="1" />
+            ))}
+
+            {/* コンテナ内の種類分布（右=扉側からポリカバー順） */}
+            {(() => {
+              let x = 90 + 270; // 右端から開始
+              const cTop = 130 - 8 - containerHeight + 2;
+              const cH = containerHeight - 4;
+              return segments.map((seg, i) => {
+                const w = (seg.pct / 100) * 268;
+                x -= w;
+                const showInside = w > 28;
+                const pctStr = `${seg.pct.toFixed(0)}%`;
+                return (
+                  <g key={seg.type}>
+                    <rect x={x + 1} y={cTop}
+                      width={Math.max(w - 1, 1)} height={cH}
+                      fill={seg.color} opacity={0.8}
+                      rx={i === 0 ? 2 : i === segments.length - 1 ? 2 : 0}
+                    />
+                    {showInside ? (
+                      <text x={x + w / 2} y={cTop + cH / 2 + 1}
+                        textAnchor="middle" dominantBaseline="middle"
+                        fontSize="10" fontWeight="800" fill="#fff"
+                        style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
+                        {pctStr}
+                      </text>
+                    ) : (
+                      <g>
+                        <line x1={x + w / 2} y1={cTop - 2}
+                          x2={x + w / 2} y2={cTop - 14}
+                          stroke={seg.color} strokeWidth="1" opacity="0.7" />
+                        <text x={x + w / 2} y={cTop - 17}
+                          textAnchor="middle" fontSize="8" fontWeight="700" fill={seg.color}>
+                          {pctStr}
+                        </text>
+                      </g>
+                    )}
+                  </g>
+                );
+              });
+            })()}
+
+            {/* コンテナ扉（右端・観音開き） */}
+            <line x1={360} y1={130 - 8 - containerHeight + 3}
+              x2={360} y2={121} stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
+            <line x1={357} y1={130 - 8 - containerHeight + 3}
+              x2={357} y2={121} stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" />
+            {/* 扉ハンドル */}
+            <rect x="358" y={130 - 8 - containerHeight / 2 - 4} width="2" height="8" rx="0.5" fill="rgba(255,255,255,0.15)" />
+            <rect x="354" y={130 - 8 - containerHeight / 2 - 4} width="2" height="8" rx="0.5" fill="rgba(255,255,255,0.1)" />
+
+            {/* ロッキングバー */}
+            <rect x="361" y={130 - 8 - containerHeight + 6} width="1.5" height={containerHeight - 14} rx="0.5"
+              fill="rgba(255,255,255,0.08)" />
+
+            {/* 後輪（コンテナ下、固定） */}
+            {[300, 322, 345].map((cx, i) => (
+              <g key={`rw-${i}`}>
+                <circle cx={cx} cy="135" r="11" fill="#1a1c22" stroke="#3a3e48" strokeWidth="2" />
+                <circle cx={cx} cy="135" r="7" fill="#2a2e36" stroke="#444" strokeWidth="0.5" />
+                <circle cx={cx} cy="135" r="3" fill="#555d68" />
+                <g>
+                  <animateTransform attributeName="transform" type="rotate"
+                    values={`0 ${cx} 135;360 ${cx} 135`} dur="1s" repeatCount="indefinite" />
+                  {[0, 60, 120].map((angle) => (
+                    <line key={angle}
+                      x1={cx + 3.5 * Math.cos(angle * Math.PI / 180)}
+                      y1={135 + 3.5 * Math.sin(angle * Math.PI / 180)}
+                      x2={cx + 6.5 * Math.cos(angle * Math.PI / 180)}
+                      y2={135 + 6.5 * Math.sin(angle * Math.PI / 180)}
+                      stroke="#555" strokeWidth="1.2" />
+                  ))}
                 </g>
               </g>
             ))}
@@ -271,7 +359,7 @@ function ContainerTruckDistribution({ items, completedIds, containerType }: {
 
         {/* 扉ラベル */}
         <div style={{
-          position: 'absolute', right: 12, top: 8,
+          position: 'absolute', right: 12, top: 6,
           fontSize: 8, color: 'rgba(255,255,255,0.35)', fontWeight: 600, letterSpacing: '0.5px',
         }}>
           DOOR →
@@ -326,15 +414,28 @@ export default function ContainerAnalyticsPage({
   const activeItems = items.filter((it) => !completedIds.has(it.id));
   const doneItems = items.filter((it) => completedIds.has(it.id));
 
+  // アイテムのCBM取得（cbmフィールド優先、なければmeasurements(cm)から計算）
+  const getItemCbm = (it: ContainerItem): number => {
+    if (it.cbm && it.cbm > 0) return it.cbm;
+    // measurements は cm 単位 (例: "55*38*38") → m³ に変換
+    if (it.measurements) {
+      const dims = parseMeas(it.measurements);
+      if (dims) return (dims[0] * dims[1] * dims[2]) / 1000000;
+    }
+    return 0;
+  };
+
   // CBM / 重量集計
   let totalCbm = 0, totalWeight = 0, hasCbm = false;
   for (const it of items) {
-    if (it.cbm) { totalCbm += it.cbm * (it.caseCount || 1); hasCbm = true; }
+    const cbm = getItemCbm(it);
+    if (cbm > 0) { totalCbm += cbm * (it.caseCount || 1); hasCbm = true; }
     if (it.grossWeight) totalWeight += it.grossWeight * (it.caseCount || 1);
   }
   let doneCbm = 0, doneWeight = 0;
   for (const it of doneItems) {
-    if (it.cbm) doneCbm += it.cbm * (it.caseCount || 1);
+    const cbm = getItemCbm(it);
+    if (cbm > 0) doneCbm += cbm * (it.caseCount || 1);
     if (it.grossWeight) doneWeight += it.grossWeight * (it.caseCount || 1);
   }
   const remainCbm = totalCbm - doneCbm;
@@ -494,12 +595,12 @@ export default function ContainerAnalyticsPage({
               品目別 CBM (降順)
             </div>
             {[...items]
-              .filter((it) => it.cbm && it.cbm > 0)
-              .sort((a, b) => ((b.cbm || 0) * (b.caseCount || 1)) - ((a.cbm || 0) * (a.caseCount || 1)))
+              .filter((it) => getItemCbm(it) > 0)
+              .sort((a, b) => (getItemCbm(b) * (b.caseCount || 1)) - (getItemCbm(a) * (a.caseCount || 1)))
               .slice(0, 10)
               .map((it) => {
                 const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
-                const itemCbm = (it.cbm || 0) * (it.caseCount || 1);
+                const itemCbm = getItemCbm(it) * (it.caseCount || 1);
                 const isDone = completedIds.has(it.id);
                 const name = it.itemName.replace(/ポリカバー/g, '').trim() || it.itemName;
                 return (
