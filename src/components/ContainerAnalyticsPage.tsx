@@ -393,20 +393,116 @@ function ContainerTruckDistribution({ items, completedIds, containerType }: {
         </div>
       </div>
 
-      {/* 凡例 */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+      {/* 種類別 完了/残り 詳細バー */}
+      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
         {orderedTypes.map((t) => {
           const c = COLOR_MAP[t];
+          const { total: typeTotal, done: typeDone } = counts[t];
+          const typeRemain = typeTotal - typeDone;
+          const donePct = typeTotal > 0 ? (typeDone / typeTotal) * 100 : 0;
+          const allDone = typeDone === typeTotal && typeTotal > 0;
           return (
-            <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: c.accent }} />
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{t}</span>
-              <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 800, color: c.accent }}>
-                {counts[t].done}/{counts[t].total}
-              </span>
+            <div key={t} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              opacity: allDone ? 0.45 : 1,
+            }}>
+              {/* ラベル */}
+              <div style={{
+                width: 80, display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+              }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: c.accent, flexShrink: 0 }} />
+                <span style={{
+                  fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{t}</span>
+              </div>
+              {/* 進捗バー */}
+              <div style={{
+                flex: 1, height: 16, borderRadius: 4, background: 'rgba(255,255,255,0.04)',
+                overflow: 'hidden', position: 'relative',
+              }}>
+                {/* 完了分（暗め） */}
+                <div style={{
+                  position: 'absolute', left: 0, top: 0, bottom: 0,
+                  width: `${donePct}%`,
+                  background: c.accent, opacity: 0.3,
+                  transition: 'width 0.5s ease',
+                }} />
+                {/* 完了ストライプ */}
+                {allDone && (
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: `repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(255,255,255,0.1) 3px, rgba(255,255,255,0.1) 6px)`,
+                  }} />
+                )}
+                {/* 残りカウント表示 */}
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                  color: allDone ? 'rgba(255,255,255,0.5)' : '#fff',
+                  textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                }}>
+                  {allDone ? '完了' : `残 ${typeRemain}`}
+                </div>
+              </div>
+              {/* 数値 */}
+              <div style={{
+                width: 52, textAlign: 'right', flexShrink: 0,
+                fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 800, color: c.accent,
+              }}>
+                <span style={{ opacity: 0.5 }}>{typeDone}</span>
+                <span style={{ opacity: 0.3 }}>/</span>
+                {typeTotal}
+              </div>
             </div>
           );
         })}
+        {/* 合計行 */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 6, marginTop: 2,
+        }}>
+          <div style={{ width: 80, fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 700, paddingLeft: 12 }}>
+            合計
+          </div>
+          <div style={{
+            flex: 1, height: 16, borderRadius: 4, background: 'rgba(255,255,255,0.04)',
+            overflow: 'hidden', position: 'relative',
+          }}>
+            {(() => {
+              const totalAll = items.length || 1;
+              const doneAll = items.filter(it => completedIds.has(it.id)).length;
+              const pctAll = (doneAll / totalAll) * 100;
+              return (
+                <>
+                  <div style={{
+                    position: 'absolute', left: 0, top: 0, bottom: 0,
+                    width: `${pctAll}%`,
+                    background: '#22c55e', opacity: 0.4,
+                    transition: 'width 0.5s ease',
+                  }} />
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, fontWeight: 700, fontFamily: 'var(--font-mono)',
+                    color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                  }}>
+                    {doneAll === totalAll ? '全完了' : `残 ${totalAll - doneAll} (${Math.round(pctAll)}%)`}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+          <div style={{
+            width: 52, textAlign: 'right', flexShrink: 0,
+            fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 800, color: '#22c55e',
+          }}>
+            <span style={{ opacity: 0.5 }}>{items.filter(it => completedIds.has(it.id)).length}</span>
+            <span style={{ opacity: 0.3 }}>/</span>
+            {items.length}
+          </div>
+        </div>
       </div>
     </div>
   );

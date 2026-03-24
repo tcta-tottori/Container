@@ -149,7 +149,7 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
 
-  // 進捗マイルストーンアナウンス（20%刻み）
+  // 進捗マイルストーンアナウンス（20%刻み — 詳細版）
   useEffect(() => {
     if (state.items.length === 0) return;
     const pct = state.completedIds.size / state.items.length * 100;
@@ -157,14 +157,14 @@ export default function Home() {
     for (const t of thresholds) {
       if (pct >= t && !announcedThresholdsRef.current.has(t)) {
         announcedThresholdsRef.current.add(t);
-        // Delay slightly so completion speech finishes first
+        // 完了アナウンスが終わった後に詳細進捗をアナウンス
         setTimeout(() => {
-          speak(`進捗${t}パーセント`);
-        }, 2000);
+          announceProgress(state.items, state.completedIds);
+        }, 2500);
         break; // Only announce one threshold at a time
       }
     }
-  }, [state.completedIds.size, state.items.length, speak]);
+  }, [state.completedIds.size, state.items.length, announceProgress, state.items, state.completedIds]);
 
   const handleFileLoaded = useCallback(
     async (file: File) => {
