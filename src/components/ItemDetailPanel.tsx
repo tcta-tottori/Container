@@ -192,7 +192,7 @@ export default function ItemDetailPanel({
           pointerEvents: 'none',
         }} />
 
-        {/* 1行目: 種目バッジ + 色柄 + 品目数 + 品番 */}
+        {/* 1行目: 種目バッジ + 色柄 + 品目数 */}
         <div className="detail-badges">
           <span className="type-badge" style={{
             backgroundColor: `${colors.accent}40`, color: '#fff',
@@ -233,22 +233,40 @@ export default function ItemDetailPanel({
           </span>
         </div>
 
-        {/* 品名（上レイヤー・パレット図より上に表示） */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, position: 'relative', zIndex: 3 }}>
-          <MarqueeText text={displayItemName} className="detail-item-name"
-            style={{
-              color: '#f0f0f0', flex: 1, minWidth: 0,
-              textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
-            }} />
+        {/* 気高コード + 新建高コード（最上レイヤー・大きく見やすく） */}
+        <div style={{ position: 'relative', zIndex: 4, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {item.partNumber && (
-            <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', fontFamily: 'var(--font-mono)', flexShrink: 0, letterSpacing: 0.5 }}>
+            <span style={{
+              fontSize: 15, fontWeight: 700, color: '#fff', fontFamily: 'var(--font-mono)',
+              letterSpacing: 0.8, background: 'rgba(255,255,255,0.1)', padding: '3px 10px',
+              borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)',
+              textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+            }}>
               {item.partNumber}
+            </span>
+          )}
+          {item.newPartNumber && (
+            <span style={{
+              fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-mono)',
+              letterSpacing: 0.5, background: 'rgba(255,255,255,0.05)', padding: '2px 8px',
+              borderRadius: 5, border: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              {item.newPartNumber}
             </span>
           )}
         </div>
 
-        {/* パレット図 (flex:1で余白吸収、品名の下1/3にのみ被る) */}
-        <div className="detail-pallet-area" style={{ marginTop: -16, zIndex: 1 }}>
+        {/* 品名（上レイヤー・パレット図より上に表示） */}
+        <div style={{ position: 'relative', zIndex: 3 }}>
+          <MarqueeText text={displayItemName} className="detail-item-name"
+            style={{
+              color: '#f0f0f0',
+              textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
+            }} />
+        </div>
+
+        {/* パレット図（品名の下2/3領域に制限、品名に被らない） */}
+        <div className="detail-pallet-area" style={{ zIndex: 1, maxHeight: '35%', marginTop: 0 }}>
           {item.qtyPerPallet > 0 && (
             <PalletDiagram palletCount={item.palletCount} fraction={item.fraction}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} />
@@ -325,20 +343,20 @@ export default function ItemDetailPanel({
               'ポリカバー': '#e6f4ea', '箱': '#e3f0fd', '部品': '#ede5f5', 'その他': '#ececec',
             };
             const typeBg = TYPE_BG[it.type] || TYPE_BG['その他'];
-            const rowBg = isDone ? '#f0f0f0' : isActive ? '#fff3e0' : typeBg;
+            const rowBg = isActive ? '#fff3e0' : typeBg;
 
             const content = (
               <>
-                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#bbb' : c.accent }} />
+                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#999' : c.accent }} />
                 <MarqueeText text={displayName}
                   className="detail-list-name"
                   style={isDone
-                    ? { color: '#aaa', textDecoration: 'line-through' }
+                    ? { color: '#999', textDecoration: 'line-through' }
                     : isActive ? { fontWeight: 700, color: '#e65100' } : { color: '#1a1a2e' }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#bbb' : isActive ? '#e65100' : c.text }}>{fmtNum(it.palletCount)}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#bbb' : isActive ? '#e65100' : '#333' }}>{fmtNum(it.fraction)}</span>
-                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#bbb' : '#888' }}>
+                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e65100' : c.text }}>{fmtNum(it.palletCount)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e65100' : '#333' }}>{fmtNum(it.fraction)}</span>
+                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#999' : '#888' }}>
                   {Math.ceil(it.totalQty).toLocaleString()}
                 </span>
               </>
@@ -350,7 +368,7 @@ export default function ItemDetailPanel({
                   onSwipe={() => onUncompleteItem?.(it.id)}
                   onClick={() => onUncompleteItem?.(it.id)}
                   className="detail-list-row"
-                  style={{ background: rowBg, borderLeftColor: '#ccc', opacity: 0.6 }}
+                  style={{ background: '#e0e0e0', borderLeftColor: '#bbb', borderLeftWidth: 3 }}
                 >{content}</UndoSwipeRow>
               );
             }
