@@ -160,12 +160,28 @@ export function extractColor(itemName: string): string | null {
   // (W), (WS), (WM), (WG), (WY), (WP) etc. → 白系
   // (T), (TD) → その他の色
   const parenMatch = itemName.match(/\(([^)]+)\)/);
-  if (!parenMatch) return null;
+  if (parenMatch) {
+    const code = parenMatch[1];
+    if (code.startsWith('K') || code.includes('KK')) return '黒';
+    if (code.startsWith('W')) return '白';
+    if (code.startsWith('T')) return '他色';
+    return null;
+  }
 
-  const code = parenMatch[1];
-  if (code.startsWith('K') || code.includes('KK')) return '黒';
-  if (code.startsWith('W')) return '白';
-  if (code.startsWith('T')) return '他色';
+  // 括弧なしパターン: JRI-H100KKB, JPV-X100K 等、末尾の色コードを検出
+  // ポリカバー系プレフィックス(JRI-, JPI-, JPV-, JPK-, JPH-等)の品名のみ対象
+  const name = itemName.replace(/ポリカバー/g, '').replace(/ﾎﾟﾘｶﾊﾞｰ/g, '').trim();
+  if (/^(JRI|JPI|JPV|JPK|JPH|JPA|JPB|JPG|JRG|JRB)-/.test(name)) {
+    // 末尾の色コード: KKB, KB, KM, KV, K, WS, WM, WG, WY, WP, W, TD, T
+    const suffixMatch = name.match(/(KKB|KB|KM|KV|K|WS|WM|WG|WY|WP|W|TD|T)$/);
+    if (suffixMatch) {
+      const code = suffixMatch[1];
+      if (code.startsWith('K') || code.includes('KK')) return '黒';
+      if (code.startsWith('W')) return '白';
+      if (code.startsWith('T')) return '他色';
+    }
+  }
+
   return null;
 }
 
