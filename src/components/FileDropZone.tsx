@@ -127,9 +127,11 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onJkpLoaded, 
           aqssFiles.push(f);
         } else if (role === 'jkp') {
           if (onJkpLoaded) onJkpLoaded(f);
-        } else if (role === 'container') {
+        } else if (role === 'container' || role === 'container_schedule') {
+          // コンテナ作業ファイルとコンテナ日程は両方ともコンテナとして読込
           containerFile = f;
         }
+        // master, ketaka は onMultiFilesLoaded 経由で処理
       }
 
       setClassifiedFiles(classified);
@@ -138,6 +140,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onJkpLoaded, 
         onMultiFilesLoaded(classified);
       }
 
+      // コンテナファイルがあれば即読込・作業ページへ遷移
       if (containerFile) onFileLoaded(containerFile);
       if (aqssFiles.length > 0 && onAqssLoaded) onAqssLoaded(aqssFiles);
     },
