@@ -143,6 +143,8 @@ export function extractColor(itemName: string): string | null {
  * 品名から読み上げ用テキストを生成
  * - 「ポリカバー」を除去
  * - 括弧内の色コードを日本語に変換
+ * - ハイフン、英字→数字、英字→カタカナの境界に間（ポーズ）を挿入
+ *   例: "JRI-A180(KB)" → "じぇーあーるあい、えー、180、くろ"
  */
 export function itemNameForSpeech(itemName: string): string {
   let name = itemName
@@ -164,7 +166,59 @@ export function itemNameForSpeech(itemName: string): string {
     }
   }
 
+  // 末尾の色コード（括弧なし）を変換: JRI-H100KKB → JRI-H100黒
+  name = name.replace(/(KKB|KB|KM|KV)$/, '黒');
+  name = name.replace(/(WS|WM|WG|WY|WP)$/, '白');
+  // 単独の K/W は英字の後のみ（数字の後の場合）
+  name = name.replace(/([0-9])(K)$/, '$1黒');
+  name = name.replace(/([0-9])(W)$/, '$1白');
+  name = name.replace(/(TD)$/, '他色');
+  name = name.replace(/([0-9])(T)$/, '$1他色');
+
+  // ポーズ挿入: ハイフン→ポーズ、英字→数字、数字→英字、英字→日本語の境界
+  name = addSpeechPauses(name);
+
   return name;
+}
+
+/** 読み上げ時に自然な間を入れるためポーズ（、）を挿入 */
+function addSpeechPauses(text: string): string {
+  let result = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    // ハイフンはポーズに置換
+    if (ch === '-' || ch === 'ー' && i > 0 && /[A-Za-z0-9]/.test(text[i - 1])) {
+      // ただし「ー」は長音（じぇー等）の可能性があるのでASCIIハイフンのみ
+      if (ch === '-') {
+        result += '、';
+        continue;
+      }
+    }
+
+    if (i > 0) {
+      const prev = text[i - 1];
+      // 英字 → 数字 の境界
+      if (/[A-Za-z]/.test(prev) && /[0-9]/.test(ch)) {
+        result += '、';
+      }
+      // 数字 → 英字 の境界
+      else if (/[0-9]/.test(prev) && /[A-Za-z]/.test(ch)) {
+        result += '、';
+      }
+      // 英数字 → 日本語（ひらがな・カタカナ・漢字）の境界
+      else if (/[A-Za-z0-9]/.test(prev) && /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(ch)) {
+        result += '、';
+      }
+      // 日本語 → 英数字 の境界
+      else if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(prev) && /[A-Za-z0-9]/.test(ch)) {
+        result += '、';
+      }
+    }
+
+    result += ch;
+  }
+  return result;
 }
 
 /** 類似の理由 */

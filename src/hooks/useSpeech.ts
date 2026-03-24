@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
-import { itemNameForSpeech, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
+import { itemNameForSpeech, areSimilarItems, getSimilarityReason, extractColor } from '@/lib/typeDetector';
 
 function speak(text: string): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
@@ -69,8 +69,9 @@ export function useSpeech() {
         const nameItems = similarItems.filter(s => getSimilarityReason(item.itemName, s.itemName) === 'name');
 
         if (colorItems.length > 0) {
-          // 色違い: 品名は言わず数量のみ読み上げ
+          // 色違い: 「色違いの黒(白)が○パレット○ケースあります」形式
           const descs = colorItems.map(s => {
+            const color = extractColor(s.itemName) || '他色';
             const fractionCeil = s.fraction % 1 !== 0 ? Math.ceil(s.fraction) : s.fraction;
             let qty = '';
             if (s.palletCount > 0 && fractionCeil > 0) {
@@ -80,11 +81,9 @@ export function useSpeech() {
             } else if (fractionCeil > 0) {
               qty = `${fractionCeil}ケース`;
             }
-            return qty;
-          }).filter(Boolean).join('、');
-          text += descs
-            ? `注意、色違いが${descs}あります。`
-            : '注意、色違いがあります。';
+            return qty ? `色違いの${color}が${qty}あります` : `色違いの${color}があります`;
+          }).join('。');
+          text += `注意、${descs}。`;
         }
 
         if (nameItems.length > 0) {

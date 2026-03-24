@@ -355,24 +355,12 @@ export default function PalletDiagram({
           </text>
         )}
 
-        {/* 端数の積み方図（右側、少し小さめ） */}
+        {/* 端数の積み方図（右側、少し小さめ、ケース数ラベルなし） */}
         {showFrac && (
           <g transform={`translate(${mainW + labelW + sp}, ${(oneH - oneH * 0.7) / 2 - 2}) scale(0.7)`}>
             <StackComponent ox={0} oy={0}
               filled={mapFrac(fraction)}
               accent={colors.accent} />
-            {/* 端数ラベル */}
-            <text
-              x={xR + 1}
-              y={yB - 1}
-              textAnchor="start"
-              style={{
-                fontSize: 8, fontWeight: 800, fontFamily: 'var(--font-mono)',
-                fill: 'rgba(255,255,255,0.6)',
-              }}
-            >
-              +{fraction % 1 !== 0 ? Math.ceil(fraction) : fraction}
-            </text>
           </g>
         )}
       </svg>
