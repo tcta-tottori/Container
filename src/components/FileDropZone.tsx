@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState, useEffect } from 'react';
-import { getRecentFiles, base64ToFile, RecentFile } from '@/lib/recentFiles';
+import { getRecentFiles, base64ToFile, RecentFile, FileType } from '@/lib/recentFiles';
 
 /** 判別されたファイルの役割 */
 export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'unknown';
@@ -190,14 +190,18 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
 
   const loadRecent = useCallback((entry: RecentFile) => {
     const file = base64ToFile(entry);
-    // 最近のファイルも分類に基づいて適切なハンドラにルーティング
     const { role } = classifyFile(file.name);
-    if (role === 'jkp') {
+    // fileType or role-based routing
+    const ft = entry.fileType || (role === 'jkp' ? 'jkp' : role === 'aqss04l' || role === 'aqss05l' ? 'aqss' : 'container');
+    if (ft === 'jkp') {
       if (onJkpLoaded) onJkpLoaded(file);
+    } else if (ft === 'aqss') {
+      if (onAqssContainerLoaded) onAqssContainerLoaded(file);
+      else onFileLoaded(file);
     } else {
       onFileLoaded(file);
     }
-  }, [onFileLoaded, onJkpLoaded]);
+  }, [onFileLoaded, onJkpLoaded, onAqssContainerLoaded]);
 
   const fmtDate = (iso: string) => {
     const d = new Date(iso);
@@ -393,44 +397,59 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             className="hidden" />
         </div>
 
-        {/* 最近のファイル */}
+        {/* 最近のファイル（スタック式横スクロール・最大5件） */}
         {recentFiles.length > 0 && (
           <div style={{ marginTop: 24 }}>
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>
               最近のファイル
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {recentFiles.map((entry) => (
-                <button key={entry.name + entry.date} onClick={() => loadRecent(entry)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                    padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)',
-                    background: 'rgba(255,255,255,0.04)', cursor: 'pointer', textAlign: 'left',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-                    background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.5">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                      <polyline points="14 2 14 8 20 8"/>
-                    </svg>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ color: '#fff', fontSize: 13, fontWeight: 500, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{
+              display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden',
+              paddingBottom: 8, scrollSnapType: 'x mandatory',
+              WebkitOverflowScrolling: 'touch',
+              msOverflowStyle: 'none', scrollbarWidth: 'none',
+            }}>
+              {recentFiles.map((entry) => {
+                const ft: FileType = entry.fileType || (classifyFile(entry.name).role === 'jkp' ? 'jkp' : classifyFile(entry.name).role.startsWith('aqss') ? 'aqss' : 'container');
+                const typeLabel = ft === 'jkp' ? 'JKP' : ft === 'aqss' ? 'AQSS' : 'CN';
+                const typeColor = ft === 'jkp' ? '#f97316' : ft === 'aqss' ? '#8b5cf6' : '#3b82f6';
+                const infoText = ft === 'jkp'
+                  ? `${entry.containerCount}品目`
+                  : `${entry.containerCount}CN · ${entry.itemCount}品目`;
+                return (
+                  <button key={entry.name + entry.date} onClick={() => loadRecent(entry)}
+                    style={{
+                      minWidth: 150, maxWidth: 200, flexShrink: 0,
+                      padding: '10px 12px', borderRadius: 12,
+                      border: `1px solid ${typeColor}30`,
+                      background: `linear-gradient(135deg, ${typeColor}10, rgba(255,255,255,0.03))`,
+                      cursor: 'pointer', textAlign: 'left',
+                      scrollSnapAlign: 'start',
+                      display: 'flex', flexDirection: 'column', gap: 6,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        fontSize: 8, fontWeight: 800, color: typeColor,
+                        background: `${typeColor}20`, padding: '2px 6px',
+                        borderRadius: 4, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
+                      }}>{typeLabel}</span>
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)' }}>
+                        {fmtDate(entry.date)}
+                      </span>
+                    </div>
+                    <p style={{
+                      color: '#fff', fontSize: 12, fontWeight: 500, margin: 0,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
                       {entry.name}
                     </p>
-                    <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, margin: '2px 0 0' }}>
-                      {fmtDate(entry.date)} · {entry.containerCount}CN · {entry.itemCount}品目
+                    <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, margin: 0 }}>
+                      {infoText}
                     </p>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

@@ -1,5 +1,7 @@
 const STORAGE_KEY = 'container-recent-files';
-const MAX_ENTRIES = 3;
+const MAX_ENTRIES = 5;
+
+export type FileType = 'container' | 'jkp' | 'aqss' | 'master' | 'other';
 
 export interface RecentFile {
   name: string;
@@ -7,6 +9,7 @@ export interface RecentFile {
   containerCount: number;
   itemCount: number;
   data: string; // base64 encoded file data
+  fileType?: FileType;
 }
 
 export function getRecentFiles(): RecentFile[] {
@@ -19,7 +22,12 @@ export function getRecentFiles(): RecentFile[] {
   }
 }
 
-export function saveRecentFile(file: File, containerCount: number, itemCount: number): void {
+export function saveRecentFile(
+  file: File,
+  containerCount: number,
+  itemCount: number,
+  fileType: FileType = 'container',
+): void {
   const reader = new FileReader();
   reader.onload = () => {
     try {
@@ -33,8 +41,9 @@ export function saveRecentFile(file: File, containerCount: number, itemCount: nu
         containerCount,
         itemCount,
         data: base64,
+        fileType,
       });
-      // 最大3件
+      // 最大5件
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered.slice(0, MAX_ENTRIES)));
     } catch {
       // storage full等は無視

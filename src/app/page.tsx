@@ -201,7 +201,7 @@ export default function Home() {
         // 5. データをロード（紐付済みの状態で表示）
         loadData(result.containers);
         const totalItems = result.containers.reduce((sum, c) => sum + c.items.length, 0);
-        saveRecentFile(file, result.containers.length, totalItems);
+        saveRecentFile(file, result.containers.length, totalItems, 'container');
 
         // 紐付済みなのでuseEffectの再紐付をスキップさせる
         const container = result.containers[0];
@@ -269,6 +269,7 @@ export default function Home() {
 
         setLoadingMsg(`紐付完了: ${linked}/${total}件 (${container.items.length}品目)`);
         loadData([container]);
+        saveRecentFile(invoiceFile, 1, container.items.length, 'aqss');
 
         // 紐付済みなのでuseEffectの再紐付をスキップ
         linkedRef.current = `${container.containerNo}-0`;
@@ -350,7 +351,7 @@ export default function Home() {
 
         setLoadingMsg(`紐付完了: ${linkedTotal}/${totalItems}件  作業シートを表示中...`);
         loadData(containers);
-        saveRecentFile(file, containers.length, totalItems);
+        saveRecentFile(file, containers.length, totalItems, 'jkp');
 
         // 紐付済みなのでuseEffectの再紐付をスキップ
         linkedRef.current = `${containers[0].containerNo}-0`;
