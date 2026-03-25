@@ -206,7 +206,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
       style={{ background: 'linear-gradient(135deg, #0f0c29 0%, #1a1a2e 40%, #16213e 100%)' }}>
       <div style={{ width: '100%', maxWidth: 420, padding: '0 20px' }}>
 
-        {/* バージョン */}
+        {/* バージョン + 更新日時 */}
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <button onClick={() => setShowChangelog(true)}
             style={{
@@ -219,6 +219,9 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             }}>
             Ver {APP_VERSION}
           </button>
+          <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, marginTop: 6, fontFamily: 'var(--font-mono)', letterSpacing: 0.5 }}>
+            Updated: {APP_UPDATED}
+          </p>
         </div>
 
         {/* バージョンポップアップ */}
@@ -288,17 +291,16 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 80, height: 80, borderRadius: 20,
-            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 33%, #f472b6 66%, #a78bfa 100%)',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #f97316 100%)',
             animation: 'logo-hue-shift 30s linear infinite',
             marginBottom: 12,
-            border: '2.5px solid rgba(160,210,255,0.5)',
-            boxShadow: '0 8px 32px rgba(96,165,250,0.3), 0 0 20px rgba(167,139,250,0.25), inset 0 0 20px rgba(140,180,255,0.08), 0 0 40px rgba(244,114,182,0.15)',
+            boxShadow: '0 8px 32px rgba(59,130,246,0.3), 0 0 20px rgba(139,92,246,0.25), 0 0 40px rgba(249,115,22,0.15)',
           }}>
             <CnsLogo size={64} />
           </div>
           <h1 style={{
             fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif',
-            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 33%, #f472b6 66%, #a78bfa 100%)',
+            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #f97316 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
             animation: 'logo-hue-shift 30s linear infinite',
@@ -307,9 +309,6 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 4 }}>
             コンテナ荷降ろし管理
-          </p>
-          <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, marginTop: 6, fontFamily: 'var(--font-mono)', letterSpacing: 0.5 }}>
-            Updated: {APP_UPDATED}
           </p>
         </div>
 
