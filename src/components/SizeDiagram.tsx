@@ -546,7 +546,7 @@ function CareMarkUmbrella({ size }: { size: number }) {
 }
 
 /** 段ボール質感（不透明） */
-function cardboardFace(brightness: number): React.CSSProperties {
+export function cardboardFace(brightness: number): React.CSSProperties {
   const r = Math.round(180 * brightness + 50);
   const g = Math.round(140 * brightness + 40);
   const b = Math.round(80 * brightness + 25);
