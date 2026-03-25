@@ -269,12 +269,6 @@ body {
   100% { background-position: 200% center; }
 }
 
-/* ===== Icon gradient seamless flow ===== */
-@keyframes icon-gradient-flow {
-  0% { background-position: 0% center; }
-  100% { background-position: -200% center; }
-}
-
 /* ===== Logo gradient animation ===== */
 @keyframes logo-gradient-rotate {
   0% { --logo-angle: 135deg; }
