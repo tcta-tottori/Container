@@ -72,7 +72,8 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
   const sd = rawSd * scaleFactor;
   const sh = rawSh * scaleFactor;
 
-  const uid = `cb-${type}-${w}-${d}-${h}`;
+  // CSS keyframe名に日本語が入ると一部ブラウザで動かないためハッシュ化
+  const uid = `cb-${w}-${d}-${h}-${type.length}`;
   const animName = `spin-${uid}`;
   const modelName = itemName ? extractModelName(itemName) : '';
   // 鍋の機種ラベル文字色
@@ -337,11 +338,11 @@ function CareMarkHandle({ size }: { size: number }) {
   );
 }
 
-/** 段ボール質感のスタイルを生成 */
+/** 段ボール質感のスタイルを生成（不透明・リアル） */
 function cardboardFace(brightness: number): React.CSSProperties {
-  const r = Math.round(160 * brightness + 40);
-  const g = Math.round(120 * brightness + 30);
-  const b = Math.round(70 * brightness + 20);
+  const r = Math.round(180 * brightness + 50);
+  const g = Math.round(140 * brightness + 40);
+  const b = Math.round(80 * brightness + 25);
   const baseColor = `rgb(${r},${g},${b})`;
 
   return {
@@ -350,26 +351,25 @@ function cardboardFace(brightness: number): React.CSSProperties {
         0deg,
         transparent,
         transparent 2px,
-        rgba(0,0,0,0.04) 2px,
-        rgba(0,0,0,0.04) 4px
+        rgba(0,0,0,0.05) 2px,
+        rgba(0,0,0,0.05) 4px
       ),
       repeating-linear-gradient(
         90deg,
         transparent,
         transparent 3px,
-        rgba(0,0,0,0.02) 3px,
-        rgba(0,0,0,0.02) 6px
+        rgba(0,0,0,0.03) 3px,
+        rgba(0,0,0,0.03) 6px
       ),
       linear-gradient(
         135deg,
-        rgba(255,255,255,0.08) 0%,
+        rgba(255,255,255,0.12) 0%,
         transparent 40%,
-        rgba(0,0,0,0.06) 100%
+        rgba(0,0,0,0.08) 100%
       ),
       ${baseColor}
     `,
-    opacity: 0.75,
-    border: `1px solid rgba(${Math.round(100 * brightness + 30)},${Math.round(80 * brightness + 20)},${Math.round(40 * brightness + 10)},0.5)`,
+    border: `1px solid rgba(${Math.round(100 * brightness + 30)},${Math.round(80 * brightness + 20)},${Math.round(40 * brightness + 10)},0.6)`,
     boxSizing: 'border-box',
     backfaceVisibility: 'hidden',
   };

@@ -5,7 +5,7 @@ import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
-import PalletDiagram, { calculateStackLayers } from './PalletDiagram';
+import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
 interface ItemDetailPanelProps {
@@ -651,16 +651,15 @@ export default function ItemDetailPanel({
             {item.fraction > 0 && (
               <div style={{
                 position: item.palletCount > 0 ? 'absolute' : 'relative',
-                top: item.palletCount > 0 ? 4 : undefined,
-                right: item.palletCount > 0 ? 4 : undefined,
-                width: item.palletCount > 0 ? '40%' : '70%',
-                height: item.palletCount > 0 ? '45%' : '100%',
+                top: item.palletCount > 0 ? 0 : undefined,
+                right: item.palletCount > 0 ? 0 : undefined,
+                width: item.palletCount > 0 ? '45%' : '90%',
+                height: item.palletCount > 0 ? '50%' : '100%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 overflow: 'hidden',
               }}>
                 <FractionPallet3D
                   fraction={item.fraction}
-                  qtyPerPallet={item.qtyPerPallet}
                   measurements={item.measurements}
                   type={item.type}
                   itemName={item.itemName}
@@ -671,7 +670,7 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 数量（PL / CT / pcs 中央揃え・固定幅） */}
+        {/* 数量（PL / CT / pcs） */}
         <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
           <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
@@ -684,18 +683,7 @@ export default function ItemDetailPanel({
               userSelect: 'none',
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
             }}>{fmtNum(item.palletCount)}</span>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
-              {(() => {
-                const st = calculateStackLayers(item.type, item.itemName, item.qtyPerPallet, item.measurements);
-                return st > 0 ? (
-                  <span className="detail-sf-at" style={{ color: `${accentColor}cc`, lineHeight: 1 }}>{st}ST</span>
-                ) : null;
-              })()}
-              {item.qtyPerPallet > 0 && (
-                <span className="detail-sf-at" style={{ color: `${accentColor}cc`, lineHeight: 1 }}>@{item.qtyPerPallet}</span>
-              )}
-              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>PL</span>
-            </div>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>PL</span>
           </div>
           <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" style={{
@@ -703,16 +691,16 @@ export default function ItemDetailPanel({
               textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`,
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
             }}>{item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : fmtNum(item.fraction)}</span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>CT</span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>CT</span>
           </div>
           <div className="detail-sf-item detail-sf-total" style={{ minWidth: 0 }}>
             <span className="detail-sf-num-sm" style={{
-              color: 'rgba(255,255,255,0.7)',
+              color: 'rgba(255,255,255,0.6)',
               display: 'inline-block', minWidth: '4ch', textAlign: 'right',
             }}>
               {Math.ceil(item.totalQty).toLocaleString()}
             </span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>pcs</span>
+            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.4)' }}>pcs</span>
           </div>
         </div>
 

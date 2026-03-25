@@ -257,6 +257,16 @@ export function linkItemsWithMaster(
     if (master.packingQty > 0 && updated.packingQty === 0) {
       updated.packingQty = master.packingQty;
     }
+    // 鍋のデフォルト1P数（マスタにもない場合のフォールバック）
+    // 60/100サイズ→30, 180サイズ→24
+    if (updated.qtyPerPallet === 0 && updated.type === '鍋') {
+      const name = updated.itemName || '';
+      if (name.includes('180') || /18[RWCS]/.test(name)) {
+        updated.qtyPerPallet = 24;
+      } else {
+        updated.qtyPerPallet = 30; // 60/100サイズ共通
+      }
+    }
     // パレット数・端数を自動計算（qtyPerPalletが設定済みで、元データにパレット情報がない場合）
     if (updated.qtyPerPallet > 0 && updated.caseCount > 0 && item.palletCount === 0) {
       updated.palletCount = Math.floor(updated.caseCount / updated.qtyPerPallet);

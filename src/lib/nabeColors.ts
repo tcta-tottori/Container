@@ -19,10 +19,10 @@ const DEFAULT_RULES: NabeColorRule[] = [
   { key: 'JPVH',  label: 'JPVH (100/180)',   color: '#22c55e' },  // 緑
   { key: 'JRIC',  label: 'JRIC (060)',        color: '#eab308' },  // 黄色
   { key: 'JRIB',  label: 'JRIB (100/180)',    color: '#ec4899' },  // ピンク
-  { key: 'JRIH',  label: 'JRIH (100/180)',    color: '#333333' },  // 黒
+  { key: 'JRIH',  label: 'JRIH (100/180)',    color: '#a0a0a0' },  // 黒系→ライトグレー表示
   { key: 'JPVHW', label: 'JPV+H W (10W/18W)', color: '#3b82f6' },  // 青
   { key: 'JPIT',  label: 'JPIT (100/180)',    color: '#eab308' },  // 黄色
-  { key: 'JRIA',  label: 'JRIA (100/180)',    color: '#333333' },  // 黒
+  { key: 'JRIA',  label: 'JRIA (100/180)',    color: '#a0a0a0' },  // 黒系→ライトグレー表示
 ];
 
 /** デフォルト（マッチしない場合）の色: 赤 */
