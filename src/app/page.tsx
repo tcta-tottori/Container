@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
 import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel } from '@/lib/masterLoader';
+import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
 import { useSpeech } from '@/hooks/useSpeech';
@@ -239,6 +240,45 @@ export default function Home() {
       }
     },
     [state.items, updateItem]
+  );
+
+  // AQSSファイルのみでコンテナを新規作成
+  const handleAqssContainerLoaded = useCallback(
+    async (invoiceFile: File, packingFile?: File) => {
+      loadedContainerRef.current = null;
+      linkedRef.current = null;
+      setLoadingMsg('AQSSファイルからコンテナを作成中...');
+      try {
+        const container = await parseAqssToContainer(invoiceFile, packingFile);
+        if (!container || container.items.length === 0) {
+          setLoadingMsg('AQSSファイルから品目を抽出できませんでした');
+          await new Promise((r) => setTimeout(r, 2000));
+          return;
+        }
+
+        // マスタと紐付
+        setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+        const masterItems = await fetchMasterData();
+        if (masterItems.length > 0) {
+          loadMaster(masterItems);
+        }
+
+        setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
+        const { linkedItems, linked, total } = linkItemsWithMaster(container.items, masterItems);
+        container.items = linkedItems;
+
+        setLoadingMsg(`紐付完了: ${linked}/${total}件 (${container.items.length}品目)`);
+        loadData([container]);
+
+        // 紐付済みなのでuseEffectの再紐付をスキップ
+        linkedRef.current = `${container.containerNo}-0`;
+
+        await new Promise((r) => setTimeout(r, 500));
+      } finally {
+        setLoadingMsg(null);
+      }
+    },
+    [loadData, loadMaster]
   );
 
   const handleJkpLoaded = useCallback(
@@ -537,7 +577,7 @@ export default function Home() {
   if (state.containers.length === 0 && jkpShipments.length === 0) {
     return (
       <>
-        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onJkpLoaded={handleJkpLoaded} />
+        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} />
         {loadingMsg && (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 300,

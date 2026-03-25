@@ -40,6 +40,7 @@ export function classifyFile(name: string): { role: FileRole; label: string } {
 interface FileDropZoneProps {
   onFileLoaded: (file: File) => void;
   onAqssLoaded?: (files: File[]) => void;
+  onAqssContainerLoaded?: (invoiceFile: File, packingFile?: File) => void;
   onJkpLoaded?: (file: File) => void;
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
@@ -111,7 +112,7 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   );
 }
 
-export default function FileDropZone({ onFileLoaded, onAqssLoaded, onJkpLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
+export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
@@ -152,8 +153,20 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onJkpLoaded, 
       }
 
       // コンテナファイルがあれば即読込・作業ページへ遷移
-      if (containerFile) onFileLoaded(containerFile);
-      if (aqssFiles.length > 0 && onAqssLoaded) onAqssLoaded(aqssFiles);
+      if (containerFile) {
+        onFileLoaded(containerFile);
+        // コンテナファイルと同時にAQSSがあれば既存データ補完
+        if (aqssFiles.length > 0 && onAqssLoaded) onAqssLoaded(aqssFiles);
+      } else if (aqssFiles.length > 0) {
+        // AQSSファイルのみ → コンテナとして新規作成
+        const inv = aqssFiles.find(f => f.name.toUpperCase().includes('AQSS04L'));
+        const pk = aqssFiles.find(f => f.name.toUpperCase().includes('AQSS05L'));
+        if (inv && onAqssContainerLoaded) {
+          onAqssContainerLoaded(inv, pk);
+        } else if (onAqssLoaded) {
+          onAqssLoaded(aqssFiles);
+        }
+      }
     },
     [onFileLoaded, onAqssLoaded, onJkpLoaded, onMultiFilesLoaded]
   );
