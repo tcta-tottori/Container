@@ -145,24 +145,43 @@ export function parseJkpVolume(wb: XLSX.WorkBook): Map<string, JkpVolume> {
 // updata シートパース
 // ──────────────────────────────────────────────────────────
 // 構造:
-//   Row10(Excel) = row9(0-indexed): 納品日 — 日付ヘッダー ("3/18", "3/19", ...)
-//   Row8(Excel)  = row7(0-indexed): 年マーカー (2025, 2026, ...)
-//   Row12+(Excel)= row11+(0-indexed): データ行
+//   Row9(Excel):  船積日行 — 日付がある列が出荷対象列（日付は納入日ではない）
+//   Row10(Excel): 納品日行 — 日付ヘッダー ("3/22", "3/23", ...)
+//   Row8(Excel):  年マーカー (2025, 2026, ...)
+//   Row12+(Excel): データ行
 //     3行1組: [N列="納入指示", B列=3TGコード] / [N列="日産数", B列=品名] / [N列="残数"]
 //   N列(col13) = "納入指示" の行のみ対象
 //   B列(col1)  = 気高コード
 //   O列(col14)以降 = 日付ごとの納入数量
 
-export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
+export interface JkpUpdataResult {
+  shipments: JkpShipment[];
+  activeDates: string[]; // 船積日行に日付がある列の納品日（YYYY-MM-DD）
+}
+
+/** セル値が日付的な値かどうか判定（M/D文字列、Excel日付シリアル値） */
+function isCellDateLike(val: string | number): boolean {
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    return /^\d{1,2}\/\d{1,2}$/.test(trimmed);
+  }
+  // Excel日付シリアル値（1900年1月1日=1〜、現実的な範囲: 40000〜50000 = 2009〜2036年頃）
+  if (typeof val === 'number' && val >= 40000 && val <= 55000) {
+    return true;
+  }
+  return false;
+}
+
+export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   const sheetName = Object.keys(wb.Sheets).find(s =>
     s.toLowerCase().includes('updata')
   );
   if (!sheetName) {
     console.warn('[JKP] updataシートが見つかりません。シート一覧:', Object.keys(wb.Sheets));
-    return [];
+    return { shipments: [], activeDates: [] };
   }
   const ws = wb.Sheets[sheetName];
-  if (!ws) return [];
+  if (!ws) return { shipments: [], activeDates: [] };
 
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
   const maxCol = Math.min(range.e.c, 3800);
@@ -185,9 +204,31 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
   }
   if (dateRow < 0) {
     console.warn('[JKP] 日付行が見つかりません');
-    return [];
+    return { shipments: [], activeDates: [] };
   }
-  console.log(`[JKP] 日付行: row${dateRow} (Excel row${dateRow + 1})`);
+  console.log(`[JKP] 納品日行: row${dateRow} (Excel row${dateRow + 1})`);
+
+  // ── 船積日行を自動検出（dateRowの上で "船積日" ラベルがある行、またはdateRow-1） ──
+  let shipDateRow = -1;
+  for (let r = dateRow - 1; r >= Math.max(0, dateRow - 3); r--) {
+    // M列〜N列付近に "船積日" ラベルがあるか確認
+    for (let c = 10; c <= 15; c++) {
+      const label = String(getCell(r, c)).trim();
+      if (label.includes('船積')) {
+        shipDateRow = r;
+        break;
+      }
+    }
+    if (shipDateRow >= 0) break;
+    // ラベルがなくても、日付的な値が複数あれば船積日行とみなす
+    let dateCellCount = 0;
+    for (let c = 14; c <= Math.min(maxCol, 100); c++) {
+      if (isCellDateLike(getCell(r, c))) dateCellCount++;
+      if (dateCellCount >= 2) { shipDateRow = r; break; }
+    }
+    if (shipDateRow >= 0) break;
+  }
+  console.log(`[JKP] 船積日行: ${shipDateRow >= 0 ? 'row' + shipDateRow + ' (Excel row' + (shipDateRow + 1) + ')' : '見つからず（全日付列を対象）'}`);
 
   // ── 年マーカー行を自動検出（dateRowより上、高い列番号帯で検索） ──
   let yearRow = -1;
@@ -226,6 +267,28 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
   }
   console.log(`[JKP] 日付列: ${colDateMap.size}列検出`);
 
+  // ── アクティブ列の判定: 船積日行に日付がある列のみ対象 ──
+  const activeColumns = new Set<number>();
+  const activeDatesSet = new Set<string>();
+
+  if (shipDateRow >= 0) {
+    colDateMap.forEach((dateStr, col) => {
+      const shipVal = getCell(shipDateRow, col);
+      if (isCellDateLike(shipVal)) {
+        activeColumns.add(col);
+        activeDatesSet.add(dateStr);
+      }
+    });
+    console.log(`[JKP] アクティブ列(船積日あり): ${activeColumns.size}列 → 納品日: ${Array.from(activeDatesSet).sort().join(', ')}`);
+  } else {
+    // 船積日行が見つからない場合は全日付列を対象
+    colDateMap.forEach((dateStr, col) => {
+      activeColumns.add(col);
+      activeDatesSet.add(dateStr);
+    });
+    console.log(`[JKP] 船積日行なし → 全${activeColumns.size}列を対象`);
+  }
+
   // ── データ行パース: N列(col13)="納入指示" の行のみ ──
   const dataStartRow = dateRow + 2; // row11(0-indexed) = Excel row12
   const shipments: JkpShipment[] = [];
@@ -240,12 +303,17 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
     // 品名: 次の行(N列="日産数")のB列
     const itemName = String(getCell(r + 1, 1)).trim();
 
-    // O列(col14)以降の日付列から数量を収集
+    // アクティブ列の日付から数量を収集（0も含める）
     const schedule = new Map<string, number | string>();
-    colDateMap.forEach((dateStr, col) => {
+    activeColumns.forEach((col) => {
+      const dateStr = colDateMap.get(col);
+      if (!dateStr) return;
       const val = getCell(r, col);
       if (typeof val === 'number' && !isNaN(val) && val > 0) {
         schedule.set(dateStr, val);
+      } else {
+        // アクティブ列なので0として記録
+        schedule.set(dateStr, 0);
       }
     });
 
@@ -254,8 +322,9 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpShipment[] {
     }
   }
 
-  console.log(`[JKP] updata: ${shipments.length}品目 (納入指示行でスケジュールあり)`);
-  return shipments;
+  const activeDates = Array.from(activeDatesSet).sort();
+  console.log(`[JKP] updata: ${shipments.length}品目, アクティブ日: ${activeDates.length}日`);
+  return { shipments, activeDates };
 }
 
 /** 今日以降の最も近い出荷日を探す */

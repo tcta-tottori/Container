@@ -21,7 +21,7 @@ import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
-import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
+import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems } from '@/lib/jkpParser';
 import * as XLSX from 'xlsx';
 
 type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
@@ -254,22 +254,22 @@ export default function Home() {
         const sheet1Items = parseJkpSheet1(wb);
         // 体積Ｍ３: CBM・箱寸
         const volumeMap = parseJkpVolume(wb);
-        // updata: 出荷スケジュール（N列="納入指示"の行のみ）
-        const shipments = parseJkpUpdata(wb);
+        // updata: 出荷スケジュール（船積日行で対象列を判定）
+        const { shipments, activeDates } = parseJkpUpdata(wb);
         setJkpShipments(shipments);
 
-        // 今日〜2週間先の日付範囲でデータがある日を特定
+        // 今日〜2週間先の日付範囲でアクティブ日をフィルタ
         const today = new Date().toISOString().slice(0, 10);
         const twoWeeksLater = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-        const scheduleDates = getScheduleDatesInRange(shipments, today, twoWeeksLater);
+        const scheduleDates = activeDates.filter(d => d >= today && d <= twoWeeksLater);
 
         if (scheduleDates.length === 0) {
-          setLoadingMsg(`${today}〜${twoWeeksLater}の出荷データがありません (updata:${shipments.length}件)`);
+          setLoadingMsg(`${today}〜${twoWeeksLater}の出荷データがありません (updata:${shipments.length}件, アクティブ日:${activeDates.length}件)`);
           await new Promise((r) => setTimeout(r, 3000));
           return;
         }
 
-        setLoadingMsg(`${scheduleDates.length}日分のデータ検出。変換中...`);
+        setLoadingMsg(`${scheduleDates.length}日分のデータ検出（船積日基準）。変換中...`);
 
         // 日付ごとにContainerを作成: "タイガー鍋(3/25)" 形式
         const containers = [];
