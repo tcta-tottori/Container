@@ -442,22 +442,17 @@ export default function PalletDiagram({
   const oneW = xR - xL;
   const oneH = yB - yT;
 
-  const showFrac = hasFrac;
-  const fracW = showFrac ? oneW * 0.7 : 0;
-  const labelW = palletCount > 0 ? 10 : 0;
-  const sp = 3;
-  const mainW = palletCount > 0 ? oneW : 0;
-  const totalSvgW = mainW + labelW + (showFrac ? sp + fracW : 0) + 4;
+  const totalSvgW = oneW + 4;
 
   return (
-    <div className="pallet-diagram-container" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+    <div className="pallet-diagram-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <svg width="100%" height="100%"
         viewBox={`${xL - 2} ${yT - 2} ${totalSvgW} ${oneH + 4}`}
         preserveAspectRatio="xMidYMid meet"
         style={{ maxHeight: '100%' }}
       >
-        {/* Full pallet diagram */}
-        {palletCount > 0 && (
+        {/* Full pallet diagram (palletCount > 0) or fraction pallet */}
+        {palletCount > 0 ? (
           jarPot ? (
             <JarPotStack ox={0} oy={0} filled={maxSlots} accent={colors.accent} layers={jpLayers} />
           ) : (
@@ -465,36 +460,17 @@ export default function PalletDiagram({
               accent={colors.accent} measurements={measurements}
               qtyPerPallet={qtyPerPallet} typeLayers={stackLayers || undefined} />
           )
-        )}
-
-        {/* xN pallet count label */}
-        {palletCount > 0 && (
-          <text
-            x={xR + 1}
-            y={yB - 1}
-            textAnchor="start"
-            style={{
-              fontSize: 7, fontWeight: 900, fontFamily: 'var(--font-mono)',
-              fill: colors.accent,
-            }}
-          >
-            ×{palletCount}
-          </text>
-        )}
-
-        {/* Fraction pallet (right side, smaller) */}
-        {showFrac && (
-          <g transform={`translate(${mainW + labelW + sp}, ${(oneH - oneH * 0.7) / 2 - 2}) scale(0.7)`}>
-            {jarPot ? (
-              <JarPotStack ox={0} oy={0}
-                filled={mapFrac(fraction)} accent={colors.accent} layers={jpLayers} />
-            ) : (
-              <GenericStack ox={0} oy={0}
-                filled={mapFrac(fraction)} accent={colors.accent}
-                measurements={measurements} qtyPerPallet={qtyPerPallet} />
-            )}
-          </g>
-        )}
+        ) : hasFrac ? (
+          jarPot ? (
+            <JarPotStack ox={0} oy={0}
+              filled={mapFrac(fraction)} accent={colors.accent} layers={jpLayers} />
+          ) : (
+            <GenericStack ox={0} oy={0}
+              filled={mapFrac(fraction)} accent={colors.accent}
+              measurements={measurements} qtyPerPallet={qtyPerPallet}
+              typeLayers={stackLayers || undefined} />
+          )
+        ) : null}
       </svg>
     </div>
   );

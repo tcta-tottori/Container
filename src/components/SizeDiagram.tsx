@@ -7,9 +7,7 @@ interface SizeDiagramProps {
   measurements?: string;
   cbm?: number;
   type: ItemType;
-  /** コンテナ内の最大寸法（全アイテム共通）。この値を基準にスケーリング */
   maxContainerDim?: number;
-  /** 品名（鍋の機種ラベル用） */
   itemName?: string;
 }
 
@@ -20,47 +18,37 @@ export function parseMeas(meas: string): [number, number, number] | null {
   return [Number(m[1]), Number(m[2]), Number(m[3])];
 }
 
-/** 品名から機種名を抽出（JPxx-xxxx形式やJPVS100等） */
+/** 品名から機種名を抽出 */
 function extractModelName(itemName: string): string {
-  // JPxx-xxxxパターン
-  const jpMatch = itemName.match(/JP[A-Z]*[\s-]?\d{3,}/);
-  if (jpMatch) return jpMatch[0].replace(/\s+/g, '');
-  // PDR/PDU/PVWパターン
+  const jpMatch = itemName.match(/JP[A-Z+]*[\s-]?\d{2,}/);
+  if (jpMatch) return jpMatch[0].replace(/[\s+]/g, '');
   const pdrMatch = itemName.match(/(PDR|PDU|PVW)[A-Z]*[\s-]?\d{3,}/);
   if (pdrMatch) return pdrMatch[0].replace(/\s+/g, '');
-  // 先頭のアルファベット+数字を取得
   const genericMatch = itemName.match(/^[A-Z]{2,}[\s-]?\d{2,}/);
   if (genericMatch) return genericMatch[0].replace(/\s+/g, '');
   return '';
 }
 
-/** 鍋タイプ判定 */
 function isPotType(type: ItemType): boolean {
   return type === '鍋' || type === 'ジャーポット';
 }
 
-/** 鍋のサイズからデフォルト寸法を返す (cm) */
 function defaultNabeDims(itemName: string): [number, number, number] | null {
   if (!itemName) return null;
-  // 180mm系
   if (itemName.includes('180') || /18[RWCS]/.test(itemName)) return [55, 42, 42];
-  // 060mm系
   if (itemName.includes('060') || itemName.includes('06')) return [42, 32, 28];
-  // 100mm系（デフォルト）
-  if (itemName.includes('100') || /10[RWCS]/.test(itemName) || /\d/.test(itemName)) return [50, 38, 38];
-  return [50, 38, 38]; // フォールバック
+  return [50, 38, 38];
 }
 
 export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, itemName }: SizeDiagramProps) {
   const parsedDims = measurements ? parseMeas(measurements) : null;
-  // 鍋はデフォルト寸法があるので常に表示
   const isPot = isPotType(type);
   const dims = parsedDims || (isPot && itemName ? defaultNabeDims(itemName) : null);
   if (!dims && !cbm) return null;
 
   const [w, d, h] = dims || [40, 30, 30];
 
-  // 鍋は自身の寸法基準でスケーリング（他アイテムに影響されない）
+  // スケーリング: 鍋は自身の寸法基準
   const refDim = isPot ? Math.max(w, d, h, 1) : (maxContainerDim || Math.max(w, d, h, 1));
   const baseScale = 1.0 / refDim;
   const rawSw = w * baseScale * 100;
@@ -73,30 +61,24 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
   const sd = rawSd * scaleFactor;
   const sh = rawSh * scaleFactor;
 
-  // CSS keyframe名に日本語が入ると一部ブラウザで動かないためハッシュ化
-  const uid = `cb-${w}-${d}-${h}-${type.length}`;
-  const animName = `spin-${uid}`;
+  const uid = `cb${Math.round(w * 10)}${Math.round(d * 10)}${Math.round(h * 10)}`;
+  const animName = `spin${uid}`;
   const modelName = itemName ? extractModelName(itemName) : '';
-  // 鍋の機種ラベル文字色
   const nabeColor = itemName ? getNabeModelColor(itemName, type) : null;
 
-  // シールサイズ（鍋: 横3cm×縦2cm相当、その他: 横2cm×縦4cm相当）
-  const sealW = isPot
-    ? Math.max(sw * (3 / w), 14)
-    : Math.max(sw * (2 / w), 10);
-  const sealH = isPot
-    ? Math.max(sh * (2 / h), 10)
-    : Math.max(sh * (4 / h), 16);
-  const sealTextSize = isPot
-    ? Math.max(Math.min(sealW * 0.28, sealH * 0.55), 4)
-    : Math.max(Math.min(sealW * 0.7, sealH * 0.22), 5);
+  // シールサイズ固定: 4cm×4.5cm → スケール適用
+  const sealH = Math.max(sh * (4 / h), 12);
+  const sealW = Math.max(sd * (4.5 / d), 14);
+  const sealTextSize = Math.max(Math.min(sealW * 0.18, sealH * 0.22), 3.5);
+
+  // 前面の「重要安全部品」文字サイズ
+  const bigTextSize = Math.max(Math.min(sw * 0.2, sh * 0.18), 6);
 
   return (
     <div style={{
       width: '100%', height: '100%',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      perspective: 400,
-      overflow: 'hidden',
+      perspective: 400, overflow: 'hidden',
     }}>
       <style>{`
         @keyframes ${animName} {
@@ -105,8 +87,7 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
         }
       `}</style>
       <div style={{
-        width: sw, height: sh,
-        position: 'relative',
+        width: sw, height: sh, position: 'relative',
         transformStyle: 'preserve-3d',
         animation: `${animName} 12s linear infinite`,
       }}>
@@ -117,27 +98,8 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
           ...cardboardFace(0.55),
         }}>
           {isPot ? (
-            /* 鍋用: 実物準拠レイアウト */
             <>
-              {/* 機種ラベルシール（左上、横3cm×縦2cm相当） */}
-              <div style={{
-                position: 'absolute', top: 3, left: 3,
-                width: sealW, height: sealH,
-                background: 'rgba(255,255,255,0.92)',
-                border: '0.5px solid rgba(0,0,0,0.25)',
-                borderRadius: 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                overflow: 'hidden', padding: 1,
-                backfaceVisibility: 'hidden',
-              }}>
-                <span style={{
-                  fontSize: sealTextSize, fontWeight: 900,
-                  color: nabeColor || '#1a1a1a', lineHeight: 1,
-                  textAlign: 'center', letterSpacing: '-0.3px',
-                  fontFamily: 'var(--font-mono)',
-                }}>{modelName || 'JPVS'}</span>
-              </div>
-              {/* ケアマーク群（中央〜右寄り） */}
+              {/* 鍋: ケアマーク */}
               <div style={{
                 position: 'absolute', top: '15%', right: '8%', bottom: '25%',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -146,9 +108,7 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               }}>
                 <CareMarkArrowUp size={Math.max(sw * 0.14, 6)} />
                 <CareMarkUmbrella size={Math.max(sw * 0.12, 5)} />
-                <CareMarkFragile size={Math.max(sw * 0.12, 5)} />
               </div>
-              {/* MADE IN KOREA（下部） */}
               <div style={{
                 position: 'absolute', bottom: '4%', left: 0, right: 0,
                 textAlign: 'center', backfaceVisibility: 'hidden',
@@ -161,79 +121,83 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               </div>
             </>
           ) : (
-            /* 鍋以外: 従来のシール */
+            /* ポリカバー: 「重要安全部品」大文字 */
             <div style={{
-              position: 'absolute', top: 3, left: 3,
-              width: sealW, height: sealH,
-              background: 'rgba(255,255,255,0.85)',
-              border: '0.5px solid rgba(0,0,0,0.2)',
-              borderRadius: 1,
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden', padding: 1,
+              position: 'absolute', inset: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               backfaceVisibility: 'hidden',
             }}>
               <span style={{
-                fontSize: sealTextSize, fontWeight: 900,
-                color: '#1a1a1a', lineHeight: 1,
-                textAlign: 'center', letterSpacing: '-0.5px',
-              }}>要</span>
-              <span style={{
-                fontSize: sealTextSize, fontWeight: 900,
-                color: '#1a1a1a', lineHeight: 1,
-                textAlign: 'center', letterSpacing: '-0.5px',
-              }}>安全</span>
-              <span style={{
-                fontSize: sealTextSize * 0.7, fontWeight: 600,
-                color: '#555', lineHeight: 1.1,
-                textAlign: 'center',
-              }}>部</span>
+                fontSize: bigTextSize, fontWeight: 900,
+                color: 'rgba(60,40,20,0.65)', lineHeight: 1.2,
+                textAlign: 'center', letterSpacing: '1px',
+                writingMode: sw < sh ? 'vertical-rl' : undefined,
+              }}>重要<br/>安全部品</span>
             </div>
           )}
         </div>
+
         {/* 背面 */}
         <div style={{
           position: 'absolute', width: sw, height: sh,
           transform: `rotateY(180deg) translateZ(${sd / 2}px)`,
           ...cardboardFace(0.30),
         }} />
-        {/* 左面 */}
+
+        {/* 左面(狭い面) — ラベルシールはここに貼る */}
         <div style={{
           position: 'absolute', width: sd, height: sh,
           left: (sw - sd) / 2,
           transform: `rotateY(-90deg) translateZ(${sw / 2}px)`,
           ...cardboardFace(0.40),
         }}>
-          {/* 左面にもケアマーク（鍋のみ） */}
-          {isPot && (
-            <div style={{
-              position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-              backfaceVisibility: 'hidden', opacity: 0.4,
-            }}>
-              <CareMarkArrowUp size={Math.max(sd * 0.16, 5)} />
-              <CareMarkHandle size={Math.max(sd * 0.14, 4)} />
-            </div>
-          )}
+          {/* ラベルシール（4cm×4.5cm固定、中央やや上） */}
+          <div style={{
+            position: 'absolute',
+            top: Math.max(sh * 0.12, 2),
+            left: '50%', transform: 'translateX(-50%)',
+            width: sealW, height: sealH,
+            background: '#f5f5f0',
+            border: '0.5px solid rgba(0,0,0,0.3)',
+            borderRadius: 1,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'flex-start', justifyContent: 'center',
+            overflow: 'hidden', padding: '1px 2px',
+            backfaceVisibility: 'hidden', gap: 0,
+          }}>
+            {isPot ? (
+              /* 鍋: 機種名ラベル */
+              <span style={{
+                fontSize: Math.max(sealTextSize * 1.8, 5), fontWeight: 900,
+                color: nabeColor || '#1a1a1a', lineHeight: 1,
+                textAlign: 'center', width: '100%',
+                fontFamily: 'var(--font-mono)',
+              }}>{modelName || 'JPVS'}</span>
+            ) : (
+              /* ポリカバー: 品名+コード */
+              <>
+                <span style={{ fontSize: sealTextSize * 0.75, color: '#666', lineHeight: 1 }}>产品规格</span>
+                <span style={{
+                  fontSize: Math.max(sealTextSize * 1.1, 4), fontWeight: 800,
+                  color: '#1a1a1a', lineHeight: 1.1,
+                  fontFamily: 'var(--font-mono)',
+                }}>{modelName || 'JPI'}</span>
+                <span style={{ fontSize: sealTextSize * 0.7, color: '#888', lineHeight: 1, marginTop: 1 }}>
+                  <span style={{ width: 4, height: 4, display: 'inline-block', background: '#ccc', marginRight: 1 }} />
+                </span>
+              </>
+            )}
+          </div>
         </div>
-        {/* 右面 */}
+
+        {/* 右面(狭い面) */}
         <div style={{
           position: 'absolute', width: sd, height: sh,
           left: (sw - sd) / 2,
           transform: `rotateY(90deg) translateZ(${sw / 2}px)`,
           ...cardboardFace(0.45),
-        }}>
-          {isPot && (
-            <div style={{
-              position: 'absolute', top: '20%', left: '50%', transform: 'translateX(-50%)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-              backfaceVisibility: 'hidden', opacity: 0.4,
-            }}>
-              <CareMarkArrowUp size={Math.max(sd * 0.16, 5)} />
-              <CareMarkUmbrella size={Math.max(sd * 0.14, 4)} />
-            </div>
-          )}
-        </div>
+        }} />
+
         {/* 上面 */}
         <div style={{
           position: 'absolute', width: sw, height: sd,
@@ -248,7 +212,7 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
           transform: `rotateX(-90deg) translateZ(${sh / 2}px)`,
           ...cardboardFace(0.25),
         }} />
-        {/* テープライン（上面中央） */}
+        {/* テープライン（上面） */}
         <div style={{
           position: 'absolute', width: sw, height: sd,
           top: (sh - sd) / 2,
@@ -258,12 +222,10 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
         }}>
           <div style={{
             width: '12%', height: '100%',
-            background: 'rgba(180,160,120,0.25)',
-            borderLeft: '1px solid rgba(160,140,100,0.15)',
-            borderRight: '1px solid rgba(160,140,100,0.15)',
+            background: 'rgba(200,180,140,0.35)',
           }} />
         </div>
-        {/* テープライン（前面中央縦） */}
+        {/* テープライン（前面縦） */}
         <div style={{
           position: 'absolute', width: sw, height: sh,
           transform: `translateZ(${sd / 2 + 0.5}px)`,
@@ -272,9 +234,7 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
         }}>
           <div style={{
             width: '12%', height: '35%',
-            background: 'rgba(180,160,120,0.20)',
-            borderLeft: '1px solid rgba(160,140,100,0.12)',
-            borderRight: '1px solid rgba(160,140,100,0.12)',
+            background: 'rgba(200,180,140,0.30)',
             borderRadius: '0 0 1px 1px',
           }} />
         </div>
@@ -283,92 +243,39 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
   );
 }
 
-/* ===== ケアマーク SVG コンポーネント（段ボール印刷風） ===== */
-
+/* ===== ケアマーク SVG ===== */
 function CareMarkArrowUp({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <g stroke="rgba(80,60,40,0.7)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="8" y1="22" x2="8" y2="6"/>
-        <polyline points="3,11 8,4 13,11"/>
-        <line x1="16" y1="22" x2="16" y2="6"/>
-        <polyline points="11,11 16,4 21,11"/>
+        <line x1="8" y1="22" x2="8" y2="6"/><polyline points="3,11 8,4 13,11"/>
+        <line x1="16" y1="22" x2="16" y2="6"/><polyline points="11,11 16,4 21,11"/>
       </g>
     </svg>
   );
 }
-
 function CareMarkUmbrella({ size }: { size: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <g stroke="rgba(80,60,40,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12,4 C6,4 2,10 2,10 L22,10 C22,10 18,4 12,4Z"/>
-        <line x1="12" y1="10" x2="12" y2="20"/>
-        <path d="M12,20 C12,22 14,22 14,20"/>
+        <line x1="12" y1="10" x2="12" y2="20"/><path d="M12,20 C12,22 14,22 14,20"/>
       </g>
     </svg>
   );
 }
 
-function CareMarkFragile({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <g stroke="rgba(80,60,40,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        {/* ワイングラス（割れ物注意） */}
-        <path d="M8,2 L16,2 L14,9 L16,9 L16,11 L8,11 L8,9 L10,9 L8,2Z"/>
-        <line x1="12" y1="11" x2="12" y2="18"/>
-        <line x1="8" y1="18" x2="16" y2="18"/>
-        {/* 割れ線 */}
-        <path d="M12,3 L13,5 L11,7 L12,9" strokeWidth="1.5"/>
-      </g>
-    </svg>
-  );
-}
-
-function CareMarkHandle({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <g stroke="rgba(80,60,40,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        {/* 手で持つマーク */}
-        <path d="M6,14 C6,8 18,8 18,14"/>
-        <line x1="6" y1="14" x2="6" y2="20"/>
-        <line x1="18" y1="14" x2="18" y2="20"/>
-        <line x1="4" y1="20" x2="20" y2="20"/>
-      </g>
-    </svg>
-  );
-}
-
-/** 段ボール質感のスタイルを生成（不透明・リアル） */
+/** 段ボール質感（不透明） */
 function cardboardFace(brightness: number): React.CSSProperties {
   const r = Math.round(180 * brightness + 50);
   const g = Math.round(140 * brightness + 40);
   const b = Math.round(80 * brightness + 25);
-  const baseColor = `rgb(${r},${g},${b})`;
-
   return {
     background: `
-      repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0,0,0,0.05) 2px,
-        rgba(0,0,0,0.05) 4px
-      ),
-      repeating-linear-gradient(
-        90deg,
-        transparent,
-        transparent 3px,
-        rgba(0,0,0,0.03) 3px,
-        rgba(0,0,0,0.03) 6px
-      ),
-      linear-gradient(
-        135deg,
-        rgba(255,255,255,0.12) 0%,
-        transparent 40%,
-        rgba(0,0,0,0.08) 100%
-      ),
-      ${baseColor}
+      repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.05) 2px,rgba(0,0,0,0.05) 4px),
+      repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(0,0,0,0.03) 3px,rgba(0,0,0,0.03) 6px),
+      linear-gradient(135deg,rgba(255,255,255,0.12) 0%,transparent 40%,rgba(0,0,0,0.08) 100%),
+      rgb(${r},${g},${b})
     `,
     border: `1px solid rgba(${Math.round(100 * brightness + 30)},${Math.round(80 * brightness + 20)},${Math.round(40 * brightness + 10)},0.6)`,
     boxSizing: 'border-box',

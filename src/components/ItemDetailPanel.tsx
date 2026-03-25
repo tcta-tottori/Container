@@ -634,27 +634,21 @@ export default function ItemDetailPanel({
             )}
           </div>
 
-          {/* 右側: パレット図 + 端数3D回転 */}
+          {/* 右側: パレット図（積み方 + 端数を横並び or 端数のみ中央） */}
           <div style={{
-            flex: 1, height: '100%', display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', position: 'relative',
+            flex: 1, height: '100%', display: 'flex', flexDirection: 'row',
+            alignItems: 'center', justifyContent: 'center', gap: 4,
           }}>
-            {/* メインパレット図 */}
-            {item.qtyPerPallet > 0 && item.palletCount > 0 && (
-              <div style={{ width: '100%', flex: 1, minHeight: 0 }}>
+            {item.palletCount > 0 && item.qtyPerPallet > 0 && (
+              <div style={{ flex: 1, height: '100%', minWidth: 0 }}>
                 <PalletDiagram palletCount={item.palletCount} fraction={0}
                   qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                   measurements={item.measurements} />
               </div>
             )}
-            {/* 端数パレット: 3D回転ボックス */}
             {item.fraction > 0 && (
               <div style={{
-                position: item.palletCount > 0 ? 'absolute' : 'relative',
-                top: item.palletCount > 0 ? 0 : undefined,
-                right: item.palletCount > 0 ? 0 : undefined,
-                width: item.palletCount > 0 ? '45%' : '90%',
-                height: item.palletCount > 0 ? '50%' : '100%',
+                flex: 1, height: '100%', minWidth: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 overflow: 'hidden',
               }}>
