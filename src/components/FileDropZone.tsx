@@ -206,7 +206,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
 
   return (
     <div className="flex items-center justify-center h-screen w-screen"
-      style={{ background: 'linear-gradient(135deg, #0f0c29 0%, #1a1a2e 40%, #16213e 100%)' }}>
+      style={{ background: 'linear-gradient(135deg, #0c0920 0%, #1a1040 30%, #1e1428 50%, #16213e 70%, #1a0e20 100%)' }}>
       <div style={{ width: '100%', maxWidth: 420, padding: '0 20px' }}>
 
         {/* バージョン + 更新日時 */}
@@ -294,8 +294,9 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 80, height: 80, borderRadius: 20,
-            background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
-            animation: 'logo-hue-shift 30s linear infinite',
+            background: 'linear-gradient(135deg, #3b6ef6, #e87420, #7c48d0, #3b6ef6, #e87420, #7c48d0, #3b6ef6)',
+            backgroundSize: '400% 400%',
+            animation: 'logo-gradient-flow 10s ease infinite',
             marginBottom: 12,
             boxShadow: '0 8px 32px rgba(59,130,246,0.3), 0 0 20px rgba(139,92,246,0.25), 0 0 40px rgba(249,115,22,0.15)',
           }}>
@@ -303,10 +304,11 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           </div>
           <h1 style={{
             fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif',
-            background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
+            background: 'linear-gradient(135deg, #3b6ef6, #e87420, #7c48d0, #3b6ef6, #e87420, #7c48d0, #3b6ef6)',
+            backgroundSize: '400% 400%',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            animation: 'logo-hue-shift 30s linear infinite',
+            animation: 'logo-text-flow 10s ease infinite',
           }}>
             Container Navigation System
           </h1>

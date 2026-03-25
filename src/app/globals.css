@@ -269,18 +269,21 @@ body {
   100% { background-position: 200% 200%; }
 }
 
-/* ===== Logo gradient animation ===== */
-@keyframes logo-gradient-rotate {
-  0% { --logo-angle: 135deg; }
-  25% { --logo-angle: 225deg; }
-  50% { --logo-angle: 315deg; }
-  75% { --logo-angle: 45deg; }
-  100% { --logo-angle: 135deg; }
+/* ===== Logo gradient animation (blue→purple→orange→blue cycle) ===== */
+@keyframes logo-gradient-flow {
+  0%   { background-position: 0% 50%; }
+  25%  { background-position: 50% 0%; }
+  50%  { background-position: 100% 50%; }
+  75%  { background-position: 50% 100%; }
+  100% { background-position: 0% 50%; }
 }
-/* 360度フル回転で切れ目なし */
-@keyframes logo-hue-shift {
-  0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(360deg); }
+/* Gradient text animation */
+@keyframes logo-text-flow {
+  0%   { background-position: 0% 50%; }
+  25%  { background-position: 50% 0%; }
+  50%  { background-position: 100% 50%; }
+  75%  { background-position: 50% 100%; }
+  100% { background-position: 0% 50%; }
 }
 
 /* ===== Detail panel ===== */

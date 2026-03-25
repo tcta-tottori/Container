@@ -2,8 +2,11 @@
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#3b6ef6"/>
-      <stop offset="40%" stop-color="#7c48d0"/>
-      <stop offset="100%" stop-color="#e87420"/>
+      <stop offset="20%" stop-color="#e87420"/>
+      <stop offset="45%" stop-color="#7c48d0"/>
+      <stop offset="65%" stop-color="#3b6ef6"/>
+      <stop offset="85%" stop-color="#e87420"/>
+      <stop offset="100%" stop-color="#7c48d0"/>
     </linearGradient>
     <filter id="glow">
       <feGaussianBlur stdDeviation="10" result="blur"/>
