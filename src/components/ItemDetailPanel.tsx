@@ -704,18 +704,17 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 類似品（琥珀枠点滅・白文字・アイコン+品名・差異赤太字・マーキー対応） */}
-        {similarItems.length > 0 && (
-          <SimilarItemsMarquee item={item} similarItems={similarItems} />
-        )}
-
-        {/* 関連 */}
-        {relatedItems.length > 0 && (
-          <div className="detail-related" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
-            <span className="detail-related-label" style={{ color: '#fff', fontWeight: 600 }}>関連:</span>
-            <MarqueeText text={relatedText} className="detail-related-text" style={{ color: '#fff' }} />
-          </div>
-        )}
+        {/* 類似品 or 関連（1行固定エリア — 類似品優先、なければ関連を表示） */}
+        <div style={{ flexShrink: 0, minHeight: 28 }}>
+          {similarItems.length > 0 ? (
+            <SimilarItemsMarquee item={item} similarItems={similarItems} />
+          ) : relatedItems.length > 0 ? (
+            <div className="detail-related" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+              <span className="detail-related-label" style={{ color: '#fff', fontWeight: 600 }}>関連:</span>
+              <MarqueeText text={relatedText} className="detail-related-text" style={{ color: '#fff' }} />
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* === 下半分リスト === */}

@@ -60,7 +60,8 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
 
   const [w, d, h] = dims || [40, 30, 30];
 
-  const refDim = maxContainerDim || Math.max(w, d, h, 1);
+  // 鍋は自身の寸法基準でスケーリング（他アイテムに影響されない）
+  const refDim = isPot ? Math.max(w, d, h, 1) : (maxContainerDim || Math.max(w, d, h, 1));
   const baseScale = 1.0 / refDim;
   const rawSw = w * baseScale * 100;
   const rawSd = d * baseScale * 100;

@@ -293,7 +293,7 @@ interface BoxLayout {
   totalSlots: number;
 }
 
-function calculateLayout(measurements?: string, qtyPerPallet?: number): BoxLayout {
+function calculateLayout(measurements?: string, qtyPerPallet?: number, typeLayers?: number): BoxLayout {
   const PALLET_CM = 110; // standard pallet 110x110 cm
   const ISO_PALLET = 22; // isometric pallet size units
   const scale = ISO_PALLET / PALLET_CM;
@@ -302,21 +302,33 @@ function calculateLayout(measurements?: string, qtyPerPallet?: number): BoxLayou
     const dims = parseMeasurements(measurements);
     if (dims) {
       const [wCm, dCm, hCm] = dims;
-      const cols = Math.max(1, Math.floor(PALLET_CM / wCm));
-      const rows = Math.max(1, Math.floor(PALLET_CM / dCm));
-      const perLayer = cols * rows;
-      const layers = qtyPerPallet && qtyPerPallet > 0
+      // 通常配置と回転配置の両方を試してより多く入る方を採用
+      const cols1 = Math.max(1, Math.floor(PALLET_CM / wCm));
+      const rows1 = Math.max(1, Math.floor(PALLET_CM / dCm));
+      const cols2 = Math.max(1, Math.floor(PALLET_CM / dCm));
+      const rows2 = Math.max(1, Math.floor(PALLET_CM / wCm));
+      const perLayer1 = cols1 * rows1;
+      const perLayer2 = cols2 * rows2;
+      const useRotated = perLayer2 > perLayer1;
+      const cols = useRotated ? cols2 : cols1;
+      const rows = useRotated ? rows2 : rows1;
+      const perLayer = useRotated ? perLayer2 : perLayer1;
+      const effectiveW = useRotated ? dCm : wCm;
+      const effectiveD = useRotated ? wCm : dCm;
+
+      // 段数: type-specificがあればそれを優先、なければ計算（最大5段）
+      const calcLayers = qtyPerPallet && qtyPerPallet > 0
         ? Math.max(1, Math.ceil(qtyPerPallet / perLayer))
         : 3;
+      const layers = typeLayers && typeLayers > 0
+        ? typeLayers
+        : Math.min(calcLayers, 5);
 
-      // Clamp layers so the diagram doesn't get absurdly tall
-      const clampedLayers = Math.min(layers, 8);
-
-      const boxW = wCm * scale;
-      const boxD = dCm * scale;
+      const boxW = effectiveW * scale;
+      const boxD = effectiveD * scale;
       const boxH = hCm * scale;
 
-      return { cols, rows, layers: clampedLayers, boxW, boxD, boxH, totalSlots: perLayer * clampedLayers };
+      return { cols, rows, layers, boxW, boxD, boxH, totalSlots: perLayer * layers };
     }
   }
 
@@ -359,12 +371,12 @@ function buildGenericSlots(layout: BoxLayout, PH: number, PS: number): BoxSlot[]
 }
 
 /* ===== Generic Stack (measurements-aware) ===== */
-function GenericStack({ ox, oy, filled, accent, measurements, qtyPerPallet }: {
+function GenericStack({ ox, oy, filled, accent, measurements, qtyPerPallet, typeLayers }: {
   ox: number; oy: number; filled: number; accent: string;
-  measurements?: string; qtyPerPallet?: number;
+  measurements?: string; qtyPerPallet?: number; typeLayers?: number;
 }) {
   const PS = 22, PH = 3;
-  const layout = calculateLayout(measurements, qtyPerPallet);
+  const layout = calculateLayout(measurements, qtyPerPallet, typeLayers);
   const { boxW, boxD, boxH } = layout;
 
   const allSlots = buildGenericSlots(layout, PH, PS);
@@ -411,7 +423,7 @@ export default function PalletDiagram({
   // Calculate stack layers using type-specific rules
   const stackLayers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements);
 
-  const layout = jarPot ? null : calculateLayout(measurements, qtyPerPallet);
+  const layout = jarPot ? null : calculateLayout(measurements, qtyPerPallet, stackLayers || undefined);
   const jpLayers = jarPot ? (stackLayers || 5) : 0;
   const maxSlots = jarPot ? 4 * jpLayers : (layout ? layout.totalSlots : 18);
 
@@ -451,7 +463,7 @@ export default function PalletDiagram({
           ) : (
             <GenericStack ox={0} oy={0} filled={maxSlots}
               accent={colors.accent} measurements={measurements}
-              qtyPerPallet={qtyPerPallet} />
+              qtyPerPallet={qtyPerPallet} typeLayers={stackLayers || undefined} />
           )
         )}
 
