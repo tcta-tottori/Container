@@ -154,24 +154,80 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               </div>
             </>
           ) : isPot && !isJarPot ? (
-            /* 鍋: ケアマーク + MADE IN KOREA */
+            /* 鍋: 写真準拠 — ラベル(左上) + GLOBAL CORD(右) + MADE IN KOREA(右上) + L字コーナー */
             <>
+              {/* L字コーナーマーク（四隅） */}
+              {[[3, 3, 'top', 'left'], [3, 3, 'top', 'right'], [3, 3, 'bottom', 'left'], [3, 3, 'bottom', 'right']].map(([, , v, h], i) => (
+                <div key={i} style={{
+                  position: 'absolute', [v as string]: '4%', [h as string]: '4%',
+                  width: Math.max(sw * 0.06, 3), height: Math.max(sh * 0.06, 3),
+                  borderColor: 'rgba(40,30,15,0.35)', borderStyle: 'solid', borderWidth: 0,
+                  ...(v === 'top' && h === 'left' ? { borderTopWidth: '0.8px', borderLeftWidth: '0.8px' } :
+                     v === 'top' && h === 'right' ? { borderTopWidth: '0.8px', borderRightWidth: '0.8px' } :
+                     v === 'bottom' && h === 'left' ? { borderBottomWidth: '0.8px', borderLeftWidth: '0.8px' } :
+                     { borderBottomWidth: '0.8px', borderRightWidth: '0.8px' }),
+                  backfaceVisibility: 'hidden',
+                }} />
+              ))}
+              {/* MADE IN KOREA（右上） */}
               <div style={{
-                position: 'absolute', top: '15%', right: '8%', bottom: '25%',
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'space-around', gap: 1,
-                backfaceVisibility: 'hidden', opacity: 0.45,
+                position: 'absolute', top: '10%', right: '8%',
+                backfaceVisibility: 'hidden',
               }}>
-                <CareMarkArrowUp size={Math.max(sw * 0.14, 6)} />
-                <CareMarkUmbrella size={Math.max(sw * 0.12, 5)} />
+                <span style={{
+                  fontSize: Math.max(sw * 0.09, 4), fontWeight: 800,
+                  color: 'rgba(40,30,15,0.55)', letterSpacing: '0.5px',
+                  fontFamily: 'var(--font-mono)',
+                }}>MADE IN KOREA</span>
               </div>
+              {/* 機種名ラベルシール（左上） */}
               <div style={{
-                position: 'absolute', bottom: '4%', left: 0, right: 0,
+                position: 'absolute', top: '28%', left: '8%',
+                width: Math.max(sw * 0.3, 12), height: Math.max(sh * 0.22, 8),
+                background: '#f8f8f4',
+                border: '0.5px solid rgba(0,0,0,0.25)',
+                borderRadius: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                overflow: 'hidden', padding: 1,
+                backfaceVisibility: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(Math.min(sw * 0.1, sh * 0.1), 4), fontWeight: 900,
+                  color: nabeColor || '#1a1a1a', lineHeight: 1,
+                  textAlign: 'center', fontFamily: 'var(--font-mono)',
+                  letterSpacing: '-0.3px',
+                }}>{modelName || 'JPVH'}</span>
+              </div>
+              {/* GLOBAL CORDラベル（ラベル右横） */}
+              <div style={{
+                position: 'absolute', top: '28%', left: '42%',
+                width: Math.max(sw * 0.28, 10), height: Math.max(sh * 0.18, 6),
+                background: '#f8f8f4',
+                border: '0.5px solid rgba(0,0,0,0.2)',
+                borderRadius: 1,
+                display: 'flex', flexDirection: 'column',
+                padding: '1px 2px', gap: 0,
+                backfaceVisibility: 'hidden', overflow: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sw * 0.04, 2), fontWeight: 700,
+                  color: 'rgba(30,30,30,0.7)', lineHeight: 1.1,
+                }}>GLOBAL CORD</span>
+                {[1, 2].map((i) => (
+                  <div key={i} style={{
+                    height: 0.6, background: `rgba(0,0,0,0.1)`,
+                    margin: '1px 0', width: `${60 + i * 15}%`,
+                  }} />
+                ))}
+              </div>
+              {/* MADE IN KOREA（下部） */}
+              <div style={{
+                position: 'absolute', bottom: '6%', left: 0, right: 0,
                 textAlign: 'center', backfaceVisibility: 'hidden',
               }}>
                 <span style={{
-                  fontSize: Math.max(sw * 0.07, 3.5), fontWeight: 700,
-                  color: 'rgba(80,60,40,0.5)', letterSpacing: '0.5px',
+                  fontSize: Math.max(sw * 0.09, 4), fontWeight: 800,
+                  color: 'rgba(40,30,15,0.55)', letterSpacing: '0.5px',
                   fontFamily: 'var(--font-mono)',
                 }}>MADE IN KOREA</span>
               </div>
@@ -287,7 +343,20 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
           transform: `rotateY(-90deg) translateZ(${sw / 2}px)`,
           ...cardboardFace(0.40),
         }}>
-          {/* ラベルシール（4cm×4.5cm固定、中央やや上） */}
+          {/* 鍋: 左面にMADE IN KOREA（ラベルは前面に移動済み） */}
+          {isPot && !isJarPot && (
+            <div style={{
+              position: 'absolute', bottom: '8%', left: 0, right: 0,
+              textAlign: 'center', backfaceVisibility: 'hidden',
+            }}>
+              <span style={{
+                fontSize: Math.max(sd * 0.08, 3), fontWeight: 800,
+                color: 'rgba(40,30,15,0.5)', fontFamily: 'var(--font-mono)',
+              }}>MADE IN KOREA</span>
+            </div>
+          )}
+          {/* ラベルシール（4cm×4.5cm固定 — 鍋以外） */}
+          {!(isPot && !isJarPot) && (
           <div style={{
             position: 'absolute',
             top: Math.max(sh * 0.12, 2),
@@ -301,16 +370,6 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
             overflow: 'hidden', padding: '1px 2px',
             backfaceVisibility: 'hidden', gap: 0,
           }}>
-            {isPot && !isJarPot ? (
-              /* 鍋: 機種名ラベル */
-              <span style={{
-                fontSize: Math.max(sealTextSize * 1.8, 5), fontWeight: 900,
-                color: nabeColor || '#1a1a1a', lineHeight: 1,
-                textAlign: 'center', width: '100%',
-                fontFamily: 'var(--font-mono)',
-              }}>{modelName || 'JPVS'}</span>
-            ) : (
-              /* ポリカバー/ジャーポット: 品名+コード */
               <>
                 <span style={{ fontSize: sealTextSize * 0.75, color: '#666', lineHeight: 1 }}>产品规格</span>
                 <span style={{
@@ -322,8 +381,8 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
                   <span style={{ width: 4, height: 4, display: 'inline-block', background: '#ccc', marginRight: 1 }} />
                 </span>
               </>
-            )}
           </div>
+          )}
         </div>
 
         {/* 右面(狭い面) */}
@@ -333,6 +392,28 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
           transform: `rotateY(90deg) translateZ(${sw / 2}px)`,
           ...cardboardFace(0.45),
         }}>
+          {/* 鍋: 右側面にもMADE IN KOREA + ケアマーク */}
+          {isPot && !isJarPot && (
+            <>
+              <div style={{
+                position: 'absolute', bottom: '8%', left: 0, right: 0,
+                textAlign: 'center', backfaceVisibility: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sd * 0.08, 3), fontWeight: 800,
+                  color: 'rgba(40,30,15,0.5)', fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.3px',
+                }}>MADE IN KOREA</span>
+              </div>
+              <div style={{
+                position: 'absolute', top: '15%', left: '50%', transform: 'translateX(-50%)',
+                display: 'flex', gap: 2, backfaceVisibility: 'hidden', opacity: 0.35,
+              }}>
+                <CareMarkArrowUp size={Math.max(sd * 0.12, 4)} />
+                <CareMarkUmbrella size={Math.max(sd * 0.12, 4)} />
+              </div>
+            </>
+          )}
           {/* 部品: 右側面にも会社名テキスト */}
           {type === '部品' && (
             <div style={{
@@ -385,7 +466,25 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
           top: (sh - sd) / 2,
           transform: `rotateX(90deg) translateZ(${sh / 2}px)`,
           ...cardboardFace(0.60),
-        }} />
+        }}>
+          {/* 鍋: 上面にケアマーク群 + MADE IN KOREA */}
+          {isPot && !isJarPot && (
+            <div style={{
+              position: 'absolute', inset: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: Math.max(sw * 0.04, 2),
+              backfaceVisibility: 'hidden', opacity: 0.4,
+            }}>
+              <CareMarkUmbrella size={Math.max(sw * 0.1, 4)} />
+              <CareMarkArrowUp size={Math.max(sw * 0.1, 4)} />
+              <span style={{
+                fontSize: Math.max(sw * 0.05, 2.5), fontWeight: 800,
+                color: 'rgba(40,30,15,0.7)', fontFamily: 'var(--font-mono)',
+                transform: 'rotate(180deg)',
+              }}>MADE IN KOREA</span>
+            </div>
+          )}
+        </div>
         {/* 下面 */}
         <div style={{
           position: 'absolute', width: sw, height: sd,
