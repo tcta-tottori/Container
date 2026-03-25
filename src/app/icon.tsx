@@ -9,14 +9,14 @@ export default function Icon() {
     (
       <div style={{
         width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(135deg, #2a4dcf 0%, #5b3dbb 30%, #7c3aaf 55%, #c4591e 80%, #e87420 100%)',
+        background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
         borderRadius: 6,
       }}>
-        <svg width="22" height="22" viewBox="0 0 340 320" fill="none">
-          <g transform="translate(170,160)">
-            <polygon points="0,-140 140,-70 0,0 -140,-70" stroke="white" strokeWidth="24" strokeLinejoin="round" fill="none"/>
-            <polygon points="-140,-70 0,0 0,115 -140,45" stroke="white" strokeWidth="24" strokeLinejoin="round" fill="none"/>
-            <polygon points="140,-70 0,0 0,115 140,45" stroke="white" strokeWidth="24" strokeLinejoin="round" fill="none"/>
+        <svg width="20" height="20" viewBox="0 0 260 260" fill="none">
+          <g transform="translate(130,130)">
+            <polygon points="0,-100 110,-50 0,0 -110,-50" stroke="white" strokeWidth="20" strokeLinejoin="round" fill="none"/>
+            <polygon points="-110,-50 0,0 0,100 -110,50" stroke="white" strokeWidth="20" strokeLinejoin="round" fill="none"/>
+            <polygon points="110,-50 0,0 0,100 110,50" stroke="white" strokeWidth="20" strokeLinejoin="round" fill="none"/>
           </g>
         </svg>
       </div>

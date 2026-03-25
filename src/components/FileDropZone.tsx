@@ -107,18 +107,18 @@ const CHANGELOG = [
   ]},
 ];
 
-/* ===== CNSロゴSVG（上面がより見えるキューブ + ネオングロー） ===== */
+/* ===== CNSロゴSVG（正方形キューブ + ネオングロー） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
+  // 正方形キューブ: 辺の長さを統一（上面の幅 = 側面の高さ）
+  const s = 18; // 辺の投影長さ
+  const h = s * 0.58; // 高さ方向の投影 (sin30° ≈ 0.5 + 微調整)
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={{ display: 'block', filter: 'drop-shadow(0 0 3px rgba(138,180,255,0.6)) drop-shadow(0 0 6px rgba(138,180,255,0.3))' }}>
-      <g transform="translate(32,32)" stroke="#fff" strokeWidth="2.8" strokeLinejoin="round" fill="none">
-        {/* Top face (wider - more visible from above) */}
-        <polygon points="0,-21 21,-10.5 0,0 -21,-10.5"/>
-        {/* Left face (shorter) */}
-        <polygon points="-21,-10.5 0,0 0,17 -21,6.5"/>
-        {/* Right face (shorter) */}
-        <polygon points="21,-10.5 0,0 0,17 21,6.5"/>
+      <g transform="translate(32,30)" stroke="#fff" strokeWidth="2.8" strokeLinejoin="round" fill="none">
+        <polygon points={`0,${-h*2} ${s},${-h} 0,0 ${-s},${-h}`}/>
+        <polygon points={`${-s},${-h} 0,0 0,${h*2} ${-s},${h}`}/>
+        <polygon points={`${s},${-h} 0,0 0,${h*2} ${s},${h}`}/>
       </g>
     </svg>
   );
@@ -294,7 +294,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 80, height: 80, borderRadius: 20,
-            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #f97316 100%)',
+            background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
             animation: 'logo-hue-shift 30s linear infinite',
             marginBottom: 12,
             boxShadow: '0 8px 32px rgba(59,130,246,0.3), 0 0 20px rgba(139,92,246,0.25), 0 0 40px rgba(249,115,22,0.15)',
@@ -303,7 +303,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           </div>
           <h1 style={{
             fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #f97316 100%)',
+            background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
             animation: 'logo-hue-shift 30s linear infinite',
