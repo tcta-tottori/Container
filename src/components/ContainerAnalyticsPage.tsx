@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
+import { getNabeModelColor } from '@/lib/nabeColors';
 
 interface ContainerAnalyticsPageProps {
   items: ContainerItem[];
@@ -723,6 +724,8 @@ export default function ContainerAnalyticsPage({
               .slice(0, 10)
               .map((it) => {
                 const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
+                const nabeColor = getNabeModelColor(it.itemName, it.type);
+                const dotColor = nabeColor || c.accent;
                 const itemCbm = getItemCbm(it) * (it.caseCount || 1);
                 const isDone = completedIds.has(it.id);
                 const name = it.itemName.replace(/ポリカバー/g, '').trim() || it.itemName;
@@ -732,13 +735,13 @@ export default function ContainerAnalyticsPage({
                     borderBottom: '1px solid rgba(255,255,255,0.04)',
                     opacity: isDone ? 0.4 : 1,
                   }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.accent, flexShrink: 0 }} />
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
                     <span style={{
-                      flex: 1, fontSize: 12, color: isDone ? '#666' : 'rgba(255,255,255,0.8)',
+                      flex: 1, fontSize: 12, color: isDone ? '#666' : (nabeColor || 'rgba(255,255,255,0.8)'),
                       textDecoration: isDone ? 'line-through' : 'none',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>{name}</span>
-                    <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 800, color: c.accent }}>
+                    <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 800, color: dotColor }}>
                       {itemCbm.toFixed(2)}
                     </span>
                     <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>m³</span>

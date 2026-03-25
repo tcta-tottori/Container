@@ -2,6 +2,7 @@
 
 import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
+import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
 
 interface ItemListPanelProps {
   items: ContainerItem[];
@@ -50,7 +51,10 @@ export default function ItemListPanel({
         {items.map((item, idx) => {
           const c = COLOR_MAP[item.type] || COLOR_MAP['その他'];
           const isActive = idx === currentIdx;
-          const typeBg = TYPE_ROW_BG[item.type] || TYPE_ROW_BG['その他'];
+          // 鍋は機種別カラーを使用
+          const nabeColor = getNabeModelColor(item.itemName, item.type);
+          const accentColor = nabeColor || c.accent;
+          const typeBg = nabeColor ? nabeColorToDarkBg(nabeColor) : (TYPE_ROW_BG[item.type] || TYPE_ROW_BG['その他']);
 
           return (
             <button key={item.id} onClick={() => onSelect(idx)}
@@ -58,19 +62,19 @@ export default function ItemListPanel({
               style={{
                 width: '100%', textAlign: 'left' as const,
                 background: isActive ? '#2a1f10' : typeBg,
-                borderLeftColor: isActive ? '#ff6d00' : c.accent,
+                borderLeftColor: isActive ? '#ff6d00' : accentColor,
                 borderLeftWidth: isActive ? 4 : 3,
                 cursor: 'pointer',
               }}>
-              <span className="detail-list-dot" style={{ backgroundColor: c.accent }} />
+              <span className="detail-list-dot" style={{ backgroundColor: accentColor }} />
               <span className="detail-list-name" style={{
-                color: isActive ? '#ff9800' : 'rgba(255,255,255,0.85)',
+                color: isActive ? '#ff9800' : (nabeColor ? nabeColor : 'rgba(255,255,255,0.85)'),
                 fontWeight: isActive ? 700 : 500,
               }}>
                 {shortenName(item.itemName)}
               </span>
               <span className="detail-list-num" style={{
-                color: isActive ? '#ff9800' : c.accent, fontWeight: 600,
+                color: isActive ? '#ff9800' : accentColor, fontWeight: 600,
               }}>{fmtNum(item.palletCount)}</span>
               <span className="detail-list-num" style={{
                 color: isActive ? '#ff9800' : 'rgba(255,255,255,0.7)',

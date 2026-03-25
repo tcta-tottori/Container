@@ -5,6 +5,7 @@ import { ContainerItem, ItemType } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { saveToGitHub, getStoredToken, storeToken } from '@/lib/githubSave';
 import { detectItemType } from '@/lib/typeDetector';
+import { getNabeColorRules, saveNabeColorRules, resetNabeColorRules, NabeColorRule } from '@/lib/nabeColors';
 import * as XLSX from 'xlsx';
 
 /** 環境変数からフォールバック GitHub トークンを取得（.env.local で設定） */
@@ -229,6 +230,7 @@ export default function ItemEditPage({
   const [showAddForm, setShowAddForm] = useState(false);
   const containerFirst = false; // CN優先ソートは廃止（列フィルターで対応）
   const [showSubMenu, setShowSubMenu] = useState(false);
+  const [showNabeColorEditor, setShowNabeColorEditor] = useState(false);
   const [showTokenDialog, setShowTokenDialog] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
@@ -526,6 +528,15 @@ export default function ItemEditPage({
                 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                   外部Excelエクスポート
+                </button>
+                <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '2px 8px' }} />
+                <button onClick={() => { setShowNabeColorEditor(true); setShowSubMenu(false); }} style={{
+                  display: 'flex', alignItems: 'center', gap: 6, width: '100%', padding: '8px 12px',
+                  borderRadius: 6, border: 'none', cursor: 'pointer',
+                  background: 'transparent', color: '#ef4444', fontSize: 12, fontWeight: 500,
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+                  鍋カラー設定
                 </button>
               </div>
             )}
@@ -884,6 +895,11 @@ export default function ItemEditPage({
           onDelete={() => { handleDeleteItem(editingIdx, items[editingIdx].itemName); setEditingIdx(null); }}
           onGoDetail={() => { onSelectAndGoDetail(editingIdx); setEditingIdx(null); }}
         />
+      )}
+
+      {/* 鍋カラー設定ポップアップ */}
+      {showNabeColorEditor && (
+        <NabeColorEditor onClose={() => setShowNabeColorEditor(false)} />
       )}
     </div>
   );
@@ -1421,5 +1437,149 @@ function EditRow({ item, colors, isContainerMatch, onStartEdit }: {
         {item.measurements || '---'}
       </span>
     </button>
+  );
+}
+
+/* ===== 鍋カラー設定エディタ ===== */
+function NabeColorEditor({ onClose }: { onClose: () => void }) {
+  const [rules, setRules] = useState<NabeColorRule[]>(() => getNabeColorRules());
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    saveNabeColorRules(rules.filter((r) => r.key.trim()));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleReset = () => {
+    if (!window.confirm('デフォルトに戻しますか？')) return;
+    const defaults = resetNabeColorRules();
+    setRules(defaults);
+  };
+
+  const updateRule = (idx: number, field: keyof NabeColorRule, value: string) => {
+    setRules((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+  };
+
+  const addRule = () => {
+    setRules((prev) => [...prev, { key: '', label: '', color: '#ef4444' }]);
+  };
+
+  const removeRule = (idx: number) => {
+    setRules((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100,
+      background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 16,
+    }} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div style={{
+        background: '#1e2130', borderRadius: 16, width: '100%', maxWidth: 480,
+        maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+      }}>
+        {/* ヘッダー */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '14px 18px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#ef4444', flex: 1 }}>
+            鍋カラー設定
+          </span>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
+            未登録機種 = 赤
+          </span>
+          <button onClick={onClose} style={{
+            background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)',
+            fontSize: 18, cursor: 'pointer', padding: '0 4px',
+          }}>×</button>
+        </div>
+
+        {/* 説明 */}
+        <div style={{
+          padding: '8px 18px', fontSize: 10, color: 'rgba(255,255,255,0.4)',
+          borderBottom: '1px solid rgba(255,255,255,0.04)', lineHeight: 1.5,
+        }}>
+          キー: 品名から数字を除いた英字部分（例: JPVH100 → JPVH, JPV+H10W → JPVHW）<br/>
+          サイズ違い（100/180等）は同じキーで同色になります
+        </div>
+
+        {/* ルールリスト */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px' }}>
+          {rules.map((rule, idx) => (
+            <div key={idx} style={{
+              display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6,
+            }}>
+              {/* カラーピッカー */}
+              <input type="color" value={rule.color} onChange={(e) => updateRule(idx, 'color', e.target.value)}
+                style={{
+                  width: 32, height: 32, border: '2px solid rgba(255,255,255,0.15)',
+                  borderRadius: 6, cursor: 'pointer', background: 'none', padding: 0,
+                  flexShrink: 0,
+                }} />
+              {/* キー */}
+              <input value={rule.key} onChange={(e) => updateRule(idx, 'key', e.target.value.toUpperCase())}
+                placeholder="キー"
+                style={{
+                  ...inputStyle, width: 80, fontFamily: 'var(--font-mono)',
+                  fontWeight: 700, fontSize: 13, textAlign: 'center',
+                  color: rule.color, flexShrink: 0,
+                }} />
+              {/* ラベル */}
+              <input value={rule.label} onChange={(e) => updateRule(idx, 'label', e.target.value)}
+                placeholder="表示名"
+                style={{ ...inputStyle, flex: 1, fontSize: 12 }} />
+              {/* 削除 */}
+              <button onClick={() => removeRule(idx)} style={{
+                background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
+                fontSize: 16, cursor: 'pointer', padding: '0 4px', flexShrink: 0,
+              }}>×</button>
+            </div>
+          ))}
+          {/* 追加 */}
+          <button onClick={addRule} style={{
+            display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
+            borderRadius: 8, border: '1px dashed rgba(255,255,255,0.15)',
+            background: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12,
+            cursor: 'pointer', width: '100%', justifyContent: 'center',
+            marginTop: 4,
+          }}>
+            + ルール追加
+          </button>
+        </div>
+
+        {/* フッター */}
+        <div style={{
+          display: 'flex', gap: 8, padding: '12px 18px',
+          borderTop: '1px solid rgba(255,255,255,0.08)', flexShrink: 0,
+        }}>
+          <button onClick={handleReset} style={{
+            padding: '8px 14px', borderRadius: 8,
+            border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
+            background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.5)',
+            fontSize: 12, fontWeight: 500,
+          }}>
+            デフォルトに戻す
+          </button>
+          <div style={{ flex: 1 }} />
+          {saved && <span style={{ fontSize: 12, color: '#4ade80', alignSelf: 'center' }}>保存しました</span>}
+          <button onClick={handleSave} style={{
+            padding: '8px 20px', borderRadius: 8,
+            border: '1px solid rgba(239,68,68,0.4)', cursor: 'pointer',
+            background: 'rgba(239,68,68,0.15)', color: '#ef4444',
+            fontSize: 13, fontWeight: 700,
+          }}>
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

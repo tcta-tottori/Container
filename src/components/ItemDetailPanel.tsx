@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
+import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
 import PalletDiagram, { calculateStackLayers } from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
@@ -287,6 +288,9 @@ export default function ItemDetailPanel({
   item, relatedItems, allItems, completedIds, onSelectItem, onCompleteItem, onUncompleteItem, onDecrementPallet,
 }: ItemDetailPanelProps) {
   const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
+  // 鍋は機種別カラーを使用（上半分の背景・アクセント色を差し替え）
+  const nabeColor = getNabeModelColor(item.itemName, item.type);
+  const accentColor = nabeColor || colors.accent;
   const [palletFlash, setPalletFlash] = useState(false);
   const doubleTapRef = useRef<number | null>(null);
 
@@ -341,12 +345,12 @@ export default function ItemDetailPanel({
     'ポリカバー': '#162218', 'ジャーポット': '#1e1520', '箱': '#151e2c', '部品': '#1c1628', '鍋': '#1e1518', 'ヤーマン部品': '#1c1a14', 'その他': '#1a1a1e',
   };
 
-  // CSS変数でaccent色を渡す
+  // CSS変数でaccent色を渡す（鍋は機種カラー）
   const heroVars = {
-    '--hero-c1': colors.accent + '30',
-    '--hero-c2': colors.accent + '18',
-    '--hero-c3': colors.accent + '10',
-    '--hero-c4': colors.accent + '22',
+    '--hero-c1': accentColor + '30',
+    '--hero-c2': accentColor + '18',
+    '--hero-c3': accentColor + '10',
+    '--hero-c4': accentColor + '22',
   } as React.CSSProperties;
 
   return (
@@ -368,10 +372,10 @@ export default function ItemDetailPanel({
         {/* 1行目: 種目バッジ + 色柄 + 品目数 */}
         <div className="detail-badges">
           <span className="type-badge" style={{
-            backgroundColor: `${colors.accent}40`, color: '#fff',
-            border: `1.5px solid ${colors.accent}70`, fontWeight: 700, fontSize: 12,
+            backgroundColor: `${accentColor}40`, color: '#fff',
+            border: `1.5px solid ${accentColor}70`, fontWeight: 700, fontSize: 12,
           }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: colors.accent, display: 'inline-block' }} />
+            <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: accentColor, display: 'inline-block' }} />
             {item.type}
           </span>
           {itemColor && (
@@ -410,8 +414,8 @@ export default function ItemDetailPanel({
         <div style={{ position: 'relative', zIndex: 3 }}>
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
-              color: '#f0f0f0',
-              textShadow: `0 0 24px ${colors.accent}60, 0 0 48px ${colors.accent}25, 0 2px 6px rgba(0,0,0,0.8)`,
+              color: nabeColor || '#f0f0f0',
+              textShadow: `0 0 24px ${accentColor}60, 0 0 48px ${accentColor}25, 0 2px 6px rgba(0,0,0,0.8)`,
             }} />
           {/* 品名の下に気高コード（KTE青）+ 新建高コード（KEN赤）縦並び */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 2 }}>
@@ -472,8 +476,8 @@ export default function ItemDetailPanel({
             <div style={{
               position: 'absolute', bottom: 0, left: 4, zIndex: 2,
               fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13,
-              color: colors.accent,
-              textShadow: `0 0 8px rgba(0,0,0,0.9), 0 1px 6px rgba(0,0,0,0.7), 0 0 20px ${colors.accent}40`,
+              color: accentColor,
+              textShadow: `0 0 8px rgba(0,0,0,0.9), 0 1px 6px rgba(0,0,0,0.7), 0 0 20px ${accentColor}40`,
               letterSpacing: '-0.5px',
             }}>
               {currentDims[0]}×{currentDims[1]}×{currentDims[2]}
@@ -485,8 +489,8 @@ export default function ItemDetailPanel({
         <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
           <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
-              color: colors.accent,
-              textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
+              color: accentColor,
+              textShadow: `0 0 16px ${accentColor}50, 0 2px 4px rgba(0,0,0,0.6)`,
               cursor: 'pointer',
               transition: 'background 0.15s ease',
               background: palletFlash ? 'rgba(255,255,255,0.25)' : 'transparent',
@@ -498,11 +502,11 @@ export default function ItemDetailPanel({
               {(() => {
                 const st = calculateStackLayers(item.type, item.itemName, item.qtyPerPallet, item.measurements);
                 return st > 0 ? (
-                  <span className="detail-sf-at" style={{ color: `${colors.accent}cc`, lineHeight: 1 }}>{st}ST</span>
+                  <span className="detail-sf-at" style={{ color: `${accentColor}cc`, lineHeight: 1 }}>{st}ST</span>
                 ) : null;
               })()}
               {item.qtyPerPallet > 0 && (
-                <span className="detail-sf-at" style={{ color: `${colors.accent}cc`, lineHeight: 1 }}>@{item.qtyPerPallet}</span>
+                <span className="detail-sf-at" style={{ color: `${accentColor}cc`, lineHeight: 1 }}>@{item.qtyPerPallet}</span>
               )}
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>PL</span>
             </div>
@@ -510,7 +514,7 @@ export default function ItemDetailPanel({
           <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" style={{
               color: '#e8e8e8',
-              textShadow: `0 0 16px ${colors.accent}30, 0 2px 4px rgba(0,0,0,0.6)`,
+              textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`,
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
             }}>{item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : fmtNum(item.fraction)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>CT</span>
@@ -555,19 +559,22 @@ export default function ItemDetailPanel({
             const isDone = completedIds.has(it.id);
             const displayName = shortenName(it.itemName);
             const origIdx = allItems.findIndex((a) => a.id === it.id);
-            const typeBg = TYPE_ROW_BG[it.type] || TYPE_ROW_BG['その他'];
+            // 鍋は機種別カラーを使用
+            const itNabeColor = getNabeModelColor(it.itemName, it.type);
+            const itAccent = itNabeColor || c.accent;
+            const typeBg = itNabeColor ? nabeColorToDarkBg(itNabeColor) : (TYPE_ROW_BG[it.type] || TYPE_ROW_BG['その他']);
             const rowBg = isDone ? '#1e1e22' : isActive ? '#2a1f10' : typeBg;
 
             const content = (
               <>
-                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#555' : c.accent }} />
+                <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#555' : itAccent }} />
                 <MarqueeText text={displayName}
                   className="detail-list-name"
                   style={isDone
                     ? { color: '#666', textDecoration: 'line-through' }
-                    : isActive ? { fontWeight: 700, color: '#ff9800' } : { color: 'rgba(255,255,255,0.85)' }
+                    : isActive ? { fontWeight: 700, color: '#ff9800' } : { color: itNabeColor || 'rgba(255,255,255,0.85)' }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : c.accent, fontWeight: 600 }}>{fmtNum(it.palletCount)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : itAccent, fontWeight: 600 }}>{fmtNum(it.palletCount)}</span>
                 <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : 'rgba(255,255,255,0.7)' }}>{fmtNum(it.fraction)}</span>
                 <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#555' : 'rgba(255,255,255,0.55)' }}>
                   {Math.ceil(it.totalQty).toLocaleString()}
@@ -592,7 +599,7 @@ export default function ItemDetailPanel({
                 className={`detail-list-row ${isActive ? 'active' : ''}`}
                 style={{
                   background: rowBg,
-                  borderLeftColor: isActive ? '#ff6d00' : c.accent,
+                  borderLeftColor: isActive ? '#ff6d00' : itAccent,
                   borderLeftWidth: isActive ? 4 : 3,
                 }}
               >

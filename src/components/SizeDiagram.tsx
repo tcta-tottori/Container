@@ -1,6 +1,7 @@
 'use client';
 
 import { ItemType } from '@/lib/types';
+import { getNabeModelColor } from '@/lib/nabeColors';
 
 interface SizeDiagramProps {
   measurements?: string;
@@ -60,6 +61,8 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
   const animName = `spin-${uid}`;
   const isPot = isPotType(type);
   const modelName = itemName ? extractModelName(itemName) : '';
+  // 鍋の機種ラベル文字色
+  const nabeColor = itemName ? getNabeModelColor(itemName, type) : null;
 
   // シールサイズ（鍋: 横3cm×縦2cm相当、その他: 横2cm×縦4cm相当）
   const sealW = isPot
@@ -113,7 +116,7 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               }}>
                 <span style={{
                   fontSize: sealTextSize, fontWeight: 900,
-                  color: '#1a1a1a', lineHeight: 1,
+                  color: nabeColor || '#1a1a1a', lineHeight: 1,
                   textAlign: 'center', letterSpacing: '-0.3px',
                   fontFamily: 'var(--font-mono)',
                 }}>{modelName || 'JPVS'}</span>
