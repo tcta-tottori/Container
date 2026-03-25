@@ -33,14 +33,14 @@ const ITEM_TYPES: ItemType[] = ['ポリカバー', 'ジャーポット', '箱', 
 function exportToExcel(items: ContainerItem[]) {
   // ヘッダー行0（グループ行）
   const groupRow = [
-    'ベース情報', '', '', '', '', '', '', '', '',
+    'ベース情報', '', '', '', '', '', '', '', '', '',
     '气高编号', '', '',
     'コンテナ日程', '', '', '',
     '', '', '', '', '',
   ];
   // ヘッダー行1
   const headerRow = [
-    '新建高コード', '気高コード', '規格', '種類', '代表機種', '入数', '総数', 'ケース数', '1P数',
+    '新建高コード', '気高コード', '規格', '種類', '代表機種', '入数', '総数', 'ケース数', '1P数', 'サイズ',
     '新建高コード\n(气高编号)', '規格\n(气高编号)', '紐付状態',
     '規格\n(コンテナ)', '代表機種\n(コンテナ)', '入数\n(コンテナ)', '1P数\n(コンテナ)',
     'ITEM\nDESCRIPTION', 'MODEL NO.', 'G.W.\n(per carton)', 'CBM', 'Meas.',
@@ -55,6 +55,7 @@ function exportToExcel(items: ContainerItem[]) {
     it.totalQty || '',
     it.caseCount || '',
     it.qtyPerPallet || '',
+    it.size || '',
     it.newPartNumberKetaka || '',
     it.itemNameKetaka || '',
     it.linkStatus || '',
@@ -73,16 +74,16 @@ function exportToExcel(items: ContainerItem[]) {
   XLSX.utils.book_append_sheet(wb, ws, '品目一覧（全集約）');
   ws['!cols'] = [
     { wch: 14 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 22 },
-    { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 6 },
+    { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 6 }, { wch: 6 },
     { wch: 14 }, { wch: 28 }, { wch: 8 },
     { wch: 28 }, { wch: 22 }, { wch: 6 }, { wch: 6 },
     { wch: 22 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 14 },
   ];
   // ヘッダーグループのマージ
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },   // ベース情報
-    { s: { r: 0, c: 9 }, e: { r: 0, c: 11 } },   // 气高编号
-    { s: { r: 0, c: 12 }, e: { r: 0, c: 15 } },  // コンテナ日程
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },    // ベース情報 (A-J)
+    { s: { r: 0, c: 10 }, e: { r: 0, c: 12 } },   // 气高编号 (K-M)
+    { s: { r: 0, c: 13 }, e: { r: 0, c: 16 } },   // コンテナ日程 (N-Q)
   ];
   XLSX.writeFile(wb, `CNS_品目一覧_全集約版.xlsx`);
 }
@@ -101,18 +102,19 @@ function extractMasterFromRow(r: unknown[]) {
     totalQty: n(6) ?? 0,
     caseCount: n(7) ?? 0,
     qtyPerPallet: n(8) ?? 0,
-    newPartNumberKetaka: v(9) || undefined,
-    itemNameKetaka: v(10) || undefined,
-    linkStatus: v(11) || undefined,
-    itemNameContainer: v(12) || undefined,
-    representModelContainer: v(13) || undefined,
-    packingQtyContainer: n(14),
-    qtyPerPalletContainer: n(15),
-    description: v(16) || undefined,
-    modelNo: v(17) || undefined,
-    grossWeight: n(18),
-    cbm: n(19),
-    measurements: v(20) || undefined,
+    size: v(9) || undefined,                    // J列: サイズ
+    newPartNumberKetaka: v(10) || undefined,     // K列
+    itemNameKetaka: v(11) || undefined,          // L列
+    linkStatus: v(12) || undefined,              // M列
+    itemNameContainer: v(13) || undefined,       // N列
+    representModelContainer: v(14) || undefined, // O列
+    packingQtyContainer: n(15),                  // P列
+    qtyPerPalletContainer: n(16),                // Q列
+    description: v(17) || undefined,             // R列
+    modelNo: v(18) || undefined,                 // S列
+    grossWeight: n(19),                          // T列
+    cbm: n(20),                                  // U列
+    measurements: v(21) || undefined,            // V列
   };
 }
 

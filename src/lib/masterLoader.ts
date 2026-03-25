@@ -122,10 +122,10 @@ export function parseAqssExcel(buffer: ArrayBuffer): Map<string, Partial<Contain
  * ファイルはリポジトリルートに配置されている
  */
 const GITHUB_RAW_URLS = [
-  // mainブランチ（リポジトリルート）
+  // デプロイブランチ（最新データ）
+  'https://raw.githubusercontent.com/tcta-tottori/Container/claude/init-container-app-0RJFr/CNS_%E5%93%81%E7%9B%AE%E4%B8%80%E8%A6%A7_%E5%85%A8%E9%9B%86%E7%B4%84%E7%89%88.xlsx',
+  // mainブランチ（フォールバック）
   'https://raw.githubusercontent.com/tcta-tottori/Container/main/CNS_%E5%93%81%E7%9B%AE%E4%B8%80%E8%A6%A7_%E5%85%A8%E9%9B%86%E7%B4%84%E7%89%88.xlsx',
-  // public/data/ にもある場合のフォールバック
-  'https://raw.githubusercontent.com/tcta-tottori/Container/main/public/data/CNS_%E5%93%81%E7%9B%AE%E4%B8%80%E8%A6%A7_%E5%85%A8%E9%9B%86%E7%B4%84%E7%89%88.xlsx',
 ];
 
 /**
