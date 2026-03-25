@@ -62,13 +62,13 @@ function palletFace(brightness: number): React.CSSProperties {
 }
 
 /* ===== CSS 3D Pallet Base (110×110cm) ===== */
-function PalletBase3D({ pw, pd, ph }: { pw: number; pd: number; ph: number }) {
+function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: number; topOffset: number }) {
   const forkW = pw * 0.2;
   const forkH = ph * 0.4;
   const forkY = ph * 0.3;
 
   return (
-    <div style={{ position: 'absolute', left: 0, bottom: 0, width: pw, height: ph, transformStyle: 'preserve-3d' }}>
+    <div style={{ position: 'absolute', left: 0, top: topOffset, width: pw, height: ph, transformStyle: 'preserve-3d' }}>
       {/* Front */}
       <div style={{ position: 'absolute', width: pw, height: ph, transform: `translateZ(${pd / 2}px)`, ...palletFace(0.5) }}>
         {[0.12, 0.55].map((p, i) => (
@@ -124,14 +124,16 @@ function PalletBase3D({ pw, pd, ph }: { pw: number; pd: number; ph: number }) {
 }
 
 /* ===== CSS 3D Cardboard Box ===== */
-function Box3D({ x, z, w, d, h }: {
+function Box3D({ x, w, d, h, topBase }: {
   x: number; y: number; z: number; w: number; d: number; h: number;
+  topBase: number;
 }) {
-  const bottom = z;
+  // topBase = totalHeight - PALLET_H_PX - z - h (inverted so z=0 is just above pallet)
+  const top = topBase;
   const left = x;
 
   return (
-    <div style={{ position: 'absolute', left, bottom, transformStyle: 'preserve-3d' }}>
+    <div style={{ position: 'absolute', left, top, transformStyle: 'preserve-3d' }}>
       {/* Front */}
       <div style={{
         position: 'absolute', width: w, height: h,
@@ -422,16 +424,19 @@ export default function PalletDiagram({
           : { transform: 'rotateX(-25deg) rotateY(-35deg)' }
         ),
       }}>
-        {/* Pallet base */}
-        <PalletBase3D pw={PALLET_PX} pd={PALLET_PX} ph={PALLET_H_PX} />
+        {/* Pallet base — always at bottom */}
+        <PalletBase3D pw={PALLET_PX} pd={PALLET_PX} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
 
-        {/* Stacked boxes */}
+        {/* Stacked boxes — above pallet */}
         {renderSlots.map((slot, i) => {
-          if (i >= filled) return null; // skip unfilled
+          if (i >= filled) return null;
+          // Convert z (bottom-up from pallet top) to top (top-down from container top)
+          const boxTop = totalHeight - PALLET_H_PX - (slot.z - PALLET_H_PX) - slot.h;
           return (
             <Box3D key={i}
               x={slot.x} y={slot.y} z={slot.z}
               w={slot.w} d={slot.d} h={slot.h}
+              topBase={boxTop}
             />
           );
         })}
