@@ -33,6 +33,27 @@ function isPotType(type: ItemType): boolean {
   return type === '鍋' || type === 'ジャーポット';
 }
 
+/** ジャーポット判定 (PDR/PDU/PVW — PDZは除外) */
+function isJarPotBox(type: ItemType, itemName?: string): boolean {
+  if (type !== 'ジャーポット') return false;
+  if (!itemName) return true;
+  return !itemName.includes('PDZ');
+}
+
+/** ジャーポットのモデル名抽出 (PDR-G221 → PDR G2) */
+function extractJarPotModel(itemName: string): { model: string; size: string } {
+  const m = itemName.match(/(PD[RU]|PVW)[\s-]*([A-Z]?\d{1,3})/);
+  if (m) {
+    const num = m[2];
+    // PDR-G221 → size "2" (2L), PDR-G301 → "3" (3L), PDR-G401 → "4" (4L/5L)
+    const sizeNum = num.match(/(\d)/);
+    const size = sizeNum ? `${sizeNum[1]}L` : '';
+    return { model: `${m[1]}`, size };
+  }
+  const gen = itemName.match(/(PD[RUZ]|PVW)/);
+  return { model: gen ? gen[1] : 'PDR', size: '' };
+}
+
 function defaultNabeDims(itemName: string): [number, number, number] | null {
   if (!itemName) return null;
   if (itemName.includes('180') || /18[RWCS]/.test(itemName)) return [55, 42, 42];
@@ -65,6 +86,8 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
   const animName = `spin${uid}`;
   const modelName = itemName ? extractModelName(itemName) : '';
   const nabeColor = itemName ? getNabeModelColor(itemName, type) : null;
+  const isJarPot = isJarPotBox(type, itemName);
+  const jarPotInfo = isJarPot && itemName ? extractJarPotModel(itemName) : null;
 
   // シールサイズ固定: 4cm×4.5cm → スケール適用
   const sealH = Math.max(sh * (4 / h), 12);
@@ -97,9 +120,42 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
           transform: `translateZ(${sd / 2}px)`,
           ...cardboardFace(0.55),
         }}>
-          {isPot ? (
+          {isJarPot && jarPotInfo ? (
+            /* ジャーポット: モデル名 + 色バリエーショングリッド */
             <>
-              {/* 鍋: ケアマーク */}
+              {/* モデル名（右上） */}
+              <div style={{
+                position: 'absolute', top: '6%', right: '8%',
+                backfaceVisibility: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sw * 0.22, 7), fontWeight: 900,
+                  color: 'rgba(40,30,15,0.75)', fontFamily: 'var(--font-mono)',
+                  letterSpacing: '-0.5px', lineHeight: 1,
+                }}>{jarPotInfo.model} {jarPotInfo.size}</span>
+              </div>
+              {/* 色バリエーショングリッド（左側） */}
+              <div style={{
+                position: 'absolute', top: '10%', left: '8%', bottom: '10%',
+                display: 'flex', flexDirection: 'column', gap: 0,
+                backfaceVisibility: 'hidden',
+              }}>
+                {['A', 'C', 'R', 'S', 'U', 'W'].map((c) => (
+                  <div key={c} style={{
+                    width: Math.max(sw * 0.14, 5),
+                    height: Math.max(sh * 0.1, 3),
+                    border: '0.5px solid rgba(40,30,15,0.5)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: Math.max(sw * 0.06, 2.5), fontWeight: 800,
+                    color: 'rgba(40,30,15,0.65)', fontFamily: 'var(--font-mono)',
+                    lineHeight: 1,
+                  }}>{c}</div>
+                ))}
+              </div>
+            </>
+          ) : isPot && !isJarPot ? (
+            /* 鍋: ケアマーク + MADE IN KOREA */
+            <>
               <div style={{
                 position: 'absolute', top: '15%', right: '8%', bottom: '25%',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -121,7 +177,7 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               </div>
             </>
           ) : (
-            /* ポリカバー: 「重要安全部品」大文字 */
+            /* ポリカバー/その他: 「重要安全部品」 */
             <div style={{
               position: 'absolute', inset: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -165,7 +221,7 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
             overflow: 'hidden', padding: '1px 2px',
             backfaceVisibility: 'hidden', gap: 0,
           }}>
-            {isPot ? (
+            {isPot && !isJarPot ? (
               /* 鍋: 機種名ラベル */
               <span style={{
                 fontSize: Math.max(sealTextSize * 1.8, 5), fontWeight: 900,
@@ -174,7 +230,7 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
                 fontFamily: 'var(--font-mono)',
               }}>{modelName || 'JPVS'}</span>
             ) : (
-              /* ポリカバー: 品名+コード */
+              /* ポリカバー/ジャーポット: 品名+コード */
               <>
                 <span style={{ fontSize: sealTextSize * 0.75, color: '#666', lineHeight: 1 }}>产品规格</span>
                 <span style={{
@@ -196,7 +252,40 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
           left: (sw - sd) / 2,
           transform: `rotateY(90deg) translateZ(${sw / 2}px)`,
           ...cardboardFace(0.45),
-        }} />
+        }}>
+          {/* ジャーポット: 右面にもモデル名+色グリッド（小さめ） */}
+          {isJarPot && jarPotInfo && (
+            <>
+              <div style={{
+                position: 'absolute', top: '8%', right: '10%',
+                backfaceVisibility: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sd * 0.18, 5), fontWeight: 900,
+                  color: 'rgba(40,30,15,0.65)', fontFamily: 'var(--font-mono)',
+                  lineHeight: 1,
+                }}>{jarPotInfo.model} {jarPotInfo.size}</span>
+              </div>
+              <div style={{
+                position: 'absolute', top: '12%', left: '10%', bottom: '15%',
+                display: 'flex', flexDirection: 'column', gap: 0,
+                backfaceVisibility: 'hidden',
+              }}>
+                {['A', 'C', 'R', 'S', 'U', 'W'].map((c) => (
+                  <div key={c} style={{
+                    width: Math.max(sd * 0.13, 4),
+                    height: Math.max(sh * 0.08, 2.5),
+                    border: '0.4px solid rgba(40,30,15,0.4)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: Math.max(sd * 0.05, 2), fontWeight: 800,
+                    color: 'rgba(40,30,15,0.55)', fontFamily: 'var(--font-mono)',
+                    lineHeight: 1,
+                  }}>{c}</div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* 上面 */}
         <div style={{
