@@ -449,7 +449,7 @@ export default function ItemDetailPanel({
           <div style={{
             position: 'relative', width: '35%', height: '100%', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            overflow: 'hidden',
+            overflow: 'visible',
           }}>
             {(item.measurements || item.cbm || item.type === '鍋') && (
               <SizeDiagram measurements={item.measurements} cbm={item.cbm}

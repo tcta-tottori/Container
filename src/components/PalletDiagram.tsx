@@ -405,7 +405,7 @@ export default function PalletDiagram({
     <div style={{
       width: '100%', height: '100%',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      perspective: 400, overflow: 'hidden',
+      perspective: 400, overflow: 'visible',
     }}>
       {rotate && (
         <style>{`

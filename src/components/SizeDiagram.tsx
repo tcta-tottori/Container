@@ -313,19 +313,33 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               </div>
             </>
           ) : (
-            /* ポリカバー/その他: 「重要安全部品」 */
-            <div style={{
-              position: 'absolute', inset: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backfaceVisibility: 'hidden',
-            }}>
-              <span style={{
-                fontSize: bigTextSize, fontWeight: 900,
-                color: 'rgba(60,40,20,0.65)', lineHeight: 1.2,
-                textAlign: 'center', letterSpacing: '1px',
-                writingMode: sw < sh ? 'vertical-rl' : undefined,
-              }}>重要<br/>安全部品</span>
-            </div>
+            /* ポリカバー/その他: 左上シール + 「重要安全部品」 */
+            <>
+              <div style={{
+                position: 'absolute', top: '8%', left: '5%',
+                width: Math.max(sw * 0.35, 14), height: Math.max(sh * 0.28, 10),
+                background: '#f5f5f0', border: '0.5px solid rgba(0,0,0,0.25)',
+                borderRadius: 1, display: 'flex', flexDirection: 'column',
+                alignItems: 'flex-start', justifyContent: 'center',
+                overflow: 'hidden', padding: '1px 2px',
+                backfaceVisibility: 'hidden',
+              }}>
+                <span style={{ fontSize: Math.max(sw * 0.04, 2), color: '#666', lineHeight: 1 }}>产品规格</span>
+                <span style={{ fontSize: Math.max(sw * 0.08, 3.5), fontWeight: 800, color: '#1a1a1a', lineHeight: 1.1, fontFamily: 'var(--font-mono)' }}>{modelName || 'JPH'}</span>
+              </div>
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backfaceVisibility: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: bigTextSize, fontWeight: 900,
+                  color: 'rgba(60,40,20,0.65)', lineHeight: 1.2,
+                  textAlign: 'center', letterSpacing: '1px',
+                  writingMode: sw < sh ? 'vertical-rl' : undefined,
+                }}>重要<br/>安全部品</span>
+              </div>
+            </>
           )}
         </div>
 
