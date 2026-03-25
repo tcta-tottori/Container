@@ -176,6 +176,44 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
                 }}>MADE IN KOREA</span>
               </div>
             </>
+          ) : type === '箱' ? (
+            /* 箱: 左上にラベルシール + 右上に黒丸数字 */
+            <>
+              {/* ラベルシール（左上、大きめ） */}
+              <div style={{
+                position: 'absolute', top: '6%', left: '5%',
+                width: '55%', height: '45%',
+                background: '#f5f5f0',
+                border: '0.5px solid rgba(0,0,0,0.25)',
+                borderRadius: 1,
+                display: 'flex', flexDirection: 'column',
+                padding: '2px 3px', gap: 0,
+                backfaceVisibility: 'hidden', overflow: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sw * 0.05, 2), color: '#888', lineHeight: 1.2,
+                }}>Green Pack Industrial Co., Ltd</span>
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} style={{
+                    height: 1, background: `rgba(0,0,0,${0.08 + i * 0.02})`,
+                    margin: '1px 0', width: `${60 + i * 8}%`,
+                  }} />
+                ))}
+              </div>
+              {/* 黒丸数字（右上） */}
+              <div style={{
+                position: 'absolute', top: '8%', right: '10%',
+                width: Math.max(sw * 0.2, 8), height: Math.max(sw * 0.2, 8),
+                borderRadius: '50%', background: 'rgba(20,20,20,0.85)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backfaceVisibility: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sw * 0.12, 4), fontWeight: 900,
+                  color: '#fff', fontFamily: 'var(--font-mono)',
+                }}>10</span>
+              </div>
+            </>
           ) : (
             /* ポリカバー/その他: 「重要安全部品」 */
             <div style={{
