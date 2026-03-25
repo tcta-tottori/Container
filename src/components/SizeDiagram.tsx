@@ -39,8 +39,23 @@ function isPotType(type: ItemType): boolean {
   return type === '鍋' || type === 'ジャーポット';
 }
 
+/** 鍋のサイズからデフォルト寸法を返す (cm) */
+function defaultNabeDims(itemName: string): [number, number, number] | null {
+  if (!itemName) return null;
+  // 180mm系
+  if (itemName.includes('180') || /18[RWCS]/.test(itemName)) return [55, 42, 42];
+  // 060mm系
+  if (itemName.includes('060') || itemName.includes('06')) return [42, 32, 28];
+  // 100mm系（デフォルト）
+  if (itemName.includes('100') || /10[RWCS]/.test(itemName) || /\d/.test(itemName)) return [50, 38, 38];
+  return [50, 38, 38]; // フォールバック
+}
+
 export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, itemName }: SizeDiagramProps) {
-  const dims = measurements ? parseMeas(measurements) : null;
+  const parsedDims = measurements ? parseMeas(measurements) : null;
+  // 鍋はデフォルト寸法があるので常に表示
+  const isPot = isPotType(type);
+  const dims = parsedDims || (isPot && itemName ? defaultNabeDims(itemName) : null);
   if (!dims && !cbm) return null;
 
   const [w, d, h] = dims || [40, 30, 30];
@@ -59,7 +74,6 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
 
   const uid = `cb-${type}-${w}-${d}-${h}`;
   const animName = `spin-${uid}`;
-  const isPot = isPotType(type);
   const modelName = itemName ? extractModelName(itemName) : '';
   // 鍋の機種ラベル文字色
   const nabeColor = itemName ? getNabeModelColor(itemName, type) : null;

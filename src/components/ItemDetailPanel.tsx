@@ -459,7 +459,7 @@ export default function ItemDetailPanel({
           )}
 
           {/* 箱3Dイメージ — 左側背景レイヤー（文字の下） */}
-          {(item.measurements || item.cbm) && (
+          {(item.measurements || item.cbm || item.type === '鍋') && (
             <div style={{
               position: 'absolute', top: 0, left: 0, bottom: 0,
               width: '40%', zIndex: 0,
