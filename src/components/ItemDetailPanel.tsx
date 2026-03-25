@@ -454,23 +454,23 @@ export default function ItemDetailPanel({
             </div>
           )}
 
-          {/* 箱3Dイメージ — 右1/3に配置 */}
+          {/* 箱3Dイメージ — 左側背景レイヤー（文字の下） */}
           {(item.measurements || item.cbm) && (
             <div style={{
-              position: 'absolute', top: 0, right: 0, bottom: 0,
-              width: '33%', zIndex: 0,
+              position: 'absolute', top: 0, left: 0, bottom: 0,
+              width: '40%', zIndex: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              overflow: 'hidden',
+              overflow: 'hidden', pointerEvents: 'none',
             }}>
               <SizeDiagram measurements={item.measurements} cbm={item.cbm}
                 type={item.type} maxContainerDim={maxContainerDim} />
             </div>
           )}
 
-          {/* 寸法テキスト — 右下オーバーレイ */}
+          {/* 寸法テキスト — 左下オーバーレイ（箱の上レイヤー） */}
           {currentDims && (
             <div style={{
-              position: 'absolute', bottom: 0, right: 4, zIndex: 2,
+              position: 'absolute', bottom: 0, left: 4, zIndex: 2,
               fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13,
               color: colors.accent,
               textShadow: `0 0 8px rgba(0,0,0,0.9), 0 1px 6px rgba(0,0,0,0.7), 0 0 20px ${colors.accent}40`,
@@ -481,9 +481,9 @@ export default function ItemDetailPanel({
           )}
         </div>
 
-        {/* 数量（PL / CT / pcs 右揃え） */}
-        <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'flex-end' }}>
-          <div className="detail-sf-item">
+        {/* 数量（PL / CT / pcs 中央揃え・固定幅） */}
+        <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
+          <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
               color: colors.accent,
               textShadow: `0 0 16px ${colors.accent}50, 0 2px 4px rgba(0,0,0,0.6)`,
@@ -492,6 +492,7 @@ export default function ItemDetailPanel({
               background: palletFlash ? 'rgba(255,255,255,0.25)' : 'transparent',
               borderRadius: 8,
               userSelect: 'none',
+              display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
             }}>{fmtNum(item.palletCount)}</span>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0 }}>
               {(() => {
@@ -506,15 +507,19 @@ export default function ItemDetailPanel({
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>PL</span>
             </div>
           </div>
-          <div className="detail-sf-item">
+          <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" style={{
               color: '#e8e8e8',
               textShadow: `0 0 16px ${colors.accent}30, 0 2px 4px rgba(0,0,0,0.6)`,
+              display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
             }}>{item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : fmtNum(item.fraction)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.7)' }}>CT</span>
           </div>
-          <div className="detail-sf-item detail-sf-total">
-            <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
+          <div className="detail-sf-item detail-sf-total" style={{ minWidth: 0 }}>
+            <span className="detail-sf-num-sm" style={{
+              color: 'rgba(255,255,255,0.7)',
+              display: 'inline-block', minWidth: '4ch', textAlign: 'right',
+            }}>
               {Math.ceil(item.totalQty).toLocaleString()}
             </span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>pcs</span>

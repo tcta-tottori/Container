@@ -102,10 +102,10 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={{ display: 'block' }}>
-      <g transform="translate(32,30)" stroke="#fff" strokeWidth="2" strokeLinejoin="round" fill="none">
-        <polygon points="0,-15 15,-7.5 0,0 -15,-7.5"/>
-        <polygon points="-15,-7.5 0,0 0,16 -15,8.5"/>
-        <polygon points="15,-7.5 0,0 0,16 15,8.5"/>
+      <g transform="translate(32,30)" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round" fill="none">
+        <polygon points="0,-20 20,-10 0,0 -20,-10"/>
+        <polygon points="-20,-10 0,0 0,22 -20,12"/>
+        <polygon points="20,-10 0,0 0,22 20,12"/>
       </g>
     </svg>
   );
