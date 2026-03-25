@@ -266,9 +266,9 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onJkpLoaded, 
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 80, height: 80, borderRadius: 20,
-            background: 'linear-gradient(135deg, #4f6ef7 0%, #9b6dfa 40%, #e06cf7 70%, #4f6ef7 100%)',
+            background: 'linear-gradient(135deg, #4f6ef7 0%, #9b6dfa 33%, #e06cf7 66%, #4f6ef7 100%)',
             backgroundSize: '300% 300%',
-            animation: 'title-shimmer 6s ease-in-out infinite, logo-hue-shift 8s ease-in-out infinite',
+            animation: 'title-shimmer 10s linear infinite, logo-hue-shift 20s linear infinite',
             marginBottom: 12,
             boxShadow: '0 8px 32px rgba(79,110,247,0.4), 0 0 60px rgba(155,109,250,0.15)',
           }}>
@@ -276,11 +276,11 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onJkpLoaded, 
           </div>
           <h1 style={{
             fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif',
-            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 40%, #f472b6 70%, #60a5fa 100%)',
+            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 33%, #f472b6 66%, #60a5fa 100%)',
             backgroundSize: '200% auto',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            animation: 'title-shimmer 4s ease-in-out infinite',
+            animation: 'title-shimmer 8s linear infinite',
           }}>
             Container Navigation System
           </h1>
