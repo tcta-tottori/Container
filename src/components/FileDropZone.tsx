@@ -168,7 +168,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
         }
       }
     },
-    [onFileLoaded, onAqssLoaded, onJkpLoaded, onMultiFilesLoaded]
+    [onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMultiFilesLoaded]
   );
 
   const onDrop = useCallback((e: React.DragEvent) => {
