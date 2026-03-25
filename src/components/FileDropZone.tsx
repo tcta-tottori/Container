@@ -97,32 +97,16 @@ const CHANGELOG = [
   ]},
 ];
 
-/* ===== CNSロゴSVG（ネオンキューブ+矢印） ===== */
+/* ===== CNSロゴSVG（シンプル立方体） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={{ display: 'block' }}>
-      <defs>
-        <filter id="cns-neon" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="b1"/>
-          <feGaussianBlur in="SourceGraphic" stdDeviation="0.5" result="b2"/>
-          <feMerge><feMergeNode in="b1"/><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-      {/* キューブ */}
-      <g transform="translate(35,29)" stroke="#b0e8ff" strokeWidth="1.6" strokeLinejoin="round" fill="none" filter="url(#cns-neon)">
-        <polygon points="0,-14 15,-7 0,0 -15,-7"/>
-        <polygon points="-15,-7 0,0 0,15 -15,8"/>
-        <polygon points="15,-7 0,0 0,15 15,8"/>
-        <line x1="0" y1="0" x2="0" y2="15"/>
+      <g transform="translate(32,30)" stroke="#fff" strokeWidth="2" strokeLinejoin="round" fill="none">
+        <polygon points="0,-15 15,-7.5 0,0 -15,-7.5"/>
+        <polygon points="-15,-7.5 0,0 0,16 -15,8.5"/>
+        <polygon points="15,-7.5 0,0 0,16 15,8.5"/>
       </g>
-      {/* 矢印（三角矢じり） */}
-      <g filter="url(#cns-neon)">
-        <line x1="20" y1="29" x2="12" y2="29" stroke="#b0e8ff" strokeWidth="1.6" strokeLinecap="round"/>
-        <polygon points="13,29 17,26 17,32" fill="#b0e8ff"/>
-      </g>
-      {/* スパークル */}
-      <path d="M55,50 L55.5,48.5 L57,48 L55.5,47.5 L55,46 L54.5,47.5 L53,48 L54.5,48.5 Z" fill="rgba(220,220,255,0.5)"/>
     </svg>
   );
 }
