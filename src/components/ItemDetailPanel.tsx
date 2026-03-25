@@ -525,16 +525,49 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 類似品 or 関連（1行固定エリア — 類似品優先、なければ関連を表示） */}
-        <div style={{ flexShrink: 0, minHeight: 28 }}>
+        {/* 類似品 & 関連（固定エリア — 常に表示、類似=黄ネオン点滅、関連=白ネオン） */}
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {similarItems.length > 0 ? (
             <SimilarItemsMarquee item={item} similarItems={similarItems} />
-          ) : relatedItems.length > 0 ? (
-            <div className="detail-related" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
-              <span className="detail-related-label" style={{ color: '#fff', fontWeight: 600 }}>関連:</span>
-              <MarqueeText text={relatedText} className="detail-related-text" style={{ color: '#fff' }} />
+          ) : (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              borderRadius: 6, padding: '4px 10px',
+              border: '2px solid rgba(251,191,36,0.15)',
+              minHeight: 28,
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(251,191,36,0.3)', whiteSpace: 'nowrap' }}>
+                類似品:
+              </span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>—</span>
             </div>
-          ) : null}
+          )}
+          {relatedItems.length > 0 ? (
+            <div className="related-neon" style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              borderRadius: 6, padding: '4px 10px',
+              overflow: 'hidden', whiteSpace: 'nowrap',
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                関連:
+              </span>
+              <div style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                <MarqueeText text={relatedText} style={{ fontSize: 12, color: '#fff' }} />
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              borderRadius: 6, padding: '4px 10px',
+              border: '2px solid rgba(255,255,255,0.08)',
+              minHeight: 28,
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>
+                関連:
+              </span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)' }}>—</span>
+            </div>
+          )}
         </div>
       </div>
 

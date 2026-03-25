@@ -432,6 +432,13 @@ body {
 .detail-similar-label { color: #d97706; font-weight: 600; white-space: nowrap; }
 .detail-similar-names { color: #92400e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* 関連 — 白ネオン枠（点滅なし） */
+.related-neon {
+  border: 2px solid rgba(255,255,255,0.4);
+  box-shadow: 0 0 8px rgba(255,255,255,0.15), inset 0 0 4px rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.04);
+}
+
 /* 関連 */
 .detail-related {
   display: flex; align-items: center; gap: 6px;

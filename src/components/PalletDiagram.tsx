@@ -124,16 +124,16 @@ function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: n
 }
 
 /* ===== CSS 3D Cardboard Box ===== */
-function Box3D({ x, w, d, h, topBase }: {
+function Box3D({ x, y, w, d, h, topBase, palletD }: {
   x: number; y: number; z: number; w: number; d: number; h: number;
-  topBase: number;
+  topBase: number; palletD: number;
 }) {
-  // topBase = totalHeight - PALLET_H_PX - z - h (inverted so z=0 is just above pallet)
   const top = topBase;
   const left = x;
+  const zOff = palletD / 2 - y - d / 2;
 
   return (
-    <div style={{ position: 'absolute', left, top, transformStyle: 'preserve-3d' }}>
+    <div style={{ position: 'absolute', left, top, transformStyle: 'preserve-3d', transform: `translateZ(${zOff}px)` }}>
       {/* Front */}
       <div style={{
         position: 'absolute', width: w, height: h,
@@ -276,6 +276,53 @@ function buildGenericSlots(
   return slots;
 }
 
+/** Nabe alternating row stacking (3 horizontal + N rotated per layer, alternating) */
+function buildNabeAltSlots(
+  bw: number, bd: number, bh: number, layers: number, pw: number, pdVal: number,
+): BoxSlot[] {
+  const slots: BoxSlot[] = [];
+  const numRotated = Math.max(1, Math.floor(pw / bd));
+  const totalRotW = numRotated * bd;
+  const gapR = numRotated > 1 ? (pw - totalRotW) / (numRotated + 1) : (pw - bd) / 2;
+  for (let layer = 0; layer < layers; layer++) {
+    if (layer % 2 === 0) {
+      // Row 1: 3 boxes horizontal (bw along x, bd along y)
+      for (let c = 0; c < 3; c++) {
+        slots.push({
+          x: c * bw, y: 0,
+          z: PALLET_H_PX + layer * bh,
+          w: bw, d: bd, h: bh,
+        });
+      }
+      // Row 2: N boxes rotated (bd along x, bw along y)
+      for (let c = 0; c < numRotated; c++) {
+        slots.push({
+          x: gapR + c * (bd + gapR), y: bd,
+          z: PALLET_H_PX + layer * bh,
+          w: bd, d: bw, h: bh,
+        });
+      }
+    } else {
+      // Mirror: Row 1: N rotated, Row 2: 3 horizontal
+      for (let c = 0; c < numRotated; c++) {
+        slots.push({
+          x: gapR + c * (bd + gapR), y: 0,
+          z: PALLET_H_PX + layer * bh,
+          w: bd, d: bw, h: bh,
+        });
+      }
+      for (let c = 0; c < 3; c++) {
+        slots.push({
+          x: c * bw, y: bw,
+          z: PALLET_H_PX + layer * bh,
+          w: bw, d: bd, h: bh,
+        });
+      }
+    }
+  }
+  return slots;
+}
+
 /** Edge-priority reorder for fraction pallets (fill edges first, skip center) */
 function edgePriorityReorder(slots: BoxSlot[], perLayer: number): BoxSlot[] {
   if (perLayer <= 4) return slots; // small grid, no reorder needed
@@ -335,26 +382,34 @@ export default function PalletDiagram({
   if (!isFull && !isFraction) return null;
 
   const [bwCm, bdCm, bhCm] = getBoxDims(measurements, itemName);
-  const bw = bwCm * CM2PX;
-  const bd = bdCm * CM2PX;
-  const bh = bhCm * CM2PX;
 
   const layers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements) || 3;
-  const isNabe = type === '鍋' || type === 'ポリカバー';
+  const isNabeType = type === '鍋' || type === 'ポリカバー';
   const isJPI = isJPIType(itemName);
   const isJarPot = type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName || '');
+
+  // Dynamic pallet dimensions (nabe: 3 boxes wide, depth = bd + bw for alternating rows)
+  let palletWCm = PALLET_CM;
+  let palletDCm = PALLET_CM;
+  if (isNabeType && !isJPI && !isJarPot) {
+    palletWCm = 3 * bwCm;
+    palletDCm = bdCm + bwCm;
+  }
+  const dynScale = PALLET_PX / Math.max(palletWCm, palletDCm);
+  const pw = palletWCm * dynScale;
+  const pdPx = palletDCm * dynScale;
+  const bw = bwCm * dynScale;
+  const bd = bdCm * dynScale;
+  const bh = bhCm * dynScale;
 
   // Build slots
   let allSlots: BoxSlot[];
   let perLayer: number;
   if (isJarPot) {
-    allSlots = buildStandard6Slots(bw, bd, bh, layers, PALLET_PX, PALLET_PX);
-    perLayer = 4; // 2×2
-    // Actually jar pots use 2×2
     allSlots = [];
     const jCols = 2, jRows = 2;
-    const jBw = (PALLET_PX - 3) / jCols;
-    const jBd = (PALLET_PX - 3) / jRows;
+    const jBw = (pw - 3) / jCols;
+    const jBd = (pdPx - 3) / jRows;
     const jBh = bh;
     perLayer = 4;
     for (let layer = 0; layer < layers; layer++) {
@@ -370,13 +425,13 @@ export default function PalletDiagram({
       }
     }
   } else if (isJPI) {
-    allSlots = buildJPI7Slots(bw, bd, bh, layers, PALLET_PX, PALLET_PX);
+    allSlots = buildJPI7Slots(bw, bd, bh, layers, pw, pdPx);
     perLayer = 7;
-  } else if (isNabe) {
-    allSlots = buildStandard6Slots(bw, bd, bh, layers, PALLET_PX, PALLET_PX);
-    perLayer = 6;
+  } else if (isNabeType) {
+    allSlots = buildNabeAltSlots(bw, bd, bh, layers, pw, pdPx);
+    perLayer = 3 + Math.max(1, Math.floor(pw / bd));
   } else {
-    allSlots = buildGenericSlots(bw, bd, bh, layers, PALLET_PX, PALLET_PX);
+    allSlots = buildGenericSlots(bw, bd, bh, layers, pw, pdPx);
     perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
   }
 
@@ -416,7 +471,7 @@ export default function PalletDiagram({
         `}</style>
       )}
       <div style={{
-        width: PALLET_PX, height: totalHeight,
+        width: pw, height: totalHeight,
         position: 'relative',
         transformStyle: 'preserve-3d',
         ...(rotate
@@ -425,7 +480,7 @@ export default function PalletDiagram({
         ),
       }}>
         {/* Pallet base — always at bottom */}
-        <PalletBase3D pw={PALLET_PX} pd={PALLET_PX} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
+        <PalletBase3D pw={pw} pd={pdPx} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
 
         {/* Stacked boxes — above pallet */}
         {renderSlots.map((slot, i) => {
@@ -437,6 +492,7 @@ export default function PalletDiagram({
               x={slot.x} y={slot.y} z={slot.z}
               w={slot.w} d={slot.d} h={slot.h}
               topBase={boxTop}
+              palletD={pdPx}
             />
           );
         })}
