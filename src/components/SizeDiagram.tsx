@@ -92,7 +92,6 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
   // シールサイズ固定: 4cm×4.5cm → スケール適用
   const sealH = Math.max(sh * (4 / h), 12);
   const sealW = Math.max(sd * (4.5 / d), 14);
-  const sealTextSize = Math.max(Math.min(sealW * 0.18, sealH * 0.22), 3.5);
 
   // 前面の「重要安全部品」文字サイズ
   const bigTextSize = Math.max(Math.min(sw * 0.2, sh * 0.18), 6);
@@ -313,33 +312,19 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               </div>
             </>
           ) : (
-            /* ポリカバー/その他: 左上シール + 「重要安全部品」 */
-            <>
-              <div style={{
-                position: 'absolute', top: '8%', left: '5%',
-                width: Math.max(sw * 0.35, 14), height: Math.max(sh * 0.28, 10),
-                background: '#f5f5f0', border: '0.5px solid rgba(0,0,0,0.25)',
-                borderRadius: 1, display: 'flex', flexDirection: 'column',
-                alignItems: 'flex-start', justifyContent: 'center',
-                overflow: 'hidden', padding: '1px 2px',
-                backfaceVisibility: 'hidden',
-              }}>
-                <span style={{ fontSize: Math.max(sw * 0.04, 2), color: '#666', lineHeight: 1 }}>产品规格</span>
-                <span style={{ fontSize: Math.max(sw * 0.08, 3.5), fontWeight: 800, color: '#1a1a1a', lineHeight: 1.1, fontFamily: 'var(--font-mono)' }}>{modelName || 'JPH'}</span>
-              </div>
-              <div style={{
-                position: 'absolute', inset: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                backfaceVisibility: 'hidden',
-              }}>
-                <span style={{
-                  fontSize: bigTextSize, fontWeight: 900,
-                  color: 'rgba(60,40,20,0.65)', lineHeight: 1.2,
-                  textAlign: 'center', letterSpacing: '1px',
-                  writingMode: sw < sh ? 'vertical-rl' : undefined,
-                }}>重要<br/>安全部品</span>
-              </div>
-            </>
+            /* ポリカバー/その他: 「重要安全部品」のみ（シールは左面に） */
+            <div style={{
+              position: 'absolute', inset: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backfaceVisibility: 'hidden',
+            }}>
+              <span style={{
+                fontSize: bigTextSize, fontWeight: 900,
+                color: 'rgba(60,40,20,0.65)', lineHeight: 1.2,
+                textAlign: 'center', letterSpacing: '1px',
+                writingMode: sw < sh ? 'vertical-rl' : undefined,
+              }}>重要<br/>安全部品</span>
+            </div>
           )}
         </div>
 
@@ -369,34 +354,37 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               }}>MADE IN KOREA</span>
             </div>
           )}
-          {/* ラベルシール（4cm×4.5cm固定 — 鍋以外） */}
-          {!(isPot && !isJarPot) && (
-          <div style={{
-            position: 'absolute',
-            top: Math.max(sh * 0.12, 2),
-            left: '50%', transform: 'translateX(-50%)',
-            width: sealW, height: sealH,
-            background: '#f5f5f0',
-            border: '0.5px solid rgba(0,0,0,0.3)',
-            borderRadius: 1,
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'flex-start', justifyContent: 'center',
-            overflow: 'hidden', padding: '1px 2px',
-            backfaceVisibility: 'hidden', gap: 0,
-          }}>
-              <>
-                <span style={{ fontSize: sealTextSize * 0.75, color: '#666', lineHeight: 1 }}>产品规格</span>
+          {/* ラベルシール（面積小の左面 — 鍋以外） */}
+          {!(isPot && !isJarPot) && (() => {
+            // ポリカバー/その他: 3cm×3.5cm固定、左上配置
+            const isPolyOther = type === 'ポリカバー' || type === 'その他';
+            const sealWPx = isPolyOther ? Math.max(sd * (3.5 / d), 10) : sealW;
+            const sealHPx = isPolyOther ? Math.max(sh * (3 / h), 9) : sealH;
+            const sealFontSize = Math.max(Math.min(sealWPx * 0.18, sealHPx * 0.22), 3);
+            return (
+              <div style={{
+                position: 'absolute',
+                top: isPolyOther ? '8%' : Math.max(sh * 0.12, 2),
+                left: isPolyOther ? '8%' : '50%',
+                transform: isPolyOther ? undefined : 'translateX(-50%)',
+                width: sealWPx, height: sealHPx,
+                background: '#f5f5f0',
+                border: '0.5px solid rgba(0,0,0,0.3)',
+                borderRadius: 1,
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'flex-start', justifyContent: 'center',
+                overflow: 'hidden', padding: '1px 2px',
+                backfaceVisibility: 'hidden', gap: 0,
+              }}>
+                <span style={{ fontSize: sealFontSize * 0.75, color: '#666', lineHeight: 1 }}>产品规格</span>
                 <span style={{
-                  fontSize: Math.max(sealTextSize * 1.1, 4), fontWeight: 800,
+                  fontSize: Math.max(sealFontSize * 1.1, 3.5), fontWeight: 800,
                   color: '#1a1a1a', lineHeight: 1.1,
                   fontFamily: 'var(--font-mono)',
                 }}>{modelName || 'JPI'}</span>
-                <span style={{ fontSize: sealTextSize * 0.7, color: '#888', lineHeight: 1, marginTop: 1 }}>
-                  <span style={{ width: 4, height: 4, display: 'inline-block', background: '#ccc', marginRight: 1 }} />
-                </span>
-              </>
-          </div>
-          )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* 右面(狭い面) */}
