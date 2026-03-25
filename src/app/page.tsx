@@ -22,7 +22,7 @@ import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
-import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems } from '@/lib/jkpParser';
+import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
 import * as XLSX from 'xlsx';
 
 type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
@@ -298,10 +298,10 @@ export default function Home() {
         const { shipments, activeDates } = parseJkpUpdata(wb);
         setJkpShipments(shipments);
 
-        // 今日〜2週間先の日付範囲でアクティブ日をフィルタ
+        // 今日〜2週間先で実際に出荷数量がある日付のみ対象
         const today = new Date().toISOString().slice(0, 10);
         const twoWeeksLater = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-        const scheduleDates = activeDates.filter(d => d >= today && d <= twoWeeksLater);
+        const scheduleDates = getScheduleDatesInRange(shipments, today, twoWeeksLater);
 
         if (scheduleDates.length === 0) {
           setLoadingMsg(`${today}〜${twoWeeksLater}の出荷データがありません (updata:${shipments.length}件, アクティブ日:${activeDates.length}件)`);
