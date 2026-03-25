@@ -476,6 +476,9 @@ body {
   50% { background: #3a2a14; }
 }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes wheelSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes truckBounce { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-1.5px); } 60% { transform: translateY(-0.5px); } }
+@keyframes roadDash { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -24; } }
 .detail-list-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .detail-list-name {
   flex: 1; min-width: 0;
