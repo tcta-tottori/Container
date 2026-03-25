@@ -266,11 +266,11 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onJkpLoaded, 
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 80, height: 80, borderRadius: 20,
-            background: 'linear-gradient(135deg, #4a5acd 0%, #6b52c9 25%, #3a4fbf 50%, #6b52c9 75%, #4a5acd 100%)',
-            backgroundSize: '200% 200%',
+            background: 'linear-gradient(90deg, #4a5acd 0%, #6b52c9 25%, #3a4fbf 50%, #6b52c9 75%, #4a5acd 100%)',
+            backgroundSize: '200% 100%',
             animation: 'icon-gradient-flow 6s linear infinite',
             marginBottom: 12,
-            border: '1.5px solid rgba(160,200,255,0.4)',
+            border: '2.5px solid rgba(160,210,255,0.5)',
             boxShadow: '0 8px 32px rgba(74,90,205,0.4), 0 0 20px rgba(140,180,255,0.25), inset 0 0 20px rgba(140,180,255,0.08), 0 0 40px rgba(107,82,201,0.15)',
           }}>
             <CnsLogo size={64} />
