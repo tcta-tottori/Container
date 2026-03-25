@@ -45,8 +45,17 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '1.6';
+const APP_VERSION = '1.7';
+const APP_UPDATED = '2026.3.25 21:29';
 const CHANGELOG = [
+  { ver: '1.7', date: '2026-03-25', changes: [
+    { icon: '📦', text: 'パレット図CSS 3D化（箱積み/端数/回転対応）' },
+    { icon: '🎨', text: '背景グラデーション一新（紫/青/オレンジ）' },
+    { icon: '🏷️', text: 'ポリカバー箱シール位置を前面左上に修正' },
+    { icon: '🔄', text: 'JPI 7個/段交互積みパターン実装' },
+    { icon: '📂', text: 'JKPファイル最近のファイル保存・自動遷移修正' },
+    { icon: '🎨', text: 'アイコンにネオングロー効果・鍋色を明るい赤に' },
+  ]},
   { ver: '1.6', date: '2026-03-25', changes: [
     { icon: '🍲', text: 'JKPパーサー全面修正（N列=納入指示フィルタ対応）' },
     { icon: '📅', text: 'JKP日別コンテナ作成（タイガー鍋(3/25)形式）' },
@@ -298,6 +307,9 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           </h1>
           <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 4 }}>
             コンテナ荷降ろし管理
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, marginTop: 6, fontFamily: 'var(--font-mono)', letterSpacing: 0.5 }}>
+            Updated: {APP_UPDATED}
           </p>
         </div>
 
