@@ -107,15 +107,18 @@ const CHANGELOG = [
   ]},
 ];
 
-/* ===== CNSロゴSVG（シンプル立方体） ===== */
+/* ===== CNSロゴSVG（上面がより見えるキューブ + ネオングロー） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style={{ display: 'block' }}>
-      <g transform="translate(32,30)" stroke="#fff" strokeWidth="2.2" strokeLinejoin="round" fill="none">
-        <polygon points="0,-20 20,-10 0,0 -20,-10"/>
-        <polygon points="-20,-10 0,0 0,22 -20,12"/>
-        <polygon points="20,-10 0,0 0,22 20,12"/>
+      style={{ display: 'block', filter: 'drop-shadow(0 0 3px rgba(138,180,255,0.6)) drop-shadow(0 0 6px rgba(138,180,255,0.3))' }}>
+      <g transform="translate(32,32)" stroke="#fff" strokeWidth="2.8" strokeLinejoin="round" fill="none">
+        {/* Top face (wider - more visible from above) */}
+        <polygon points="0,-21 21,-10.5 0,0 -21,-10.5"/>
+        {/* Left face (shorter) */}
+        <polygon points="-21,-10.5 0,0 0,17 -21,6.5"/>
+        {/* Right face (shorter) */}
+        <polygon points="21,-10.5 0,0 0,17 21,6.5"/>
       </g>
     </svg>
   );
