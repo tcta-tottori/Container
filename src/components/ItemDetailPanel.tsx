@@ -463,7 +463,7 @@ export default function ItemDetailPanel({
               overflow: 'hidden', pointerEvents: 'none',
             }}>
               <SizeDiagram measurements={item.measurements} cbm={item.cbm}
-                type={item.type} maxContainerDim={maxContainerDim} />
+                type={item.type} maxContainerDim={maxContainerDim} itemName={item.itemName} />
             </div>
           )}
 
