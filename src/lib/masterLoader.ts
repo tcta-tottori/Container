@@ -23,9 +23,10 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
 
     const itemName = v(2);
     const qtyPerPallet = n(8);
+    const sizeStr = v(9) || undefined;   // J列: サイズ (100, 180 等)
     const storedType = v(3) as ItemType;
-    const description = v(16) || undefined;  // ITEM DESCRIPTION (Q列)
-    const itemNameKetaka = v(10) || undefined;  // 規格(气高编号) (K列)
+    const description = v(17) || undefined;  // ITEM DESCRIPTION (R列)
+    const itemNameKetaka = v(11) || undefined;  // 規格(气高编号) (L列)
     // D列に値があればそれを最優先、なければ自動判定
     const type = storedType
       ? storedType
@@ -37,6 +38,7 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
       itemName,
       representModel: v(4),
       type,
+      size: sizeStr,
       packingQty: n(5),
       totalQty: n(6),
       caseCount: n(7),
@@ -44,18 +46,18 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
       fraction: 0,
       qtyPerPallet,
       newPartNumber: v(0) || undefined,
-      newPartNumberKetaka: v(9) || undefined,
-      itemNameKetaka: v(10) || undefined,
-      linkStatus: v(11) || undefined,
-      itemNameContainer: v(12) || undefined,
-      representModelContainer: v(13) || undefined,
-      packingQtyContainer: nOpt(14),
-      qtyPerPalletContainer: nOpt(15),
-      description: v(16) || undefined,
-      modelNo: v(17) || undefined,
-      grossWeight: nOpt(18),
-      cbm: nOpt(19),
-      measurements: v(20) || undefined,
+      newPartNumberKetaka: v(10) || undefined,  // K列
+      itemNameKetaka: v(11) || undefined,        // L列
+      linkStatus: v(12) || undefined,            // M列
+      itemNameContainer: v(13) || undefined,     // N列
+      representModelContainer: v(14) || undefined, // O列
+      packingQtyContainer: nOpt(15),             // P列
+      qtyPerPalletContainer: nOpt(16),           // Q列
+      description: v(17) || undefined,           // R列
+      modelNo: v(18) || undefined,               // S列
+      grossWeight: nOpt(19),                     // T列
+      cbm: nOpt(20),                             // U列
+      measurements: v(21) || undefined,          // V列
     });
   }
   return items;
@@ -243,6 +245,10 @@ export function linkItemsWithMaster(
     if (master.type) {
       updated.type = master.type;
     }
+    // サイズをマスタから補完（J列）
+    if (master.size && !updated.size) {
+      updated.size = master.size;
+    }
     // 1P数がマスタにあり、作業データにない場合はマスタから補完
     if (master.qtyPerPallet > 0 && updated.qtyPerPallet === 0) {
       updated.qtyPerPallet = master.qtyPerPallet;
@@ -250,6 +256,11 @@ export function linkItemsWithMaster(
     // 入数もマスタから補完
     if (master.packingQty > 0 && updated.packingQty === 0) {
       updated.packingQty = master.packingQty;
+    }
+    // パレット数・端数を自動計算（qtyPerPalletが設定済みで、元データにパレット情報がない場合）
+    if (updated.qtyPerPallet > 0 && updated.caseCount > 0 && item.palletCount === 0) {
+      updated.palletCount = Math.floor(updated.caseCount / updated.qtyPerPallet);
+      updated.fraction = updated.caseCount % updated.qtyPerPallet;
     }
 
     return updated;
