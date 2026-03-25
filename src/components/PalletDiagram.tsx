@@ -172,11 +172,11 @@ function Box({ x, y, z, w, d, h, ghost, accent }: {
   );
 }
 
-/* ===== Pallet base with fork openings ===== */
+/* ===== Pallet base with fork openings and X-pattern top ===== */
 function PalletBase({ x, y, z, w, d, h }: {
   x: number; y: number; z: number; w: number; d: number; h: number;
 }) {
-  const sk = '#2a2e36';
+  const sk = '#1e2228';
   const front = [
     iso(x, y, z + h), iso(x + w, y, z + h),
     iso(x + w, y, z), iso(x, y, z),
@@ -191,34 +191,67 @@ function PalletBase({ x, y, z, w, d, h }: {
   ] as [number, number][];
 
   // Fork openings on front face
-  const forkW = w * 0.2;
+  const forkW = w * 0.22;
   const forkH = h * 0.45;
   const forkZ = z + h * 0.18;
-  const forkFront = [0.15, 0.58].map((pct, i) => {
+  const forkFront = [0.12, 0.56].map((pct, i) => {
     const fx = x + w * pct;
     const q = [
       iso(fx, y, forkZ + forkH), iso(fx + forkW, y, forkZ + forkH),
       iso(fx + forkW, y, forkZ), iso(fx, y, forkZ),
     ] as [number, number][];
-    return <polygon key={`ff${i}`} points={pts(...q)} fill="#1a1e24" stroke={sk} strokeWidth={0.4} />;
+    return <polygon key={`ff${i}`} points={pts(...q)} fill="#0e1118" stroke={sk} strokeWidth={0.3} />;
   });
 
   // Fork openings on left face
-  const forkLeft = [0.15, 0.58].map((pct, i) => {
+  const forkLeft = [0.12, 0.56].map((pct, i) => {
     const fy = y + d * pct;
-    const fd = d * 0.18;
+    const fd = d * 0.2;
     const q = [
       iso(x, fy, forkZ + forkH), iso(x, fy + fd, forkZ + forkH),
       iso(x, fy + fd, forkZ), iso(x, fy, forkZ),
     ] as [number, number][];
-    return <polygon key={`fl${i}`} points={pts(...q)} fill="#1a1e24" stroke={sk} strokeWidth={0.4} />;
+    return <polygon key={`fl${i}`} points={pts(...q)} fill="#0e1118" stroke={sk} strokeWidth={0.3} />;
   });
+
+  // X-pattern grooves on top surface (2×2 grid with X in each quadrant)
+  const xLines: React.ReactElement[] = [];
+  const qw = w / 2, qd = d / 2;
+  for (let qi = 0; qi < 2; qi++) {
+    for (let qj = 0; qj < 2; qj++) {
+      const qx = x + qi * qw + qw * 0.12;
+      const qy = y + qj * qd + qd * 0.12;
+      const qxw = qw * 0.76;
+      const qyd = qd * 0.76;
+      // X diagonals
+      const d1a = iso(qx, qy, z + h);
+      const d1b = iso(qx + qxw, qy + qyd, z + h);
+      const d2a = iso(qx + qxw, qy, z + h);
+      const d2b = iso(qx, qy + qyd, z + h);
+      xLines.push(
+        <line key={`x1-${qi}-${qj}`} x1={d1a[0]} y1={d1a[1]} x2={d1b[0]} y2={d1b[1]}
+          stroke="rgba(80,90,105,0.4)" strokeWidth={0.3} />,
+        <line key={`x2-${qi}-${qj}`} x1={d2a[0]} y1={d2a[1]} x2={d2b[0]} y2={d2b[1]}
+          stroke="rgba(80,90,105,0.4)" strokeWidth={0.3} />,
+      );
+      // Border lines around each quadrant
+      const brd = [
+        iso(qx, qy, z + h), iso(qx + qxw, qy, z + h),
+        iso(qx + qxw, qy + qyd, z + h), iso(qx, qy + qyd, z + h),
+      ] as [number, number][];
+      xLines.push(
+        <polygon key={`qb-${qi}-${qj}`} points={pts(...brd)}
+          fill="none" stroke="rgba(80,90,105,0.3)" strokeWidth={0.25} />,
+      );
+    }
+  }
 
   return (
     <g>
-      <polygon points={pts(...front)} fill="#555d68" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
-      <polygon points={pts(...left)} fill="#444c56" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
-      <polygon points={pts(...top)} fill="#6b7280" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
+      <polygon points={pts(...front)} fill="#4a5260" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
+      <polygon points={pts(...left)} fill="#3d4550" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
+      <polygon points={pts(...top)} fill="#5a6370" stroke={sk} strokeWidth={0.8} strokeLinejoin="round" />
+      {xLines}
       {forkFront}{forkLeft}
     </g>
   );
@@ -293,7 +326,7 @@ interface BoxLayout {
   totalSlots: number;
 }
 
-function calculateLayout(measurements?: string, qtyPerPallet?: number, typeLayers?: number): BoxLayout {
+function calculateLayout(measurements?: string, qtyPerPallet?: number, typeLayers?: number, nabeOverride?: boolean): BoxLayout {
   const PALLET_CM = 110; // standard pallet 110x110 cm
   const ISO_PALLET = 22; // isometric pallet size units
   const scale = ISO_PALLET / PALLET_CM;
@@ -302,6 +335,15 @@ function calculateLayout(measurements?: string, qtyPerPallet?: number, typeLayer
     const dims = parseMeasurements(measurements);
     if (dims) {
       const [wCm, dCm, hCm] = dims;
+      // 鍋: 3列×2行固定（縦置き）
+      if (nabeOverride) {
+        const layers = typeLayers || 5;
+        const boxW = wCm * scale;
+        const boxD = dCm * scale;
+        const boxH = hCm * scale;
+        return { cols: 3, rows: 2, layers, boxW, boxD, boxH, totalSlots: 6 * layers };
+      }
+
       // 通常配置と回転配置の両方を試してより多く入る方を採用
       const cols1 = Math.max(1, Math.floor(PALLET_CM / wCm));
       const rows1 = Math.max(1, Math.floor(PALLET_CM / dCm));
@@ -371,12 +413,12 @@ function buildGenericSlots(layout: BoxLayout, PH: number, PS: number): BoxSlot[]
 }
 
 /* ===== Generic Stack (measurements-aware) ===== */
-function GenericStack({ ox, oy, filled, accent, measurements, qtyPerPallet, typeLayers }: {
+function GenericStack({ ox, oy, filled, accent, measurements, qtyPerPallet, typeLayers, nabeOverride }: {
   ox: number; oy: number; filled: number; accent: string;
-  measurements?: string; qtyPerPallet?: number; typeLayers?: number;
+  measurements?: string; qtyPerPallet?: number; typeLayers?: number; nabeOverride?: boolean;
 }) {
   const PS = 22, PH = 3;
-  const layout = calculateLayout(measurements, qtyPerPallet, typeLayers);
+  const layout = calculateLayout(measurements, qtyPerPallet, typeLayers, nabeOverride);
   const { boxW, boxD, boxH } = layout;
 
   const allSlots = buildGenericSlots(layout, PH, PS);
@@ -423,7 +465,8 @@ export default function PalletDiagram({
   // Calculate stack layers using type-specific rules
   const stackLayers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements);
 
-  const layout = jarPot ? null : calculateLayout(measurements, qtyPerPallet, stackLayers || undefined);
+  const isNabe = type === '鍋';
+  const layout = jarPot ? null : calculateLayout(measurements, qtyPerPallet, stackLayers || undefined, isNabe);
   const jpLayers = jarPot ? (stackLayers || 5) : 0;
   const maxSlots = jarPot ? 4 * jpLayers : (layout ? layout.totalSlots : 18);
 
@@ -458,7 +501,7 @@ export default function PalletDiagram({
           ) : (
             <GenericStack ox={0} oy={0} filled={maxSlots}
               accent={colors.accent} measurements={measurements}
-              qtyPerPallet={qtyPerPallet} typeLayers={stackLayers || undefined} />
+              qtyPerPallet={qtyPerPallet} typeLayers={stackLayers || undefined} nabeOverride={isNabe} />
           )
         ) : hasFrac ? (
           jarPot ? (
@@ -468,7 +511,7 @@ export default function PalletDiagram({
             <GenericStack ox={0} oy={0}
               filled={mapFrac(fraction)} accent={colors.accent}
               measurements={measurements} qtyPerPallet={qtyPerPallet}
-              typeLayers={stackLayers || undefined} />
+              typeLayers={stackLayers || undefined} nabeOverride={isNabe} />
           )
         ) : null}
       </svg>

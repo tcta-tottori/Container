@@ -183,171 +183,6 @@ function SimilarItemsMarquee({ item, similarItems }: {
   );
 }
 
-/* ===== 端数パレット3D回転表示 ===== */
-function FractionPallet3D({ fraction, measurements, type, accentColor }: {
-  fraction: number; qtyPerPallet?: number; measurements?: string;
-  type: string; itemName?: string; accentColor: string;
-}) {
-  // 寸法からボックスサイズ算出
-  const dims = measurements ? parseMeas(measurements) : null;
-  const [bw, bd, bh] = dims || [50, 38, 38];
-
-  // パレット上のレイアウト計算 (110cm角パレット)
-  const PALLET = 110;
-  const cols = Math.max(1, Math.floor(PALLET / bw));
-  const rows = Math.max(1, Math.floor(PALLET / bd));
-  const perLayer = cols * rows;
-  const layers = fraction > 0 ? Math.min(Math.ceil(fraction / perLayer), 6) : 1;
-  const actualBoxes = Math.min(fraction, perLayer * layers);
-
-  // 3D表示用スケーリング (全体がコンテナに収まるように)
-  const palletW = cols * bw;
-  const palletD = rows * bd;
-  const totalH = bh * layers;
-  const maxDim = Math.max(palletW, palletD, totalH + 15); // +15 for pallet base
-  const scale = 60 / maxDim;
-
-  const sw = palletW * scale;
-  const sd = palletD * scale;
-  const sh = totalH * scale;
-  const baseH = 6;
-  const boxSw = bw * scale;
-  const boxSd = bd * scale;
-  const boxSh = bh * scale;
-
-  const uid = `frac-${type}-${fraction}-${bw}-${bd}`;
-  const animName = `spin-frac-${uid}`;
-
-  return (
-    <div style={{
-      width: '100%', height: '100%',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      perspective: 300, overflow: 'hidden',
-    }}>
-      <style>{`
-        @keyframes ${animName} {
-          0% { transform: rotateX(-25deg) rotateY(0deg); }
-          100% { transform: rotateX(-25deg) rotateY(360deg); }
-        }
-      `}</style>
-      <div style={{
-        position: 'relative',
-        width: sw, height: sh + baseH,
-        transformStyle: 'preserve-3d',
-        animation: `${animName} 15s linear infinite`,
-      }}>
-        {/* パレットベース */}
-        <div style={{
-          position: 'absolute', width: sw, height: baseH,
-          bottom: 0, left: 0,
-          transform: `translateZ(${sd / 2}px)`,
-          background: '#555d68', border: '1px solid #2a2e36',
-          borderRadius: 1, boxSizing: 'border-box',
-          backfaceVisibility: 'hidden',
-        }} />
-        <div style={{
-          position: 'absolute', width: sd, height: baseH,
-          bottom: 0, left: (sw - sd) / 2,
-          transform: `rotateY(-90deg) translateZ(${sw / 2}px)`,
-          background: '#444c56', border: '1px solid #2a2e36',
-          borderRadius: 1, boxSizing: 'border-box',
-          backfaceVisibility: 'hidden',
-        }} />
-        <div style={{
-          position: 'absolute', width: sw, height: sd,
-          bottom: baseH - sd / 2, left: 0,
-          transform: `rotateX(90deg) translateZ(${-baseH}px)`,
-          background: '#6b7280', border: '1px solid #2a2e36',
-          borderRadius: 1, boxSizing: 'border-box',
-          backfaceVisibility: 'hidden',
-        }} />
-        {/* 箱をスタック */}
-        {Array.from({ length: actualBoxes }).map((_, i) => {
-          const layer = Math.floor(i / perLayer);
-          const posInLayer = i % perLayer;
-          const col = posInLayer % cols;
-          const row = Math.floor(posInLayer / cols);
-          const bx = col * boxSw;
-          const by = row * boxSd;
-          const bz = baseH + layer * boxSh;
-          return (
-            <FractionBox key={i}
-              x={bx} y={by} z={bz}
-              w={boxSw} d={boxSd} h={boxSh}
-              sw={sw} sd={sd} totalH={sh + baseH}
-            />
-          );
-        })}
-      </div>
-      {/* 端数ラベル */}
-      <div style={{
-        marginTop: 4, fontSize: 11, fontWeight: 800,
-        fontFamily: 'var(--font-mono)', color: accentColor,
-        textShadow: `0 0 8px rgba(0,0,0,0.8)`,
-        textAlign: 'center',
-      }}>
-        {fraction}CT
-      </div>
-    </div>
-  );
-}
-
-/* ===== 端数パレットの個別ボックス (CSS 3D) ===== */
-function FractionBox({ x, y, z, w, d, h, sw, sd, totalH }: {
-  x: number; y: number; z: number;
-  w: number; d: number; h: number;
-  sw: number; sd: number; totalH: number;
-}) {
-  const bottom = totalH - z - h;
-  const left = x;
-  // 3面を表示
-  return (
-    <>
-      {/* 前面 */}
-      <div style={{
-        position: 'absolute', width: w - 0.5, height: h - 0.5,
-        left, bottom,
-        transform: `translateZ(${sd / 2 - y}px)`,
-        background: '#dea550', border: '0.5px solid #5a4020',
-        boxSizing: 'border-box', backfaceVisibility: 'hidden',
-      }}>
-        {/* テープ */}
-        <div style={{
-          position: 'absolute', left: '40%', top: 0, width: '20%', height: '30%',
-          background: 'rgba(255,255,255,0.35)',
-        }} />
-      </div>
-      {/* 左面 */}
-      <div style={{
-        position: 'absolute', width: d - 0.5, height: h - 0.5,
-        left: left + (w - d) / 2, bottom,
-        transform: `rotateY(-90deg) translateZ(${sw / 2 - left - w / 2}px)`,
-        background: '#c08a3a', border: '0.5px solid #5a4020',
-        boxSizing: 'border-box', backfaceVisibility: 'hidden',
-      }} />
-      {/* 上面 */}
-      <div style={{
-        position: 'absolute', width: w - 0.5, height: d - 0.5,
-        left, bottom: bottom + h - d / 2,
-        transform: `rotateX(90deg) translateZ(${h / 2}px)`,
-        background: '#e8c06a', border: '0.5px solid #5a4020',
-        boxSizing: 'border-box', backfaceVisibility: 'hidden',
-      }}>
-        {/* テープ十字 */}
-        <div style={{
-          position: 'absolute', left: '42%', top: 0, width: '16%', height: '100%',
-          background: 'rgba(255,255,255,0.4)',
-        }} />
-        <div style={{
-          position: 'absolute', top: '42%', left: 0, width: '100%', height: '16%',
-          background: 'rgba(255,255,255,0.35)',
-        }} />
-      </div>
-    </>
-  );
-}
-
 /* ===== 数値フォーマット ===== */
 function fmtNum(v: number): string {
   if (Number.isInteger(v)) return String(v);
@@ -634,7 +469,7 @@ export default function ItemDetailPanel({
             )}
           </div>
 
-          {/* 右側: パレット図（積み方 + 端数を横並び or 端数のみ中央） */}
+          {/* 右側: パレット図（積み方 + 端数を横並び — 同じSVGコンポーネント） */}
           <div style={{
             flex: 1, height: '100%', display: 'flex', flexDirection: 'row',
             alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -647,18 +482,10 @@ export default function ItemDetailPanel({
               </div>
             )}
             {item.fraction > 0 && (
-              <div style={{
-                flex: 1, height: '100%', minWidth: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                overflow: 'hidden',
-              }}>
-                <FractionPallet3D
-                  fraction={item.fraction}
-                  measurements={item.measurements}
-                  type={item.type}
-                  itemName={item.itemName}
-                  accentColor={accentColor}
-                />
+              <div style={{ flex: 1, height: '100%', minWidth: 0 }}>
+                <PalletDiagram palletCount={0} fraction={item.fraction}
+                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+                  measurements={item.measurements} />
               </div>
             )}
           </div>
