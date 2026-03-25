@@ -214,6 +214,48 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
                 }}>10</span>
               </div>
             </>
+          ) : type === '部品' ? (
+            /* 部品: 新建高電業（深圳）有限公司 + オレンジラベル */
+            <>
+              {/* 会社名テキスト（中央〜下） */}
+              <div style={{
+                position: 'absolute', bottom: '12%', left: '6%', right: '6%',
+                backfaceVisibility: 'hidden',
+              }}>
+                <div style={{
+                  fontSize: Math.max(sw * 0.13, 5), fontWeight: 900,
+                  color: 'rgba(40,25,10,0.7)', lineHeight: 1.3,
+                  letterSpacing: '0.5px',
+                }}>新建高電業(深圳)有限公司</div>
+                <div style={{
+                  fontSize: Math.max(sw * 0.045, 2.5), fontWeight: 600,
+                  color: 'rgba(40,25,10,0.45)', lineHeight: 1.2,
+                  letterSpacing: '0.3px', marginTop: 1,
+                  fontFamily: 'var(--font-mono)',
+                }}>KENCORP ELECTRIC(SHENZHEN)CO.,LIMITED</div>
+              </div>
+              {/* オレンジ色ラベルシール（右上） */}
+              <div style={{
+                position: 'absolute', top: '6%', right: '5%',
+                width: '35%', height: '40%',
+                background: 'linear-gradient(180deg, #f97316 0%, #f97316 15%, #fff 15%, #fff 100%)',
+                border: '0.5px solid rgba(0,0,0,0.3)',
+                borderRadius: 1,
+                backfaceVisibility: 'hidden', overflow: 'hidden',
+                display: 'flex', flexDirection: 'column',
+                padding: '0 2px',
+              }}>
+                {/* オレンジヘッダー部分 */}
+                <div style={{ height: '15%', minHeight: 2 }} />
+                {/* 情報ライン */}
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} style={{
+                    height: 0.8, background: `rgba(0,0,0,${0.06 + i * 0.015})`,
+                    margin: '1.5px 1px', width: `${50 + i * 8}%`,
+                  }} />
+                ))}
+              </div>
+            </>
           ) : (
             /* ポリカバー/その他: 「重要安全部品」 */
             <div style={{
@@ -291,6 +333,18 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
           transform: `rotateY(90deg) translateZ(${sw / 2}px)`,
           ...cardboardFace(0.45),
         }}>
+          {/* 部品: 右側面にも会社名テキスト */}
+          {type === '部品' && (
+            <div style={{
+              position: 'absolute', bottom: '12%', left: '8%', right: '8%',
+              backfaceVisibility: 'hidden',
+            }}>
+              <div style={{
+                fontSize: Math.max(sd * 0.11, 3.5), fontWeight: 900,
+                color: 'rgba(40,25,10,0.6)', lineHeight: 1.3,
+              }}>新建高電業(深圳)有限公司</div>
+            </div>
+          )}
           {/* ジャーポット: 右面にもモデル名+色グリッド（小さめ） */}
           {isJarPot && jarPotInfo && (
             <>
