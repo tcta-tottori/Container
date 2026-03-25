@@ -310,6 +310,7 @@ export default function Home() {
 
         setLoadingMsg(`紐付完了: ${linkedTotal}/${totalItems}件  作業シートを表示中...`);
         loadData(containers);
+        saveRecentFile(file, containers.length, totalItems);
 
         // 紐付済みなのでuseEffectの再紐付をスキップ
         linkedRef.current = `${containers[0].containerNo}-0`;
