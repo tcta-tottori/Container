@@ -498,7 +498,6 @@ export default function PalletDiagram({
   // 各箱の落下アニメーション用keyframes生成
   const boxDropKeyframes = renderSlots.map((_, i) => {
     if (i >= filled) return '';
-    const delay = 0.3 + i * 0.05;
     return `@keyframes ${dropAnimName}_${i} { 0% { opacity: 0; transform: translateY(-30px); } 100% { opacity: 1; transform: translateY(0); } }`;
   }).filter(Boolean).join('\n');
 
