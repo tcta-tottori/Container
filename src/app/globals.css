@@ -265,6 +265,19 @@ body {
   100% { background-position: 200% 200%; }
 }
 
+/* ===== Version badge shimmer ===== */
+.ver-badge-shimmer::after {
+  content: '';
+  position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%);
+  animation: badge-shimmer 3s ease-in-out infinite;
+}
+@keyframes badge-shimmer {
+  0% { left: -100%; }
+  50% { left: 150%; }
+  100% { left: 150%; }
+}
+
 /* ===== Logo gradient animation ===== */
 @keyframes logo-gradient-rotate {
   0% { --logo-angle: 135deg; }
