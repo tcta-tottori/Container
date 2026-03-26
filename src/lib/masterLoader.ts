@@ -429,12 +429,60 @@ export function linkItemsWithMaster(
     return updated;
   });
 
+  // === 第2パス: measurements/cbm/grossWeight が空のアイテムに類似品名からフォールバック ===
+  // マスタ全体からmeasurementsを持つアイテムの品名→measurements マップ構築
+  const measByName = new Map<string, { measurements: string; cbm?: number; grossWeight?: number }>();
+  for (const m of masterItems) {
+    if (m.measurements && m.itemName) {
+      measByName.set(m.itemName, { measurements: m.measurements, cbm: m.cbm, grossWeight: m.grossWeight });
+    }
+  }
+
+  for (let i = 0; i < linkedItems.length; i++) {
+    const it = linkedItems[i];
+    if (it.measurements) continue; // 既にある
+
+    // 品名の基幹部分を抽出して類似検索（色記号やサフィックスを除いた品名で検索）
+    const baseName = extractBaseName(it.itemName);
+    if (!baseName) continue;
+
+    // 完全一致 → 前方一致 → 基幹一致の順で検索
+    let found: { measurements: string; cbm?: number; grossWeight?: number } | undefined;
+    found = measByName.get(it.itemName);
+    if (!found) {
+      // 基幹品名が一致するものを探す
+      for (const [name, data] of Array.from(measByName.entries())) {
+        if (extractBaseName(name) === baseName) {
+          found = data;
+          break;
+        }
+      }
+    }
+    if (found) {
+      linkedItems[i] = {
+        ...it,
+        measurements: found.measurements,
+        cbm: it.cbm ?? found.cbm,
+        grossWeight: it.grossWeight ?? found.grossWeight,
+      };
+    }
+  }
+
   return {
     linkedItems,
     linked,
     unlinked: items.length - linked,
     total: items.length,
   };
+}
+
+/**
+ * 品名から基幹名を抽出（色記号やサフィックスを除去）
+ * 例: "JRI-H100(KKB)" → "JRI-H100", "JPV-X180(K)" → "JPV-X180"
+ */
+function extractBaseName(name: string): string {
+  // 括弧とその中身を除去、末尾の色コードや空白を除去
+  return name.replace(/\(.*?\)/g, '').replace(/[A-Z]{1,3}$/, '').replace(/[\s\-]+$/, '').trim();
 }
 
 /**
