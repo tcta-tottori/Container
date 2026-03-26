@@ -438,12 +438,12 @@ export default function ItemDetailPanel({
           const remainingPct = ((totalItems - completedCount) / totalItems) * 100;
           return (
             <div style={{
-              position: 'absolute', top: 8, right: 10, zIndex: 5,
-              display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2,
+              position: 'absolute', top: 6, right: 10, zIndex: 5,
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3,
             }}>
-              {/* 棒ゲージ: 種類別の積み割合（右寄せで左から減る） */}
+              {/* 棒ゲージ: 種類別の積み割合（右寄せで左から減る、種類アイコン列と同幅） */}
               <div style={{
-                display: 'flex', width: 100, height: 6, borderRadius: 3,
+                display: 'flex', width: '100%', height: 6, borderRadius: 3,
                 overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)',
                 background: 'rgba(0,0,0,0.3)',
                 justifyContent: 'flex-end',
@@ -468,22 +468,22 @@ export default function ItemDetailPanel({
                   })}
                 </div>
               </div>
-              {/* 種類別の数（ゲージの下） */}
+              {/* 種類別の数（色●と数字のみ） */}
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600,
               }}>
                 {Array.from(typeCounts.entries()).map(([type, count]) => {
                   const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
                   return (
                     <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
-                      <span style={{ color: 'rgba(255,255,255,0.7)' }}>{count}</span>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
+                      <span style={{ color: 'rgba(255,255,255,0.75)' }}>{count}</span>
                     </span>
                   );
                 })}
               </div>
-              {/* 進捗率（その下） */}
+              {/* 進捗率（種類別数の下） */}
               <span style={{
                 fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700,
                 color: 'rgba(255,255,255,0.5)', letterSpacing: 0.3,
@@ -518,12 +518,6 @@ export default function ItemDetailPanel({
               {itemColor}
             </span>
           )}
-          <span style={{
-            marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.5)',
-            fontFamily: 'var(--font-mono)', fontWeight: 600,
-          }}>
-            {allItems.length}品
-          </span>
         </div>
 
         {/* 品名（下から出現 1秒） */}
