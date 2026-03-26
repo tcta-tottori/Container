@@ -17,7 +17,7 @@
   <g clip-path="url(#clip)">
     <rect width="512" height="512" fill="url(#bg)"/>
   </g>
-  <g transform="translate(256,240)" filter="url(#glow)" fill="none" stroke="#fff" stroke-width="30" stroke-linejoin="round">
+  <g transform="translate(256,256)" filter="url(#glow)" fill="none" stroke="#fff" stroke-width="30" stroke-linejoin="round">
     <polygon points="0,-167 144,-83.5 0,0 -144,-83.5"/>
     <polygon points="-144,-83.5 0,0 0,167 -144,83.5"/>
     <polygon points="144,-83.5 0,0 0,167 144,83.5"/>
