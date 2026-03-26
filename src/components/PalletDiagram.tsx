@@ -117,14 +117,11 @@ function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: n
 }
 
 /* ===== CSS 3D Cardboard Box (properly positioned in 3D space) ===== */
-function Box3D({ x, y, w, d, h, topBase, palletDepth, delaySec }: {
+function Box3D({ x, y, w, d, h, topBase, palletDepth }: {
   x: number; y: number; w: number; d: number; h: number;
-  topBase: number; palletDepth: number; delaySec?: number;
+  topBase: number; palletDepth: number;
 }) {
   const zOffset = palletDepth / 2 - y - d / 2;
-
-  // アニメーション: opacityとtopをtransitionで制御（transformに干渉しない）
-  const hasAnim = delaySec !== undefined && delaySec >= 0;
 
   return (
     <div style={{
@@ -132,10 +129,6 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, delaySec }: {
       width: w, height: h,
       transformStyle: 'preserve-3d',
       transform: `translateZ(${zOffset}px)`,
-      ...(hasAnim ? {
-        opacity: 0,
-        animation: `boxAppear 0.4s ease ${delaySec}s forwards`,
-      } : {}),
     }}>
       {/* Front */}
       <div style={{
@@ -500,21 +493,12 @@ export default function PalletDiagram({
   const animName = `spinPl${uid}`;
   const rotate = isFraction;
 
-  // 箱の出現アニメーション: opacityのみ（transformに一切干渉しない）
-  const boxDropCss = `
-    @keyframes boxAppear {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-  `;
-
   return (
     <div style={{
       width: '100%', height: '100%',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       overflow: 'visible',
     }}>
-      <style>{boxDropCss}</style>
       {rotate && (
         <style>{`
           @keyframes ${animName} {
@@ -535,7 +519,7 @@ export default function PalletDiagram({
         {/* Pallet base */}
         <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
 
-        {/* Stacked boxes — 3D空間を維持しつつ個別にフェードイン出現 */}
+        {/* Stacked boxes — 3D空間内に配置 */}
         {renderSlots.map((slot, i) => {
           if (i >= filled) return null;
           const boxTop = totalHeight - PALLET_H_PX - (slot.z - PALLET_H_PX) - slot.h;
@@ -545,7 +529,6 @@ export default function PalletDiagram({
               w={slot.w} d={slot.d} h={slot.h}
               topBase={boxTop}
               palletDepth={pd}
-              delaySec={0.3 + i * 0.06}
             />
           );
         })}
