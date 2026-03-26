@@ -502,9 +502,9 @@ body {
 @keyframes dropIn { 0% { opacity: 0; transform: translateY(-30px); } 100% { opacity: 1; transform: translateY(0); } }
 
 .anim-count-up { animation: countUp 4.5s cubic-bezier(0.34,1.56,0.64,1) both; }
-.anim-slide-up { animation: slideUp 1s cubic-bezier(0.16,1,0.3,1) both; }
-.anim-zoom-in { animation: zoomIn 1.5s cubic-bezier(0.16,1,0.3,1) both; }
-.anim-fade-in { animation: fadeIn 0.5s ease both; }
+.anim-slide-up { animation: slideUp 1.8s cubic-bezier(0.16,1,0.3,1) both; }
+.anim-zoom-in { animation: zoomIn 2s cubic-bezier(0.16,1,0.3,1) both; }
+.anim-fade-in { animation: fadeIn 1s ease both; }
 .anim-drop-in { animation: dropIn 0.4s cubic-bezier(0.22,1,0.36,1) both; }
 
 .stat-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow-sm); }
