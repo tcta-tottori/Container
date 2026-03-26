@@ -8,32 +8,57 @@ import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
 import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
-/** カウントアップアニメーション: 0.5秒待機→2.5秒で0→targetまで緩急付きカウント */
+/**
+ * カウントアップアニメーション
+ * keyが変わるとリセット。1.5秒間0のまま待機→2秒で0→targetまで緩急付きカウント
+ * targetRefで最新値を追跡し、keyが同じなら即座に最新値を返す
+ */
 function useCountUp(target: number, key: string): number {
-  const [value, setValue] = useState(0);
+  const [value, setValue] = useState(target);
   const rafRef = useRef<number>(0);
+  const targetRef = useRef(target);
+  const keyRef = useRef(key);
 
+  // key が変わったとき: カウントアップ開始
   useEffect(() => {
+    keyRef.current = key;
+    targetRef.current = target;
     setValue(0);
-    const startTime = performance.now() + 500; // 0.5秒待機
-    const duration = 2500; // 2.5秒カウント
+    const startTime = performance.now() + 1500; // 1.5秒待機（フェードイン完了まで0表示）
+    const duration = 2000; // 2秒でカウント
 
     const animate = (now: number) => {
       if (now < startTime) {
+        setValue(0);
         rafRef.current = requestAnimationFrame(animate);
         return;
       }
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      // ease-in-out: ゆっくり→早く→ゆっくり
+      // ease-in-out cubic: ゆっくり→早く→ゆっくり
       const eased = progress < 0.5
         ? 4 * progress * progress * progress
         : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-      setValue(Math.round(eased * target));
-      if (progress < 1) rafRef.current = requestAnimationFrame(animate);
+      const current = targetRef.current;
+      setValue(Math.round(eased * current));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
+        setValue(current); // 最終値を確定
+      }
     };
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]); // keyのみ依存（targetの変更ではリセットしない）
+
+  // target が変わったとき（key同じ = パレット減少等）: 即座に反映
+  useEffect(() => {
+    if (keyRef.current === key) {
+      targetRef.current = target;
+      // アニメーション中でなければ即反映
+      setValue(target);
+    }
   }, [target, key]);
 
   return value;
