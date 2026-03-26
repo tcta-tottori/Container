@@ -560,8 +560,9 @@ export default function ItemDetailPanel({
         <div className="detail-pallet-area" style={{
           position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0,
           display: 'flex', flexDirection: 'row',
-          transform: 'scale(0.85)', transformOrigin: 'center center',
-          margin: '-4px 0',
+          transform: 'scale(0.72)', transformOrigin: 'center center',
+          margin: '-8px 0',
+          padding: 0,
         }}>
           {/* 左側: 箱3Dイメージ（中心からズーム1.5秒） + 寸法テキスト（0.5秒後フェード） */}
           <div style={{
