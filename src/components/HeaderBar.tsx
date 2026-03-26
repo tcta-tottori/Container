@@ -39,6 +39,18 @@ export default function HeaderBar({
   const [popupOpen, setPopupOpen] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
   const lastFlashedAt = useRef(0);
+  const [currentTime, setCurrentTime] = useState('');
+
+  // リアルタイム時計
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setCurrentTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+    };
+    update();
+    const iv = setInterval(update, 10000); // 10秒ごとに更新
+    return () => clearInterval(iv);
+  }, []);
 
   // 5分ごとに黄色点滅（5秒間）
   useEffect(() => {
@@ -72,12 +84,19 @@ export default function HeaderBar({
 
       <div className="flex-1" />
 
-      {/* 作業経過時間 */}
+      {/* 経過時間（黄色）+ リアルタイム時計 */}
       <span
         className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
-        style={{ cursor: 'default' }}
+        style={{ color: '#f59e0b', marginRight: 8 }}
       >
         {workElapsed}
+      </span>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+        color: 'rgba(255,255,255,0.85)', fontVariantNumeric: 'tabular-nums',
+        letterSpacing: 0.5, flexShrink: 0, marginRight: 4,
+      }}>
+        {currentTime}
       </span>
 
       {/* 経過時間ポップアップ */}
