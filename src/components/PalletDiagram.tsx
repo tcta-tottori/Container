@@ -14,9 +14,6 @@ interface PalletDiagramProps {
 }
 
 /* ===== Constants ===== */
-const PALLET_CM = 110;
-const PALLET_PX = 80; // CSS px for 110cm pallet
-const CM2PX = PALLET_PX / PALLET_CM;
 const PALLET_H_PX = 8; // pallet base height in px
 
 /* ===== Parse measurements ===== */
@@ -40,7 +37,8 @@ export function calculateStackLayers(
   if (measurements && qtyPerPallet > 0) {
     const dims = parseMeas(measurements);
     if (dims) {
-      const perLayer = Math.max(1, Math.floor(PALLET_CM / dims[0])) * Math.max(1, Math.floor(PALLET_CM / dims[1]));
+      const palletCm = 110;
+      const perLayer = Math.max(1, Math.floor(palletCm / dims[0])) * Math.max(1, Math.floor(palletCm / dims[1]));
       return Math.min(Math.max(1, Math.ceil(qtyPerPallet / perLayer)), 5);
     }
   }
@@ -61,9 +59,9 @@ function palletFace(brightness: number): React.CSSProperties {
   };
 }
 
-/* ===== CSS 3D Pallet Base (110×110cm) ===== */
+/* ===== CSS 3D Pallet Base ===== */
 function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: number; topOffset: number }) {
-  const forkW = pw * 0.2;
+  const forkW = pw * 0.18;
   const forkH = ph * 0.4;
   const forkY = ph * 0.3;
 
@@ -80,13 +78,13 @@ function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: n
       {/* Left */}
       <div style={{ position: 'absolute', width: pd, height: ph, left: (pw - pd) / 2, transform: `rotateY(-90deg) translateZ(${pw / 2}px)`, ...palletFace(0.4) }}>
         {[0.12, 0.55].map((p, i) => (
-          <div key={i} style={{ position: 'absolute', left: `${p * 100}%`, top: forkY, width: pd * 0.2, height: forkH, background: '#0a0e14', borderRadius: 1 }} />
+          <div key={i} style={{ position: 'absolute', left: `${p * 100}%`, top: forkY, width: pd * 0.18, height: forkH, background: '#0a0e14', borderRadius: 1 }} />
         ))}
       </div>
       {/* Right */}
       <div style={{ position: 'absolute', width: pd, height: ph, left: (pw - pd) / 2, transform: `rotateY(90deg) translateZ(${pw / 2}px)`, ...palletFace(0.45) }}>
         {[0.12, 0.55].map((p, i) => (
-          <div key={i} style={{ position: 'absolute', left: `${p * 100}%`, top: forkY, width: pd * 0.2, height: forkH, background: '#0a0e14', borderRadius: 1 }} />
+          <div key={i} style={{ position: 'absolute', left: `${p * 100}%`, top: forkY, width: pd * 0.18, height: forkH, background: '#0a0e14', borderRadius: 1 }} />
         ))}
       </div>
       {/* Top with X-groove pattern */}
@@ -94,18 +92,13 @@ function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: n
         position: 'absolute', width: pw, height: pd, top: (ph - pd) / 2,
         transform: `rotateX(90deg) translateZ(${ph / 2}px)`, ...palletFace(0.6),
       }}>
-        {/* 2×2 X-pattern grooves */}
         {[0, 1].map(qi => [0, 1].map(qj => {
-          const qw = pw / 2;
-          const qd = pd / 2;
-          const x = qi * qw + qw * 0.1;
-          const y = qj * qd + qd * 0.1;
-          const w = qw * 0.8;
-          const h = qd * 0.8;
+          const qw = pw / 2; const qd = pd / 2;
           return (
             <React.Fragment key={`${qi}-${qj}`}>
               <div style={{
-                position: 'absolute', left: x, top: y, width: w, height: h,
+                position: 'absolute', left: qi * qw + qw * 0.1, top: qj * qd + qd * 0.1,
+                width: qw * 0.8, height: qd * 0.8,
                 border: '0.5px solid rgba(60,70,85,0.4)',
                 background: `
                   linear-gradient(45deg, transparent 48%, rgba(60,70,85,0.3) 48%, rgba(60,70,85,0.3) 52%, transparent 52%),
@@ -123,28 +116,33 @@ function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: n
   );
 }
 
-/* ===== CSS 3D Cardboard Box ===== */
-function Box3D({ x, w, d, h, topBase }: {
-  x: number; y: number; z: number; w: number; d: number; h: number;
-  topBase: number;
+/* ===== CSS 3D Cardboard Box (properly positioned in 3D space) ===== */
+function Box3D({ x, y, w, d, h, topBase, palletDepth }: {
+  x: number; y: number; w: number; d: number; h: number;
+  topBase: number; palletDepth: number;
 }) {
-  // topBase = totalHeight - PALLET_H_PX - z - h (inverted so z=0 is just above pallet)
-  const top = topBase;
-  const left = x;
+  // y=0 is front edge of pallet, y increases towards back
+  // In CSS 3D: translateZ moves towards viewer (positive = front)
+  // We center the depth range: front = +palletDepth/2, back = -palletDepth/2
+  const zOffset = palletDepth / 2 - y - d / 2;
 
   return (
-    <div style={{ position: 'absolute', left, top, transformStyle: 'preserve-3d' }}>
+    <div style={{
+      position: 'absolute', left: x, top: topBase,
+      width: w, height: h,
+      transformStyle: 'preserve-3d',
+      transform: `translateZ(${zOffset}px)`,
+    }}>
       {/* Front */}
       <div style={{
         position: 'absolute', width: w, height: h,
-        transform: `translateZ(${pd2(d)}px)`,
+        transform: `translateZ(${d / 2}px)`,
         ...cardboardFace(0.55),
       }}>
-        {/* Tape wrap down front center */}
-        <div style={{ position: 'absolute', left: `${50 - 6}%`, top: 0, width: '12%', height: '28%', background: 'rgba(200,180,140,0.35)' }} />
+        <div style={{ position: 'absolute', left: '44%', top: 0, width: '12%', height: '28%', background: 'rgba(200,180,140,0.35)' }} />
       </div>
       {/* Back */}
-      <div style={{ position: 'absolute', width: w, height: h, transform: `rotateY(180deg) translateZ(${pd2(d)}px)`, ...cardboardFace(0.3) }} />
+      <div style={{ position: 'absolute', width: w, height: h, transform: `rotateY(180deg) translateZ(${d / 2}px)`, ...cardboardFace(0.3) }} />
       {/* Left */}
       <div style={{ position: 'absolute', width: d, height: h, left: (w - d) / 2, transform: `rotateY(-90deg) translateZ(${w / 2}px)`, ...cardboardFace(0.4) }} />
       {/* Right */}
@@ -155,39 +153,47 @@ function Box3D({ x, w, d, h, topBase }: {
         transform: `rotateX(90deg) translateZ(${h / 2}px)`,
         ...cardboardFace(0.6),
       }}>
-        <div style={{ position: 'absolute', left: `${50 - 6}%`, top: 0, width: '12%', height: '100%', background: 'rgba(200,180,140,0.4)' }} />
-        <div style={{ position: 'absolute', top: `${50 - 6}%`, left: 0, width: '100%', height: '12%', background: 'rgba(200,180,140,0.35)' }} />
+        <div style={{ position: 'absolute', left: '44%', top: 0, width: '12%', height: '100%', background: 'rgba(200,180,140,0.4)' }} />
+        <div style={{ position: 'absolute', top: '44%', left: 0, width: '100%', height: '12%', background: 'rgba(200,180,140,0.35)' }} />
       </div>
       {/* Bottom */}
       <div style={{ position: 'absolute', width: w, height: d, top: (h - d) / 2, transform: `rotateX(-90deg) translateZ(${h / 2}px)`, ...cardboardFace(0.25) }} />
     </div>
   );
 }
-function pd2(d: number) { return d / 2; }
 
 /* ===== Stacking Logic ===== */
-
 interface BoxSlot {
   x: number; y: number; z: number;
   w: number; d: number; h: number;
 }
 
-/** Standard 3×2 stacking (polycover/nabe) */
-function buildStandard6Slots(
-  bw: number, bd: number, bh: number, layers: number, pw: number, pd: number,
+/**
+ * Nabe/Polycover 3×N stacking
+ * Orient boxes so the smaller horizontal dimension is the column width (3 across)
+ */
+function buildNabeSlots(
+  bwCm: number, bdCm: number, bhPx: number, layers: number,
+  pw: number, pd: number, cm2px: number,
 ): BoxSlot[] {
-  const cols = 3, rows = 2;
-  const gapX = (pw - cols * bw) / (cols + 1);
-  const gapY = (pd - rows * bd) / (rows + 1);
+  // Use smaller dim as width for 3 across, larger as depth
+  const smallCm = Math.min(bwCm, bdCm);
+  const largeCm = Math.max(bwCm, bdCm);
+  const boxW = smallCm * cm2px;
+  const boxD = largeCm * cm2px;
+  const cols = 3;
+  const rows = Math.max(1, Math.floor(pd / boxD));
+  const gapX = Math.max(0, (pw - cols * boxW) / (cols + 1));
+  const gapY = Math.max(0, (pd - rows * boxD) / (rows + 1));
   const slots: BoxSlot[] = [];
   for (let layer = 0; layer < layers; layer++) {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         slots.push({
-          x: gapX + c * (bw + gapX),
-          y: gapY + r * (bd + gapY),
-          z: PALLET_H_PX + layer * bh,
-          w: bw, d: bd, h: bh,
+          x: gapX + c * (boxW + gapX),
+          y: gapY + r * (boxD + gapY),
+          z: PALLET_H_PX + layer * bhPx,
+          w: boxW, d: boxD, h: bhPx,
         });
       }
     }
@@ -197,54 +203,72 @@ function buildStandard6Slots(
 
 /** JPI 7-per-layer alternating stacking */
 function buildJPI7Slots(
-  bw: number, bd: number, bh: number, layers: number, pw: number, pd: number,
+  bwCm: number, bdCm: number, bhPx: number, layers: number,
+  pw: number, pd: number, cm2px: number,
 ): BoxSlot[] {
+  const smallCm = Math.min(bwCm, bdCm);
+  const largeCm = Math.max(bwCm, bdCm);
+  const bSmall = smallCm * cm2px;
+  const bLarge = largeCm * cm2px;
   const slots: BoxSlot[] = [];
+
   for (let layer = 0; layer < layers; layer++) {
     const isOdd = layer % 2 === 0;
-    // Odd layers: left=3 horizontal, right=4 vertical (3 vertical + gap management)
-    // Even layers: mirror
     if (isOdd) {
-      // Left: 3 boxes horizontal (bw along x, bd along y)
-      const leftColX = 1;
+      // Left: 3 boxes with small dim as width, large as depth
       for (let r = 0; r < 3; r++) {
-        slots.push({
-          x: leftColX,
-          y: 1 + r * (bd + 0.5),
-          z: PALLET_H_PX + layer * bh,
-          w: bw, d: bd, h: bh,
-        });
+        const yPos = (pd - 3 * bLarge) / 4 + r * (bLarge + (pd - 3 * bLarge) / 4);
+        slots.push({ x: 1, y: yPos, z: PALLET_H_PX + layer * bhPx, w: bSmall, d: bLarge, h: bhPx });
       }
-      // Right: 3-4 boxes vertical (bd along x, bw along y)
-      const rightStartX = leftColX + bw + 1;
-      const rightCols = Math.max(1, Math.floor((pw - rightStartX) / (bd + 0.5)));
+      // Right: boxes rotated 90° (large as width, small as depth)
+      const rightX = bSmall + 2;
+      const rightCols = Math.max(1, Math.floor((pw - rightX) / (bLarge + 1)));
       for (let c = 0; c < Math.min(rightCols, 4); c++) {
         slots.push({
-          x: rightStartX + c * (bd + 0.5),
-          y: (pd - bw) / 2,
-          z: PALLET_H_PX + layer * bh,
-          w: bd, d: bw, h: bh,
+          x: rightX + c * (bLarge + 1),
+          y: (pd - bSmall) / 2,
+          z: PALLET_H_PX + layer * bhPx,
+          w: bLarge, d: bSmall, h: bhPx,
         });
       }
     } else {
-      // Mirror: left=vertical, right=horizontal
-      const rightColX = pw - bw - 1;
+      // Mirror
+      const rightColX = pw - bSmall - 1;
       for (let r = 0; r < 3; r++) {
-        slots.push({
-          x: rightColX,
-          y: 1 + r * (bd + 0.5),
-          z: PALLET_H_PX + layer * bh,
-          w: bw, d: bd, h: bh,
-        });
+        const yPos = (pd - 3 * bLarge) / 4 + r * (bLarge + (pd - 3 * bLarge) / 4);
+        slots.push({ x: rightColX, y: yPos, z: PALLET_H_PX + layer * bhPx, w: bSmall, d: bLarge, h: bhPx });
       }
-      const leftEnd = rightColX - 1;
-      const leftCols = Math.max(1, Math.floor(leftEnd / (bd + 0.5)));
+      const leftEnd = rightColX - 2;
+      const leftCols = Math.max(1, Math.floor(leftEnd / (bLarge + 1)));
       for (let c = 0; c < Math.min(leftCols, 4); c++) {
         slots.push({
-          x: 1 + c * (bd + 0.5),
-          y: (pd - bw) / 2,
-          z: PALLET_H_PX + layer * bh,
-          w: bd, d: bw, h: bh,
+          x: 1 + c * (bLarge + 1),
+          y: (pd - bSmall) / 2,
+          z: PALLET_H_PX + layer * bhPx,
+          w: bLarge, d: bSmall, h: bhPx,
+        });
+      }
+    }
+  }
+  return slots;
+}
+
+/** Jar pot 2×2 stacking */
+function buildJarPotSlots(
+  bhPx: number, layers: number, pw: number, pd: number,
+): BoxSlot[] {
+  const cols = 2, rows = 2;
+  const bw = (pw - 3) / cols;
+  const bd = (pd - 3) / rows;
+  const slots: BoxSlot[] = [];
+  for (let layer = 0; layer < layers; layer++) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        slots.push({
+          x: 1 + c * (bw + 1),
+          y: 1 + r * (bd + 1),
+          z: PALLET_H_PX + layer * bhPx,
+          w: bw, d: bd, h: bhPx,
         });
       }
     }
@@ -254,12 +278,15 @@ function buildJPI7Slots(
 
 /** Generic stacking based on measurements */
 function buildGenericSlots(
-  bw: number, bd: number, bh: number, layers: number, pw: number, pdVal: number,
+  bwCm: number, bdCm: number, bhPx: number, layers: number,
+  pw: number, pd: number, cm2px: number,
 ): BoxSlot[] {
+  const bw = bwCm * cm2px;
+  const bd = bdCm * cm2px;
   const cols = Math.max(1, Math.floor(pw / bw));
-  const rows = Math.max(1, Math.floor(pdVal / bd));
-  const gapX = (pw - cols * bw) / (cols + 1);
-  const gapY = (pdVal - rows * bd) / (rows + 1);
+  const rows = Math.max(1, Math.floor(pd / bd));
+  const gapX = Math.max(0, (pw - cols * bw) / (cols + 1));
+  const gapY = Math.max(0, (pd - rows * bd) / (rows + 1));
   const slots: BoxSlot[] = [];
   for (let layer = 0; layer < layers; layer++) {
     for (let r = 0; r < rows; r++) {
@@ -267,8 +294,8 @@ function buildGenericSlots(
         slots.push({
           x: gapX + c * (bw + gapX),
           y: gapY + r * (bd + gapY),
-          z: PALLET_H_PX + layer * bh,
-          w: bw, d: bd, h: bh,
+          z: PALLET_H_PX + layer * bhPx,
+          w: bw, d: bd, h: bhPx,
         });
       }
     }
@@ -278,42 +305,34 @@ function buildGenericSlots(
 
 /** Edge-priority reorder for fraction pallets (fill edges first, skip center) */
 function edgePriorityReorder(slots: BoxSlot[], perLayer: number): BoxSlot[] {
-  if (perLayer <= 4) return slots; // small grid, no reorder needed
-  // Group by layer
+  if (perLayer <= 4) return slots;
   const result: BoxSlot[] = [];
   for (let i = 0; i < slots.length; i += perLayer) {
     const layer = slots.slice(i, i + perLayer);
-    // Sort: corners first, then edges, then center
-    const sorted = [...layer].sort((a, b) => {
-      const aDist = edgeScore(a, layer);
-      const bDist = edgeScore(b, layer);
-      return aDist - bDist;
-    });
+    const sorted = [...layer].sort((a, b) => edgeScore(a, layer) - edgeScore(b, layer));
     result.push(...sorted);
   }
   return result;
 }
 
 function edgeScore(slot: BoxSlot, layer: BoxSlot[]): number {
-  // Lower score = higher priority (edges/corners first)
   const xs = layer.map(s => s.x);
   const ys = layer.map(s => s.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
   const isEdgeX = slot.x <= minX || slot.x >= maxX;
   const isEdgeY = slot.y <= minY || slot.y >= maxY;
-  if (isEdgeX && isEdgeY) return 0; // corner
-  if (isEdgeX || isEdgeY) return 1; // edge
-  return 2; // center
+  if (isEdgeX && isEdgeY) return 0;
+  if (isEdgeX || isEdgeY) return 1;
+  return 2;
 }
 
-/* ===== Default box dimensions (JRI-A100 fallback) ===== */
-function getBoxDims(measurements?: string, itemName?: string): [number, number, number] {
+/* ===== Default box dimensions ===== */
+function getBoxDimsCm(measurements?: string, itemName?: string): [number, number, number] {
   if (measurements) {
     const d = parseMeas(measurements);
     if (d) return d;
   }
-  // Default: JRI-A100 ≈ 55×38×38
   if (itemName) {
     if (itemName.includes('180') || /18[RWCS]/.test(itemName)) return [55, 42, 42];
     if (itemName.includes('060')) return [42, 32, 28];
@@ -321,7 +340,6 @@ function getBoxDims(measurements?: string, itemName?: string): [number, number, 
   return [55, 38, 38];
 }
 
-/* ===== Detect stacking type ===== */
 function isJPIType(itemName?: string): boolean {
   return !!itemName && /JPI[+\-]?[A-Z]/.test(itemName.replace(/\s/g, ''));
 }
@@ -334,49 +352,48 @@ export default function PalletDiagram({
   const isFraction = !isFull && fraction > 0;
   if (!isFull && !isFraction) return null;
 
-  const [bwCm, bdCm, bhCm] = getBoxDims(measurements, itemName);
-  const bw = bwCm * CM2PX;
-  const bd = bdCm * CM2PX;
-  const bh = bhCm * CM2PX;
-
-  const layers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements) || 3;
+  const [bwCm, bdCm, bhCm] = getBoxDimsCm(measurements, itemName);
   const isNabe = type === '鍋' || type === 'ポリカバー';
   const isJPI = isJPIType(itemName);
   const isJarPot = type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName || '');
+
+  // Calculate pallet dimensions in cm
+  let palletWcm: number;
+  let palletDcm: number;
+  if (isNabe) {
+    // Nabe: pallet width = 3 × smaller box dim, depth = 2 × larger box dim
+    const smallDim = Math.min(bwCm, bdCm);
+    const largeDim = Math.max(bwCm, bdCm);
+    palletWcm = smallDim * 3;
+    palletDcm = largeDim * 2;
+  } else {
+    palletWcm = 110;
+    palletDcm = 110;
+  }
+
+  // Scale: fit in ~85px visual width
+  const VISUAL_PX = 85;
+  const cm2px = VISUAL_PX / palletWcm;
+  const pw = palletWcm * cm2px; // = VISUAL_PX
+  const pd = palletDcm * cm2px;
+  const bh = bhCm * cm2px;
+
+  const layers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements) || 3;
 
   // Build slots
   let allSlots: BoxSlot[];
   let perLayer: number;
   if (isJarPot) {
-    allSlots = buildStandard6Slots(bw, bd, bh, layers, PALLET_PX, PALLET_PX);
-    perLayer = 4; // 2×2
-    // Actually jar pots use 2×2
-    allSlots = [];
-    const jCols = 2, jRows = 2;
-    const jBw = (PALLET_PX - 3) / jCols;
-    const jBd = (PALLET_PX - 3) / jRows;
-    const jBh = bh;
+    allSlots = buildJarPotSlots(bh, layers, pw, pd);
     perLayer = 4;
-    for (let layer = 0; layer < layers; layer++) {
-      for (let r = 0; r < jRows; r++) {
-        for (let c = 0; c < jCols; c++) {
-          allSlots.push({
-            x: 1 + c * (jBw + 0.5),
-            y: 1 + r * (jBd + 0.5),
-            z: PALLET_H_PX + layer * jBh,
-            w: jBw, d: jBd, h: jBh,
-          });
-        }
-      }
-    }
   } else if (isJPI) {
-    allSlots = buildJPI7Slots(bw, bd, bh, layers, PALLET_PX, PALLET_PX);
+    allSlots = buildJPI7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = 7;
   } else if (isNabe) {
-    allSlots = buildStandard6Slots(bw, bd, bh, layers, PALLET_PX, PALLET_PX);
-    perLayer = 6;
+    allSlots = buildNabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
+    perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
   } else {
-    allSlots = buildGenericSlots(bw, bd, bh, layers, PALLET_PX, PALLET_PX);
+    allSlots = buildGenericSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
   }
 
@@ -387,7 +404,6 @@ export default function PalletDiagram({
   let renderSlots = allSlots;
   if (isFraction && filled < allSlots.length) {
     renderSlots = edgePriorityReorder(allSlots, perLayer);
-    // Only render enough layers
     const layersNeeded = Math.ceil(filled / perLayer);
     renderSlots = renderSlots.slice(0, layersNeeded * perLayer);
   }
@@ -396,8 +412,7 @@ export default function PalletDiagram({
   const maxZ = renderSlots.reduce((max, s) => Math.max(max, s.z + s.h), PALLET_H_PX);
   const totalHeight = maxZ + 4;
 
-  // Animation for fraction pallets
-  const uid = `pl${bwCm}${bdCm}${filled}`;
+  const uid = `pl${Math.round(bwCm)}${Math.round(bdCm)}${filled}`;
   const animName = `spinPl${uid}`;
   const rotate = isFraction;
 
@@ -416,7 +431,7 @@ export default function PalletDiagram({
         `}</style>
       )}
       <div style={{
-        width: PALLET_PX, height: totalHeight,
+        width: pw, height: totalHeight,
         position: 'relative',
         transformStyle: 'preserve-3d',
         ...(rotate
@@ -424,19 +439,19 @@ export default function PalletDiagram({
           : { transform: 'rotateX(-25deg) rotateY(-35deg)' }
         ),
       }}>
-        {/* Pallet base — always at bottom */}
-        <PalletBase3D pw={PALLET_PX} pd={PALLET_PX} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
+        {/* Pallet base */}
+        <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
 
-        {/* Stacked boxes — above pallet */}
+        {/* Stacked boxes — positioned in full 3D (x, y→depth, z→height) */}
         {renderSlots.map((slot, i) => {
           if (i >= filled) return null;
-          // Convert z (bottom-up from pallet top) to top (top-down from container top)
           const boxTop = totalHeight - PALLET_H_PX - (slot.z - PALLET_H_PX) - slot.h;
           return (
             <Box3D key={i}
-              x={slot.x} y={slot.y} z={slot.z}
+              x={slot.x} y={slot.y}
               w={slot.w} d={slot.d} h={slot.h}
               topBase={boxTop}
+              palletDepth={pd}
             />
           );
         })}
