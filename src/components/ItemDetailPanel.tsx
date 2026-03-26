@@ -166,7 +166,7 @@ function SimilarItemsMarquee({ item, similarItems }: {
         fontSize: 13, fontWeight: 500, color: '#fbbf24', whiteSpace: 'nowrap', flexShrink: 0,
         display: 'flex', alignItems: 'center', gap: 4,
       }}>
-        <span style={{ fontSize: 14 }}>&#x26A0;&#xFE0F;</span>類似品:
+        類似品:
       </span>
       <div ref={outerRef} style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
         <div className={overflow ? 'marquee-scroll' : ''} style={{ display: 'inline-flex', alignItems: 'center' }}>
@@ -182,6 +182,57 @@ function SimilarItemsMarquee({ item, similarItems }: {
       </div>
     </div>
   );
+}
+
+/* ===== カウントアップアニメーション ===== */
+function AnimatedNumber({ value, duration = 2500, delay = 500, formatFn }: {
+  value: number; duration?: number; delay?: number;
+  formatFn?: (v: number) => string;
+}) {
+  const [display, setDisplay] = useState('0');
+  const prevValue = useRef(value);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    prevValue.current = value;
+    setDisplay('0');
+    let startTime: number | null = null;
+    const fmt = formatFn || ((v: number) => {
+      if (Number.isInteger(value)) return String(Math.round(v));
+      return String(Math.ceil(v * 100) / 100);
+    });
+
+    // ease-in-out-cubic: slow start, fast middle, slow end
+    const easeInOutCubic = (t: number) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = easeInOutCubic(progress);
+      const current = easedProgress * value;
+
+      setDisplay(fmt(current));
+
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
+        setDisplay(fmt(value));
+      }
+    };
+
+    const timer = setTimeout(() => {
+      rafRef.current = requestAnimationFrame(animate);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [value, duration, delay, formatFn]);
+
+  return <>{display}</>;
 }
 
 /* ===== 数値フォーマット ===== */
@@ -381,40 +432,67 @@ export default function ItemDetailPanel({
         }} />
 
         {/* 積載分布ゲージ（右上固定） */}
-        {allItems.length > 0 && (
-          <div style={{
-            position: 'absolute', top: 8, right: 10, zIndex: 5,
-            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3,
-          }}>
-            {/* 棒ゲージ: 種類別の積み割合 */}
+        {allItems.length > 0 && (() => {
+          const totalItems = allItems.length;
+          const completedCount = completedIds.size;
+          const remainingPct = ((totalItems - completedCount) / totalItems) * 100;
+          return (
             <div style={{
-              display: 'flex', width: 100, height: 10, borderRadius: 5,
-              overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)',
-              background: 'rgba(0,0,0,0.3)',
+              position: 'absolute', top: 8, right: 10, zIndex: 5,
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2,
             }}>
-              {Array.from(typeCounts.entries()).map(([type, count]) => {
-                const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
-                const completedOfType = allItems.filter(it => it.type === type && completedIds.has(it.id)).length;
-                const remainingOfType = count - completedOfType;
-                const pct = (remainingOfType / allItems.length) * 100;
-                return pct > 0 ? (
-                  <div key={type} style={{
-                    width: `${pct}%`, height: '100%',
-                    background: tc.accent,
-                    transition: 'width 0.3s ease',
-                  }} />
-                ) : null;
-              })}
+              {/* 棒ゲージ: 種類別の積み割合（右寄せで左から減る） */}
+              <div style={{
+                display: 'flex', width: 100, height: 6, borderRadius: 3,
+                overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(0,0,0,0.3)',
+                justifyContent: 'flex-end',
+              }}>
+                <div style={{
+                  display: 'flex', width: `${remainingPct}%`, height: '100%',
+                  transition: 'width 0.3s ease',
+                }}>
+                  {Array.from(typeCounts.entries()).map(([type, count]) => {
+                    const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
+                    const completedOfType = allItems.filter(it => it.type === type && completedIds.has(it.id)).length;
+                    const remainingOfType = count - completedOfType;
+                    const remaining = totalItems - completedCount;
+                    const segPct = remaining > 0 ? (remainingOfType / remaining) * 100 : 0;
+                    return segPct > 0 ? (
+                      <div key={type} style={{
+                        width: `${segPct}%`, height: '100%',
+                        background: tc.accent,
+                        transition: 'width 0.3s ease',
+                      }} />
+                    ) : null;
+                  })}
+                </div>
+              </div>
+              {/* 種類別の数（ゲージの下） */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 600,
+              }}>
+                {Array.from(typeCounts.entries()).map(([type, count]) => {
+                  const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
+                  return (
+                    <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
+                      <span style={{ color: 'rgba(255,255,255,0.7)' }}>{count}</span>
+                    </span>
+                  );
+                })}
+              </div>
+              {/* 進捗率（その下） */}
+              <span style={{
+                fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700,
+                color: 'rgba(255,255,255,0.5)', letterSpacing: 0.3,
+              }}>
+                {Math.round((completedCount / totalItems) * 100)}%
+              </span>
             </div>
-            {/* 進捗率 */}
-            <span style={{
-              fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
-              color: 'rgba(255,255,255,0.6)', letterSpacing: 0.3,
-            }}>
-              {Math.round((completedIds.size / allItems.length) * 100)}%
-            </span>
-          </div>
-        )}
+          );
+        })()}
 
         {/* 1行目: 種目バッジ + 色柄 + 品目数 */}
         <div className="detail-badges">
@@ -441,19 +519,10 @@ export default function ItemDetailPanel({
             </span>
           )}
           <span style={{
-            marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8,
-            fontSize: 11, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)', fontWeight: 600,
+            marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.5)',
+            fontFamily: 'var(--font-mono)', fontWeight: 600,
           }}>
-            {Array.from(typeCounts.entries()).map(([type, count]) => {
-              const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
-              return (
-                <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
-                  <span style={{ color: '#fff' }}>{count}</span>
-                </span>
-              );
-            })}
-            <span style={{ color: 'rgba(255,255,255,0.5)' }}>/ {allItems.length}品</span>
+            {allItems.length}品
           </span>
         </div>
 
@@ -491,10 +560,12 @@ export default function ItemDetailPanel({
         <div className="detail-pallet-area" style={{
           position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0,
           display: 'flex', flexDirection: 'row',
+          transform: 'scale(0.85)', transformOrigin: 'center center',
+          margin: '-4px 0',
         }}>
           {/* 左側: 箱3Dイメージ（中心からズーム1.5秒） + 寸法テキスト（0.5秒後フェード） */}
           <div style={{
-            position: 'relative', width: '35%', height: '100%', flexShrink: 0,
+            position: 'relative', width: '30%', height: '100%', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'visible',
           }}>
@@ -541,9 +612,9 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 数量（PL / CT / pcs）— カウントアップアニメーション 1秒 */}
+        {/* 数量（PL / CT / pcs）— カウントアップアニメーション（0.5秒待機→2.5秒で緩急付きカウント） */}
         <div key={`stats-${animKey}`} className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
-          <div className="detail-sf-item anim-count-up" style={{ minWidth: 0 }}>
+          <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
               color: accentColor,
               textShadow: `0 0 16px ${accentColor}50, 0 2px 4px rgba(0,0,0,0.6)`,
@@ -553,23 +624,23 @@ export default function ItemDetailPanel({
               borderRadius: 8,
               userSelect: 'none',
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
-            }}>{fmtNum(item.palletCount)}</span>
+            }}><AnimatedNumber value={item.palletCount} /></span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>PL</span>
           </div>
-          <div className="detail-sf-item anim-count-up" style={{ minWidth: 0, animationDelay: '0.1s' }}>
+          <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" style={{
               color: '#e8e8e8',
               textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`,
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
-            }}>{item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : fmtNum(item.fraction)}</span>
+            }}><AnimatedNumber value={item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction} /></span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>CT</span>
           </div>
-          <div className="detail-sf-item detail-sf-total anim-count-up" style={{ minWidth: 0, animationDelay: '0.2s' }}>
+          <div className="detail-sf-item detail-sf-total" style={{ minWidth: 0 }}>
             <span className="detail-sf-num-sm" style={{
               color: 'rgba(255,255,255,0.6)',
               display: 'inline-block', minWidth: '4ch', textAlign: 'right',
             }}>
-              {Math.ceil(item.totalQty).toLocaleString()}
+              <AnimatedNumber value={Math.ceil(item.totalQty)} formatFn={(v: number) => Math.round(v).toLocaleString()} />
             </span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.4)' }}>pcs</span>
           </div>

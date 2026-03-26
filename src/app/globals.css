@@ -453,11 +453,11 @@ body {
   font-family: var(--font-mono);
 }
 .detail-list-h-name { flex: 1; min-width: 0; }
-.detail-list-h-num { width: 38px; text-align: center; flex-shrink: 0; }
+.detail-list-h-num { width: 34px; text-align: center; flex-shrink: 0; }
 .detail-list-h-total { width: 50px; text-align: right; }
 .detail-list-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .detail-list-row {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 4px;
   padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.05);
   font-size: 13px; color: rgba(255,255,255,0.85);
   border-left: 3px solid transparent;
@@ -483,7 +483,7 @@ body {
   font-size: 14px; font-weight: 500;
 }
 .detail-list-num {
-  width: 38px; text-align: center; flex-shrink: 0;
+  width: 34px; text-align: center; flex-shrink: 0;
   font-family: var(--font-mono); font-size: 15px;
   font-weight: 700; font-variant-numeric: tabular-nums;
 }

@@ -39,8 +39,8 @@ export default function ItemListPanel({
         fontFamily: 'var(--font-mono)',
       }}>
         <span style={{ flex: 1 }}>品名</span>
-        <span style={{ width: 38, textAlign: 'center' }}>PL</span>
-        <span style={{ width: 38, textAlign: 'center' }}>CS</span>
+        <span style={{ width: 34, textAlign: 'center' }}>PL</span>
+        <span style={{ width: 34, textAlign: 'center' }}>CS</span>
         <span className="list-col-extra" style={{ width: 46, textAlign: 'center' }}>CBM</span>
         <span className="list-col-extra" style={{ width: 70, textAlign: 'center' }}>Meas.</span>
         <span style={{ width: 50, textAlign: 'right' }}>PCS</span>
