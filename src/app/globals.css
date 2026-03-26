@@ -92,6 +92,10 @@ body {
   50% { color: rgba(245,158,11,0.3); }
 }
 
+/* Header date: landscape only */
+.header-date-landscape { display: none; }
+@media (orientation: landscape) { .header-date-landscape { display: inline; } }
+
 /* ===== Menu ===== */
 .menu-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.18); backdrop-filter: blur(3px); }
 .menu-panel {

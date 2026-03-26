@@ -40,15 +40,18 @@ export default function HeaderBar({
   const [isFlashing, setIsFlashing] = useState(false);
   const lastFlashedAt = useRef(0);
   const [currentTime, setCurrentTime] = useState('');
+  const [currentDate, setCurrentDate] = useState('');
 
-  // リアルタイム時計
+  // リアルタイム時計+日付
   useEffect(() => {
+    const days = ['日', '月', '火', '水', '木', '金', '土'];
     const update = () => {
       const now = new Date();
       setCurrentTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+      setCurrentDate(`${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}(${days[now.getDay()]})`);
     };
     update();
-    const iv = setInterval(update, 10000); // 10秒ごとに更新
+    const iv = setInterval(update, 10000);
     return () => clearInterval(iv);
   }, []);
 
@@ -84,7 +87,13 @@ export default function HeaderBar({
 
       <div className="flex-1" />
 
-      {/* 経過時間（黄色）+ リアルタイム時計 — 右端から余白 */}
+      {/* 日付（横画面のみ）+ 経過時間（黄色）+ リアルタイム時計 */}
+      <span className="header-date-landscape" style={{
+        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
+        color: 'rgba(255,255,255,0.4)', flexShrink: 0, marginRight: 8,
+      }}>
+        {currentDate}
+      </span>
       <span
         className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
         style={{ color: '#f59e0b', marginRight: 6, flexShrink: 0 }}
@@ -94,7 +103,7 @@ export default function HeaderBar({
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
         color: 'rgba(255,255,255,0.85)', fontVariantNumeric: 'tabular-nums',
-        letterSpacing: 0.5, flexShrink: 0, marginRight: 8,
+        letterSpacing: 0.5, flexShrink: 0, marginRight: 16,
       }}>
         {currentTime}
       </span>
