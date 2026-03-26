@@ -117,13 +117,10 @@ function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: n
 }
 
 /* ===== CSS 3D Cardboard Box (properly positioned in 3D space) ===== */
-function Box3D({ x, y, w, d, h, topBase, palletDepth }: {
+function Box3D({ x, y, w, d, h, topBase, palletDepth, dropAnimation }: {
   x: number; y: number; w: number; d: number; h: number;
-  topBase: number; palletDepth: number;
+  topBase: number; palletDepth: number; dropAnimation?: string;
 }) {
-  // y=0 is front edge of pallet, y increases towards back
-  // In CSS 3D: translateZ moves towards viewer (positive = front)
-  // We center the depth range: front = +palletDepth/2, back = -palletDepth/2
   const zOffset = palletDepth / 2 - y - d / 2;
 
   return (
@@ -132,6 +129,7 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth }: {
       width: w, height: h,
       transformStyle: 'preserve-3d',
       transform: `translateZ(${zOffset}px)`,
+      animation: dropAnimation || undefined,
     }}>
       {/* Front */}
       <div style={{
@@ -494,7 +492,14 @@ export default function PalletDiagram({
 
   const uid = `pl${Math.round(bwCm)}${Math.round(bdCm)}${filled}`;
   const animName = `spinPl${uid}`;
+  const dropAnimName = `boxDrop${uid}`;
   const rotate = isFraction;
+
+  // 各箱の落下アニメーション用keyframes生成
+  const boxDropKeyframes = renderSlots.map((_, i) => {
+    if (i >= filled) return '';
+    return `@keyframes ${dropAnimName}_${i} { 0% { opacity: 0; transform: translateY(-30px); } 100% { opacity: 1; transform: translateY(0); } }`;
+  }).filter(Boolean).join('\n');
 
   return (
     <div style={{
@@ -502,6 +507,7 @@ export default function PalletDiagram({
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       overflow: 'visible',
     }}>
+      <style>{boxDropKeyframes}</style>
       {rotate && (
         <style>{`
           @keyframes ${animName} {
@@ -522,21 +528,19 @@ export default function PalletDiagram({
         {/* Pallet base */}
         <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
 
-        {/* Stacked boxes — 個別に上から落下（まばらに遅延） */}
+        {/* Stacked boxes — 3D空間内で個別に上から落下 */}
         {renderSlots.map((slot, i) => {
           if (i >= filled) return null;
           const boxTop = totalHeight - PALLET_H_PX - (slot.z - PALLET_H_PX) - slot.h;
-          // 各箱にまばらな落下遅延（0.05秒間隔 + ランダム風にずらす）
           const delay = 0.3 + i * 0.05;
           return (
-            <div key={i} className="anim-drop-in" style={{ animationDelay: `${delay}s` }}>
-              <Box3D
-                x={slot.x} y={slot.y}
-                w={slot.w} d={slot.d} h={slot.h}
-                topBase={boxTop}
-                palletDepth={pd}
-              />
-            </div>
+            <Box3D key={i}
+              x={slot.x} y={slot.y}
+              w={slot.w} d={slot.d} h={slot.h}
+              topBase={boxTop}
+              palletDepth={pd}
+              dropAnimation={`${dropAnimName}_${i} 0.4s cubic-bezier(0.22,1,0.36,1) ${delay}s both`}
+            />
           );
         })}
       </div>
