@@ -40,7 +40,14 @@ function SwipeCompleteRow({ children, onSwipe, onClick, style }: {
   }, [onSwipe]);
   return (
     <div style={{ overflow: 'hidden', position: 'relative' }}>
-      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', background: 'linear-gradient(90deg, #16a34a, #22c55e)', display: 'flex', alignItems: 'center', paddingLeft: 12, color: '#fff', fontSize: 11, fontWeight: 700 }}>✓ 完了</div>
+      <div style={{
+        position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%',
+        background: 'linear-gradient(90deg, #00ff88, #22ff66)',
+        display: 'flex', alignItems: 'center', paddingLeft: 12,
+        color: '#fff', fontSize: 12, fontWeight: 800,
+        textShadow: '0 0 10px rgba(0,255,136,0.8), 0 0 20px rgba(0,255,136,0.4)',
+        boxShadow: 'inset 0 0 20px rgba(0,255,136,0.3)',
+      }}>✓ 完了</div>
       <div ref={rowRef} style={{ ...style, position: 'relative', zIndex: 1 }}
         onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} onClick={onClick}
       >{children}</div>
