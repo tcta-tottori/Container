@@ -24,7 +24,7 @@ function useCountUp(target: number, key: string): number {
     keyRef.current = key;
     targetRef.current = target;
     setValue(0);
-    const startTime = performance.now() + 800; // 0.8秒待機
+    const startTime = performance.now() + 400; // 0.4秒待機（フェードイン直後）
     const duration = 1000; // 1秒でカウント
 
     const animate = (now: number) => {
@@ -354,25 +354,24 @@ export default function ItemDetailPanel({
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
 
-  // 品目切替検知 → フェードアウト→空白→フェードイン
+  // 品目切替検知 → フェードアウト→空白→フェードイン（高速化）
   useEffect(() => {
     if (prevItemIdRef.current !== item.id) {
       prevItemIdRef.current = item.id;
-      // フェードアウト(0.3s) → 空白(0.5s) → フェードイン
       setTransitionPhase('fadeout');
-      const t1 = setTimeout(() => setTransitionPhase('blank'), 300);
+      const t1 = setTimeout(() => setTransitionPhase('blank'), 200);
       const t2 = setTimeout(() => {
         setAnimKey(item.id);
         setTransitionPhase('fadein');
-      }, 800);
-      const t3 = setTimeout(() => setTransitionPhase('visible'), 1300);
+      }, 400);
+      const t3 = setTimeout(() => setTransitionPhase('visible'), 700);
       return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
   }, [item.id]);
 
-  // 上半分コンテンツの表示状態
+  // 上半分コンテンツの表示状態（品名・箱図・パレットのみ対象）
   const upperOpacity = transitionPhase === 'fadeout' ? 0 : transitionPhase === 'blank' ? 0 : 1;
-  const upperTransition = transitionPhase === 'fadeout' ? 'opacity 0.3s ease' : transitionPhase === 'fadein' ? 'opacity 0.5s ease' : 'none';
+  const upperTransition = transitionPhase === 'fadeout' ? 'opacity 0.2s ease' : transitionPhase === 'fadein' ? 'opacity 0.3s ease' : 'none';
   const showContent = transitionPhase !== 'blank';
 
   const handlePalletDoubleTap = useCallback(() => {
@@ -455,15 +454,7 @@ export default function ItemDetailPanel({
           `,
         }} />
 
-        {/* トランジション制御ラッパー（親のflex layoutを継承） */}
-        <div style={{
-          opacity: upperOpacity, transition: upperTransition,
-          display: showContent ? 'flex' : 'none',
-          flexDirection: 'column', gap: 4, flex: '1 1 0', minHeight: 0,
-          position: 'relative', zIndex: 1,
-        }}>
-
-        {/* 積載分布ゲージ + 種類数 + 進捗率（右上） */}
+        {/* 積載分布ゲージ + 種類数 + 進捗率（右上 — 常時表示） */}
         {allItems.length > 0 && (
           <div style={{
             position: 'absolute', top: 6, right: 10, zIndex: 5,
@@ -516,6 +507,14 @@ export default function ItemDetailPanel({
             </span>
           </div>
         )}
+
+        {/* トランジション制御ラッパー（品名・箱図・パレット・数量のみ対象） */}
+        <div style={{
+          opacity: upperOpacity, transition: upperTransition,
+          display: showContent ? 'flex' : 'none',
+          flexDirection: 'column', gap: 4, flex: '1 1 0', minHeight: 0,
+          position: 'relative', zIndex: 1,
+        }}>
 
         {/* 1行目: 種目バッジ + 色柄 */}
         <div className="detail-badges">
@@ -628,7 +627,7 @@ export default function ItemDetailPanel({
         </div>
 
         {/* 数量（PL / CT / pcs）— カウントアップアニメーション 1秒 */}
-        <div key={`stats-${animKey}`} className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
+        <div key={`stats-${animKey}`} className="detail-stats-free anim-slide-up" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
           <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
               color: accentColor,
@@ -661,7 +660,9 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 類似品 or 関連（統一エリア — 類似品優先、なければ関連を表示） */}
+        </div>{/* トランジション制御ラッパー閉じ */}
+
+        {/* 類似品 or 関連（常時表示 — トランジション対象外） */}
         <div style={{ flexShrink: 0, minHeight: 32 }}>
           {similarItems.length > 0 ? (
             <SimilarItemsMarquee item={item} similarItems={similarItems} />
@@ -676,7 +677,6 @@ export default function ItemDetailPanel({
             </div>
           ) : null}
         </div>
-        </div>{/* トランジション制御ラッパー閉じ */}
       </div>
 
       {/* === 下半分リスト === */}
