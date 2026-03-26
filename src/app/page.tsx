@@ -27,6 +27,65 @@ import * as XLSX from 'xlsx';
 
 type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
 
+/* ===== おしゃれな読込ポップアップ ===== */
+function LoadingOverlay({ message, progress }: { message: string; progress: number }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)',
+    }}>
+      <div style={{
+        background: 'linear-gradient(160deg, #14112a 0%, #1a1530 50%, #1e1828 100%)',
+        border: '1px solid rgba(107,82,212,0.2)',
+        borderRadius: 24, padding: '36px 44px', textAlign: 'center',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(107,82,212,0.1)',
+        width: '90%', maxWidth: 320,
+      }}>
+        {/* グラデーションスピナー */}
+        <div style={{ position: 'relative', width: 52, height: 52, margin: '0 auto 20px' }}>
+          <svg width="52" height="52" viewBox="0 0 52 52" style={{ animation: 'spin 1.2s linear infinite' }}>
+            <defs>
+              <linearGradient id="spinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#4a7af7" />
+                <stop offset="50%" stopColor="#9b45c9" />
+                <stop offset="100%" stopColor="#c0549a" />
+              </linearGradient>
+            </defs>
+            <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(107,82,212,0.15)" strokeWidth="4" />
+            <circle cx="26" cy="26" r="22" fill="none" stroke="url(#spinGrad)" strokeWidth="4"
+              strokeLinecap="round" strokeDasharray="100 40" />
+          </svg>
+          {/* 中央%表示 */}
+          <span style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.7)',
+            fontFamily: 'var(--font-mono)',
+          }}>{Math.round(progress)}</span>
+        </div>
+
+        {/* メッセージ */}
+        <p style={{ color: '#fff', fontSize: 13, fontWeight: 600, margin: '0 0 6px', lineHeight: 1.5 }}>
+          {message}
+        </p>
+
+        {/* プログレスバー */}
+        <div style={{
+          width: '100%', height: 6, borderRadius: 3, marginTop: 16,
+          background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+        }}>
+          <div style={{
+            height: '100%', borderRadius: 3,
+            background: 'linear-gradient(90deg, #4a7af7, #9b45c9, #c0549a)',
+            width: `${progress}%`,
+            transition: 'width 0.4s ease',
+          }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const {
     state,
@@ -64,6 +123,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0); // 0-100
   const [jkpShipments, setJkpShipments] = useState<JkpShipment[]>([]);
   const jkpUserLoadedRef = useRef(false);  // ユーザーが明示的にJKPを読み込んだか
 
@@ -183,20 +243,25 @@ export default function Home() {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('Excelファイルを読み込み中...');
+      setLoadingProgress(10);
       try {
         // 1. 作業ファイルをパース
         const result = await parseExcelFile(file);
         if (result.containers.length === 0) return;
+        setLoadingProgress(25);
 
-        // 2. GitHubから最新マスタを確実に取得
+        // 2. GitHubから最新マスタを確実に取得（Meas.等の最新データ反映）
         setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+        setLoadingProgress(35);
         const masterItems = await fetchMasterData();
         if (masterItems.length > 0) {
           loadMaster(masterItems);
         }
+        setLoadingProgress(60);
 
         // 3. マスタと紐付（気高コード＋新建高コード両方で検索）
         setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
+        setLoadingProgress(70);
         const allItems = result.containers.flatMap(c => c.items);
         const { linkedItems, linked, total } = linkItemsWithMaster(allItems, masterItems);
 
@@ -209,6 +274,7 @@ export default function Home() {
         }
 
         setLoadingMsg(`紐付完了: ${linked}/${total}件  データを表示中...`);
+        setLoadingProgress(90);
 
         // 5. データをロード（紐付済みの状態で表示）
         loadData(result.containers);
@@ -224,7 +290,7 @@ export default function Home() {
         // 表示完了まで少し待機
         await new Promise((r) => setTimeout(r, 200));
       } finally {
-        setLoadingMsg(null);
+        setLoadingMsg(null); setLoadingProgress(0);
       }
     },
     [loadData, loadMaster]
@@ -248,7 +314,7 @@ export default function Home() {
         setLoadingMsg(`AQSS読込完了: ${totalUpdated}件更新`);
         await new Promise((r) => setTimeout(r, 1000));
       } finally {
-        setLoadingMsg(null);
+        setLoadingMsg(null); setLoadingProgress(0);
       }
     },
     [state.items, updateItem]
@@ -288,7 +354,7 @@ export default function Home() {
 
         await new Promise((r) => setTimeout(r, 500));
       } finally {
-        setLoadingMsg(null);
+        setLoadingMsg(null); setLoadingProgress(0);
       }
     },
     [loadData, loadMaster]
@@ -336,7 +402,7 @@ export default function Home() {
         saveRecentFile(file, 1, masterItems.length, 'master');
         await new Promise((r) => setTimeout(r, 1500));
       } finally {
-        setLoadingMsg(null);
+        setLoadingMsg(null); setLoadingProgress(0);
       }
     },
     [loadMaster, state.items, updateItem]
@@ -423,7 +489,7 @@ export default function Home() {
         setLoadingMsg(`JKP読込エラー: ${e instanceof Error ? e.message : String(e)}`);
         await new Promise((r) => setTimeout(r, 3000));
       } finally {
-        setLoadingMsg(null);
+        setLoadingMsg(null); setLoadingProgress(0);
       }
     },
     [loadData, loadMaster]
@@ -651,32 +717,7 @@ export default function Home() {
     return (
       <>
         <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} />
-        {loadingMsg && (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 300,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-          }}>
-            <div style={{
-              background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 20, padding: '32px 40px', textAlign: 'center',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-            }}>
-              <div style={{
-                width: 40, height: 40, margin: '0 auto 16px',
-                border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6',
-                borderRadius: '50%', animation: 'spin 1s linear infinite',
-              }} />
-              <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>
-                {loadingMsg}
-              </p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>
-                しばらくお待ちください
-              </p>
-            </div>
-          </div>
-        )}
+        {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} />}
       </>
     );
   }
@@ -734,32 +775,7 @@ export default function Home() {
     <>
       {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
-      {loadingMsg && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 300,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-        }}>
-          <div style={{
-            background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 20, padding: '32px 40px', textAlign: 'center',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-          }}>
-            <div style={{
-              width: 40, height: 40, margin: '0 auto 16px',
-              border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6',
-              borderRadius: '50%', animation: 'spin 1s linear infinite',
-            }} />
-            <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>
-              {loadingMsg}
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>
-              しばらくお待ちください
-            </p>
-          </div>
-        </div>
-      )}
+      {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} />}
 
       {/* メニューオーバーレイ */}
       {menuOpen && (
@@ -961,7 +977,7 @@ export default function Home() {
                     }
                     await new Promise((r) => setTimeout(r, 1500));
                   } finally {
-                    setLoadingMsg(null);
+                    setLoadingMsg(null); setLoadingProgress(0);
                   }
                 }}
               />
