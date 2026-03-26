@@ -166,7 +166,7 @@ function SimilarItemsMarquee({ item, similarItems }: {
         fontSize: 13, fontWeight: 500, color: '#fbbf24', whiteSpace: 'nowrap', flexShrink: 0,
         display: 'flex', alignItems: 'center', gap: 4,
       }}>
-        <span style={{ fontSize: 14 }}>&#x26A0;&#xFE0F;</span>類似品:
+        類似品:
       </span>
       <div ref={outerRef} style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
         <div className={overflow ? 'marquee-scroll' : ''} style={{ display: 'inline-flex', alignItems: 'center' }}>
@@ -380,17 +380,18 @@ export default function ItemDetailPanel({
           `,
         }} />
 
-        {/* 積載分布ゲージ（右上固定） */}
+        {/* 積載分布ゲージ + 種類数 + 進捗率（右上） */}
         {allItems.length > 0 && (
           <div style={{
-            position: 'absolute', top: 8, right: 10, zIndex: 5,
-            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3,
+            position: 'absolute', top: 6, right: 10, zIndex: 5,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0,
           }}>
-            {/* 棒ゲージ: 種類別の積み割合 */}
+            {/* 棒ゲージ: グラデーション背景 + 種類別セグメント */}
             <div style={{
-              display: 'flex', width: 100, height: 10, borderRadius: 5,
-              overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)',
-              background: 'rgba(0,0,0,0.3)',
+              display: 'flex', width: 110, height: 8, borderRadius: 4,
+              overflow: 'hidden',
+              background: 'rgba(255,255,255,0.06)',
+              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3), 0 0 8px rgba(107,82,212,0.1)',
             }}>
               {Array.from(typeCounts.entries()).map(([type, count]) => {
                 const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
@@ -400,23 +401,40 @@ export default function ItemDetailPanel({
                 return pct > 0 ? (
                   <div key={type} style={{
                     width: `${pct}%`, height: '100%',
-                    background: tc.accent,
-                    transition: 'width 0.3s ease',
+                    background: `linear-gradient(180deg, ${tc.accent}dd, ${tc.accent}88)`,
+                    transition: 'width 0.5s ease',
+                    borderRight: '0.5px solid rgba(0,0,0,0.2)',
                   }} />
                 ) : null;
               })}
             </div>
-            {/* 進捗率 */}
+            {/* 種類+数（ゲージの下、1文字分スペース空け） */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6, marginTop: 6,
+              fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600,
+            }}>
+              {Array.from(typeCounts.entries()).map(([type, count]) => {
+                const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
+                return (
+                  <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
+                    <span style={{ color: 'rgba(255,255,255,0.7)' }}>{count}</span>
+                  </span>
+                );
+              })}
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9 }}>/ {allItems.length}品</span>
+            </div>
+            {/* 進捗率（さらに下） */}
             <span style={{
-              fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
-              color: 'rgba(255,255,255,0.6)', letterSpacing: 0.3,
+              fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700, marginTop: 3,
+              color: 'rgba(255,255,255,0.45)', letterSpacing: 0.3,
             }}>
               {Math.round((completedIds.size / allItems.length) * 100)}%
             </span>
           </div>
         )}
 
-        {/* 1行目: 種目バッジ + 色柄 + 品目数 */}
+        {/* 1行目: 種目バッジ + 色柄 */}
         <div className="detail-badges">
           <span className="type-badge" style={{
             backgroundColor: `${accentColor}40`, color: '#fff',
@@ -440,21 +458,6 @@ export default function ItemDetailPanel({
               {itemColor}
             </span>
           )}
-          <span style={{
-            marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8,
-            fontSize: 11, color: 'rgba(255,255,255,0.7)', fontFamily: 'var(--font-mono)', fontWeight: 600,
-          }}>
-            {Array.from(typeCounts.entries()).map(([type, count]) => {
-              const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
-              return (
-                <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
-                  <span style={{ color: '#fff' }}>{count}</span>
-                </span>
-              );
-            })}
-            <span style={{ color: 'rgba(255,255,255,0.5)' }}>/ {allItems.length}品</span>
-          </span>
         </div>
 
         {/* 品名（下から出現 1秒） */}
