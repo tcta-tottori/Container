@@ -162,6 +162,18 @@ body {
   100% { transform: scale(1.5); opacity: 0; }
 }
 
+/* ===== Drop zone layout (responsive) ===== */
+.drop-zone-root { max-width: 400px; margin: 0 auto; }
+.drop-zone-columns { display: flex; flex-direction: column; }
+.drop-zone-left { display: flex; flex-direction: column; align-items: center; }
+.drop-zone-right { display: flex; flex-direction: column; width: 100%; }
+@media (orientation: landscape) {
+  .drop-zone-root { max-width: 800px !important; }
+  .drop-zone-columns { flex-direction: row; gap: 32px; align-items: center; }
+  .drop-zone-left { flex: 0 0 40%; justify-content: center; min-height: 0; }
+  .drop-zone-right { flex: 1; min-height: 0; max-height: 90vh; overflow-y: auto; }
+}
+
 /* ===== Drop zone ===== */
 .drop-zone {
   border: 2px dashed var(--border-accent); border-radius: 20px;

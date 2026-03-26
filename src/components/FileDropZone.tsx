@@ -243,10 +243,13 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
 
   return (
     <div className="flex items-center justify-center h-screen w-screen"
-      style={{ background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)' }}>
-      <div style={{ width: '100%', maxWidth: 400, padding: '0 20px' }}>
+      style={{ background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)', overflow: 'auto' }}>
+      <div className="drop-zone-root" style={{ width: '100%', maxWidth: 800, padding: '0 20px' }}>
 
-        {/* バージョン + 更新日時 */}
+        {/* 横画面: 2カラム構成 */}
+        <div className="drop-zone-columns">
+          {/* 左カラム: ロゴ+タイトル+バージョン */}
+          <div className="drop-zone-left">
         <div style={{ textAlign: 'center', marginBottom: 18 }}>
           <button onClick={() => setShowChangelog(true)}
             className="ver-badge-shimmer"
@@ -354,6 +357,10 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             コンテナ荷降ろし管理
           </p>
         </div>
+          </div>{/* 左カラム閉じ */}
+
+          {/* 右カラム: ドロップゾーン+マスタ情報+最近のファイル */}
+          <div className="drop-zone-right">
 
         {/* ドロップゾーン */}
         <div
@@ -502,6 +509,8 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             </div>
           </div>
         )}
+          </div>{/* 右カラム閉じ */}
+        </div>{/* columns閉じ */}
       </div>
     </div>
   );
