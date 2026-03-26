@@ -437,20 +437,28 @@ export function linkItemsWithMaster(
       measByName.set(m.itemName, { measurements: m.measurements, cbm: m.cbm, grossWeight: m.grossWeight });
     }
   }
+  // 紐付済みのアイテムからもMeas.を収集（紐付でコピーされたもの）
+  for (const it of linkedItems) {
+    if (it.measurements && it.itemName && !measByName.has(it.itemName)) {
+      measByName.set(it.itemName, { measurements: it.measurements, cbm: it.cbm, grossWeight: it.grossWeight });
+    }
+  }
 
   for (let i = 0; i < linkedItems.length; i++) {
     const it = linkedItems[i];
     if (it.measurements) continue; // 既にある
 
-    // 品名の基幹部分を抽出して類似検索（色記号やサフィックスを除いた品名で検索）
     const baseName = extractBaseName(it.itemName);
+    const sizeCode = extractSizeCode(it.itemName); // "100", "180" 等
     if (!baseName) continue;
 
-    // 完全一致 → 前方一致 → 基幹一致の順で検索
     let found: { measurements: string; cbm?: number; grossWeight?: number } | undefined;
+
+    // 1. 品名完全一致
     found = measByName.get(it.itemName);
+
+    // 2. 基幹品名一致（括弧・色コード除去）
     if (!found) {
-      // 基幹品名が一致するものを探す
       for (const [name, data] of Array.from(measByName.entries())) {
         if (extractBaseName(name) === baseName) {
           found = data;
@@ -458,6 +466,17 @@ export function linkItemsWithMaster(
         }
       }
     }
+
+    // 3. プレフィックス+サイズ一致（JRI-*100*, JPV-*180* 等、最も広い検索）
+    if (!found && sizeCode) {
+      for (const [name, data] of Array.from(measByName.entries())) {
+        if (name.includes(sizeCode) && extractPrefix(name) === extractPrefix(it.itemName)) {
+          found = data;
+          break;
+        }
+      }
+    }
+
     if (found) {
       linkedItems[i] = {
         ...it,
@@ -477,12 +496,24 @@ export function linkItemsWithMaster(
 }
 
 /**
- * 品名から基幹名を抽出（色記号やサフィックスを除去）
+ * 品名から基幹名を抽出（括弧・色コード除去）
  * 例: "JRI-H100(KKB)" → "JRI-H100", "JPV-X180(K)" → "JPV-X180"
+ *     "JPI-S100(WS)ポリカバー" → "JPI-S100ポリカバー"
  */
 function extractBaseName(name: string): string {
-  // 括弧とその中身を除去、末尾の色コードや空白を除去
-  return name.replace(/\(.*?\)/g, '').replace(/[A-Z]{1,3}$/, '').replace(/[\s\-]+$/, '').trim();
+  return name.replace(/\([^)]*\)/g, '').replace(/[\s]+$/g, '').trim();
+}
+
+/** サイズコード抽出: "100", "180", "060" 等 */
+function extractSizeCode(name: string): string {
+  const m = name.match(/(180|100|060|06)/);
+  return m ? m[1] : '';
+}
+
+/** プレフィックス抽出: "JRI-", "JPV-", "JPI-" 等 */
+function extractPrefix(name: string): string {
+  const m = name.match(/^([A-Z]{2,4}[\-+]?)/);
+  return m ? m[1] : '';
 }
 
 /**
