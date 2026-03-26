@@ -123,7 +123,7 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"
       style={{ display: 'block', filter: 'drop-shadow(0 0 3px rgba(138,180,255,0.6)) drop-shadow(0 0 6px rgba(138,180,255,0.3))' }}>
-      <g transform="translate(32,30)" stroke="#fff" strokeWidth="2.8" strokeLinejoin="round" fill="none">
+      <g transform="translate(32,30)" stroke="#fff" strokeWidth="3.8" strokeLinejoin="round" fill="none">
         <polygon points={`0,${-h*2} ${s},${-h} 0,0 ${-s},${-h}`}/>
         <polygon points={`${-s},${-h} 0,0 0,${h*2} ${-s},${h}`}/>
         <polygon points={`${s},${-h} 0,0 0,${h*2} ${s},${h}`}/>
@@ -306,8 +306,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 80, height: 80, borderRadius: 20,
-            background: 'radial-gradient(circle at 15% 25%, #3b6ef6 0%, transparent 50%), radial-gradient(circle at 75% 20%, #7c48d0 0%, transparent 45%), radial-gradient(circle at 60% 80%, #e87420 0%, transparent 50%), radial-gradient(circle at 30% 70%, #3b6ef6 0%, transparent 40%), radial-gradient(circle at 85% 65%, #9b30ff 0%, transparent 45%)',
-            backgroundColor: '#0e0b1a',
+            background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
             animation: 'logo-hue-shift 12s ease-in-out infinite',
             marginBottom: 12,
             boxShadow: '0 8px 32px rgba(59,130,246,0.3), 0 0 20px rgba(139,92,246,0.25), 0 0 40px rgba(249,115,22,0.15)',
