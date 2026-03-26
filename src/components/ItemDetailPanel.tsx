@@ -558,7 +558,7 @@ export default function ItemDetailPanel({
         }}>
 
         {/* 品名（下から出現）— 右側の種類数表示と重ならないようwidth制限 */}
-        <div key={`name-${animKey}`} className="anim-slide-up" style={{ position: 'relative', zIndex: 3, maxWidth: 'calc(100% - 180px)' }}>
+        <div key={`name-${animKey}`} className="anim-slide-up" style={{ position: 'relative', zIndex: 3, maxWidth: 'calc(100% - 130px)' }}>
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
               color: nabeColor || '#f0f0f0',
