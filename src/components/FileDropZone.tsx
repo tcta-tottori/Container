@@ -48,7 +48,7 @@ interface FileDropZoneProps {
 }
 
 const APP_VERSION = '1.8';
-const APP_UPDATED = '2026.3.26 11:10';
+const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
   { ver: '1.8', date: '2026-03-26', changes: [
     { icon: '🔧', text: '管理ページフィルター機能修正（初回クリックで選択表示）' },
