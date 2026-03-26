@@ -225,25 +225,27 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
+  const gradientStyle = 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)';
+
   return (
     <div className="flex items-center justify-center h-screen w-screen"
-      style={{ background: 'linear-gradient(135deg, #0f0c29 0%, #1a1a2e 40%, #16213e 100%)' }}>
-      <div style={{ width: '100%', maxWidth: 420, padding: '0 20px' }}>
+      style={{ background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)' }}>
+      <div style={{ width: '100%', maxWidth: 400, padding: '0 20px' }}>
 
         {/* バージョン + 更新日時 */}
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ textAlign: 'center', marginBottom: 18 }}>
           <button onClick={() => setShowChangelog(true)}
             style={{
-              background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.2))',
-              border: '1px solid rgba(139,92,246,0.4)',
+              background: 'linear-gradient(135deg, rgba(74,122,247,0.15), rgba(155,69,201,0.15))',
+              border: '1px solid rgba(107,82,212,0.4)',
               borderRadius: 20, padding: '5px 18px', cursor: 'pointer',
               color: '#a78bfa', fontSize: 12, fontFamily: 'var(--font-mono)',
               fontWeight: 700, letterSpacing: 0.8,
-              boxShadow: '0 0 12px rgba(139,92,246,0.15)',
+              boxShadow: '0 0 16px rgba(107,82,212,0.2)',
             }}>
             Ver {APP_VERSION}
           </button>
-          <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 9, marginTop: 6, fontFamily: 'var(--font-mono)', letterSpacing: 0.5 }}>
+          <p style={{ color: 'rgba(255,255,255,0.18)', fontSize: 9, marginTop: 5, fontFamily: 'var(--font-mono)', letterSpacing: 0.5 }}>
             Updated: {APP_UPDATED}
           </p>
         </div>
@@ -311,62 +313,61 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
         )}
 
         {/* タイトル */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 80, height: 80, borderRadius: 22,
-            background: 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)',
+            width: 76, height: 76, borderRadius: 22,
+            background: gradientStyle,
             animation: 'logo-hue-shift 12s ease-in-out infinite',
-            marginBottom: 12,
-            boxShadow: '0 8px 32px rgba(75,122,247,0.3), 0 0 20px rgba(107,82,212,0.25), 0 0 40px rgba(155,69,201,0.15)',
+            marginBottom: 14,
+            boxShadow: '0 8px 32px rgba(75,122,247,0.25), 0 0 20px rgba(107,82,212,0.2), 0 0 48px rgba(155,69,201,0.12)',
           }}>
-            <CnsLogo size={64} />
+            <CnsLogo size={60} />
           </div>
           <h1 style={{
-            fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif',
-            background: 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)',
+            fontSize: 21, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif',
+            background: gradientStyle,
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
             animation: 'logo-hue-shift 12s ease-in-out infinite',
           }}>
             Container Navigation System
           </h1>
-          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, marginTop: 4 }}>
+          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, marginTop: 4, letterSpacing: 1 }}>
             コンテナ荷降ろし管理
           </p>
         </div>
 
-        {/* 統合ドロップゾーン */}
+        {/* ドロップゾーン */}
         <div
           onDrop={onDrop}
           onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
           onDragLeave={() => setIsDragging(false)}
           onClick={() => inputRef.current?.click()}
           style={{
-            border: `2px dashed ${isDragging ? '#3b82f6' : 'rgba(255,255,255,0.15)'}`,
-            borderRadius: 16, padding: '24px 20px', textAlign: 'center', cursor: 'pointer',
-            background: isDragging ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.03)',
+            border: `2px dashed ${isDragging ? 'rgba(107,82,212,0.6)' : 'rgba(255,255,255,0.1)'}`,
+            borderRadius: 16, padding: '20px 16px', textAlign: 'center', cursor: 'pointer',
+            background: isDragging ? 'rgba(107,82,212,0.06)' : 'rgba(255,255,255,0.02)',
             transition: 'all 0.3s ease',
           }}
         >
           <div style={{
-            width: 44, height: 44, margin: '0 auto 10px', borderRadius: 12,
-            background: 'rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 40, height: 40, margin: '0 auto 8px', borderRadius: 10,
+            background: 'rgba(107,82,212,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9b7ae8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/>
               <line x1="9" y1="15" x2="12" y2="12"/><line x1="15" y1="15" x2="12" y2="12"/>
             </svg>
           </div>
-          <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 6px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>
             Excelファイルをドラッグ＆ドロップ
           </p>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: '0 0 8px' }}>
+          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, margin: '0 0 10px' }}>
             またはタップして選択（.xlsx / .xls）
           </p>
-          {/* 対応ファイル説明 */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 5, flexWrap: 'wrap' }}>
             {[
               { label: 'コンテナ日程', color: '#60a5fa' },
               { label: '品目一覧', color: '#34d399' },
@@ -375,38 +376,29 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               { label: '气高编号', color: '#f472b6' },
             ].map(({ label, color }) => (
               <span key={label} style={{
-                fontSize: 9, color: `${color}cc`, background: `${color}15`,
-                padding: '2px 6px', borderRadius: 4, border: `1px solid ${color}25`,
+                fontSize: 9, color, background: `${color}12`,
+                padding: '2px 8px', borderRadius: 10, border: `1px solid ${color}20`,
+                fontWeight: 500,
               }}>{label}</span>
             ))}
           </div>
-
-          {/* 判別結果表示 */}
           {classifiedFiles.length > 0 && (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {classifiedFiles.map((cf, i) => {
-                const roleIcons: Record<FileRole, string> = {
-                  container: '📋', master: '📊', ketaka: '🔗', container_schedule: '📅',
-                  aqss04l: '📄', aqss05l: '📄', jkp: '🍲', unknown: '❓',
-                };
-                return (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
-                    padding: '3px 8px', borderRadius: 6,
-                    background: cf.role === 'unknown' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.08)',
-                    border: cf.role === 'unknown' ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(34,197,94,0.15)',
-                  }}>
-                    <span>{roleIcons[cf.role]}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>{cf.label}:</span>
-                    <span style={{ color: 'rgba(255,255,255,0.8)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {cf.file.name}
-                    </span>
-                    <span style={{ color: cf.role === 'unknown' ? '#ef4444' : '#22c55e', fontSize: 12 }}>
-                      {cf.role === 'unknown' ? '⚠' : '✓'}
-                    </span>
-                  </div>
-                );
-              })}
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {classifiedFiles.map((cf, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 6, fontSize: 10,
+                  padding: '4px 8px', borderRadius: 8,
+                  background: cf.role === 'unknown' ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.06)',
+                }}>
+                  <span style={{ color: cf.role === 'unknown' ? '#ef4444' : '#22c55e', fontSize: 11 }}>
+                    {cf.role === 'unknown' ? '⚠' : '✓'}
+                  </span>
+                  <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>{cf.label}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.7)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {cf.file.name}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
           <input ref={inputRef} type="file" accept=".xlsx,.xls" multiple
@@ -417,80 +409,76 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
         {/* マスタファイル最終更新情報 */}
         {masterLastUpdate && (
           <div style={{
-            marginTop: 16, padding: '10px 14px', borderRadius: 12,
-            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+            marginTop: 12, padding: '8px 12px', borderRadius: 10,
+            background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.12)',
+            display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>CNS_品目一覧_全集約版.xlsx</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" style={{ flexShrink: 0 }}>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginBottom: 1 }}>
+                CNS_品目一覧_全集約版.xlsx
+              </div>
+              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 更新: {(() => {
                   const d = new Date(masterLastUpdate.date);
                   return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
                 })()}
-              </span>
-              <span style={{
-                fontSize: 9, color: 'rgba(255,255,255,0.25)', overflow: 'hidden',
-                textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-              }}>
+                {' · '}
                 {masterLastUpdate.message.split('\n')[0]}
-              </span>
+              </div>
             </div>
           </div>
         )}
 
-        {/* 最近のファイル（スタック式横スクロール・最大5件） */}
+        {/* 最近のファイル */}
         {recentFiles.length > 0 && (
-          <div style={{ marginTop: 24 }}>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 4 }}>
+          <div style={{ marginTop: 16 }}>
+            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 6, paddingLeft: 2 }}>
               最近のファイル
             </p>
-            <div style={{
-              display: 'flex', gap: 8, overflowX: 'auto', overflowY: 'hidden',
-              paddingBottom: 8, scrollSnapType: 'x mandatory',
-              WebkitOverflowScrolling: 'touch',
-              msOverflowStyle: 'none', scrollbarWidth: 'none',
-            }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {recentFiles.map((entry) => {
-                const ft: FileType = entry.fileType || (classifyFile(entry.name).role === 'jkp' ? 'jkp' : classifyFile(entry.name).role.startsWith('aqss') ? 'aqss' : 'container');
-                const typeLabel = ft === 'jkp' ? 'JKP' : ft === 'aqss' ? 'AQSS' : 'CN';
-                const typeColor = ft === 'jkp' ? '#f97316' : ft === 'aqss' ? '#8b5cf6' : '#3b82f6';
+                const ft: FileType = entry.fileType || (classifyFile(entry.name).role === 'jkp' ? 'jkp' : classifyFile(entry.name).role === 'master' ? 'master' : classifyFile(entry.name).role.startsWith('aqss') ? 'aqss' : 'container');
+                const typeLabel = ft === 'jkp' ? 'JKP' : ft === 'aqss' ? 'AQSS' : ft === 'master' ? 'マスタ' : 'CN';
+                const typeColor = ft === 'jkp' ? '#f97316' : ft === 'aqss' ? '#8b5cf6' : ft === 'master' ? '#34d399' : '#60a5fa';
                 const infoText = ft === 'jkp'
-                  ? `${entry.containerCount}品目`
+                  ? `${entry.itemCount}品目`
+                  : ft === 'master'
+                  ? `${entry.itemCount}品目`
                   : `${entry.containerCount}CN · ${entry.itemCount}品目`;
                 return (
                   <button key={entry.name + entry.date} onClick={() => loadRecent(entry)}
                     style={{
-                      minWidth: 150, maxWidth: 200, flexShrink: 0,
+                      display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 12px', borderRadius: 12,
-                      border: `1px solid ${typeColor}30`,
-                      background: `linear-gradient(135deg, ${typeColor}10, rgba(255,255,255,0.03))`,
-                      cursor: 'pointer', textAlign: 'left',
-                      scrollSnapAlign: 'start',
-                      display: 'flex', flexDirection: 'column', gap: 6,
+                      border: `1px solid rgba(255,255,255,0.06)`,
+                      background: 'rgba(255,255,255,0.02)',
+                      cursor: 'pointer', textAlign: 'left', width: '100%',
+                      transition: 'background 0.15s',
                     }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{
-                        fontSize: 8, fontWeight: 800, color: typeColor,
-                        background: `${typeColor}20`, padding: '2px 6px',
-                        borderRadius: 4, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
-                      }}>{typeLabel}</span>
-                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)' }}>
-                        {fmtDate(entry.date)}
-                      </span>
+                    <span style={{
+                      fontSize: 8, fontWeight: 800, color: typeColor,
+                      background: `${typeColor}18`, padding: '3px 7px',
+                      borderRadius: 6, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
+                      flexShrink: 0, minWidth: 32, textAlign: 'center',
+                    }}>{typeLabel}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: 500, margin: 0,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{entry.name}</p>
+                      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, margin: '2px 0 0' }}>
+                        {infoText}
+                      </p>
                     </div>
-                    <p style={{
-                      color: '#fff', fontSize: 12, fontWeight: 500, margin: 0,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {entry.name}
-                    </p>
-                    <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, margin: 0 }}>
-                      {infoText}
-                    </p>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                      {fmtDate(entry.date)}
+                    </span>
                   </button>
                 );
               })}
