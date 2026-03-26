@@ -340,20 +340,19 @@ function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: num
     return allSlots.slice(0, fraction);
   }
 
-  // 端数が半分超→普通に下段満杯+最上段に四隅積み
-  // 端数が半分以下→最上段の箱数を増やすため、下段から1個ずつ減らす
-  let topCount = remainder;
+  // 端数が少なすぎる場合(perLayerの半分以下)、満杯段を1段減らし
+  // 最上2段に分散させる（例: 19個=2段満杯(12)+1段満杯(6)+最上段1個 → 2段満杯(12)+上2段に3-4個ずつ）
   let belowFullLayers = fullLayers;
+  let topLayers: number[] = [remainder]; // 最上段の各段の箱数
 
-  // 端数が少なすぎる場合(perLayerの半分以下)、1段減らして分散
-  if (remainder <= Math.floor(perLayer / 2) && belowFullLayers > 0) {
+  if (remainder > 0 && remainder <= Math.floor(perLayer / 2) && belowFullLayers > 0) {
+    // 1段減らして2段に分散
     belowFullLayers -= 1;
-    topCount = fraction - belowFullLayers * perLayer; // 例: 19-2*6=7 → 最上段7個(>6なので2段に)
-    // topCountがperLayerを超える場合は2段に分ける
-    if (topCount > perLayer) {
-      belowFullLayers += 1;
-      topCount = fraction - belowFullLayers * perLayer;
-    }
+    const distributed = fraction - belowFullLayers * perLayer;
+    // 2段に均等分配: 下段を多めに
+    const upperCount = Math.floor(distributed / 2);
+    const lowerCount = distributed - upperCount;
+    topLayers = [lowerCount, upperCount]; // 下段が多い, 上段が少ない
   }
 
   const result: BoxSlot[] = [];
@@ -363,15 +362,24 @@ function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: num
     result.push(allSlots[i]);
   }
 
-  // 最上段: 四隅積み（中央空け）
-  if (topCount > 0) {
-    const topLayerStart = belowFullLayers * perLayer;
-    const topLayerSlots = allSlots.slice(topLayerStart, topLayerStart + perLayer);
+  // 端数段（1段または2段）: 四隅積み（中央空け）
+  for (let tl = 0; tl < topLayers.length; tl++) {
+    const count = topLayers[tl];
+    if (count <= 0) continue;
+    const layerIdx = belowFullLayers + tl;
+    const layerStart = layerIdx * perLayer;
+    const layerSlots = allSlots.slice(layerStart, layerStart + perLayer);
 
-    if (topLayerSlots.length > 0) {
-      const sorted = [...topLayerSlots].sort((a, b) => cornerScore(a, topLayerSlots) - cornerScore(b, topLayerSlots));
-      for (let i = 0; i < Math.min(topCount, sorted.length); i++) {
-        result.push(sorted[i]);
+    if (layerSlots.length > 0) {
+      if (count >= perLayer) {
+        // 満杯
+        for (const s of layerSlots) result.push(s);
+      } else {
+        // 四隅→辺→中央の順に配置
+        const sorted = [...layerSlots].sort((a, b) => cornerScore(a, layerSlots) - cornerScore(b, layerSlots));
+        for (let i = 0; i < Math.min(count, sorted.length); i++) {
+          result.push(sorted[i]);
+        }
       }
     }
   }
