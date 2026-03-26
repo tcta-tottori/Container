@@ -611,7 +611,12 @@ export default function ItemDetailPanel({
               </div>
             )}
             {inspectionDeducted > 0 && (
-              <div key={`fr-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
+              <div key={`fr-${animKey}`} style={{
+                flex: item.palletCount > 0 ? '0 0 35%' : 1,
+                height: item.palletCount > 0 ? '75%' : '100%',
+                minWidth: 0, cursor: 'pointer',
+                alignSelf: 'flex-start',
+              }}
                 onClick={(e) => { e.stopPropagation(); setFullscreenPallet('fraction'); }}>
                 <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} />
               </div>
@@ -735,6 +740,8 @@ export default function ItemDetailPanel({
               </SwipeRow>
             );
           })}
+          {/* リスト下部余白（最下行が見えるように） */}
+          <div style={{ height: 60, flexShrink: 0 }} />
         </div>
       </div>
 

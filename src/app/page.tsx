@@ -938,7 +938,7 @@ export default function Home() {
                 )}
               </div>
               <div className="list-panel-side">
-                <ItemListPanel items={state.items} currentIdx={state.currentItemIdx} onSelect={handleSelectItem} />
+                <ItemListPanel items={state.items} currentIdx={state.currentItemIdx} onSelect={handleSelectItem} onComplete={completeItem} />
               </div>
             </>
           )}
