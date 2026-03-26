@@ -24,8 +24,8 @@ function useCountUp(target: number, key: string): number {
     keyRef.current = key;
     targetRef.current = target;
     setValue(0);
-    const startTime = performance.now() + 1500; // 1.5秒待機（フェードイン完了まで0表示）
-    const duration = 2000; // 2秒でカウント
+    const startTime = performance.now() + 800; // 0.8秒待機
+    const duration = 1000; // 1秒でカウント
 
     const animate = (now: number) => {
       if (now < startTime) {
@@ -455,8 +455,13 @@ export default function ItemDetailPanel({
           `,
         }} />
 
-        {/* トランジション制御ラッパー */}
-        <div style={{ opacity: upperOpacity, transition: upperTransition, display: showContent ? undefined : 'none' }}>
+        {/* トランジション制御ラッパー（親のflex layoutを継承） */}
+        <div style={{
+          opacity: upperOpacity, transition: upperTransition,
+          display: showContent ? 'flex' : 'none',
+          flexDirection: 'column', gap: 4, flex: '1 1 0', minHeight: 0,
+          position: 'relative', zIndex: 1,
+        }}>
 
         {/* 積載分布ゲージ + 種類数 + 進捗率（右上） */}
         {allItems.length > 0 && (
