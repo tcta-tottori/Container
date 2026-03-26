@@ -305,17 +305,17 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 80, height: 80, borderRadius: 20,
-            background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
+            width: 80, height: 80, borderRadius: 22,
+            background: 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)',
             animation: 'logo-hue-shift 12s ease-in-out infinite',
             marginBottom: 12,
-            boxShadow: '0 8px 32px rgba(59,130,246,0.3), 0 0 20px rgba(139,92,246,0.25), 0 0 40px rgba(249,115,22,0.15)',
+            boxShadow: '0 8px 32px rgba(75,122,247,0.3), 0 0 20px rgba(107,82,212,0.25), 0 0 40px rgba(155,69,201,0.15)',
           }}>
             <CnsLogo size={64} />
           </div>
           <h1 style={{
             fontSize: 22, fontWeight: 800, margin: 0, letterSpacing: '-0.5px', fontFamily: 'Inter, sans-serif',
-            background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
+            background: 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
             animation: 'logo-hue-shift 12s ease-in-out infinite',

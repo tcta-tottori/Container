@@ -9,14 +9,14 @@ export default function AppleIcon() {
     (
       <div style={{
         width: 180, height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
-        borderRadius: 32,
+        background: 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)',
+        borderRadius: 38,
       }}>
-        <svg width="120" height="120" viewBox="0 0 260 260" fill="none">
+        <svg width="110" height="110" viewBox="0 0 260 260" fill="none">
           <g transform="translate(130,130)">
-            <polygon points="0,-100 110,-50 0,0 -110,-50" stroke="white" strokeWidth="22" strokeLinejoin="round" fill="none"/>
-            <polygon points="-110,-50 0,0 0,100 -110,50" stroke="white" strokeWidth="22" strokeLinejoin="round" fill="none"/>
-            <polygon points="110,-50 0,0 0,100 110,50" stroke="white" strokeWidth="22" strokeLinejoin="round" fill="none"/>
+            <polygon points="0,-95 105,-47 0,0 -105,-47" stroke="white" strokeWidth="20" strokeLinejoin="round" fill="none"/>
+            <polygon points="-105,-47 0,0 0,95 -105,47" stroke="white" strokeWidth="20" strokeLinejoin="round" fill="none"/>
+            <polygon points="105,-47 0,0 0,95 105,47" stroke="white" strokeWidth="20" strokeLinejoin="round" fill="none"/>
           </g>
         </svg>
       </div>
