@@ -757,15 +757,13 @@ export default function ItemEditPage({
                   ref={filterDropdownRef}
                   onClick={(e) => e.stopPropagation()}
                   style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: col.align === 'right' ? 'auto' : 0,
-                    right: col.align === 'right' ? 0 : 'auto',
-                    marginTop: 4,
-                    zIndex: 50,
+                    position: 'fixed',
+                    top: 'auto', bottom: 0, left: 0, right: 0,
+                    borderRadius: '16px 16px 0 0',
+                    maxHeight: '60vh',
+                    zIndex: 200,
                     background: '#252a40',
                     border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 10,
                     minWidth: 180,
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                     textTransform: 'none' as const,
