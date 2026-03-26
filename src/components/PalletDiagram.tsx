@@ -117,11 +117,14 @@ function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: n
 }
 
 /* ===== CSS 3D Cardboard Box (properly positioned in 3D space) ===== */
-function Box3D({ x, y, w, d, h, topBase, palletDepth, dropAnim }: {
+function Box3D({ x, y, w, d, h, topBase, palletDepth, delaySec }: {
   x: number; y: number; w: number; d: number; h: number;
-  topBase: number; palletDepth: number; dropAnim?: string;
+  topBase: number; palletDepth: number; delaySec?: number;
 }) {
   const zOffset = palletDepth / 2 - y - d / 2;
+
+  // アニメーション: opacityとtopをtransitionで制御（transformに干渉しない）
+  const hasAnim = delaySec !== undefined && delaySec >= 0;
 
   return (
     <div style={{
@@ -129,7 +132,10 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, dropAnim }: {
       width: w, height: h,
       transformStyle: 'preserve-3d',
       transform: `translateZ(${zOffset}px)`,
-      animation: dropAnim || undefined,
+      ...(hasAnim ? {
+        opacity: 0,
+        animation: `boxAppear 0.4s ease ${delaySec}s forwards`,
+      } : {}),
     }}>
       {/* Front */}
       <div style={{
@@ -492,14 +498,13 @@ export default function PalletDiagram({
 
   const uid = `pl${Math.round(bwCm)}${Math.round(bdCm)}${filled}`;
   const animName = `spinPl${uid}`;
-  const dropAnimName = `boxDrop${uid}`;
   const rotate = isFraction;
 
-  // 箱の落下アニメーション: opacity + margin-topで落下表現（transformを上書きしない）
+  // 箱の出現アニメーション: opacityのみ（transformに一切干渉しない）
   const boxDropCss = `
-    @keyframes ${dropAnimName} {
-      0% { opacity: 0; margin-top: -30px; }
-      100% { opacity: 1; margin-top: 0px; }
+    @keyframes boxAppear {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
   `;
 
@@ -530,18 +535,17 @@ export default function PalletDiagram({
         {/* Pallet base */}
         <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
 
-        {/* Stacked boxes — 3D空間を維持しつつ個別に上から落下 */}
+        {/* Stacked boxes — 3D空間を維持しつつ個別にフェードイン出現 */}
         {renderSlots.map((slot, i) => {
           if (i >= filled) return null;
           const boxTop = totalHeight - PALLET_H_PX - (slot.z - PALLET_H_PX) - slot.h;
-          const delay = 0.3 + i * 0.06;
           return (
             <Box3D key={i}
               x={slot.x} y={slot.y}
               w={slot.w} d={slot.d} h={slot.h}
               topBase={boxTop}
               palletDepth={pd}
-              dropAnim={`${dropAnimName} 0.5s cubic-bezier(0.22,1,0.36,1) ${delay}s both`}
+              delaySec={0.3 + i * 0.06}
             />
           );
         })}
