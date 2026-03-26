@@ -12,7 +12,9 @@ export type VoiceAction =
   | 'QUERY_FRACTION'
   | 'CONFIRM_OK'
   | 'CONTAINER_SUMMARY'
-  | 'QUERY_PROGRESS';
+  | 'QUERY_PROGRESS'
+  | 'UNDO_DECREASE'
+  | 'QUERY_TYPE_COUNT';
 
 /** キーワード → アクション マッピング */
 const VOICE_COMMANDS: [string, VoiceAction][] = [
@@ -40,6 +42,8 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
   ['ぱれっと', 'QUERY_PALLET'],
   ['端数', 'QUERY_FRACTION'],
   ['はすう', 'QUERY_FRACTION'],
+  ['お願いします', 'CONFIRM_OK'],
+  ['おねがいします', 'CONFIRM_OK'],
   ['okです', 'CONFIRM_OK'],
   ['ok', 'CONFIRM_OK'],
   ['オッケー', 'CONFIRM_OK'],
@@ -54,6 +58,12 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
   ['しんちょく', 'QUERY_PROGRESS'],
   ['状況', 'QUERY_PROGRESS'],
   ['じょうきょう', 'QUERY_PROGRESS'],
+  ['戻して', 'UNDO_DECREASE'],
+  ['もどして', 'UNDO_DECREASE'],
+  ['元に戻', 'UNDO_DECREASE'],
+  ['もとにもど', 'UNDO_DECREASE'],
+  ['何種類', 'QUERY_TYPE_COUNT'],
+  ['なんしゅるい', 'QUERY_TYPE_COUNT'],
 ];
 
 /**
