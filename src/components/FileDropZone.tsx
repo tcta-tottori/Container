@@ -47,9 +47,17 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '1.8';
+const APP_VERSION = '1.9';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '1.9', date: '2026-03-26', changes: [
+    { icon: '📦', text: 'パレット3D表示改善（3列×2行配置、JPI 7個/段、四隅積み）' },
+    { icon: '✨', text: '品目切替アニメーション（フェード遷移+カウントアップ+ズーム）' },
+    { icon: '📊', text: '積載分布ゲージ・進捗率表示（右上2倍サイズ）' },
+    { icon: '🔧', text: 'Meas.類似品名フォールバック取得（箱サイズ必ず表示）' },
+    { icon: '🎨', text: '読込ポップアップのグラデーションデザイン+プログレスバー' },
+    { icon: '📡', text: 'GitHub保存マージ戦略（最新データを上書きしない）' },
+  ]},
   { ver: '1.8', date: '2026-03-26', changes: [
     { icon: '🔧', text: '管理ページフィルター機能修正（初回クリックで選択表示）' },
     { icon: '📡', text: 'GitHub API経由でマスタデータ確実取得（トークン認証対応）' },
