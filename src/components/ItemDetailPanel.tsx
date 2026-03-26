@@ -145,10 +145,11 @@ function SimilarItemsMarquee({ item, similarItems }: {
     return (
       <span key={s.id} style={{
         display: 'inline-flex', alignItems: 'center', gap: 3,
-        fontSize: 12, fontWeight: 700, color: '#fff',
+        fontSize: 13, fontWeight: 900, color: '#fcd34d',
+        textShadow: '0 0 6px rgba(251,191,36,0.3)',
       }}>
-        {i > 0 && <span style={{ color: 'rgba(255,255,255,0.3)', margin: '0 4px' }}>|</span>}
-        {reason === 'color' ? <ColorVariantIcon size={14} /> : <NameSimilarIcon size={14} />}
+        {i > 0 && <span style={{ color: 'rgba(251,191,36,0.4)', margin: '0 4px' }}>|</span>}
+        {reason === 'color' ? <ColorVariantIcon size={15} /> : <NameSimilarIcon size={15} />}
         <HighlightDiff base={item.itemName} target={s.itemName} />
       </span>
     );
@@ -156,16 +157,17 @@ function SimilarItemsMarquee({ item, similarItems }: {
 
   return (
     <div className="similar-warn-blink" style={{
-      display: 'flex', alignItems: 'center', gap: 6,
-      borderRadius: 6, padding: '4px 10px',
+      display: 'flex', alignItems: 'center', gap: 8,
+      borderRadius: 8, padding: '6px 12px',
       flexShrink: 0, position: 'relative', zIndex: 2,
       overflow: 'hidden', whiteSpace: 'nowrap',
     }}>
       <span style={{
-        fontSize: 11, fontWeight: 800, color: '#fbbf24', whiteSpace: 'nowrap', flexShrink: 0,
-        display: 'flex', alignItems: 'center', gap: 3,
+        fontSize: 13, fontWeight: 900, color: '#fbbf24', whiteSpace: 'nowrap', flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 4,
+        textShadow: '0 0 8px rgba(251,191,36,0.5)',
       }}>
-        <span style={{ fontSize: 13 }}>&#x26A0;&#xFE0F;</span>類似品:
+        <span style={{ fontSize: 14 }}>&#x26A0;&#xFE0F;</span>類似品:
       </span>
       <div ref={outerRef} style={{ overflow: 'hidden', flex: 1, minWidth: 0 }}>
         <div className={overflow ? 'marquee-scroll' : ''} style={{ display: 'inline-flex', alignItems: 'center' }}>
@@ -525,14 +527,18 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 類似品 or 関連（1行固定エリア — 類似品優先、なければ関連を表示） */}
-        <div style={{ flexShrink: 0, minHeight: 28 }}>
+        {/* 類似品 or 関連（統一エリア — 類似品優先、なければ関連を表示） */}
+        <div style={{ flexShrink: 0, minHeight: 32 }}>
           {similarItems.length > 0 ? (
             <SimilarItemsMarquee item={item} similarItems={similarItems} />
           ) : relatedItems.length > 0 ? (
-            <div className="detail-related" style={{ borderColor: 'rgba(255,255,255,0.12)' }}>
-              <span className="detail-related-label" style={{ color: '#fff', fontWeight: 600 }}>関連:</span>
-              <MarqueeText text={relatedText} className="detail-related-text" style={{ color: '#fff' }} />
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '6px 12px', borderRadius: 8,
+              background: 'rgba(255,255,255,0.06)',
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', flexShrink: 0 }}>関連:</span>
+              <MarqueeText text={relatedText} className="detail-related-text" style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 500 }} />
             </div>
           ) : null}
         </div>

@@ -93,8 +93,13 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
   const sealH = Math.max(sh * (4 / h), 12);
   const sealW = Math.max(sd * (4.5 / d), 14);
 
-  // 前面の「重要安全部品」文字サイズ
-  const bigTextSize = Math.max(Math.min(sw * 0.2, sh * 0.18), 6);
+  // 前面の「重要安全部品」文字サイズ — 箱サイズに収まるよう自動調整
+  const bigTextSize = Math.max(Math.min(sw * 0.18, sh * 0.16, sd * 0.2), 5);
+  // 部品の会社名テキスト — 箱幅に合わせて縮小
+  const companyTextSize = Math.max(Math.min(sw * 0.11, sh * 0.08), 4);
+  const companySubTextSize = Math.max(Math.min(sw * 0.04, sh * 0.03), 2);
+  // MADE IN KOREAテキスト — 面幅に合わせる
+  const koreaTextSize = (faceW: number) => Math.max(Math.min(faceW * 0.08, 5), 2.5);
 
   return (
     <div style={{
@@ -171,12 +176,12 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               {/* MADE IN KOREA（右上） */}
               <div style={{
                 position: 'absolute', top: '10%', right: '8%',
-                backfaceVisibility: 'hidden',
+                backfaceVisibility: 'hidden', maxWidth: '55%', overflow: 'hidden',
               }}>
                 <span style={{
-                  fontSize: Math.max(sw * 0.09, 4), fontWeight: 800,
-                  color: 'rgba(40,30,15,0.55)', letterSpacing: '0.5px',
-                  fontFamily: 'var(--font-mono)',
+                  fontSize: koreaTextSize(sw), fontWeight: 800,
+                  color: 'rgba(40,30,15,0.55)', letterSpacing: '0.3px',
+                  fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap',
                 }}>MADE IN KOREA</span>
               </div>
               {/* 機種名ラベルシール（左上） */}
@@ -225,9 +230,9 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
                 textAlign: 'center', backfaceVisibility: 'hidden',
               }}>
                 <span style={{
-                  fontSize: Math.max(sw * 0.09, 4), fontWeight: 800,
-                  color: 'rgba(40,30,15,0.55)', letterSpacing: '0.5px',
-                  fontFamily: 'var(--font-mono)',
+                  fontSize: koreaTextSize(sw), fontWeight: 800,
+                  color: 'rgba(40,30,15,0.55)', letterSpacing: '0.3px',
+                  fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap',
                 }}>MADE IN KOREA</span>
               </div>
             </>
@@ -278,15 +283,17 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
                 backfaceVisibility: 'hidden',
               }}>
                 <div style={{
-                  fontSize: Math.max(sw * 0.13, 5), fontWeight: 900,
+                  fontSize: companyTextSize, fontWeight: 900,
                   color: 'rgba(40,25,10,0.7)', lineHeight: 1.3,
-                  letterSpacing: '0.5px',
+                  letterSpacing: '0.3px', overflow: 'hidden', whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
                 }}>新建高電業(深圳)有限公司</div>
                 <div style={{
-                  fontSize: Math.max(sw * 0.045, 2.5), fontWeight: 600,
+                  fontSize: companySubTextSize, fontWeight: 600,
                   color: 'rgba(40,25,10,0.45)', lineHeight: 1.2,
-                  letterSpacing: '0.3px', marginTop: 1,
-                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.2px', marginTop: 1,
+                  fontFamily: 'var(--font-mono)', overflow: 'hidden',
+                  whiteSpace: 'nowrap', textOverflow: 'ellipsis',
                 }}>KENCORP ELECTRIC(SHENZHEN)CO.,LIMITED</div>
               </div>
               {/* オレンジ色ラベルシール（右上） */}
@@ -402,8 +409,8 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
                 textAlign: 'center', backfaceVisibility: 'hidden',
               }}>
                 <span style={{
-                  fontSize: Math.max(sd * 0.08, 3), fontWeight: 800,
-                  color: 'rgba(40,30,15,0.5)', fontFamily: 'var(--font-mono)',
+                  fontSize: koreaTextSize(sd), fontWeight: 800,
+                  color: 'rgba(40,30,15,0.5)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap',
                   letterSpacing: '0.3px',
                 }}>MADE IN KOREA</span>
               </div>
@@ -423,8 +430,9 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               backfaceVisibility: 'hidden',
             }}>
               <div style={{
-                fontSize: Math.max(sd * 0.11, 3.5), fontWeight: 900,
+                fontSize: Math.max(Math.min(sd * 0.11, sh * 0.07), 3), fontWeight: 900,
                 color: 'rgba(40,25,10,0.6)', lineHeight: 1.3,
+                overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
               }}>新建高電業(深圳)有限公司</div>
             </div>
           )}
