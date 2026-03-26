@@ -447,7 +447,18 @@ export default function Home() {
   /** OKコマンド: パレット1つ消費、なくなったら自動完了 */
   const handleConfirmOk = useCallback(() => {
     if (!currentItem) return;
-    if (currentItem.palletCount <= 0 && currentItem.fraction <= 0) return;
+
+    // パレット0・端数0 → 完了処理
+    if (currentItem.palletCount <= 0 && currentItem.fraction <= 0) {
+      const name = currentItem.itemName;
+      const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
+      completeItem(currentItem.id);
+      announceOk(name, 0);
+      if (remaining <= 0) {
+        setTimeout(() => announceAllComplete(), 1500);
+      }
+      return;
+    }
 
     // 消費時間を記録
     if (state.itemStartTime) {

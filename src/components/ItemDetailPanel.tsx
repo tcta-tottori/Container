@@ -370,6 +370,42 @@ export default function ItemDetailPanel({
           `,
         }} />
 
+        {/* 積載分布ゲージ（右上固定） */}
+        {allItems.length > 0 && (
+          <div style={{
+            position: 'absolute', top: 8, right: 10, zIndex: 5,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3,
+          }}>
+            {/* 棒ゲージ: 種類別の積み割合 */}
+            <div style={{
+              display: 'flex', width: 100, height: 10, borderRadius: 5,
+              overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)',
+              background: 'rgba(0,0,0,0.3)',
+            }}>
+              {Array.from(typeCounts.entries()).map(([type, count]) => {
+                const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
+                const completedOfType = allItems.filter(it => it.type === type && completedIds.has(it.id)).length;
+                const remainingOfType = count - completedOfType;
+                const pct = (remainingOfType / allItems.length) * 100;
+                return pct > 0 ? (
+                  <div key={type} style={{
+                    width: `${pct}%`, height: '100%',
+                    background: tc.accent,
+                    transition: 'width 0.3s ease',
+                  }} />
+                ) : null;
+              })}
+            </div>
+            {/* 進捗率 */}
+            <span style={{
+              fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 700,
+              color: 'rgba(255,255,255,0.6)', letterSpacing: 0.3,
+            }}>
+              {Math.round((completedIds.size / allItems.length) * 100)}%
+            </span>
+          </div>
+        )}
+
         {/* 1行目: 種目バッジ + 色柄 + 品目数 */}
         <div className="detail-badges">
           <span className="type-badge" style={{
