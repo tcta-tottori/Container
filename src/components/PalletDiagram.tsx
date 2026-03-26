@@ -321,28 +321,51 @@ function buildGenericSlots(
   return slots;
 }
 
-/** Edge-priority reorder for fraction pallets (fill edges first, skip center) */
-function edgePriorityReorder(slots: BoxSlot[], perLayer: number): BoxSlot[] {
-  if (perLayer <= 4) return slots;
+/**
+ * 端数パレットのスロット生成
+ * 下段は満杯、最上段のみ四隅積み（中央空け）で端数を配置
+ * 参考: 荷重安定のため四隅→辺→中央の順で配置
+ */
+function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: number): BoxSlot[] {
+  if (fraction <= 0 || perLayer <= 0) return [];
+
+  const fullLayers = Math.floor(fraction / perLayer);
+  const remainder = fraction % perLayer;
   const result: BoxSlot[] = [];
-  for (let i = 0; i < slots.length; i += perLayer) {
-    const layer = slots.slice(i, i + perLayer);
-    const sorted = [...layer].sort((a, b) => edgeScore(a, layer) - edgeScore(b, layer));
-    result.push(...sorted);
+
+  // 満杯の段をそのまま追加
+  for (let i = 0; i < fullLayers * perLayer && i < allSlots.length; i++) {
+    result.push(allSlots[i]);
   }
+
+  // 端数段: 四隅積み（中央空け）
+  if (remainder > 0 && fullLayers * perLayer < allSlots.length) {
+    const topLayerStart = fullLayers * perLayer;
+    const topLayerSlots = allSlots.slice(topLayerStart, topLayerStart + perLayer);
+
+    if (topLayerSlots.length > 0) {
+      // 四隅→辺→中央の順にソート
+      const sorted = [...topLayerSlots].sort((a, b) => cornerScore(a, topLayerSlots) - cornerScore(b, topLayerSlots));
+      for (let i = 0; i < Math.min(remainder, sorted.length); i++) {
+        result.push(sorted[i]);
+      }
+    }
+  }
+
   return result;
 }
 
-function edgeScore(slot: BoxSlot, layer: BoxSlot[]): number {
+/** 四隅積みスコア: 0=四隅, 1=辺, 2=中央 */
+function cornerScore(slot: BoxSlot, layer: BoxSlot[]): number {
   const xs = layer.map(s => s.x);
   const ys = layer.map(s => s.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const isEdgeX = slot.x <= minX || slot.x >= maxX;
-  const isEdgeY = slot.y <= minY || slot.y >= maxY;
-  if (isEdgeX && isEdgeY) return 0;
-  if (isEdgeX || isEdgeY) return 1;
-  return 2;
+  const isEdgeX = Math.abs(slot.x - minX) < 0.5 || Math.abs(slot.x - maxX) < 0.5;
+  const isEdgeY = Math.abs(slot.y - minY) < 0.5 || Math.abs(slot.y - maxY) < 0.5;
+  if (isEdgeX && isEdgeY) return 0; // 四隅
+  if (isEdgeX || isEdgeY) return 1; // 辺
+  return 2; // 中央
 }
 
 /* ===== Default box dimensions ===== */
@@ -395,8 +418,8 @@ export default function PalletDiagram({
     palletDcm = 110;
   }
 
-  // Scale: fit in ~85px visual width
-  const VISUAL_PX = 85;
+  // Scale: fit in ~100px visual width
+  const VISUAL_PX = 100;
   const cm2px = VISUAL_PX / palletWcm;
   const pw = palletWcm * cm2px; // = VISUAL_PX
   const pd = palletDcm * cm2px;
@@ -421,15 +444,16 @@ export default function PalletDiagram({
     perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
   }
 
-  // Determine filled count
-  const filled = isFull ? allSlots.length : Math.min(fraction, allSlots.length);
-
-  // For fraction: apply edge-priority reorder
-  let renderSlots = allSlots;
-  if (isFraction && filled < allSlots.length) {
-    renderSlots = edgePriorityReorder(allSlots, perLayer);
-    const layersNeeded = Math.ceil(filled / perLayer);
-    renderSlots = renderSlots.slice(0, layersNeeded * perLayer);
+  // Determine rendered slots
+  let renderSlots: BoxSlot[];
+  let filled: number;
+  if (isFull) {
+    renderSlots = allSlots;
+    filled = allSlots.length;
+  } else {
+    // 端数: 下段は満杯、最上段のみ四隅積み
+    renderSlots = buildFractionSlots(allSlots, perLayer, fraction);
+    filled = renderSlots.length;
   }
 
   // Calculate total height for viewbox
