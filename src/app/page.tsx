@@ -33,52 +33,58 @@ function LoadingOverlay({ message, progress }: { message: string; progress: numb
     <div style={{
       position: 'fixed', inset: 0, zIndex: 300,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)',
+      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(16px)',
+      animation: 'fadeIn 0.15s ease both',
     }}>
+      <style>{`
+        @keyframes spinFast { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      `}</style>
       <div style={{
-        background: 'linear-gradient(160deg, #14112a 0%, #1a1530 50%, #1e1828 100%)',
-        border: '1px solid rgba(107,82,212,0.2)',
-        borderRadius: 24, padding: '36px 44px', textAlign: 'center',
-        boxShadow: '0 24px 80px rgba(0,0,0,0.6), 0 0 40px rgba(107,82,212,0.1)',
-        width: '90%', maxWidth: 320,
+        background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
+        border: '1.5px solid rgba(255,255,255,0.15)',
+        borderRadius: 24, padding: '32px 40px', textAlign: 'center',
+        boxShadow: '0 0 40px rgba(255,255,255,0.05), 0 24px 60px rgba(0,0,0,0.6)',
+        width: '90%', maxWidth: 300,
       }}>
-        {/* グラデーションスピナー */}
-        <div style={{ position: 'relative', width: 52, height: 52, margin: '0 auto 20px' }}>
-          <svg width="52" height="52" viewBox="0 0 52 52" style={{ animation: 'spin 1.2s linear infinite' }}>
-            <defs>
-              <linearGradient id="spinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#4a7af7" />
-                <stop offset="50%" stopColor="#9b45c9" />
-                <stop offset="100%" stopColor="#c0549a" />
-              </linearGradient>
-            </defs>
-            <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(107,82,212,0.15)" strokeWidth="4" />
-            <circle cx="26" cy="26" r="22" fill="none" stroke="url(#spinGrad)" strokeWidth="4"
-              strokeLinecap="round" strokeDasharray="100 40" />
+        {/* 白ネオンスピナー（中身空白、緩急回転） */}
+        <div style={{ position: 'relative', width: 56, height: 56, margin: '0 auto 16px' }}>
+          <svg width="56" height="56" viewBox="0 0 56 56" style={{ animation: 'spinFast 0.8s cubic-bezier(0.4,0,0.2,1) infinite' }}>
+            <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+            <circle cx="28" cy="28" r="24" fill="none" stroke="#fff" strokeWidth="3"
+              strokeLinecap="round" strokeDasharray="80 70"
+              style={{ filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.5)) drop-shadow(0 0 12px rgba(255,255,255,0.2))' }} />
           </svg>
-          {/* 中央%表示 */}
-          <span style={{
-            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.7)',
-            fontFamily: 'var(--font-mono)',
-          }}>{Math.round(progress)}</span>
         </div>
 
-        {/* メッセージ */}
-        <p style={{ color: '#fff', fontSize: 13, fontWeight: 600, margin: '0 0 6px', lineHeight: 1.5 }}>
+        {/* メッセージ（白ネオン） */}
+        <p style={{
+          color: '#fff', fontSize: 12, fontWeight: 600, margin: '0 0 12px', lineHeight: 1.5,
+          textShadow: '0 0 8px rgba(255,255,255,0.3)',
+        }}>
           {message}
         </p>
 
-        {/* プログレスバー */}
+        {/* 進捗率（白ネオン大きめ） */}
+        <p style={{
+          color: '#fff', fontSize: 20, fontWeight: 800, margin: '0 0 10px',
+          fontFamily: 'var(--font-mono)',
+          textShadow: '0 0 10px rgba(255,255,255,0.6), 0 0 20px rgba(255,255,255,0.3)',
+        }}>
+          {Math.round(progress)}%
+        </p>
+
+        {/* プログレスバー（白ネオン） */}
         <div style={{
-          width: '100%', height: 6, borderRadius: 3, marginTop: 16,
-          background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+          width: '100%', height: 4, borderRadius: 2,
+          background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+          border: '0.5px solid rgba(255,255,255,0.1)',
         }}>
           <div style={{
-            height: '100%', borderRadius: 3,
-            background: 'linear-gradient(90deg, #4a7af7, #9b45c9, #c0549a)',
+            height: '100%', borderRadius: 2,
+            background: '#fff',
+            boxShadow: '0 0 8px rgba(255,255,255,0.5), 0 0 16px rgba(255,255,255,0.2)',
             width: `${progress}%`,
-            transition: 'width 0.4s ease',
+            transition: 'width 0.3s ease',
           }} />
         </div>
       </div>
