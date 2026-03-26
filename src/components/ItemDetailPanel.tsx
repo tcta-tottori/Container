@@ -363,24 +363,25 @@ export default function ItemDetailPanel({
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
 
-  // 品目切替検知 → フェードアウト→空白→フェードイン（高速化）
+  // 品目切替検知 → なだらかにフェードアウト→データ更新→フェードイン
   useEffect(() => {
     if (prevItemIdRef.current !== item.id) {
       prevItemIdRef.current = item.id;
       setTransitionPhase('fadeout');
-      const t1 = setTimeout(() => setTransitionPhase('blank'), 200);
+      // フェードアウト完了(0.4s)を待ってからblank
+      const t1 = setTimeout(() => setTransitionPhase('blank'), 400);
       const t2 = setTimeout(() => {
         setAnimKey(item.id);
         setTransitionPhase('fadein');
-      }, 400);
-      const t3 = setTimeout(() => setTransitionPhase('visible'), 700);
+      }, 500);
+      const t3 = setTimeout(() => setTransitionPhase('visible'), 1000);
       return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
   }, [item.id]);
 
-  // 上半分コンテンツの表示状態（品名・箱図・パレットのみ対象）
-  const upperOpacity = transitionPhase === 'fadeout' ? 0 : transitionPhase === 'blank' ? 0 : 1;
-  const upperTransition = transitionPhase === 'fadeout' ? 'opacity 0.2s ease' : transitionPhase === 'fadein' ? 'opacity 0.3s ease' : 'none';
+  // 上半分コンテンツの表示状態
+  const upperOpacity = (transitionPhase === 'fadeout' || transitionPhase === 'blank') ? 0 : 1;
+  const upperTransition = transitionPhase === 'fadeout' ? 'opacity 0.4s ease' : transitionPhase === 'fadein' ? 'opacity 0.5s ease' : 'none';
   const showContent = transitionPhase !== 'blank';
 
   const handlePalletDoubleTap = useCallback(() => {
