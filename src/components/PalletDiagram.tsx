@@ -447,8 +447,8 @@ export default function PalletDiagram({
     palletDcm = 110;
   }
 
-  // Scale: fit in ~100px visual width
-  const VISUAL_PX = 100;
+  // Scale: responsive visual width
+  const VISUAL_PX = 85;
   const cm2px = VISUAL_PX / palletWcm;
   const pw = palletWcm * cm2px; // = VISUAL_PX
   const pd = palletDcm * cm2px;

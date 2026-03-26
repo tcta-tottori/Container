@@ -435,7 +435,10 @@ export default function ItemDetailPanel({
 
   // カウントアップアニメーション
   const animPL = useCountUp(item.palletCount, animKey);
-  const animCT = useCountUp(item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction, animKey);
+  // CT: 検査抜き（端数から1個引いた値）。端数0の場合はそのまま0。
+  const rawFraction = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
+  const inspectionDeducted = rawFraction > 0 ? rawFraction - 1 : 0;
+  const animCT = useCountUp(inspectionDeducted, animKey);
   const animPCS = useCountUp(Math.ceil(item.totalQty), animKey);
 
   return (
@@ -454,20 +457,20 @@ export default function ItemDetailPanel({
           `,
         }} />
 
-        {/* 積載分布ゲージ + 種類数 + 進捗率（右上 — 常時表示） */}
+        {/* 積載分布ゲージ + 種類数 + 進捗率（右上 — 常時表示、バッジ行と同じ高さ） */}
         {allItems.length > 0 && (
           <div style={{
-            position: 'absolute', top: 6, right: 10, zIndex: 5,
+            position: 'absolute', top: 10, right: 10, zIndex: 5,
             display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0,
           }}>
-            {/* 棒ゲージ */}
+            {/* 棒ゲージ（右から収縮: row-reverse） */}
             <div style={{
-              display: 'flex', width: 220, height: 16, borderRadius: 8,
+              display: 'flex', flexDirection: 'row-reverse', width: 220, height: 16, borderRadius: 8,
               overflow: 'hidden',
               background: 'rgba(255,255,255,0.06)',
               boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3), 0 0 12px rgba(107,82,212,0.1)',
             }}>
-              {Array.from(typeCounts.entries()).map(([type, count]) => {
+              {Array.from(typeCounts.entries()).reverse().map(([type, count]) => {
                 const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
                 const completedOfType = allItems.filter(it => it.type === type && completedIds.has(it.id)).length;
                 const remainingOfType = count - completedOfType;
@@ -477,7 +480,7 @@ export default function ItemDetailPanel({
                     width: `${pct}%`, height: '100%',
                     background: `linear-gradient(180deg, ${tc.accent}dd, ${tc.accent}88)`,
                     transition: 'width 0.5s ease',
-                    borderRight: '0.5px solid rgba(0,0,0,0.2)',
+                    borderLeft: '0.5px solid rgba(0,0,0,0.2)',
                   }} />
                 ) : null;
               })}
@@ -573,14 +576,14 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 箱イメージ + パレット図（KENコード下〜PL数上の固定エリア） */}
+        {/* 箱イメージ + パレット図 */}
         <div className="detail-pallet-area" style={{
           position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0,
-          display: 'flex', flexDirection: 'row',
+          display: 'flex', flexDirection: 'row', overflow: 'hidden',
         }}>
-          {/* 左側: 箱3Dイメージ（中心からズーム1.5秒） + 寸法テキスト（0.5秒後フェード） */}
+          {/* 左側: 箱3Dイメージ */}
           <div style={{
-            position: 'relative', width: '35%', height: '100%', flexShrink: 0,
+            position: 'relative', width: '30%', height: '100%', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'visible',
           }}>
@@ -605,10 +608,11 @@ export default function ItemDetailPanel({
             )}
           </div>
 
-          {/* 右側: パレット図（段ボール上から落下 2秒） */}
+          {/* 右側: パレット図 */}
           <div style={{
             flex: 1, height: '100%', display: 'flex', flexDirection: 'row',
-            alignItems: 'center', justifyContent: 'center', gap: 4,
+            alignItems: 'center', justifyContent: 'center', gap: 2,
+            overflow: 'hidden',
           }}>
             {item.palletCount > 0 && item.qtyPerPallet > 0 && (
               <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
@@ -617,9 +621,9 @@ export default function ItemDetailPanel({
                   measurements={item.measurements} />
               </div>
             )}
-            {item.fraction > 0 && (
+            {inspectionDeducted > 0 && (
               <div key={`fr-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
-                <PalletDiagram palletCount={0} fraction={item.fraction}
+                <PalletDiagram palletCount={0} fraction={inspectionDeducted}
                   qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                   measurements={item.measurements} />
               </div>
@@ -642,7 +646,15 @@ export default function ItemDetailPanel({
             }}>{fmtNum(animPL)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>PL</span>
           </div>
-          <div className="detail-sf-item" style={{ minWidth: 0 }}>
+          <div className="detail-sf-item" style={{ minWidth: 0, position: 'relative' }}>
+            {/* 実数(検査含む)を小さくカッコ表示 */}
+            {rawFraction > 0 && rawFraction !== inspectionDeducted && (
+              <span style={{
+                position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
+                fontSize: 10, color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)',
+                whiteSpace: 'nowrap',
+              }}>({rawFraction})</span>
+            )}
             <span className="detail-sf-num" style={{
               color: '#e8e8e8',
               textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`,
