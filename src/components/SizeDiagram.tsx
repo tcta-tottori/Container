@@ -105,7 +105,7 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
     <div style={{
       width: '100%', height: '100%',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      perspective: 400, overflow: 'hidden',
+      overflow: 'hidden',
     }}>
       <style>{`
         @keyframes ${animName} {
