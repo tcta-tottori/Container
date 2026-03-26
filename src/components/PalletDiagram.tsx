@@ -522,17 +522,21 @@ export default function PalletDiagram({
         {/* Pallet base */}
         <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
 
-        {/* Stacked boxes — positioned in full 3D (x, y→depth, z→height) */}
+        {/* Stacked boxes — 個別に上から落下（まばらに遅延） */}
         {renderSlots.map((slot, i) => {
           if (i >= filled) return null;
           const boxTop = totalHeight - PALLET_H_PX - (slot.z - PALLET_H_PX) - slot.h;
+          // 各箱にまばらな落下遅延（0.05秒間隔 + ランダム風にずらす）
+          const delay = 0.3 + i * 0.05;
           return (
-            <Box3D key={i}
-              x={slot.x} y={slot.y}
-              w={slot.w} d={slot.d} h={slot.h}
-              topBase={boxTop}
-              palletDepth={pd}
-            />
+            <div key={i} className="anim-drop-in" style={{ animationDelay: `${delay}s` }}>
+              <Box3D
+                x={slot.x} y={slot.y}
+                w={slot.w} d={slot.d} h={slot.h}
+                topBase={boxTop}
+                palletDepth={pd}
+              />
+            </div>
           );
         })}
       </div>

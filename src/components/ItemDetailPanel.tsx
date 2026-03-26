@@ -499,7 +499,7 @@ export default function ItemDetailPanel({
             overflow: 'visible',
           }}>
             {(item.measurements || item.cbm || item.type === '鍋') && (
-              <div key={`box-${animKey}`} className="anim-zoom-in">
+              <div key={`box-${animKey}`} className="anim-zoom-in" style={{ width: '100%', height: '100%' }}>
                 <SizeDiagram measurements={item.measurements} cbm={item.cbm}
                   type={item.type} maxContainerDim={maxContainerDim} itemName={item.itemName} />
               </div>
@@ -525,14 +525,14 @@ export default function ItemDetailPanel({
             alignItems: 'center', justifyContent: 'center', gap: 4,
           }}>
             {item.palletCount > 0 && item.qtyPerPallet > 0 && (
-              <div key={`pl-${animKey}`} className="anim-drop-in" style={{ flex: 1, height: '100%', minWidth: 0 }}>
+              <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
                 <PalletDiagram palletCount={item.palletCount} fraction={0}
                   qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                   measurements={item.measurements} />
               </div>
             )}
             {item.fraction > 0 && (
-              <div key={`fr-${animKey}`} className="anim-drop-in" style={{ flex: 1, height: '100%', minWidth: 0, animationDelay: '0.3s' }}>
+              <div key={`fr-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
                 <PalletDiagram palletCount={0} fraction={item.fraction}
                   qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                   measurements={item.measurements} />
