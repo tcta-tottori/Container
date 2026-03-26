@@ -29,7 +29,9 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <head>
-        {/* favicon/apple-icon は src/app/icon.tsx, apple-icon.tsx で動的生成 */}
+        <link rel="icon" type="image/svg+xml" href="/Container/icons/favicon.svg" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/Container/icons/favicon-32.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/Container/icons/apple-touch-icon.png" />
       </head>
       <body className="font-sans antialiased">{children}</body>
     </html>
