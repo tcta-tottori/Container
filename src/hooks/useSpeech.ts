@@ -286,12 +286,12 @@ export function useSpeech() {
     speak(text);
   }, []);
 
-  /** OK確認アナウンス */
-  const announceOk = useCallback((itemName: string, remainingPallets: number) => {
+  /** OK確認アナウンス（品名コールなし） */
+  const announceOk = useCallback((_itemName: string, remainingPallets: number) => {
     if (remainingPallets > 0) {
-      speak(`OK。${itemNameForSpeech(itemName)}、残り${remainingPallets}パレット。`);
+      speak(`残り${remainingPallets}パレット。`);
     } else {
-      speak(`OK。${itemNameForSpeech(itemName)}、完了。`);
+      speak('完了。');
     }
   }, []);
 
