@@ -332,7 +332,6 @@ function buildGenericSlots(
 function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: number): BoxSlot[] {
   if (fraction <= 0 || perLayer <= 0) return [];
 
-  const totalLayers = Math.ceil(fraction / perLayer);
   const fullLayers = Math.floor(fraction / perLayer);
   const remainder = fraction % perLayer;
 
