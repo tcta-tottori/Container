@@ -584,65 +584,8 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 箱イメージ + パレット図 */}
-        <div className="detail-pallet-area" style={{
-          position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0,
-          display: 'flex', flexDirection: 'row', overflow: 'hidden',
-        }}>
-          {/* 左側: 箱3Dイメージ */}
-          <div style={{
-            position: 'relative', width: '30%', height: '100%', flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            overflow: 'visible',
-          }}>
-            {(item.measurements || item.cbm || item.type === '鍋') && (
-              <div key={`box-${animKey}`} className="anim-zoom-in" style={{ width: '100%', height: '100%' }}>
-                <SizeDiagram measurements={item.measurements} cbm={item.cbm}
-                  type={item.type} maxContainerDim={maxContainerDim} itemName={item.itemName} />
-              </div>
-            )}
-            {/* 寸法テキスト — 左下オーバーレイ（2秒後にフェード） */}
-            {currentDims && (
-              <div key={`dims-${animKey}`} className="anim-fade-in" style={{
-                position: 'absolute', bottom: 0, left: 4, zIndex: 2,
-                fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13,
-                color: accentColor,
-                textShadow: `0 0 8px rgba(0,0,0,0.9), 0 1px 6px rgba(0,0,0,0.7), 0 0 20px ${accentColor}40`,
-                letterSpacing: '-0.5px',
-                animationDelay: '2s',
-              }}>
-                {currentDims[0]}×{currentDims[1]}×{currentDims[2]}
-              </div>
-            )}
-          </div>
-
-          {/* 右側: パレット図 */}
-          <div style={{
-            flex: 1, height: '100%', display: 'flex', flexDirection: 'row',
-            alignItems: 'center', justifyContent: 'center', gap: 2,
-            overflow: 'hidden',
-          }}>
-            {item.palletCount > 0 && item.qtyPerPallet > 0 && (
-              <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
-                onClick={() => setFullscreenPallet('full')}>
-                <PalletDiagram palletCount={item.palletCount} fraction={0}
-                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-                  measurements={item.measurements} />
-              </div>
-            )}
-            {inspectionDeducted > 0 && (
-              <div key={`fr-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
-                onClick={() => setFullscreenPallet('fraction')}>
-                <PalletDiagram palletCount={0} fraction={inspectionDeducted}
-                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-                  measurements={item.measurements} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 数量（PL / CT / pcs）— カウントアップアニメーション 1秒 */}
-        <div key={`stats-${animKey}`} className="detail-stats-free anim-slide-up" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
+        {/* 数量（PL / CT / pcs）— カウントアップ */}
+        <div key={`stats-${animKey}`} className="detail-stats-free anim-slide-up" style={{ position: 'relative', zIndex: 2, justifyContent: 'center', flexShrink: 0 }}>
           <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
               color: accentColor,
@@ -650,8 +593,7 @@ export default function ItemDetailPanel({
               cursor: 'pointer',
               transition: 'background 0.15s ease',
               background: palletFlash ? 'rgba(255,255,255,0.25)' : 'transparent',
-              borderRadius: 8,
-              userSelect: 'none',
+              borderRadius: 8, userSelect: 'none',
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
             }}>{fmtNum(animPL)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>PL</span>
@@ -663,12 +605,8 @@ export default function ItemDetailPanel({
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
             }}>{fmtNum(animCT)}</span>
             <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-              {/* 実数(検査含む)をCTの上に小さくカッコ表示 */}
               {rawFraction > 0 && rawFraction !== inspectionDeducted && (
-                <span style={{
-                  fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)',
-                  lineHeight: 1,
-                }}>({rawFraction})</span>
+                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)', lineHeight: 1 }}>({rawFraction})</span>
               )}
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1 }}>CT</span>
             </span>
@@ -677,11 +615,58 @@ export default function ItemDetailPanel({
             <span className="detail-sf-num-sm" style={{
               color: 'rgba(255,255,255,0.6)',
               display: 'inline-block', minWidth: '4ch', textAlign: 'right',
-            }}>
-              {animPCS.toLocaleString()}
-            </span>
+            }}>{animPCS.toLocaleString()}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.4)' }}>pcs</span>
           </div>
+        </div>
+
+        {/* 箱イメージ + パレット図（PL/CT/PCSの下） */}
+        <div style={{
+          flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'row',
+          alignItems: 'center', justifyContent: 'center', gap: 4,
+          overflow: 'hidden', zIndex: 0,
+        }}>
+          {/* 箱3Dイメージ */}
+          <div style={{
+            position: 'relative', flex: '0 0 28%', height: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {(item.measurements || item.cbm || item.type === '鍋') && (
+              <div key={`box-${animKey}`} className="anim-zoom-in" style={{ width: '100%', height: '100%' }}>
+                <SizeDiagram measurements={item.measurements} cbm={item.cbm}
+                  type={item.type} maxContainerDim={maxContainerDim} itemName={item.itemName} />
+              </div>
+            )}
+            {currentDims && (
+              <div key={`dims-${animKey}`} className="anim-fade-in" style={{
+                position: 'absolute', bottom: 0, left: 2, zIndex: 2,
+                fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 11,
+                color: accentColor,
+                textShadow: `0 0 8px rgba(0,0,0,0.9), 0 1px 4px rgba(0,0,0,0.7)`,
+                letterSpacing: '-0.3px', animationDelay: '2s',
+              }}>
+                {currentDims[0]}×{currentDims[1]}×{currentDims[2]}
+              </div>
+            )}
+          </div>
+
+          {/* パレット図 */}
+          {item.palletCount > 0 && item.qtyPerPallet > 0 && (
+            <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
+              onClick={(e) => { e.stopPropagation(); setFullscreenPallet('full'); }}>
+              <PalletDiagram palletCount={item.palletCount} fraction={0}
+                qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+                measurements={item.measurements} />
+            </div>
+          )}
+          {inspectionDeducted > 0 && (
+            <div key={`fr-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
+              onClick={(e) => { e.stopPropagation(); setFullscreenPallet('fraction'); }}>
+              <PalletDiagram palletCount={0} fraction={inspectionDeducted}
+                qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+                measurements={item.measurements} />
+            </div>
+          )}
         </div>
 
         </div>{/* トランジション制御ラッパー閉じ */}
@@ -774,29 +759,48 @@ export default function ItemDetailPanel({
       {/* パレット全画面表示モーダル */}
       {fullscreenPallet && (
         <div
-          onClick={() => { setFullscreenPallet(null); setFsRotateY(-35); }}
-          onTouchStart={(e) => { fsTouchRef.current = { startX: e.touches[0].clientX, startRotY: fsRotateY }; }}
+          onClick={() => {
+            // ドラッグ中でなければ閉じる
+            if (!fsTouchRef.current) { setFullscreenPallet(null); setFsRotateY(-35); }
+          }}
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            fsTouchRef.current = { startX: e.touches[0].clientX, startRotY: fsRotateY };
+          }}
           onTouchMove={(e) => {
+            e.stopPropagation(); e.preventDefault();
             if (!fsTouchRef.current) return;
             setFsRotateY(fsTouchRef.current.startRotY + (e.touches[0].clientX - fsTouchRef.current.startX) * 0.5);
           }}
-          onTouchEnd={() => { fsTouchRef.current = null; }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            if (fsTouchRef.current) {
+              const dx = Math.abs(fsRotateY - fsTouchRef.current.startRotY);
+              fsTouchRef.current = null;
+              if (dx > 3) return; // ドラッグした場合はclickで閉じない
+            }
+          }}
           onMouseDown={(e) => { fsTouchRef.current = { startX: e.clientX, startRotY: fsRotateY }; }}
           onMouseMove={(e) => {
             if (!fsTouchRef.current || !e.buttons) return;
             setFsRotateY(fsTouchRef.current.startRotY + (e.clientX - fsTouchRef.current.startX) * 0.5);
           }}
-          onMouseUp={() => { fsTouchRef.current = null; }}
+          onMouseUp={() => {
+            if (fsTouchRef.current) {
+              const dx = Math.abs(fsRotateY - fsTouchRef.current.startRotY);
+              fsTouchRef.current = null;
+              if (dx > 3) return;
+            }
+          }}
           style={{
             position: 'fixed', inset: 0, zIndex: 200,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)',
-            cursor: 'grab', transition: 'opacity 0.3s ease',
+            background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(16px)',
+            cursor: 'grab', touchAction: 'none',
+            animation: 'fadeIn 0.3s ease both',
           }}
         >
-          <div style={{ width: '60vmin', height: '60vmin' }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div style={{ width: '75vmin', height: '75vmin', pointerEvents: 'none' }}>
             <PalletDiagram
               palletCount={fullscreenPallet === 'full' ? item.palletCount : 0}
               fraction={fullscreenPallet === 'fraction' ? inspectionDeducted : 0}
@@ -804,7 +808,7 @@ export default function ItemDetailPanel({
               measurements={item.measurements}
             />
           </div>
-          <div style={{ position: 'absolute', bottom: 40, color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+          <div style={{ position: 'absolute', bottom: 32, color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
             スライドで回転 / タップで閉じる
           </div>
         </div>

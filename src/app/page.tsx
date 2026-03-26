@@ -219,6 +219,7 @@ export default function Home() {
     if (loadedContainerRef.current === key) return;
     loadedContainerRef.current = key;
     announcedThresholdsRef.current = new Set();
+    firstItemSkipRef.current = true; // 概要コール中は品目コールをスキップ
     // 少し遅延して概要アナウンス
     const timer = setTimeout(() => {
       announceContainerSummary(state.items, container.containerNo);
