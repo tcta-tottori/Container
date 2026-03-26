@@ -45,9 +45,17 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '1.7';
-const APP_UPDATED = '2026.3.25 21:29';
+const APP_VERSION = '1.8';
+const APP_UPDATED = '2026.3.26 10:31';
 const CHANGELOG = [
+  { ver: '1.8', date: '2026-03-26', changes: [
+    { icon: '🔧', text: '管理ページフィルター機能修正（初回クリックで選択表示）' },
+    { icon: '📡', text: 'GitHub API経由でマスタデータ確実取得（トークン認証対応）' },
+    { icon: '📦', text: 'JKP出荷スケジュールもGitHubから自動取得' },
+    { icon: '🐛', text: 'サイズ列欠落による Meas./CBM データ消失バグ修正' },
+    { icon: '🔄', text: '再読込ボタンでマスタ+JKP両方を最新に更新' },
+    { icon: '🎨', text: 'アイコン・読込画面を青紫オレンジ乱雑グラデーションに統一' },
+  ]},
   { ver: '1.7', date: '2026-03-25', changes: [
     { icon: '📦', text: 'パレット図CSS 3D化（箱積み/端数/回転対応）' },
     { icon: '🎨', text: '背景グラデーション一新（紫/青/オレンジ）' },
