@@ -796,35 +796,37 @@ export default function Home() {
         background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)',
         zIndex: 999,
       }}>
-        {/* アイコン */}
-        <div style={{
-          width: 80, height: 80, borderRadius: 22,
-          background: 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 8px 40px rgba(75,122,247,0.3), 0 0 60px rgba(107,82,212,0.2)',
-          marginBottom: 24, animation: 'gentle-pulse 2s ease-in-out infinite',
-        }}>
-          <svg width="52" height="52" viewBox="0 0 64 64" fill="none">
-            <g transform="translate(32,32)" stroke="#fff" strokeWidth="3.8" strokeLinejoin="round" fill="none">
-              <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
-              <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
-              <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
-            </g>
-          </svg>
-        </div>
-        <p style={{
-          fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.7)',
-          fontFamily: 'Inter, sans-serif', letterSpacing: 0.5, margin: '0 0 8px',
-        }}>Container Navigation System</p>
-        {/* ローディングドット */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-          {[0, 1, 2].map(i => (
-            <div key={i} style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #4a7af7, #9b45c9)',
-              animation: `gentle-pulse 1.2s ease-in-out ${i * 0.2}s infinite`,
-            }} />
-          ))}
+        <style>{`
+          @keyframes neonPulse { 0%,100% { opacity: 0.7; filter: drop-shadow(0 0 6px rgba(255,255,255,0.4)); } 50% { opacity: 1; filter: drop-shadow(0 0 14px rgba(255,255,255,0.7)) drop-shadow(0 0 30px rgba(255,255,255,0.3)); } }
+          @keyframes dotFlow { 0%,20% { opacity: 0.15; } 40% { opacity: 1; } 60%,100% { opacity: 0.15; } }
+        `}</style>
+        {/* 白ネオンキューブ枠のみ */}
+        <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
+          style={{ marginBottom: 28, animation: 'neonPulse 2.5s ease-in-out infinite' }}>
+          <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none"
+            style={{ filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.5)) drop-shadow(0 0 16px rgba(255,255,255,0.25))' }}>
+            <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
+            <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
+            <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
+          </g>
+        </svg>
+        {/* Loading + 5ドット（白ネオン） */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+          <span style={{
+            fontSize: 16, fontWeight: 600, color: '#fff', fontFamily: 'Inter, sans-serif',
+            letterSpacing: 3,
+            textShadow: '0 0 10px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.35), 0 0 40px rgba(255,255,255,0.15)',
+          }}>Loading</span>
+          <div style={{ display: 'flex', gap: 3, marginLeft: 2 }}>
+            {[0, 1, 2, 3, 4].map(i => (
+              <span key={i} style={{
+                display: 'inline-block', width: 5, height: 5, borderRadius: '50%',
+                background: '#fff',
+                boxShadow: '0 0 6px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.3)',
+                animation: `dotFlow 2s ease-in-out ${i * 0.3}s infinite`,
+              }} />
+            ))}
+          </div>
         </div>
       </div>
     );
