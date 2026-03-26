@@ -16,7 +16,7 @@ import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
-import ActionBar from '@/components/ActionBar';
+// ActionBar removed - replaced by floating mic button
 import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
@@ -665,7 +665,7 @@ export default function Home() {
       if (el) {
         const p = Number(el.getAttribute('data-pallet-count'));
         const fraction = currentItem.fraction;
-        const fractionCeil = fraction % 1 !== 0 ? Math.ceil(fraction) : fraction;
+        const fractionCeil = Math.max(0, (fraction % 1 !== 0 ? Math.ceil(fraction) : fraction) - 1); // 検査抜き
         let qtyText = '';
         if (p > 0 && fractionCeil > 0) {
           qtyText = `残り${p}パレットと${fractionCeil}ケース`;
@@ -763,9 +763,22 @@ export default function Home() {
         case 'QUERY_PROGRESS':
           handleProgress();
           break;
+        case 'UNDO_DECREASE':
+          handleIncrease();
+          speak('パレットを1つ戻しました。');
+          break;
+        case 'QUERY_TYPE_COUNT': {
+          const counts: Record<string, number> = {};
+          const remaining = state.items.filter(it => !state.completedIds.has(it.id));
+          for (const it of remaining) counts[it.type] = (counts[it.type] || 0) + 1;
+          const parts: string[] = [];
+          for (const [t, c] of Object.entries(counts)) parts.push(`${t}が${c}種類`);
+          speak(`残り${remaining.length}品目。${parts.join('、')}。`);
+          break;
+        }
       }
     },
-    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items.length, speak, handleConfirmOk, handleContainerSummary, handleProgress]
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, handleConfirmOk, handleContainerSummary, handleProgress]
   );
 
   const { isListening, isSupported, lastTranscript, toggleListening } =
@@ -1043,17 +1056,24 @@ export default function Home() {
           )}
         </div>
 
-        {/* 操作バー (作業モード時のみ) */}
-        {viewMode === 'work' && (
-          <ActionBar
-            onIncrease={handleIncrease}
-            onDecrease={handleDecrease}
-            onAnnounce={handleAnnounce}
-            hasItems={state.items.length > 0}
-            isListening={isListening}
-            isVoiceSupported={isSupported}
-            onToggleVoice={toggleListening}
-          />
+        {/* フローティングマイクボタン（右下固定） */}
+        {viewMode === 'work' && isSupported && (
+          <button onClick={toggleListening}
+            style={{
+              position: 'fixed', bottom: 20, right: 20, zIndex: 100,
+              width: 52, height: 52, borderRadius: '50%',
+              background: isListening ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #4a7af7, #6b52d4)',
+              border: 'none', cursor: 'pointer',
+              boxShadow: isListening ? '0 4px 20px rgba(239,68,68,0.4)' : '0 4px 20px rgba(107,82,212,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              animation: isListening ? 'gentle-pulse 1.5s ease-in-out infinite' : 'none',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            </svg>
+          </button>
         )}
         <UpdateNotification />
       </div>
