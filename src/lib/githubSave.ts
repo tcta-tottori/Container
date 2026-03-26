@@ -11,13 +11,13 @@ const BRANCH = 'main';
  */
 function buildExcelBuffer(items: ContainerItem[]): ArrayBuffer {
   const groupRow = [
-    'ベース情報', '', '', '', '', '', '', '', '',
+    'ベース情報', '', '', '', '', '', '', '', '', '',
     '气高编号', '', '',
     'コンテナ日程', '', '', '',
     '', '', '', '', '',
   ];
   const headerRow = [
-    '新建高コード', '気高コード', '規格', '種類', '代表機種', '入数', '総数', 'ケース数', '1P数',
+    '新建高コード', '気高コード', '規格', '種類', '代表機種', '入数', '総数', 'ケース数', '1P数', 'サイズ',
     '新建高コード\n(气高编号)', '規格\n(气高编号)', '紐付状態',
     '規格\n(コンテナ)', '代表機種\n(コンテナ)', '入数\n(コンテナ)', '1P数\n(コンテナ)',
     'ITEM\nDESCRIPTION', 'MODEL NO.', 'G.W.\n(per carton)', 'CBM', 'Meas.',
@@ -25,7 +25,7 @@ function buildExcelBuffer(items: ContainerItem[]): ArrayBuffer {
   const dataRows = items.map((it) => [
     it.newPartNumber || '', it.partNumber, it.itemName,
     it.type || '', it.representModel,
-    it.packingQty || '', it.totalQty || '', it.caseCount || '', it.qtyPerPallet || '',
+    it.packingQty || '', it.totalQty || '', it.caseCount || '', it.qtyPerPallet || '', it.size || '',
     it.newPartNumberKetaka || '', it.itemNameKetaka || '', it.linkStatus || '',
     it.itemNameContainer || '', it.representModelContainer || '',
     it.packingQtyContainer || '', it.qtyPerPalletContainer || '',
@@ -38,15 +38,15 @@ function buildExcelBuffer(items: ContainerItem[]): ArrayBuffer {
   XLSX.utils.book_append_sheet(wb, ws, '品目一覧（全集約）');
   ws['!cols'] = [
     { wch: 14 }, { wch: 16 }, { wch: 30 }, { wch: 10 }, { wch: 22 },
-    { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 6 },
+    { wch: 6 }, { wch: 8 }, { wch: 8 }, { wch: 6 }, { wch: 6 },
     { wch: 14 }, { wch: 28 }, { wch: 8 },
     { wch: 28 }, { wch: 22 }, { wch: 6 }, { wch: 6 },
     { wch: 22 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 14 },
   ];
   ws['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
-    { s: { r: 0, c: 9 }, e: { r: 0, c: 11 } },
-    { s: { r: 0, c: 12 }, e: { r: 0, c: 15 } },
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },    // ベース情報 (A-J)
+    { s: { r: 0, c: 10 }, e: { r: 0, c: 12 } },   // 气高编号 (K-M)
+    { s: { r: 0, c: 13 }, e: { r: 0, c: 16 } },   // コンテナ日程 (N-Q)
   ];
 
   const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });

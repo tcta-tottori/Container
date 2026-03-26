@@ -1,6 +1,13 @@
 import * as XLSX from 'xlsx';
 import { ContainerItem, ItemType } from './types';
 import { detectItemType } from './typeDetector';
+import { getStoredToken } from './githubSave';
+
+const REPO_OWNER = 'tcta-tottori';
+const REPO_NAME = 'Container';
+const MASTER_FILE_PATH = 'CNS_品目一覧_全集約版.xlsx';
+const JKP_FILE_PATH = 'JKP_Shipping Schedule.xlsx';
+const BRANCH = 'main';
 
 /**
  * CNS品目一覧（全集約版）をパースしてContainerItem[]を返す
@@ -118,45 +125,96 @@ export function parseAqssExcel(buffer: ArrayBuffer): Map<string, Partial<Contain
 }
 
 /**
- * GitHub Raw URLs（最新マスタデータ取得用）
- * ファイルはリポジトリルートに配置されている
+ * GitHub Contents API でファイルを取得（バイナリ）
+ * トークン付きで認証し、確実に最新データを返す
  */
-const GITHUB_RAW_URLS = [
-  // デプロイブランチ（最新データ）
-  'https://raw.githubusercontent.com/tcta-tottori/Container/claude/init-container-app-0RJFr/CNS_%E5%93%81%E7%9B%AE%E4%B8%80%E8%A6%A7_%E5%85%A8%E9%9B%86%E7%B4%84%E7%89%88.xlsx',
-  // mainブランチ（フォールバック）
-  'https://raw.githubusercontent.com/tcta-tottori/Container/main/CNS_%E5%93%81%E7%9B%AE%E4%B8%80%E8%A6%A7_%E5%85%A8%E9%9B%86%E7%B4%84%E7%89%88.xlsx',
-];
-
-/**
- * CNS品目一覧を取得（GitHub Raw → ローカルの順でフォールバック）
- * cache-busting付きでキャッシュを回避
- */
-export async function fetchMasterData(): Promise<ContainerItem[]> {
-  const bust = `?t=${Date.now()}`;
-
-  // 1. GitHubから最新を取得（複数URLを試行）
-  for (const url of GITHUB_RAW_URLS) {
-    try {
-      const res = await fetch(url + bust, { cache: 'no-store' });
-      if (res.ok) {
-        const buffer = await res.arrayBuffer();
-        const items = parseMasterExcel(buffer);
-        if (items.length > 0) return items;
-      }
-    } catch { /* 次のURLを試す */ }
+async function fetchGitHubFile(filePath: string, token?: string): Promise<ArrayBuffer | null> {
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${encodeURIComponent(filePath)}?ref=${BRANCH}&t=${Date.now()}`;
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.v3.raw',
+  };
+  if (token) {
+    headers['Authorization'] = `token ${token}`;
   }
 
-  // 2. ローカルからフォールバック（basePath対応）
-  //    Next.js の basePath="/Container" を考慮
+  try {
+    const res = await fetch(url, { headers, cache: 'no-store' });
+    if (res.ok) {
+      return await res.arrayBuffer();
+    }
+    console.warn(`[GitHub API] ${filePath}: ${res.status} ${res.statusText}`);
+  } catch (e) {
+    console.warn(`[GitHub API] ${filePath}: fetch error`, e);
+  }
+  return null;
+}
+
+/**
+ * GitHub Raw URL でファイルを取得（フォールバック用、認証不要な公開リポジトリ向け）
+ */
+async function fetchGitHubRaw(filePath: string): Promise<ArrayBuffer | null> {
+  const encodedPath = encodeURIComponent(filePath).replace(/%2F/g, '/');
+  const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${encodedPath}?t=${Date.now()}`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.ok) {
+      return await res.arrayBuffer();
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+/**
+ * CNS品目一覧を取得（GitHub API → Raw URL → ローカルの順でフォールバック）
+ * GitHub Contents API（トークン付き）を最優先で使用し、確実に最新データを取得
+ */
+export async function fetchMasterData(): Promise<ContainerItem[]> {
+  const token = typeof window !== 'undefined' ? getStoredToken() : '';
+  const fallbackToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || '';
+  const effectiveToken = token || fallbackToken;
+
+  // 1. GitHub Contents API（トークン付き、最も信頼性が高い）
+  if (effectiveToken) {
+    const buffer = await fetchGitHubFile(MASTER_FILE_PATH, effectiveToken);
+    if (buffer) {
+      const items = parseMasterExcel(buffer);
+      if (items.length > 0) {
+        console.log(`[Master] GitHub API: ${items.length}件取得`);
+        return items;
+      }
+    }
+  }
+
+  // 2. GitHub Contents API（トークンなし、公開リポジトリ用）
+  {
+    const buffer = await fetchGitHubFile(MASTER_FILE_PATH);
+    if (buffer) {
+      const items = parseMasterExcel(buffer);
+      if (items.length > 0) {
+        console.log(`[Master] GitHub API (no token): ${items.length}件取得`);
+        return items;
+      }
+    }
+  }
+
+  // 3. GitHub Raw URL（フォールバック）
+  {
+    const buffer = await fetchGitHubRaw(MASTER_FILE_PATH);
+    if (buffer) {
+      const items = parseMasterExcel(buffer);
+      if (items.length > 0) {
+        console.log(`[Master] GitHub Raw: ${items.length}件取得`);
+        return items;
+      }
+    }
+  }
+
+  // 4. ローカルからフォールバック（basePath対応）
+  const bust = `?t=${Date.now()}`;
   const paths = [
-    // window.location.pathname ベースで自動検出
     ...(typeof window !== 'undefined' ? [
-      // 現在のページURLからbasePath推定
       window.location.pathname.replace(/\/[^/]*$/, '') + '/data/CNS_品目一覧_全集約版.xlsx',
-      // origin + basePath
       window.location.origin + '/Container/data/CNS_品目一覧_全集約版.xlsx',
-      // origin直下
       window.location.origin + '/data/CNS_品目一覧_全集約版.xlsx',
     ] : ['/data/CNS_品目一覧_全集約版.xlsx']),
   ];
@@ -167,12 +225,70 @@ export async function fetchMasterData(): Promise<ContainerItem[]> {
       if (res.ok) {
         const buffer = await res.arrayBuffer();
         const items = parseMasterExcel(buffer);
-        if (items.length > 0) return items;
+        if (items.length > 0) {
+          console.log(`[Master] Local: ${items.length}件取得`);
+          return items;
+        }
       }
     } catch { /* 次のパスを試す */ }
   }
 
   return [];
+}
+
+/**
+ * JKP_Shipping Schedule.xlsx を GitHub から取得
+ * GitHub Contents API（トークン付き）→ Raw URL の順でフォールバック
+ * @returns XLSX WorkBook or null
+ */
+export async function fetchJkpFromGitHub(): Promise<XLSX.WorkBook | null> {
+  const token = typeof window !== 'undefined' ? getStoredToken() : '';
+  const fallbackToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || '';
+  const effectiveToken = token || fallbackToken;
+
+  // 1. GitHub Contents API（トークン付き）
+  if (effectiveToken) {
+    const buffer = await fetchGitHubFile(JKP_FILE_PATH, effectiveToken);
+    if (buffer) {
+      try {
+        const wb = XLSX.read(buffer, { type: 'array' });
+        console.log(`[JKP] GitHub API: ファイル取得成功 (シート: ${Object.keys(wb.Sheets).join(', ')})`);
+        return wb;
+      } catch (e) {
+        console.warn('[JKP] GitHub API: parse error', e);
+      }
+    }
+  }
+
+  // 2. GitHub Contents API（トークンなし）
+  {
+    const buffer = await fetchGitHubFile(JKP_FILE_PATH);
+    if (buffer) {
+      try {
+        const wb = XLSX.read(buffer, { type: 'array' });
+        console.log(`[JKP] GitHub API (no token): ファイル取得成功`);
+        return wb;
+      } catch (e) {
+        console.warn('[JKP] GitHub API (no token): parse error', e);
+      }
+    }
+  }
+
+  // 3. GitHub Raw URL（フォールバック）
+  {
+    const buffer = await fetchGitHubRaw(JKP_FILE_PATH);
+    if (buffer) {
+      try {
+        const wb = XLSX.read(buffer, { type: 'array' });
+        console.log(`[JKP] GitHub Raw: ファイル取得成功`);
+        return wb;
+      } catch (e) {
+        console.warn('[JKP] GitHub Raw: parse error', e);
+      }
+    }
+  }
+
+  return null;
 }
 
 /**

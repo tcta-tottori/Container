@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
-import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel } from '@/lib/masterLoader';
+import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel, fetchJkpFromGitHub } from '@/lib/masterLoader';
 import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
@@ -87,13 +87,24 @@ export default function Home() {
     };
   }, [viewMode, state.items.length]);
 
-  // CNS品目一覧マスタデータを起動時に自動読込
+  // CNS品目一覧マスタデータ＋JKPデータを起動時に自動読込
   useEffect(() => {
     if (masterLoadedRef.current) return;
     masterLoadedRef.current = true;
+    // マスタデータ取得
     fetchMasterData().then((items) => {
       if (items.length > 0) loadMaster(items);
     });
+    // JKPデータも並行取得
+    fetchJkpFromGitHub().then((wb) => {
+      if (wb) {
+        const { shipments } = parseJkpUpdata(wb);
+        if (shipments.length > 0) {
+          setJkpShipments(shipments);
+          console.log(`[JKP] 起動時自動読込: ${shipments.length}品目`);
+        }
+      }
+    }).catch(() => { /* JKP取得失敗は無視 */ });
   }, [loadMaster]);
 
   // コンテナ品目にマスタデータを自動紐付（気高コード＋新建高コード両方で検索）
@@ -846,6 +857,7 @@ export default function Home() {
                   setLoadingMsg('GitHubから最新の品目一覧を取得中...');
                   try {
                     masterLoadedRef.current = false;
+                    // 1. マスタデータを取得・紐付
                     const { masterItems: newMaster, linkedItems, linked: linkedCount, total } =
                       await fetchAndLinkMaster(state.items);
                     if (newMaster.length > 0) {
@@ -864,7 +876,25 @@ export default function Home() {
                         if (Object.keys(updates).length > 0) updateItem(idx, updates);
                       });
                       linkedRef.current = null;
-                      setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件`);
+
+                      // 2. JKPデータもGitHubから最新を取得
+                      setLoadingMsg(`マスタ${newMaster.length}件取得完了。JKPデータを取得中...`);
+                      try {
+                        const jkpWb = await fetchJkpFromGitHub();
+                        if (jkpWb) {
+                          const { shipments } = parseJkpUpdata(jkpWb);
+                          if (shipments.length > 0) {
+                            setJkpShipments(shipments);
+                            setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件, JKP${shipments.length}品目`);
+                          } else {
+                            setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件 (JKPデータなし)`);
+                          }
+                        } else {
+                          setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件`);
+                        }
+                      } catch {
+                        setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件`);
+                      }
                     } else {
                       setLoadingMsg('マスタデータの取得に失敗しました');
                     }

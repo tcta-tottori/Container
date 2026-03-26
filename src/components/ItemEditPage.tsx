@@ -359,9 +359,8 @@ export default function ItemEditPage({
 
       let newSet: Set<string>;
       if (!current || current.size === 0) {
-        // First click: start from all selected, then remove this one
-        newSet = new Set(allValues.keys());
-        newSet.delete(value);
+        // フィルター未適用 → クリックした値だけを選択（この値のみ表示）
+        newSet = new Set([value]);
       } else {
         newSet = new Set(current);
         if (newSet.has(value)) {
@@ -370,15 +369,17 @@ export default function ItemEditPage({
           newSet.add(value);
         }
       }
-      // If all selected, clear the filter
+      // 全て選択された場合 → フィルターをクリア
       if (newSet.size === allValues.size) {
         const next = { ...prev };
         delete next[colKey];
         return next;
       }
       if (newSet.size === 0) {
-        // Don't allow empty — keep at least the toggled value
-        newSet.add(value);
+        // 空にはさせない → フィルターをクリア（全表示に戻す）
+        const next = { ...prev };
+        delete next[colKey];
+        return next;
       }
       return { ...prev, [colKey]: newSet };
     });
@@ -391,6 +392,8 @@ export default function ItemEditPage({
       return next;
     });
   }, []);
+
+
 
 
   const handleSort = useCallback((colKey: string, direction: 'asc' | 'desc') => {
@@ -792,7 +795,7 @@ export default function ItemEditPage({
                   </div>
                   {/* Divider */}
                   <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '0 10px' }} />
-                  {/* Select all checkbox */}
+                  {/* Select all / clear filter */}
                   <div style={{ padding: '8px 10px 4px' }}>
                     <label style={{
                       display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
@@ -801,14 +804,7 @@ export default function ItemEditPage({
                       <input
                         type="checkbox"
                         checked={!columnFilters[col.key] || columnFilters[col.key]?.size === 0}
-                        onChange={() => {
-                          const filterSet = columnFilters[col.key];
-                          if (!filterSet || filterSet.size === 0) {
-                            // Currently all selected — can't deselect all, do nothing
-                          } else {
-                            handleSelectAll(col.key);
-                          }
-                        }}
+                        onChange={() => handleSelectAll(col.key)}
                         style={{ accentColor: '#60a5fa', width: 14, height: 14 }}
                       />
                       すべて選択
