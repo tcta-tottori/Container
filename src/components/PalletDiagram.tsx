@@ -499,6 +499,12 @@ export default function PalletDiagram({
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       overflow: 'visible',
     }}>
+      <style>{`
+        @keyframes palletFadeUp {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+      `}</style>
       {rotate && (
         <style>{`
           @keyframes ${animName} {
@@ -507,15 +513,17 @@ export default function PalletDiagram({
           }
         `}</style>
       )}
-      <div style={{
-        width: pw, height: totalHeight,
-        position: 'relative',
-        transformStyle: 'preserve-3d',
-        ...(rotate
-          ? { animation: `${animName} 15s linear infinite` }
-          : { transform: 'rotateX(-25deg) rotateY(-35deg)' }
-        ),
-      }}>
+      {/* 出現アニメーション用ラッパー（opacityのみ。3D変換なし） */}
+      <div style={{ animation: 'palletFadeUp 1.5s ease 0.5s both' }}>
+        <div style={{
+          width: pw, height: totalHeight,
+          position: 'relative',
+          transformStyle: 'preserve-3d',
+          ...(rotate
+            ? { animation: `${animName} 15s linear infinite` }
+            : { transform: 'rotateX(-25deg) rotateY(-35deg)' }
+          ),
+        }}>
         {/* Pallet base */}
         <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
 
@@ -532,6 +540,7 @@ export default function PalletDiagram({
             />
           );
         })}
+      </div>
       </div>
     </div>
   );
