@@ -86,6 +86,58 @@ function LoadingOverlay({ message, progress }: { message: string; progress: numb
   );
 }
 
+/* ===== PWA更新通知 ===== */
+function UpdateNotification() {
+  const [hasUpdate, setHasUpdate] = useState(false);
+  useEffect(() => {
+    // Service Worker更新チェック
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    const checkUpdate = async () => {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  setHasUpdate(true);
+                }
+              });
+            }
+          });
+          reg.update();
+        }
+      } catch { /* ignore */ }
+    };
+    checkUpdate();
+    // 5分ごとに更新チェック
+    const interval = setInterval(checkUpdate, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!hasUpdate) return null;
+  return (
+    <div style={{
+      position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 500, animation: 'slideUp 0.5s ease both',
+    }}>
+      <button onClick={() => window.location.reload()} style={{
+        background: 'linear-gradient(135deg, #4a7af7, #9b45c9)',
+        border: 'none', borderRadius: 24, padding: '10px 24px',
+        color: '#fff', fontSize: 13, fontWeight: 700,
+        cursor: 'pointer', boxShadow: '0 4px 24px rgba(107,82,212,0.4)',
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        新しいバージョンがあります — 更新して再読み込み
+      </button>
+    </div>
+  );
+}
+
 export default function Home() {
   const {
     state,
@@ -1003,6 +1055,7 @@ export default function Home() {
             onToggleVoice={toggleListening}
           />
         )}
+        <UpdateNotification />
       </div>
     </>
   );
