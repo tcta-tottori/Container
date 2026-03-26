@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
-import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel, fetchJkpFromGitHub } from '@/lib/masterLoader';
+import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel, parseMasterExcel, fetchJkpFromGitHub } from '@/lib/masterLoader';
 import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
@@ -291,6 +291,54 @@ export default function Home() {
       }
     },
     [loadData, loadMaster]
+  );
+
+  // マスターデータ（CNS品目一覧）をファイルから読込
+  const handleMasterLoaded = useCallback(
+    async (file: File) => {
+      setLoadingMsg('マスターデータを読み込み中...');
+      try {
+        const buffer = await file.arrayBuffer();
+        const masterItems = parseMasterExcel(buffer);
+        if (masterItems.length === 0) {
+          setLoadingMsg('マスターデータの解析に失敗しました');
+          await new Promise((r) => setTimeout(r, 2000));
+          return;
+        }
+
+        // マスタデータを更新
+        loadMaster(masterItems);
+        masterLoadedRef.current = true;
+
+        // 既存コンテナ品目があれば再紐付
+        if (state.items.length > 0) {
+          setLoadingMsg(`マスタ${masterItems.length}件で紐付中...`);
+          const { linkedItems, linked, total } = linkItemsWithMaster(state.items, masterItems);
+          linkedItems.forEach((updatedItem, idx) => {
+            const orig = state.items[idx];
+            if (!orig) return;
+            const updates: Partial<typeof orig> = {};
+            for (const k of Object.keys(updatedItem) as (keyof typeof updatedItem)[]) {
+              if (updatedItem[k] !== orig[k]) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (updates as any)[k] = updatedItem[k];
+              }
+            }
+            if (Object.keys(updates).length > 0) updateItem(idx, updates);
+          });
+          linkedRef.current = null;
+          setLoadingMsg(`マスタ読込完了: ${masterItems.length}件, 紐付${linked}/${total}件`);
+        } else {
+          setLoadingMsg(`マスタ読込完了: ${masterItems.length}件`);
+        }
+
+        saveRecentFile(file, 1, masterItems.length, 'container');
+        await new Promise((r) => setTimeout(r, 1500));
+      } finally {
+        setLoadingMsg(null);
+      }
+    },
+    [loadMaster, state.items, updateItem]
   );
 
   const handleJkpLoaded = useCallback(
@@ -589,7 +637,7 @@ export default function Home() {
   if (state.containers.length === 0 && jkpShipments.length === 0) {
     return (
       <>
-        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} />
+        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} />
         {loadingMsg && (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 300,

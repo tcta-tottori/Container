@@ -42,6 +42,7 @@ interface FileDropZoneProps {
   onAqssLoaded?: (files: File[]) => void;
   onAqssContainerLoaded?: (invoiceFile: File, packingFile?: File) => void;
   onJkpLoaded?: (file: File) => void;
+  onMasterLoaded?: (file: File) => void;
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
@@ -132,7 +133,7 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   );
 }
 
-export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
+export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
@@ -159,11 +160,13 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           aqssFiles.push(f);
         } else if (role === 'jkp') {
           if (onJkpLoaded) onJkpLoaded(f);
+        } else if (role === 'master') {
+          // マスターデータ（CNS品目一覧）→ 直接読込・反映
+          if (onMasterLoaded) onMasterLoaded(f);
         } else if (role === 'container' || role === 'container_schedule') {
           // コンテナ作業ファイルとコンテナ日程は両方ともコンテナとして読込
           containerFile = f;
         }
-        // master, ketaka は onMultiFilesLoaded 経由で処理
       }
 
       setClassifiedFiles(classified);

@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { ContainerItem } from './types';
+import { parseMasterExcel } from './masterLoader';
 
 const REPO_OWNER = 'tcta-tottori';
 const REPO_NAME = 'Container';
@@ -64,24 +65,112 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 /**
- * GitHub Contents API でファイルの現在の SHA を取得
+ * GitHub Contents API でファイルの現在の SHA とバイナリデータを取得
  */
-async function getFileSha(token: string): Promise<string | null> {
+async function getFileInfo(token: string): Promise<{ sha: string | null; buffer: ArrayBuffer | null }> {
   try {
-    const res = await fetch(
+    // SHA取得
+    const metaRes = await fetch(
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${encodeURIComponent(FILE_PATH)}?ref=${BRANCH}`,
       { headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3+json' } }
     );
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.sha || null;
+    if (!metaRes.ok) return { sha: null, buffer: null };
+    const meta = await metaRes.json();
+    const sha = meta.sha || null;
+
+    // バイナリ取得（Raw）
+    const rawRes = await fetch(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${encodeURIComponent(FILE_PATH)}?ref=${BRANCH}`,
+      { headers: { Authorization: `token ${token}`, Accept: 'application/vnd.github.v3.raw' }, cache: 'no-store' }
+    );
+    if (!rawRes.ok) return { sha, buffer: null };
+    const buffer = await rawRes.arrayBuffer();
+    return { sha, buffer };
   } catch {
-    return null;
+    return { sha: null, buffer: null };
   }
 }
 
 /**
- * GitHub Contents API でファイルを更新（commit & push）
+ * GitHubの最新データと保存データをマージ
+ *
+ * 戦略:
+ * - GitHub側のデータをベースとする
+ * - アプリ側のデータで空でないフィールドだけ上書き
+ * - GitHub側にしかない品目はそのまま保持
+ * - アプリ側にしかない品目は追加
+ *
+ * これにより、GitHubに直接アップロードしたデータ（Meas.等）が
+ * アプリの保存で消えることを防ぐ
+ */
+function mergeItems(appItems: ContainerItem[], githubItems: ContainerItem[]): ContainerItem[] {
+  // GitHub側のマップ（気高コード → アイテム）
+  const ghByPart = new Map<string, ContainerItem>();
+  const ghByNewPart = new Map<string, ContainerItem>();
+  for (const g of githubItems) {
+    if (g.partNumber) ghByPart.set(g.partNumber, g);
+    if (g.newPartNumber) ghByNewPart.set(g.newPartNumber, g);
+  }
+
+  const usedGhParts = new Set<string>();
+  const merged: ContainerItem[] = [];
+
+  for (const app of appItems) {
+    // GitHub側で対応するアイテムを探す
+    const gh = ghByPart.get(app.partNumber) || ghByNewPart.get(app.partNumber)
+      || (app.newPartNumber ? (ghByNewPart.get(app.newPartNumber) || ghByPart.get(app.newPartNumber)) : undefined);
+
+    if (gh) {
+      usedGhParts.add(gh.partNumber);
+      if (gh.newPartNumber) usedGhParts.add(gh.newPartNumber);
+
+      // GitHub側をベースにして、アプリ側の空でないフィールドで上書き
+      const result = { ...gh };
+
+      // アプリ側に値があるフィールドのみ上書き
+      if (app.newPartNumber) result.newPartNumber = app.newPartNumber;
+      if (app.partNumber) result.partNumber = app.partNumber;
+      if (app.itemName) result.itemName = app.itemName;
+      if (app.type) result.type = app.type;
+      if (app.representModel) result.representModel = app.representModel;
+      if (app.packingQty) result.packingQty = app.packingQty;
+      if (app.qtyPerPallet) result.qtyPerPallet = app.qtyPerPallet;
+      if (app.size) result.size = app.size;
+      if (app.newPartNumberKetaka) result.newPartNumberKetaka = app.newPartNumberKetaka;
+      if (app.itemNameKetaka) result.itemNameKetaka = app.itemNameKetaka;
+      if (app.linkStatus) result.linkStatus = app.linkStatus;
+      if (app.itemNameContainer) result.itemNameContainer = app.itemNameContainer;
+      if (app.representModelContainer) result.representModelContainer = app.representModelContainer;
+      if (app.packingQtyContainer !== undefined && app.packingQtyContainer !== 0) result.packingQtyContainer = app.packingQtyContainer;
+      if (app.qtyPerPalletContainer !== undefined && app.qtyPerPalletContainer !== 0) result.qtyPerPalletContainer = app.qtyPerPalletContainer;
+      if (app.description) result.description = app.description;
+      if (app.modelNo) result.modelNo = app.modelNo;
+      if (app.grossWeight !== undefined && app.grossWeight !== 0) result.grossWeight = app.grossWeight;
+      if (app.cbm !== undefined && app.cbm !== 0) result.cbm = app.cbm;
+      if (app.measurements) result.measurements = app.measurements;
+
+      merged.push(result);
+    } else {
+      // GitHub側にないアプリ側の新規品目
+      merged.push(app);
+    }
+  }
+
+  // GitHub側にしかない品目を追加（アプリ側で削除されていない品目）
+  for (const gh of githubItems) {
+    if (!usedGhParts.has(gh.partNumber)) {
+      merged.push(gh);
+    }
+  }
+
+  return merged;
+}
+
+/**
+ * GitHub Contents API でファイルを更新（マージ戦略付き）
+ *
+ * 保存前にGitHubの最新データを取得し、マージしてから保存する。
+ * これにより、GitHub上で直接更新されたデータ（Meas.等）が失われない。
  */
 export async function saveToGitHub(
   items: ContainerItem[],
@@ -89,16 +178,31 @@ export async function saveToGitHub(
   onProgress?: (msg: string) => void,
 ): Promise<{ success: boolean; message: string }> {
   try {
-    onProgress?.('Excelファイルを生成中...');
-    const buffer = buildExcelBuffer(items);
-    const content = arrayBufferToBase64(buffer);
+    onProgress?.('GitHubから最新データを取得中...');
+    const { sha, buffer: ghBuffer } = await getFileInfo(token);
 
-    onProgress?.('GitHubから現在のファイル情報を取得中...');
-    const sha = await getFileSha(token);
+    // GitHub側の最新データをパース → マージ
+    let mergedItems = items;
+    if (ghBuffer) {
+      try {
+        const ghItems = parseMasterExcel(ghBuffer);
+        if (ghItems.length > 0) {
+          onProgress?.(`マージ中... (アプリ: ${items.length}件, GitHub: ${ghItems.length}件)`);
+          mergedItems = mergeItems(items, ghItems);
+          console.log(`[Save] マージ完了: ${items.length}件(アプリ) + ${ghItems.length}件(GitHub) → ${mergedItems.length}件`);
+        }
+      } catch (e) {
+        console.warn('[Save] GitHubデータのパース失敗、アプリデータのみで保存:', e);
+      }
+    }
+
+    onProgress?.(`Excelファイルを生成中... (${mergedItems.length}件)`);
+    const buffer = buildExcelBuffer(mergedItems);
+    const content = arrayBufferToBase64(buffer);
 
     onProgress?.('GitHubへアップロード中...');
     const body: Record<string, string> = {
-      message: `Update CNS_品目一覧_全集約版.xlsx (${items.length}件, ${new Date().toLocaleString('ja-JP')})`,
+      message: `Update CNS_品目一覧_全集約版.xlsx (${mergedItems.length}件, ${new Date().toLocaleString('ja-JP')})`,
       content,
       branch: BRANCH,
     };
@@ -118,7 +222,7 @@ export async function saveToGitHub(
     );
 
     if (res.ok) {
-      return { success: true, message: `GitHub更新完了 (${items.length}件)` };
+      return { success: true, message: `GitHub更新完了 (${mergedItems.length}件)` };
     } else {
       const err = await res.json().catch(() => ({}));
       return { success: false, message: `GitHub更新失敗: ${res.status} ${(err as Record<string, string>).message || ''}` };
