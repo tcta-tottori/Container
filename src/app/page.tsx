@@ -333,7 +333,7 @@ export default function Home() {
           setLoadingMsg(`マスタ読込完了: ${masterItems.length}件`);
         }
 
-        saveRecentFile(file, 1, masterItems.length, 'container');
+        saveRecentFile(file, 1, masterItems.length, 'master');
         await new Promise((r) => setTimeout(r, 1500));
       } finally {
         setLoadingMsg(null);
