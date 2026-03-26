@@ -477,7 +477,8 @@ export default function ItemDetailPanel({
               display: 'flex', flexDirection: 'row-reverse', width: 140, height: 22, borderRadius: 20,
               overflow: 'hidden',
               background: 'rgba(255,255,255,0.06)',
-              border: '1.5px solid rgba(255,255,255,0.15)',
+              border: '1.5px solid rgba(255,255,255,0.5)',
+              boxShadow: '0 0 8px rgba(255,255,255,0.15), inset 0 0 4px rgba(255,255,255,0.05)',
             }}>
               {Array.from(typeCounts.entries()).reverse().map(([type, count]) => {
                 const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
@@ -512,8 +513,9 @@ export default function ItemDetailPanel({
             </div>
             {/* 進捗率 */}
             <span style={{
-              fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700, marginTop: 6,
-              color: 'rgba(255,255,255,0.45)', letterSpacing: 0.3,
+              fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 800, marginTop: 6,
+              color: '#fff', letterSpacing: 0.3,
+              textShadow: '0 0 8px rgba(255,255,255,0.6), 0 0 16px rgba(255,255,255,0.3)',
             }}>
               {Math.round((completedIds.size / allItems.length) * 100)}%
             </span>
