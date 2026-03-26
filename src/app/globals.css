@@ -475,6 +475,44 @@ body {
   50% { background: #3a2a14; }
 }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+/* 読込ポップアップ入場 */
+@keyframes loadingPopupIn {
+  0% { opacity: 0; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes loadingOverlayIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+  animation: loadingOverlayIn 0.3s ease both;
+}
+.loading-popup-card {
+  background: linear-gradient(160deg, #1e2235 0%, #252a40 100%);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px; padding: 32px 40px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  animation: loadingPopupIn 0.4s cubic-bezier(0.16,1,0.3,1) both;
+}
+.loading-spinner {
+  width: 40px; height: 40px; margin: 0 auto 16px;
+  border-radius: 50%;
+  border: 3px solid rgba(107,82,212,0.15);
+  border-top: 3px solid transparent;
+  animation: spin 1s linear infinite;
+  background: conic-gradient(from 0deg, #4a7af7, #6b52d4, #9b45c9, #c0549a, transparent 320deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+}
+.loading-msg {
+  color: #fff; font-size: 14px; font-weight: 600; margin: 0 0 4px;
+}
+.loading-sub {
+  color: rgba(255,255,255,0.4); font-size: 11px; margin: 0;
+}
 @keyframes wheelSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes truckBounce { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-1.5px); } 60% { transform: translateY(-0.5px); } }
 @keyframes roadDash { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -24; } }

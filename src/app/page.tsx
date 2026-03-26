@@ -652,28 +652,11 @@ export default function Home() {
       <>
         <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} />
         {loadingMsg && (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 300,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-          }}>
-            <div style={{
-              background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 20, padding: '32px 40px', textAlign: 'center',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-            }}>
-              <div style={{
-                width: 40, height: 40, margin: '0 auto 16px',
-                border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6',
-                borderRadius: '50%', animation: 'spin 1s linear infinite',
-              }} />
-              <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>
-                {loadingMsg}
-              </p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>
-                しばらくお待ちください
-              </p>
+          <div className="loading-overlay">
+            <div className="loading-popup-card">
+              <div className="loading-spinner" />
+              <p className="loading-msg">{loadingMsg}</p>
+              <p className="loading-sub">しばらくお待ちください</p>
             </div>
           </div>
         )}
