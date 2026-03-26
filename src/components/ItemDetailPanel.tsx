@@ -294,6 +294,16 @@ export default function ItemDetailPanel({
   const accentColor = nabeColor || colors.accent;
   const [palletFlash, setPalletFlash] = useState(false);
   const doubleTapRef = useRef<number | null>(null);
+  const [animKey, setAnimKey] = useState(item.id);
+  const prevItemIdRef = useRef(item.id);
+
+  // 品目切替検知 → アニメーションリセット
+  useEffect(() => {
+    if (prevItemIdRef.current !== item.id) {
+      prevItemIdRef.current = item.id;
+      setAnimKey(item.id);
+    }
+  }, [item.id]);
 
   const handlePalletDoubleTap = useCallback(() => {
     const now = Date.now();
@@ -447,8 +457,8 @@ export default function ItemDetailPanel({
           </span>
         </div>
 
-        {/* 品名 */}
-        <div style={{ position: 'relative', zIndex: 3 }}>
+        {/* 品名（下から出現 1秒） */}
+        <div key={`name-${animKey}`} className="anim-slide-up" style={{ position: 'relative', zIndex: 3 }}>
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
               color: nabeColor || '#f0f0f0',
@@ -482,44 +492,47 @@ export default function ItemDetailPanel({
           position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0,
           display: 'flex', flexDirection: 'row',
         }}>
-          {/* 左側: 箱3Dイメージ + 寸法テキスト */}
+          {/* 左側: 箱3Dイメージ（中心からズーム1.5秒） + 寸法テキスト（0.5秒後フェード） */}
           <div style={{
             position: 'relative', width: '35%', height: '100%', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'visible',
           }}>
             {(item.measurements || item.cbm || item.type === '鍋') && (
-              <SizeDiagram measurements={item.measurements} cbm={item.cbm}
-                type={item.type} maxContainerDim={maxContainerDim} itemName={item.itemName} />
+              <div key={`box-${animKey}`} className="anim-zoom-in">
+                <SizeDiagram measurements={item.measurements} cbm={item.cbm}
+                  type={item.type} maxContainerDim={maxContainerDim} itemName={item.itemName} />
+              </div>
             )}
-            {/* 寸法テキスト — 左下オーバーレイ */}
+            {/* 寸法テキスト — 左下オーバーレイ（2秒後にフェード） */}
             {currentDims && (
-              <div style={{
+              <div key={`dims-${animKey}`} className="anim-fade-in" style={{
                 position: 'absolute', bottom: 0, left: 4, zIndex: 2,
                 fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 13,
                 color: accentColor,
                 textShadow: `0 0 8px rgba(0,0,0,0.9), 0 1px 6px rgba(0,0,0,0.7), 0 0 20px ${accentColor}40`,
                 letterSpacing: '-0.5px',
+                animationDelay: '2s',
               }}>
                 {currentDims[0]}×{currentDims[1]}×{currentDims[2]}
               </div>
             )}
           </div>
 
-          {/* 右側: パレット図（積み方 + 端数を横並び — 同じSVGコンポーネント） */}
+          {/* 右側: パレット図（段ボール上から落下 2秒） */}
           <div style={{
             flex: 1, height: '100%', display: 'flex', flexDirection: 'row',
             alignItems: 'center', justifyContent: 'center', gap: 4,
           }}>
             {item.palletCount > 0 && item.qtyPerPallet > 0 && (
-              <div style={{ flex: 1, height: '100%', minWidth: 0 }}>
+              <div key={`pl-${animKey}`} className="anim-drop-in" style={{ flex: 1, height: '100%', minWidth: 0 }}>
                 <PalletDiagram palletCount={item.palletCount} fraction={0}
                   qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                   measurements={item.measurements} />
               </div>
             )}
             {item.fraction > 0 && (
-              <div style={{ flex: 1, height: '100%', minWidth: 0 }}>
+              <div key={`fr-${animKey}`} className="anim-drop-in" style={{ flex: 1, height: '100%', minWidth: 0, animationDelay: '0.3s' }}>
                 <PalletDiagram palletCount={0} fraction={item.fraction}
                   qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                   measurements={item.measurements} />
@@ -528,9 +541,9 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 数量（PL / CT / pcs） */}
-        <div className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
-          <div className="detail-sf-item" style={{ minWidth: 0 }}>
+        {/* 数量（PL / CT / pcs）— カウントアップアニメーション 1秒 */}
+        <div key={`stats-${animKey}`} className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
+          <div className="detail-sf-item anim-count-up" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
               color: accentColor,
               textShadow: `0 0 16px ${accentColor}50, 0 2px 4px rgba(0,0,0,0.6)`,
@@ -543,7 +556,7 @@ export default function ItemDetailPanel({
             }}>{fmtNum(item.palletCount)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>PL</span>
           </div>
-          <div className="detail-sf-item" style={{ minWidth: 0 }}>
+          <div className="detail-sf-item anim-count-up" style={{ minWidth: 0, animationDelay: '0.1s' }}>
             <span className="detail-sf-num" style={{
               color: '#e8e8e8',
               textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`,
@@ -551,7 +564,7 @@ export default function ItemDetailPanel({
             }}>{item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : fmtNum(item.fraction)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>CT</span>
           </div>
-          <div className="detail-sf-item detail-sf-total" style={{ minWidth: 0 }}>
+          <div className="detail-sf-item detail-sf-total anim-count-up" style={{ minWidth: 0, animationDelay: '0.2s' }}>
             <span className="detail-sf-num-sm" style={{
               color: 'rgba(255,255,255,0.6)',
               display: 'inline-block', minWidth: '4ch', textAlign: 'right',
