@@ -84,16 +84,12 @@ body {
   transition: font-size 0.4s ease, color 0.4s ease, transform 0.4s ease;
 }
 .header-elapsed-flash {
-  position: fixed !important;
-  top: 6px; left: 50%; transform: translateX(-50%);
-  z-index: 9999;
-  font-size: 56px !important; color: #f59e0b !important;
-  background: rgba(0,0,0,0.85) !important;
-  border: none !important;
-  border-radius: 12px;
-  padding: 8px 24px !important;
-  pointer-events: auto;
-  transition: font-size 0.4s ease, color 0.4s ease, transform 0.4s ease, opacity 0.4s ease;
+  color: #f59e0b !important;
+  animation: elapsed-blink 0.8s ease-in-out infinite;
+}
+@keyframes elapsed-blink {
+  0%, 100% { color: #f59e0b; }
+  50% { color: rgba(245,158,11,0.3); }
 }
 
 /* ===== Menu ===== */

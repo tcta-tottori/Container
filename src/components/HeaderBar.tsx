@@ -44,12 +44,12 @@ export default function HeaderBar({
   const [isFlashing, setIsFlashing] = useState(false);
   const lastFlashedAt = useRef(0);
 
-  // 5分ごとに経過時間を拡大表示（3秒間）
+  // 5分ごとに黄色点滅（5秒間）
   useEffect(() => {
     if (workRawSeconds > 0 && workRawSeconds % 300 === 0 && lastFlashedAt.current !== workRawSeconds) {
       lastFlashedAt.current = workRawSeconds;
       setIsFlashing(true);
-      const timer = setTimeout(() => setIsFlashing(false), 3000);
+      const timer = setTimeout(() => setIsFlashing(false), 5000);
       return () => clearTimeout(timer);
     }
   }, [workRawSeconds]);
