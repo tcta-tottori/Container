@@ -65,6 +65,7 @@ export default function Home() {
   const [manualOpen, setManualOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
   const [jkpShipments, setJkpShipments] = useState<JkpShipment[]>([]);
+  const jkpUserLoadedRef = useRef(false);  // ユーザーが明示的にJKPを読み込んだか
 
   // 作業ページ表示中は画面スリープを防止（Wake Lock API）
   useEffect(() => {
@@ -343,6 +344,7 @@ export default function Home() {
 
   const handleJkpLoaded = useCallback(
     async (file: File) => {
+      jkpUserLoadedRef.current = true;  // ユーザー操作による読込
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('JKPファイルを読み込み中...');
@@ -634,7 +636,7 @@ export default function Home() {
   const { isListening, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
-  if (state.containers.length === 0 && jkpShipments.length === 0) {
+  if (state.containers.length === 0 && !(jkpUserLoadedRef.current && jkpShipments.length > 0)) {
     return (
       <>
         <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} />
@@ -668,8 +670,8 @@ export default function Home() {
     );
   }
 
-  // JKPデータのみ（コンテナなし）の場合: JKPスケジュールページ表示
-  if (state.containers.length === 0 && jkpShipments.length > 0) {
+  // JKPデータのみ（コンテナなし、ユーザー明示読込時のみ）: JKPスケジュールページ表示
+  if (state.containers.length === 0 && jkpUserLoadedRef.current && jkpShipments.length > 0) {
     return (
       <div className="app-layout" style={{ background: 'var(--bg-primary)' }}>
         <div style={{
