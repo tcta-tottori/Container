@@ -145,7 +145,7 @@ function SimilarItemsMarquee({ item, similarItems }: {
     return (
       <span key={s.id} style={{
         display: 'inline-flex', alignItems: 'center', gap: 3,
-        fontSize: 13, fontWeight: 900, color: '#fcd34d',
+        fontSize: 13, fontWeight: 500, color: '#fcd34d',
         textShadow: '0 0 6px rgba(251,191,36,0.3)',
       }}>
         {i > 0 && <span style={{ color: 'rgba(251,191,36,0.4)', margin: '0 4px' }}>|</span>}
@@ -163,9 +163,8 @@ function SimilarItemsMarquee({ item, similarItems }: {
       overflow: 'hidden', whiteSpace: 'nowrap',
     }}>
       <span style={{
-        fontSize: 13, fontWeight: 900, color: '#fbbf24', whiteSpace: 'nowrap', flexShrink: 0,
+        fontSize: 13, fontWeight: 500, color: '#fbbf24', whiteSpace: 'nowrap', flexShrink: 0,
         display: 'flex', alignItems: 'center', gap: 4,
-        textShadow: '0 0 8px rgba(251,191,36,0.5)',
       }}>
         <span style={{ fontSize: 14 }}>&#x26A0;&#xFE0F;</span>類似品:
       </span>
@@ -537,7 +536,7 @@ export default function ItemDetailPanel({
               padding: '6px 12px', borderRadius: 8,
               background: 'rgba(255,255,255,0.06)',
             }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', flexShrink: 0 }}>関連:</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', flexShrink: 0 }}>関連:</span>
               <MarqueeText text={relatedText} className="detail-related-text" style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 500 }} />
             </div>
           ) : null}
