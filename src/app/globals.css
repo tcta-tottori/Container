@@ -277,10 +277,12 @@ body {
   75% { --logo-angle: 45deg; }
   100% { --logo-angle: 135deg; }
 }
-/* 360度フル回転で切れ目なし */
+/* 青→紫→オレンジ→青 の色相回転（高速12秒サイクル） */
 @keyframes logo-hue-shift {
   0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(360deg); }
+  33% { filter: hue-rotate(40deg); }
+  66% { filter: hue-rotate(-30deg); }
+  100% { filter: hue-rotate(0deg); }
 }
 
 /* ===== Detail panel ===== */

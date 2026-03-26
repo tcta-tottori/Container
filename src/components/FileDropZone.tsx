@@ -298,8 +298,9 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: 80, height: 80, borderRadius: 20,
-            background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
-            animation: 'logo-hue-shift 30s linear infinite',
+            background: 'radial-gradient(circle at 15% 25%, #3b6ef6 0%, transparent 50%), radial-gradient(circle at 75% 20%, #7c48d0 0%, transparent 45%), radial-gradient(circle at 60% 80%, #e87420 0%, transparent 50%), radial-gradient(circle at 30% 70%, #3b6ef6 0%, transparent 40%), radial-gradient(circle at 85% 65%, #9b30ff 0%, transparent 45%)',
+            backgroundColor: '#0e0b1a',
+            animation: 'logo-hue-shift 12s ease-in-out infinite',
             marginBottom: 12,
             boxShadow: '0 8px 32px rgba(59,130,246,0.3), 0 0 20px rgba(139,92,246,0.25), 0 0 40px rgba(249,115,22,0.15)',
           }}>
@@ -310,7 +311,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             background: 'linear-gradient(135deg, #3b6ef6 0%, #7c48d0 40%, #e87420 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            animation: 'logo-hue-shift 30s linear infinite',
+            animation: 'logo-hue-shift 12s ease-in-out infinite',
           }}>
             Container Navigation System
           </h1>
