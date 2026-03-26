@@ -422,14 +422,14 @@ body {
   0%, 100% { background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.3); }
   50% { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.12); }
 }
-/* 類似品 枠線点滅（暗背景+琥珀枠・白文字に合う） */
+/* 類似品背景点滅（枠なし、背景色が脈動） */
 .similar-warn-blink {
-  border: 2px solid rgba(251,191,36,0.7);
-  animation: similar-flash 1.2s ease-in-out infinite;
+  border: none;
+  animation: similar-bg-pulse 1.8s ease-in-out infinite;
 }
-@keyframes similar-flash {
-  0%, 100% { background: rgba(245,158,11,0.18); border-color: rgba(251,191,36,0.8); box-shadow: 0 0 12px rgba(245,158,11,0.4); }
-  50% { background: rgba(245,158,11,0.04); border-color: rgba(251,191,36,0.25); box-shadow: 0 0 2px rgba(245,158,11,0.1); }
+@keyframes similar-bg-pulse {
+  0%, 100% { background: rgba(180,80,20,0.35); }
+  50% { background: rgba(120,40,10,0.15); }
 }
 .detail-similar-label { color: #d97706; font-weight: 600; white-space: nowrap; }
 .detail-similar-names { color: #92400e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
