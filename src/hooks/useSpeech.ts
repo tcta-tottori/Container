@@ -187,8 +187,8 @@ export function useSpeech() {
     // === 開始コール（挨拶なし、コンテナ番号なし） ===
     const isResume = completedIds && done > 0;
     let text = isResume
-      ? `続きです。合計${items.length}品目。`
-      : `荷降ろしを開始します。合計${items.length}品目。`;
+      ? '続きです。'
+      : '荷降ろしを開始します。';
 
     // === 内容物コール: 「〇〇がN種類」形式 ===
     const typeLabels: [string, string][] = [
@@ -237,26 +237,13 @@ export function useSpeech() {
   }, []);
 
   /** 進捗状況アナウンス（完了率・残りCBM等） */
+  /** 進捗コール: 進捗率 + 種類別残りのみ */
   const announceProgress = useCallback((items: ContainerItem[], completedIds: Set<string>) => {
     const total = items.length;
     const done = items.filter((it) => completedIds.has(it.id)).length;
-    const remaining = total - done;
     const pct = total > 0 ? Math.round(done / total * 100) : 0;
 
-    let text = `進捗${pct}パーセント。${done}品目完了、残り${remaining}品目。`;
-
-    // CBM情報があれば残り容積もアナウンス
-    let totalCbm = 0, remainCbm = 0;
-    for (const it of items) {
-      if (it.cbm) {
-        const vol = it.cbm * (it.caseCount || 1);
-        totalCbm += vol;
-        if (!completedIds.has(it.id)) remainCbm += vol;
-      }
-    }
-    if (totalCbm > 0) {
-      text += `残り容積約${remainCbm.toFixed(1)}立方メートル。`;
-    }
+    let text = `進捗${pct}パーセント。`;
 
     // 種類別残り
     const typeCounts: Record<string, number> = {};
@@ -266,22 +253,10 @@ export function useSpeech() {
       }
     }
     const parts: string[] = [];
-    if (typeCounts['ポリカバー']) parts.push(`ポリカバー${typeCounts['ポリカバー']}`);
-    if (typeCounts['ジャーポット']) parts.push(`ジャーポット${typeCounts['ジャーポット']}`);
-    if (typeCounts['箱']) parts.push(`箱${typeCounts['箱']}`);
-    if (typeCounts['部品']) parts.push(`部品${typeCounts['部品']}`);
-    if (typeCounts['鍋']) parts.push(`鍋${typeCounts['鍋']}`);
-    if (typeCounts['ヤーマン部品']) parts.push(`ヤーマン${typeCounts['ヤーマン部品']}`);
-    if (typeCounts['その他']) parts.push(`その他${typeCounts['その他']}`);
-    if (parts.length > 0) {
-      text += `内訳、${parts.join('、')}。`;
+    for (const [t, c] of Object.entries(typeCounts)) {
+      parts.push(`${t}が${c}種類`);
     }
-
-    if (remaining === 0) {
-      text += '全品目完了です。お疲れ様でした。';
-    } else if (pct >= 75) {
-      text += 'もう少しです、頑張りましょう。';
-    }
+    if (parts.length > 0) text += parts.join('、') + '。';
 
     speak(text);
   }, []);

@@ -279,20 +279,18 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
 
-  // 進捗マイルストーンアナウンス（20%刻み — 詳細版）
+  // 進捗マイルストーンアナウンス（50%, 80%）
   useEffect(() => {
     if (state.items.length === 0) return;
     const pct = state.completedIds.size / state.items.length * 100;
-    const thresholds = [20, 40, 60, 80, 100];
-    for (const t of thresholds) {
-      if (pct >= t && !announcedThresholdsRef.current.has(t)) {
-        announcedThresholdsRef.current.add(t);
-        // 完了アナウンスが終わった後に詳細進捗をアナウンス
-        setTimeout(() => {
-          announceProgress(state.items, state.completedIds);
-        }, 2500);
-        break; // Only announce one threshold at a time
-      }
+    // 50%: 残り半分コール、80%: あと少しコール
+    if (pct >= 50 && !announcedThresholdsRef.current.has(50)) {
+      announcedThresholdsRef.current.add(50);
+      setTimeout(() => speak('残り半分です。'), 2500);
+    }
+    if (pct >= 80 && !announcedThresholdsRef.current.has(80)) {
+      announcedThresholdsRef.current.add(80);
+      setTimeout(() => speak('あと少しです。頑張りましょう。'), 2500);
     }
   }, [state.completedIds.size, state.items.length, announceProgress, state.items, state.completedIds]);
 
@@ -858,13 +856,7 @@ export default function Home() {
               </svg>
               作業
             </button>
-            <button className={`menu-item ${viewMode === 'list' ? 'active' : ''}`} onClick={() => switchView('list')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-                <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-              </svg>
-              一覧
-            </button>
+            {/* 一覧ページ削除 */}
             <button className={`menu-item ${viewMode === 'edit' ? 'active' : ''}`} onClick={() => switchView('edit')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
