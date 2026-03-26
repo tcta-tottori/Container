@@ -8,6 +8,37 @@ import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
 import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
+/** カウントアップアニメーション: 0.5秒待機→2.5秒で0→targetまで緩急付きカウント */
+function useCountUp(target: number, key: string): number {
+  const [value, setValue] = useState(0);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    setValue(0);
+    const startTime = performance.now() + 500; // 0.5秒待機
+    const duration = 2500; // 2.5秒カウント
+
+    const animate = (now: number) => {
+      if (now < startTime) {
+        rafRef.current = requestAnimationFrame(animate);
+        return;
+      }
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-in-out: ゆっくり→早く→ゆっくり
+      const eased = progress < 0.5
+        ? 4 * progress * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      setValue(Math.round(eased * target));
+      if (progress < 1) rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [target, key]);
+
+  return value;
+}
+
 interface ItemDetailPanelProps {
   item: ContainerItem;
   relatedItems: ContainerItem[];
@@ -295,15 +326,29 @@ export default function ItemDetailPanel({
   const [palletFlash, setPalletFlash] = useState(false);
   const doubleTapRef = useRef<number | null>(null);
   const [animKey, setAnimKey] = useState(item.id);
+  const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
 
-  // 品目切替検知 → アニメーションリセット
+  // 品目切替検知 → フェードアウト→空白→フェードイン
   useEffect(() => {
     if (prevItemIdRef.current !== item.id) {
       prevItemIdRef.current = item.id;
-      setAnimKey(item.id);
+      // フェードアウト(0.3s) → 空白(0.5s) → フェードイン
+      setTransitionPhase('fadeout');
+      const t1 = setTimeout(() => setTransitionPhase('blank'), 300);
+      const t2 = setTimeout(() => {
+        setAnimKey(item.id);
+        setTransitionPhase('fadein');
+      }, 800);
+      const t3 = setTimeout(() => setTransitionPhase('visible'), 1300);
+      return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
     }
   }, [item.id]);
+
+  // 上半分コンテンツの表示状態
+  const upperOpacity = transitionPhase === 'fadeout' ? 0 : transitionPhase === 'blank' ? 0 : 1;
+  const upperTransition = transitionPhase === 'fadeout' ? 'opacity 0.3s ease' : transitionPhase === 'fadein' ? 'opacity 0.5s ease' : 'none';
+  const showContent = transitionPhase !== 'blank';
 
   const handlePalletDoubleTap = useCallback(() => {
     const now = Date.now();
@@ -364,6 +409,11 @@ export default function ItemDetailPanel({
     '--hero-c4': accentColor + '22',
   } as React.CSSProperties;
 
+  // カウントアップアニメーション
+  const animPL = useCountUp(item.palletCount, animKey);
+  const animCT = useCountUp(item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction, animKey);
+  const animPCS = useCountUp(Math.ceil(item.totalQty), animKey);
+
   return (
     <div className="detail-root" style={{ background: '#1a1d2e' }}>
       {/* === 上半分（アニメーショングラデーション） === */}
@@ -379,6 +429,9 @@ export default function ItemDetailPanel({
             radial-gradient(ellipse 60% 70% at 70% 70%, var(--hero-c4) 0%, transparent 60%)
           `,
         }} />
+
+        {/* トランジション制御ラッパー */}
+        <div style={{ opacity: upperOpacity, transition: upperTransition, display: showContent ? undefined : 'none' }}>
 
         {/* 積載分布ゲージ + 種類数 + 進捗率（右上） */}
         {allItems.length > 0 && (
@@ -546,7 +599,7 @@ export default function ItemDetailPanel({
 
         {/* 数量（PL / CT / pcs）— カウントアップアニメーション 1秒 */}
         <div key={`stats-${animKey}`} className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'center' }}>
-          <div className="detail-sf-item anim-count-up" style={{ minWidth: 0 }}>
+          <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
               color: accentColor,
               textShadow: `0 0 16px ${accentColor}50, 0 2px 4px rgba(0,0,0,0.6)`,
@@ -556,23 +609,23 @@ export default function ItemDetailPanel({
               borderRadius: 8,
               userSelect: 'none',
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
-            }}>{fmtNum(item.palletCount)}</span>
+            }}>{fmtNum(animPL)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>PL</span>
           </div>
-          <div className="detail-sf-item anim-count-up" style={{ minWidth: 0, animationDelay: '0.1s' }}>
+          <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" style={{
               color: '#e8e8e8',
               textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`,
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
-            }}>{item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : fmtNum(item.fraction)}</span>
+            }}>{fmtNum(animCT)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>CT</span>
           </div>
-          <div className="detail-sf-item detail-sf-total anim-count-up" style={{ minWidth: 0, animationDelay: '0.2s' }}>
+          <div className="detail-sf-item detail-sf-total" style={{ minWidth: 0 }}>
             <span className="detail-sf-num-sm" style={{
               color: 'rgba(255,255,255,0.6)',
               display: 'inline-block', minWidth: '4ch', textAlign: 'right',
             }}>
-              {Math.ceil(item.totalQty).toLocaleString()}
+              {animPCS.toLocaleString()}
             </span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.4)' }}>pcs</span>
           </div>
@@ -593,6 +646,7 @@ export default function ItemDetailPanel({
             </div>
           ) : null}
         </div>
+        </div>{/* トランジション制御ラッパー閉じ */}
       </div>
 
       {/* === 下半分リスト === */}
