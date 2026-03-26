@@ -47,14 +47,20 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '1.9';
+const APP_VERSION = '2.0';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '2.0', date: '2026-03-26', changes: [
+    { icon: '🎙️', text: '操作バー廃止→マイクボタン固定化（音声メイン操作）' },
+    { icon: '🗣️', text: '音声コマンド拡充（お願いします/戻して/何種類?）' },
+    { icon: '📦', text: 'パレット3D表示改善+端数パレット小表示+四隅積み' },
+    { icon: '✨', text: '品目切替アニメーション（フェード+カウントアップ+ズーム）' },
+    { icon: '📊', text: '積載分布ゲージ・@N表示・検査抜きCT表示' },
+    { icon: '🔧', text: 'Meas.フォールバック+GitHub保存マージ+PWA更新通知' },
+  ]},
   { ver: '1.9', date: '2026-03-26', changes: [
-    { icon: '📦', text: 'パレット3D表示改善（3列×2行配置、JPI 7個/段、四隅積み）' },
-    { icon: '✨', text: '品目切替アニメーション（フェード遷移+カウントアップ+ズーム）' },
-    { icon: '📊', text: '積載分布ゲージ・進捗率表示（右上2倍サイズ）' },
-    { icon: '🔧', text: 'Meas.類似品名フォールバック取得（箱サイズ必ず表示）' },
+    { icon: '📦', text: 'パレット3D表示改善（3列×2行配置、JPI 7個/段）' },
+    { icon: '📊', text: '積載分布ゲージ・進捗率表示' },
     { icon: '🎨', text: '読込ポップアップのグラデーションデザイン+プログレスバー' },
     { icon: '📡', text: 'GitHub保存マージ戦略（最新データを上書きしない）' },
   ]},
@@ -243,13 +249,16 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
         {/* バージョン + 更新日時 */}
         <div style={{ textAlign: 'center', marginBottom: 18 }}>
           <button onClick={() => setShowChangelog(true)}
+            className="ver-badge-shimmer"
             style={{
-              background: 'linear-gradient(135deg, rgba(74,122,247,0.15), rgba(155,69,201,0.15))',
-              border: '1px solid rgba(107,82,212,0.4)',
-              borderRadius: 20, padding: '5px 18px', cursor: 'pointer',
-              color: '#a78bfa', fontSize: 12, fontFamily: 'var(--font-mono)',
-              fontWeight: 700, letterSpacing: 0.8,
-              boxShadow: '0 0 16px rgba(107,82,212,0.2)',
+              position: 'relative', overflow: 'hidden',
+              background: 'linear-gradient(135deg, rgba(74,122,247,0.2), rgba(155,69,201,0.2))',
+              border: '1.5px solid rgba(255,255,255,0.3)',
+              borderRadius: 20, padding: '6px 22px', cursor: 'pointer',
+              color: '#fff', fontSize: 13, fontFamily: 'var(--font-mono)',
+              fontWeight: 800, letterSpacing: 1,
+              textShadow: '0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.4), 0 0 40px rgba(107,82,212,0.3)',
+              boxShadow: '0 0 20px rgba(107,82,212,0.25), 0 0 40px rgba(74,122,247,0.1)',
             }}>
             Ver {APP_VERSION}
           </button>
