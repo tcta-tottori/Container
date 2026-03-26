@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { getRecentFiles, base64ToFile, RecentFile, FileType } from '@/lib/recentFiles';
+import { fetchMasterFileLastUpdate } from '@/lib/masterLoader';
 
 /** 判別されたファイルの役割 */
 export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'unknown';
@@ -138,10 +139,15 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
   const [showChangelog, setShowChangelog] = useState(false);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
   const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
+  const [masterLastUpdate, setMasterLastUpdate] = useState<{ date: string; message: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setRecentFiles(getRecentFiles());
+    // マスタファイルの最終更新情報を取得
+    fetchMasterFileLastUpdate().then((info) => {
+      if (info) setMasterLastUpdate(info);
+    });
   }, []);
 
   // ファイル名で自動判別・振り分け
@@ -407,6 +413,33 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
             className="hidden" />
         </div>
+
+        {/* マスタファイル最終更新情報 */}
+        {masterLastUpdate && (
+          <div style={{
+            marginTop: 16, padding: '10px 14px', borderRadius: 12,
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.6)' }}>CNS_品目一覧_全集約版.xlsx</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)' }}>
+                更新: {(() => {
+                  const d = new Date(masterLastUpdate.date);
+                  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                })()}
+              </span>
+              <span style={{
+                fontSize: 9, color: 'rgba(255,255,255,0.25)', overflow: 'hidden',
+                textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+              }}>
+                {masterLastUpdate.message.split('\n')[0]}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* 最近のファイル（スタック式横スクロール・最大5件） */}
         {recentFiles.length > 0 && (

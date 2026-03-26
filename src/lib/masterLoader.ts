@@ -292,6 +292,43 @@ export async function fetchJkpFromGitHub(): Promise<XLSX.WorkBook | null> {
 }
 
 /**
+ * GitHub上のファイルの最終更新情報を取得
+ * Commits APIで最新コミットの日時・メッセージを返す
+ */
+export async function fetchFileLastUpdate(filePath: string): Promise<{ date: string; message: string } | null> {
+  const token = typeof window !== 'undefined' ? getStoredToken() : '';
+  const fallbackToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || '';
+  const effectiveToken = token || fallbackToken;
+
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.v3+json',
+  };
+  if (effectiveToken) headers['Authorization'] = `token ${effectiveToken}`;
+
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits?path=${encodeURIComponent(filePath)}&sha=${BRANCH}&per_page=1`,
+      { headers, cache: 'no-store' }
+    );
+    if (!res.ok) return null;
+    const commits = await res.json();
+    if (!Array.isArray(commits) || commits.length === 0) return null;
+    const commit = commits[0];
+    return {
+      date: commit.commit?.committer?.date || commit.commit?.author?.date || '',
+      message: commit.commit?.message || '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** マスタファイルの最終更新情報を取得 */
+export async function fetchMasterFileLastUpdate(): Promise<{ date: string; message: string } | null> {
+  return fetchFileLastUpdate(MASTER_FILE_PATH);
+}
+
+/**
  * マスタデータとコンテナ品目を紐付する（同期処理）
  *
  * ※ AQSS04Lファイルの品番は「すべて新建高コード」
