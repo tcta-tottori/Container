@@ -196,11 +196,16 @@ export default function Home() {
     });
   }, [state.items, state.masterItems, state.containers, state.selectedContainerIdx, updateItem]);
 
-  // 品目切替時の自動アナウンス
+  // 品目切替時の自動アナウンス（コンテナ読込直後の最初の品目はスキップ — 概要コールと混ざるため）
+  const firstItemSkipRef = useRef(true);
   useEffect(() => {
     if (!currentItem || !state.autoAnnounce) return;
     if (prevItemRef.current !== currentItem.id) {
       prevItemRef.current = currentItem.id;
+      if (firstItemSkipRef.current) {
+        firstItemSkipRef.current = false;
+        return; // 最初の品目コールをスキップ
+      }
       announceItem(currentItem, state.items);
     }
   }, [currentItem, state.autoAnnounce, announceItem, state.items]);

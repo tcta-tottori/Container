@@ -656,21 +656,22 @@ export default function ItemDetailPanel({
             }}>{fmtNum(animPL)}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>PL</span>
           </div>
-          <div className="detail-sf-item" style={{ minWidth: 0, position: 'relative' }}>
-            {/* 実数(検査含む)を小さくカッコ表示 */}
-            {rawFraction > 0 && rawFraction !== inspectionDeducted && (
-              <span style={{
-                position: 'absolute', top: -14, left: '50%', transform: 'translateX(-50%)',
-                fontSize: 10, color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)',
-                whiteSpace: 'nowrap',
-              }}>({rawFraction})</span>
-            )}
+          <div className="detail-sf-item" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" style={{
               color: '#e8e8e8',
               textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`,
               display: 'inline-block', minWidth: '2.2ch', textAlign: 'right',
             }}>{fmtNum(animCT)}</span>
-            <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)' }}>CT</span>
+            <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+              {/* 実数(検査含む)をCTの上に小さくカッコ表示 */}
+              {rawFraction > 0 && rawFraction !== inspectionDeducted && (
+                <span style={{
+                  fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)',
+                  lineHeight: 1,
+                }}>({rawFraction})</span>
+              )}
+              <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1 }}>CT</span>
+            </span>
           </div>
           <div className="detail-sf-item detail-sf-total" style={{ minWidth: 0 }}>
             <span className="detail-sf-num-sm" style={{

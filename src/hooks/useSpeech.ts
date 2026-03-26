@@ -147,10 +147,9 @@ export function useSpeech() {
    *  completedIds / elapsedSeconds を渡すと進捗情報も読み上げる */
   const announceContainerSummary = useCallback((
     items: ContainerItem[],
-    containerNo: string,
-    completedIds?: Set<string>,
-    elapsedSeconds?: number,
+    ...rest: [string, Set<string>?, number?]
   ) => {
+    const completedIds = rest[1];
     if (items.length === 0) return;
 
     const done = completedIds ? items.filter((it) => completedIds.has(it.id)).length : 0;
@@ -185,14 +184,13 @@ export function useSpeech() {
       }
     }
 
-    // === 挨拶 ===
+    // === 開始コール（挨拶なし、コンテナ番号なし） ===
     const isResume = completedIds && done > 0;
     let text = isResume
-      ? `お疲れ様です。コンテナ${containerNo}の続きです。`
-      : `お疲れ様です。コンテナ${containerNo}の荷降ろしを開始します。`;
+      ? `続きです。合計${items.length}品目。`
+      : `荷降ろしを開始します。合計${items.length}品目。`;
 
-    // === 内容物コール: 「〇〇が何種類」形式 ===
-    text += `合計${items.length}品目。`;
+    // === 内容物コール: 「〇〇がN種類」形式 ===
     const typeLabels: [string, string][] = [
       ['ポリカバー', 'ポリカバー'],
       ['ジャーポット', 'ジャーポット'],
@@ -209,33 +207,28 @@ export function useSpeech() {
 
     // === 進捗情報（再開時） ===
     if (isResume) {
-      text += `進捗${pct}パーセント、${done}品完了、残り${remaining}品。`;
-      if (elapsedSeconds && elapsedSeconds > 0) {
-        const m = Math.floor(elapsedSeconds / 60);
-        const s = elapsedSeconds % 60;
-        text += m > 0 ? `経過時間${m}分${s > 0 ? `${s}秒` : ''}。` : `経過時間${s}秒。`;
-      }
+      text += `進捗${pct}パーセント、残り${remaining}品。`;
     }
 
-    // === 類似品警告: 「〇〇に類似品があります」形式 ===
+    // === 類似品警告: 種類単位で短くコール ===
     if (similarPairs.length > 0) {
-      // 類似品がある品名を列挙
-      const warnedNames = new Set<string>();
+      // 類似品がある種類を収集
+      const warnedTypes = new Set<string>();
       for (const a of items) {
         for (const b of items) {
           if (a.id >= b.id) continue;
           if (areSimilarItems(a.itemName, b.itemName)) {
-            warnedNames.add(itemNameForSpeech(a.itemName));
+            warnedTypes.add(a.type);
           }
         }
       }
-      for (const name of Array.from(warnedNames)) {
-        text += `${name}に類似品があります。`;
+      for (const t of Array.from(warnedTypes)) {
+        text += `${t}に類似品があります。`;
       }
     }
 
     if (completedIds && remaining === 0) {
-      text += '全品目完了です。お疲れ様でした。';
+      text += '全品目完了です。';
     }
 
     text += 'よろしくお願いします。';
