@@ -390,8 +390,8 @@ function cornerScore(slot: BoxSlot, layer: BoxSlot[]): number {
   const ys = layer.map(s => s.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const isEdgeX = Math.abs(slot.x - minX) < 0.5 || Math.abs(slot.x - maxX) < 0.5;
-  const isEdgeY = Math.abs(slot.y - minY) < 0.5 || Math.abs(slot.y - maxY) < 0.5;
+  const isEdgeX = Math.abs(slot.x - minX) < 1 || Math.abs(slot.x - maxX) < 1;
+  const isEdgeY = Math.abs(slot.y - minY) < 1 || Math.abs(slot.y - maxY) < 1;
   if (isEdgeX && isEdgeY) return 0; // 四隅
   if (isEdgeX || isEdgeY) return 1; // 辺
   return 2; // 中央

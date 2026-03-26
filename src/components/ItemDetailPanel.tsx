@@ -474,7 +474,7 @@ export default function ItemDetailPanel({
           }}>
             {/* 棒ゲージ（右から収縮: row-reverse） */}
             <div style={{
-              display: 'flex', flexDirection: 'row-reverse', width: 140, height: 12, borderRadius: 20,
+              display: 'flex', flexDirection: 'row-reverse', width: 140, height: 22, borderRadius: 20,
               overflow: 'hidden',
               background: 'rgba(255,255,255,0.06)',
               border: '1.5px solid rgba(255,255,255,0.15)',
@@ -588,7 +588,7 @@ export default function ItemDetailPanel({
         {/* 箱イメージ + パレット図 */}
         <div className="detail-pallet-area" style={{
           position: 'relative', zIndex: 0, flex: '1 1 0', minHeight: 0,
-          display: 'flex', flexDirection: 'row', overflow: 'hidden', gap: 2,
+          display: 'flex', flexDirection: 'row', gap: 2,
         }}>
           <div style={{ position: 'relative', flex: '0 0 28%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {(item.measurements || item.cbm || item.type === '鍋') && (
@@ -598,12 +598,12 @@ export default function ItemDetailPanel({
             )}
             {currentDims && (
               <div key={`dims-${animKey}`} className="anim-fade-in" style={{
-                position: 'absolute', bottom: 0, left: 2, zIndex: 2, fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 11,
+                position: 'absolute', bottom: 0, left: 2, zIndex: 10, fontFamily: 'var(--font-mono)', fontWeight: 800, fontSize: 11,
                 color: accentColor, textShadow: `0 0 8px rgba(0,0,0,0.9), 0 1px 4px rgba(0,0,0,0.7)`, letterSpacing: '-0.3px', animationDelay: '2s',
               }}>{currentDims[0]}×{currentDims[1]}×{currentDims[2]}</div>
             )}
           </div>
-          <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, overflow: 'hidden' }}>
+          <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
             {item.palletCount > 0 && item.qtyPerPallet > 0 && (
               <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
                 onClick={(e) => { e.stopPropagation(); setFullscreenPallet('full'); }}>
@@ -619,8 +619,8 @@ export default function ItemDetailPanel({
           </div>
         </div>
 
-        {/* 数量（PL / CT / pcs）— 左からタイミングずらしカウントアップ+@N/実数出現 */}
-        <div key={`stats-${animKey}`} className="detail-stats-free" style={{ position: 'relative', zIndex: 2, justifyContent: 'center', flexShrink: 0 }}>
+        {/* 数量（PL / CT / pcs）— zIndex高めで図の上に表示 */}
+        <div key={`stats-${animKey}`} className="detail-stats-free" style={{ position: 'relative', zIndex: 10, justifyContent: 'center', flexShrink: 0 }}>
           <div className="detail-sf-item anim-slide-up" style={{ minWidth: 0 }}>
             <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
               color: accentColor, textShadow: `0 0 16px ${accentColor}50, 0 2px 4px rgba(0,0,0,0.6)`,
@@ -630,7 +630,7 @@ export default function ItemDetailPanel({
             }}>{fmtNum(animPL)}</span>
             <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
               {item.qtyPerPallet > 0 && (
-                <span key={`at-${animKey}`} style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)', fontFamily: 'var(--font-mono)', lineHeight: 1, opacity: 0, animation: 'fadeIn 0.5s ease 1.5s forwards' }}>@{item.qtyPerPallet}</span>
+                <span key={`at-${animKey}`} style={{ fontSize: 13, color: accentColor, fontFamily: 'var(--font-mono)', fontWeight: 700, lineHeight: 1, opacity: 0, animation: 'fadeIn 0.5s ease 1.5s forwards' }}>@{item.qtyPerPallet}</span>
               )}
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1 }}>PL</span>
             </span>
@@ -639,7 +639,7 @@ export default function ItemDetailPanel({
             <span className="detail-sf-num" style={{ color: '#e8e8e8', textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`, display: 'inline-block', minWidth: '2.2ch', textAlign: 'right' }}>{fmtNum(animCT)}</span>
             <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
               {rawFraction > 0 && rawFraction !== inspectionDeducted && (
-                <span key={`raw-${animKey}`} style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)', lineHeight: 1, opacity: 0, animation: 'fadeIn 0.5s ease 1.8s forwards' }}>({rawFraction})</span>
+                <span key={`raw-${animKey}`} style={{ fontSize: 13, color: '#e8e8e8', fontFamily: 'var(--font-mono)', fontWeight: 700, lineHeight: 1, opacity: 0, animation: 'fadeIn 0.5s ease 1.8s forwards' }}>({rawFraction})</span>
               )}
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1 }}>CT</span>
             </span>
