@@ -508,15 +508,7 @@ export default function ItemDetailPanel({
           </div>
         )}
 
-        {/* トランジション制御ラッパー（品名・箱図・パレット・数量のみ対象） */}
-        <div style={{
-          opacity: upperOpacity, transition: upperTransition,
-          display: showContent ? 'flex' : 'none',
-          flexDirection: 'column', gap: 4, flex: '1 1 0', minHeight: 0,
-          position: 'relative', zIndex: 1,
-        }}>
-
-        {/* 1行目: 種目バッジ + 色柄 */}
+        {/* 1行目: 種目バッジ + 色柄（常時表示） */}
         <div className="detail-badges">
           <span className="type-badge" style={{
             backgroundColor: `${accentColor}40`, color: '#fff',
@@ -542,7 +534,16 @@ export default function ItemDetailPanel({
           )}
         </div>
 
-        {/* 品名（下から出現 1秒） */}
+        {/* トランジション制御ラッパー（品名・箱図・パレット・数量のみ対象） */}
+        <div style={{
+          opacity: upperOpacity, transition: upperTransition,
+          visibility: showContent ? 'visible' : 'hidden',
+          display: 'flex',
+          flexDirection: 'column', gap: 4, flex: '1 1 0', minHeight: 0,
+          position: 'relative', zIndex: 1,
+        }}>
+
+        {/* 品名（下から出現） */}
         <div key={`name-${animKey}`} className="anim-slide-up" style={{ position: 'relative', zIndex: 3 }}>
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
@@ -662,8 +663,8 @@ export default function ItemDetailPanel({
 
         </div>{/* トランジション制御ラッパー閉じ */}
 
-        {/* 類似品 or 関連（常時表示 — トランジション対象外） */}
-        <div style={{ flexShrink: 0, minHeight: 32 }}>
+        {/* 類似品 or 関連（常時表示 — 下部固定） */}
+        <div style={{ flexShrink: 0, minHeight: 32, zIndex: 2 }}>
           {similarItems.length > 0 ? (
             <SimilarItemsMarquee item={item} similarItems={similarItems} />
           ) : relatedItems.length > 0 ? (
