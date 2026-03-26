@@ -218,8 +218,9 @@ function SimilarItemsMarquee({ item, similarItems }: {
 
   return (
     <div className="similar-warn-blink" style={{
-      display: 'flex', alignItems: 'center', gap: 8,
-      borderRadius: 8, padding: '6px 12px',
+      display: 'flex', alignItems: 'center', gap: 6,
+      borderRadius: 20, padding: '4px 12px',
+      border: '1.5px solid rgba(251,191,36,0.3)',
       flexShrink: 0, position: 'relative', zIndex: 2,
       overflow: 'hidden', whiteSpace: 'nowrap',
     }}>
@@ -473,10 +474,10 @@ export default function ItemDetailPanel({
           }}>
             {/* 棒ゲージ（右から収縮: row-reverse） */}
             <div style={{
-              display: 'flex', flexDirection: 'row-reverse', width: 220, height: 16, borderRadius: 8,
+              display: 'flex', flexDirection: 'row-reverse', width: 160, height: 14, borderRadius: 20,
               overflow: 'hidden',
               background: 'rgba(255,255,255,0.06)',
-              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3), 0 0 12px rgba(107,82,212,0.1)',
+              border: '1.5px solid rgba(255,255,255,0.15)',
             }}>
               {Array.from(typeCounts.entries()).reverse().map(([type, count]) => {
                 const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
@@ -495,8 +496,8 @@ export default function ItemDetailPanel({
             </div>
             {/* 種類+数 */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, marginTop: 12,
-              fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 8, marginTop: 8,
+              fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600,
             }}>
               {Array.from(typeCounts.entries()).map(([type, count]) => {
                 const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
@@ -677,12 +678,13 @@ export default function ItemDetailPanel({
             <SimilarItemsMarquee item={item} similarItems={similarItems} />
           ) : relatedItems.length > 0 ? (
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '6px 12px', borderRadius: 8,
-              background: 'rgba(255,255,255,0.06)',
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '4px 12px', borderRadius: 20,
+              background: 'rgba(255,255,255,0.05)',
+              border: '1.5px solid rgba(255,255,255,0.12)',
             }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', flexShrink: 0 }}>関連:</span>
-              <MarqueeText text={relatedText} className="detail-related-text" style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 500 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.6)', whiteSpace: 'nowrap', flexShrink: 0 }}>関連:</span>
+              <MarqueeText text={relatedText} className="detail-related-text" style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 500 }} />
             </div>
           ) : null}
         </div>
