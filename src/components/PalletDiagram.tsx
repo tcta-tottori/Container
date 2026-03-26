@@ -201,7 +201,12 @@ function buildNabeSlots(
   return slots;
 }
 
-/** JPI 7-per-layer alternating stacking */
+/** JPI 7-per-layer alternating stacking
+ * 参考画像の配置:
+ * 奇数段: 手前3個(幅=small, 奥行=large) + 奥4個(幅=large, 奥行=small)を2列×2行
+ * 偶数段: 180°回転（手前4個回転2×2 + 奥3個通常）
+ * パレット: 幅=3×small, 奥行=large+2×small
+ */
 function buildJPI7Slots(
   bwCm: number, bdCm: number, bhPx: number, layers: number,
   pw: number, pd: number, cm2px: number,
@@ -215,37 +220,50 @@ function buildJPI7Slots(
   for (let layer = 0; layer < layers; layer++) {
     const isOdd = layer % 2 === 0;
     if (isOdd) {
-      // Left: 3 boxes with small dim as width, large as depth
-      for (let r = 0; r < 3; r++) {
-        const yPos = (pd - 3 * bLarge) / 4 + r * (bLarge + (pd - 3 * bLarge) / 4);
-        slots.push({ x: 1, y: yPos, z: PALLET_H_PX + layer * bhPx, w: bSmall, d: bLarge, h: bhPx });
-      }
-      // Right: boxes rotated 90° (large as width, small as depth)
-      const rightX = bSmall + 2;
-      const rightCols = Math.max(1, Math.floor((pw - rightX) / (bLarge + 1)));
-      for (let c = 0; c < Math.min(rightCols, 4); c++) {
+      // 手前: 3個 (幅=bSmall, 奥行=bLarge) を横に3列
+      const frontGap = (pw - 3 * bSmall) / 4;
+      for (let c = 0; c < 3; c++) {
         slots.push({
-          x: rightX + c * (bLarge + 1),
-          y: (pd - bSmall) / 2,
+          x: frontGap + c * (bSmall + frontGap),
+          y: 0,
           z: PALLET_H_PX + layer * bhPx,
-          w: bLarge, d: bSmall, h: bhPx,
+          w: bSmall, d: bLarge, h: bhPx,
         });
       }
-    } else {
-      // Mirror
-      const rightColX = pw - bSmall - 1;
-      for (let r = 0; r < 3; r++) {
-        const yPos = (pd - 3 * bLarge) / 4 + r * (bLarge + (pd - 3 * bLarge) / 4);
-        slots.push({ x: rightColX, y: yPos, z: PALLET_H_PX + layer * bhPx, w: bSmall, d: bLarge, h: bhPx });
+      // 奥: 4個 (幅=bLarge, 奥行=bSmall) を2列×2行
+      const backY = bLarge;
+      const backGapX = (pw - 2 * bLarge) / 3;
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+          slots.push({
+            x: backGapX + c * (bLarge + backGapX),
+            y: backY + r * bSmall,
+            z: PALLET_H_PX + layer * bhPx,
+            w: bLarge, d: bSmall, h: bhPx,
+          });
+        }
       }
-      const leftEnd = rightColX - 2;
-      const leftCols = Math.max(1, Math.floor(leftEnd / (bLarge + 1)));
-      for (let c = 0; c < Math.min(leftCols, 4); c++) {
+    } else {
+      // 偶数段: ミラー — 手前4個(回転2×2) + 奥3個(通常)
+      const frontGapX = (pw - 2 * bLarge) / 3;
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+          slots.push({
+            x: frontGapX + c * (bLarge + frontGapX),
+            y: r * bSmall,
+            z: PALLET_H_PX + layer * bhPx,
+            w: bLarge, d: bSmall, h: bhPx,
+          });
+        }
+      }
+      const backY = 2 * bSmall;
+      const backGap = (pw - 3 * bSmall) / 4;
+      for (let c = 0; c < 3; c++) {
         slots.push({
-          x: 1 + c * (bLarge + 1),
-          y: (pd - bSmall) / 2,
+          x: backGap + c * (bSmall + backGap),
+          y: backY,
           z: PALLET_H_PX + layer * bhPx,
-          w: bLarge, d: bSmall, h: bhPx,
+          w: bSmall, d: bLarge, h: bhPx,
         });
       }
     }
@@ -360,8 +378,14 @@ export default function PalletDiagram({
   // Calculate pallet dimensions in cm
   let palletWcm: number;
   let palletDcm: number;
-  if (isNabe) {
-    // Nabe: pallet width = 3 × smaller box dim, depth = 2 × larger box dim
+  if (isJPI) {
+    // JPI: 7個/段 — 手前3個(通常) + 奥4個(90°回転、2列×2行)
+    const smallDim = Math.min(bwCm, bdCm);
+    const largeDim = Math.max(bwCm, bdCm);
+    palletWcm = smallDim * 3;            // 3×38 = 114cm
+    palletDcm = largeDim + smallDim * 2;  // 55 + 38×2 = 131cm
+  } else if (isNabe) {
+    // Nabe 6個/段: pallet width = 3 × smaller box dim, depth = 2 × larger box dim
     const smallDim = Math.min(bwCm, bdCm);
     const largeDim = Math.max(bwCm, bdCm);
     palletWcm = smallDim * 3;

@@ -158,7 +158,9 @@ function reducer(state: ContainerState, action: Action): ContainerState {
       if (!original || item.qtyPerPallet === 0) return state;
 
       const newPallet = item.palletCount + 1;
-      const newTotal = item.totalQty + item.qtyPerPallet;
+      // PCS増加量 = 1パレット分の箱数 × 1箱の入数
+      const pcsPerPallet = item.qtyPerPallet * (item.packingQty || 1);
+      const newTotal = item.totalQty + pcsPerPallet;
 
       // 上限チェック
       if (newPallet > original.palletCount) return state;
@@ -186,7 +188,9 @@ function reducer(state: ContainerState, action: Action): ContainerState {
       if (item.qtyPerPallet === 0) return state;
 
       const newPallet = item.palletCount - 1;
-      const newTotal = item.totalQty - item.qtyPerPallet;
+      // PCS減少量 = 1パレット分の箱数 × 1箱の入数
+      const pcsPerPallet = item.qtyPerPallet * (item.packingQty || 1);
+      const newTotal = item.totalQty - pcsPerPallet;
 
       // 下限チェック
       if (newPallet < 0 || newTotal < 0) return state;
