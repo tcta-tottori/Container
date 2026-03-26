@@ -160,16 +160,12 @@ export function useSpeech() {
     // 種類別カウント（残りのみ）
     const typeCounts: Record<string, number> = {};
     const totalTypeCounts: Record<string, number> = {};
-    let hasJarPot = false;
     const similarPairs: string[] = [];
 
     for (const it of items) {
       totalTypeCounts[it.type] = (totalTypeCounts[it.type] || 0) + 1;
       if (!completedIds || !completedIds.has(it.id)) {
         typeCounts[it.type] = (typeCounts[it.type] || 0) + 1;
-      }
-      if (/^JP[A-Z]/.test(it.itemName) || it.itemName.includes('ジャーポット')) {
-        hasJarPot = true;
       }
     }
 
@@ -189,53 +185,60 @@ export function useSpeech() {
       }
     }
 
-    let text = `コンテナ${containerNo}。合計${items.length}品目。`;
+    // === 挨拶 ===
+    const isResume = completedIds && done > 0;
+    let text = isResume
+      ? `お疲れ様です。コンテナ${containerNo}の続きです。`
+      : `お疲れ様です。コンテナ${containerNo}の荷降ろしを開始します。`;
 
-    // 進捗情報（completedIdsがある場合）
-    if (completedIds && done > 0) {
-      text += `進捗${pct}パーセント、${done}品完了、残り${remaining}品。`;
+    // === 内容物コール: 「〇〇が何種類」形式 ===
+    text += `合計${items.length}品目。`;
+    const typeLabels: [string, string][] = [
+      ['ポリカバー', 'ポリカバー'],
+      ['ジャーポット', 'ジャーポット'],
+      ['箱', '箱'],
+      ['部品', '部品'],
+      ['鍋', '鍋'],
+      ['ヤーマン部品', 'ヤーマン部品'],
+      ['その他', 'その他'],
+    ];
+    for (const [typeKey, label] of typeLabels) {
+      const count = totalTypeCounts[typeKey];
+      if (count) text += `${label}が${count}種類。`;
     }
 
-    // 経過時間
-    if (elapsedSeconds && elapsedSeconds > 0) {
-      const m = Math.floor(elapsedSeconds / 60);
-      const s = elapsedSeconds % 60;
-      if (m > 0) {
-        text += `経過時間${m}分${s > 0 ? `${s}秒` : ''}。`;
-      } else {
-        text += `経過時間${s}秒。`;
+    // === 進捗情報（再開時） ===
+    if (isResume) {
+      text += `進捗${pct}パーセント、${done}品完了、残り${remaining}品。`;
+      if (elapsedSeconds && elapsedSeconds > 0) {
+        const m = Math.floor(elapsedSeconds / 60);
+        const s = elapsedSeconds % 60;
+        text += m > 0 ? `経過時間${m}分${s > 0 ? `${s}秒` : ''}。` : `経過時間${s}秒。`;
       }
     }
 
-    // 種類内訳（残り）
-    const useRemaining = completedIds && done > 0;
-    const counts = useRemaining ? typeCounts : totalTypeCounts;
-    const typeNames: string[] = [];
-    if (counts['ポリカバー']) typeNames.push(`ポリカバー${counts['ポリカバー']}品`);
-    if (counts['ジャーポット']) typeNames.push(`ジャーポット${counts['ジャーポット']}品`);
-    if (counts['箱']) typeNames.push(`箱${counts['箱']}品`);
-    if (counts['部品']) typeNames.push(`部品${counts['部品']}品`);
-    if (counts['鍋']) typeNames.push(`鍋${counts['鍋']}品`);
-    if (counts['ヤーマン部品']) typeNames.push(`ヤーマン${counts['ヤーマン部品']}品`);
-    if (counts['その他']) typeNames.push(`その他${counts['その他']}品`);
-    if (typeNames.length > 0) {
-      text += (useRemaining ? '残り内訳、' : '') + typeNames.join('、') + '。';
-    }
-
-    if (hasJarPot) {
-      text += 'ジャーポットあり。';
-    }
-
+    // === 類似品警告: 「〇〇に類似品があります」形式 ===
     if (similarPairs.length > 0) {
-      text += `注意、類似品が${similarPairs.length}組あります。`;
-      if (similarPairs.length <= 3) {
-        text += similarPairs.join('、') + '。';
+      // 類似品がある品名を列挙
+      const warnedNames = new Set<string>();
+      for (const a of items) {
+        for (const b of items) {
+          if (a.id >= b.id) continue;
+          if (areSimilarItems(a.itemName, b.itemName)) {
+            warnedNames.add(itemNameForSpeech(a.itemName));
+          }
+        }
+      }
+      for (const name of Array.from(warnedNames)) {
+        text += `${name}に類似品があります。`;
       }
     }
 
     if (completedIds && remaining === 0) {
       text += '全品目完了です。お疲れ様でした。';
     }
+
+    text += 'よろしくお願いします。';
 
     speak(text);
   }, []);

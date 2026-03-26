@@ -9,56 +9,61 @@ import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
 /**
- * カウントアップアニメーション
- * keyが変わるとリセット。1.5秒間0のまま待機→2秒で0→targetまで緩急付きカウント
- * targetRefで最新値を追跡し、keyが同じなら即座に最新値を返す
+ * カウントアニメーション（アップ/ダウン対応）
+ * - key変更: 0.4秒待機→1秒で0→targetまでカウントアップ
+ * - target変更(key同一): 0.5秒で旧値→新値にスムーズ遷移（カウントダウン/アップ）
  */
 function useCountUp(target: number, key: string): number {
   const [value, setValue] = useState(target);
   const rafRef = useRef<number>(0);
   const targetRef = useRef(target);
   const keyRef = useRef(key);
+  const prevValueRef = useRef(target);
 
-  // key が変わったとき: カウントアップ開始
+  // key が変わったとき: 0→targetへカウントアップ
   useEffect(() => {
     keyRef.current = key;
     targetRef.current = target;
+    prevValueRef.current = 0;
     setValue(0);
-    const startTime = performance.now() + 400; // 0.4秒待機（フェードイン直後）
-    const duration = 1000; // 1秒でカウント
-
+    cancelAnimationFrame(rafRef.current);
+    const startTime = performance.now() + 400;
+    const duration = 1000;
     const animate = (now: number) => {
-      if (now < startTime) {
-        setValue(0);
-        rafRef.current = requestAnimationFrame(animate);
-        return;
-      }
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      // ease-in-out cubic: ゆっくり→早く→ゆっくり
-      const eased = progress < 0.5
-        ? 4 * progress * progress * progress
-        : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-      const current = targetRef.current;
-      setValue(Math.round(eased * current));
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate);
-      } else {
-        setValue(current); // 最終値を確定
-      }
+      if (now < startTime) { setValue(0); rafRef.current = requestAnimationFrame(animate); return; }
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
+      const t = targetRef.current;
+      const v = Math.round(eased * t);
+      setValue(v);
+      if (progress < 1) rafRef.current = requestAnimationFrame(animate);
+      else { setValue(t); prevValueRef.current = t; }
     };
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]); // keyのみ依存（targetの変更ではリセットしない）
+  }, [key]);
 
-  // target が変わったとき（key同じ = パレット減少等）: 即座に反映
+  // target が変わったとき（key同一 = パレット減少等）: スムーズ遷移
   useEffect(() => {
-    if (keyRef.current === key) {
-      targetRef.current = target;
-      // アニメーション中でなければ即反映
-      setValue(target);
-    }
+    if (keyRef.current !== key) return;
+    const from = prevValueRef.current;
+    const to = target;
+    if (from === to) return;
+    targetRef.current = to;
+    cancelAnimationFrame(rafRef.current);
+    const startTime = performance.now();
+    const duration = 500;
+    const animate = (now: number) => {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = progress < 0.5 ? 2 * progress * progress : 1 - (-2 * progress + 2) ** 2 / 2;
+      const v = Math.round(from + (to - from) * eased);
+      setValue(v);
+      if (progress < 1) rafRef.current = requestAnimationFrame(animate);
+      else { setValue(to); prevValueRef.current = to; }
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafRef.current);
   }, [target, key]);
 
   return value;
@@ -350,6 +355,9 @@ export default function ItemDetailPanel({
   const accentColor = nabeColor || colors.accent;
   const [palletFlash, setPalletFlash] = useState(false);
   const doubleTapRef = useRef<number | null>(null);
+  const [fullscreenPallet, setFullscreenPallet] = useState<'full' | 'fraction' | null>(null);
+  const [fsRotateY, setFsRotateY] = useState(-35);
+  const fsTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
   const [animKey, setAnimKey] = useState(item.id);
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
@@ -615,14 +623,16 @@ export default function ItemDetailPanel({
             overflow: 'hidden',
           }}>
             {item.palletCount > 0 && item.qtyPerPallet > 0 && (
-              <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
+              <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
+                onClick={() => setFullscreenPallet('full')}>
                 <PalletDiagram palletCount={item.palletCount} fraction={0}
                   qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                   measurements={item.measurements} />
               </div>
             )}
             {inspectionDeducted > 0 && (
-              <div key={`fr-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
+              <div key={`fr-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
+                onClick={() => setFullscreenPallet('fraction')}>
                 <PalletDiagram palletCount={0} fraction={inspectionDeducted}
                   qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                   measurements={item.measurements} />
@@ -759,6 +769,45 @@ export default function ItemDetailPanel({
           })}
         </div>
       </div>
+
+      {/* パレット全画面表示モーダル */}
+      {fullscreenPallet && (
+        <div
+          onClick={() => { setFullscreenPallet(null); setFsRotateY(-35); }}
+          onTouchStart={(e) => { fsTouchRef.current = { startX: e.touches[0].clientX, startRotY: fsRotateY }; }}
+          onTouchMove={(e) => {
+            if (!fsTouchRef.current) return;
+            setFsRotateY(fsTouchRef.current.startRotY + (e.touches[0].clientX - fsTouchRef.current.startX) * 0.5);
+          }}
+          onTouchEnd={() => { fsTouchRef.current = null; }}
+          onMouseDown={(e) => { fsTouchRef.current = { startX: e.clientX, startRotY: fsRotateY }; }}
+          onMouseMove={(e) => {
+            if (!fsTouchRef.current || !e.buttons) return;
+            setFsRotateY(fsTouchRef.current.startRotY + (e.clientX - fsTouchRef.current.startX) * 0.5);
+          }}
+          onMouseUp={() => { fsTouchRef.current = null; }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(12px)',
+            cursor: 'grab', transition: 'opacity 0.3s ease',
+          }}
+        >
+          <div style={{ width: '60vmin', height: '60vmin' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <PalletDiagram
+              palletCount={fullscreenPallet === 'full' ? item.palletCount : 0}
+              fraction={fullscreenPallet === 'fraction' ? inspectionDeducted : 0}
+              qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+              measurements={item.measurements}
+            />
+          </div>
+          <div style={{ position: 'absolute', bottom: 40, color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+            スライドで回転 / タップで閉じる
+          </div>
+        </div>
+      )}
     </div>
   );
 }
