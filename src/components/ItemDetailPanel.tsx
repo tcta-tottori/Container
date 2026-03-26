@@ -477,8 +477,8 @@ export default function ItemDetailPanel({
               display: 'flex', flexDirection: 'row-reverse', width: 140, height: 22, borderRadius: 20,
               overflow: 'hidden',
               background: 'rgba(255,255,255,0.06)',
-              border: '1.5px solid rgba(255,255,255,0.5)',
-              boxShadow: '0 0 8px rgba(255,255,255,0.15), inset 0 0 4px rgba(255,255,255,0.05)',
+              border: '1.5px solid rgba(255,255,255,0.7)',
+              boxShadow: '0 0 12px rgba(255,255,255,0.25), 0 0 24px rgba(255,255,255,0.1), inset 0 0 4px rgba(255,255,255,0.1)',
             }}>
               {Array.from(typeCounts.entries()).reverse().map(([type, count]) => {
                 const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
@@ -513,9 +513,9 @@ export default function ItemDetailPanel({
             </div>
             {/* 進捗率 */}
             <span style={{
-              fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 800, marginTop: 6,
-              color: '#fff', letterSpacing: 0.3,
-              textShadow: '0 0 8px rgba(255,255,255,0.6), 0 0 16px rgba(255,255,255,0.3)',
+              fontSize: 18, fontFamily: 'var(--font-mono)', fontWeight: 800, marginTop: 6,
+              color: '#fff', letterSpacing: 0.5,
+              textShadow: '0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.4), 0 0 40px rgba(255,255,255,0.2)',
             }}>
               {Math.round((completedIds.size / allItems.length) * 100)}%
             </span>
@@ -557,8 +557,8 @@ export default function ItemDetailPanel({
           position: 'relative', zIndex: 1,
         }}>
 
-        {/* 品名（下から出現） */}
-        <div key={`name-${animKey}`} className="anim-slide-up" style={{ position: 'relative', zIndex: 3 }}>
+        {/* 品名（下から出現）— 右側の種類数表示と重ならないようwidth制限 */}
+        <div key={`name-${animKey}`} className="anim-slide-up" style={{ position: 'relative', zIndex: 3, maxWidth: 'calc(100% - 180px)' }}>
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
               color: nabeColor || '#f0f0f0',

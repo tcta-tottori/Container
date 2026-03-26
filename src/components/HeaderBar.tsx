@@ -84,17 +84,17 @@ export default function HeaderBar({
 
       <div className="flex-1" />
 
-      {/* 経過時間（黄色）+ リアルタイム時計 */}
+      {/* 経過時間（黄色）+ リアルタイム時計 — 右端から余白 */}
       <span
         className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
-        style={{ color: '#f59e0b', marginRight: 8 }}
+        style={{ color: '#f59e0b', marginRight: 6, flexShrink: 0 }}
       >
         {workElapsed}
       </span>
       <span style={{
         fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
         color: 'rgba(255,255,255,0.85)', fontVariantNumeric: 'tabular-nums',
-        letterSpacing: 0.5, flexShrink: 0, marginRight: 4,
+        letterSpacing: 0.5, flexShrink: 0, marginRight: 8,
       }}>
         {currentTime}
       </span>
