@@ -386,12 +386,12 @@ export default function ItemDetailPanel({
             position: 'absolute', top: 6, right: 10, zIndex: 5,
             display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0,
           }}>
-            {/* 棒ゲージ: グラデーション背景 + 種類別セグメント */}
+            {/* 棒ゲージ */}
             <div style={{
-              display: 'flex', width: 110, height: 8, borderRadius: 4,
+              display: 'flex', width: 220, height: 16, borderRadius: 8,
               overflow: 'hidden',
               background: 'rgba(255,255,255,0.06)',
-              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3), 0 0 8px rgba(107,82,212,0.1)',
+              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3), 0 0 12px rgba(107,82,212,0.1)',
             }}>
               {Array.from(typeCounts.entries()).map(([type, count]) => {
                 const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
@@ -408,25 +408,25 @@ export default function ItemDetailPanel({
                 ) : null;
               })}
             </div>
-            {/* 種類+数（ゲージの下、1文字分スペース空け） */}
+            {/* 種類+数 */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 6, marginTop: 6,
-              fontSize: 10, fontFamily: 'var(--font-mono)', fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 10, marginTop: 12,
+              fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 600,
             }}>
               {Array.from(typeCounts.entries()).map(([type, count]) => {
                 const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
                 return (
-                  <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
+                  <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
                     <span style={{ color: 'rgba(255,255,255,0.7)' }}>{count}</span>
                   </span>
                 );
               })}
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9 }}>/ {allItems.length}品</span>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>/ {allItems.length}品</span>
             </div>
-            {/* 進捗率（さらに下） */}
+            {/* 進捗率 */}
             <span style={{
-              fontSize: 9, fontFamily: 'var(--font-mono)', fontWeight: 700, marginTop: 3,
+              fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700, marginTop: 6,
               color: 'rgba(255,255,255,0.45)', letterSpacing: 0.3,
             }}>
               {Math.round((completedIds.size / allItems.length) * 100)}%
