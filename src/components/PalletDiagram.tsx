@@ -323,30 +323,54 @@ function buildGenericSlots(
 
 /**
  * 端数パレットのスロット生成
- * 下段は満杯、最上段のみ四隅積み（中央空け）で端数を配置
- * 参考: 荷重安定のため四隅→辺→中央の順で配置
+ *
+ * ルール:
+ * - 最上段の端数が perLayer の半分以下の場合、見栄えが悪いので
+ *   1つ下の段から箱を減らして最上段に分散させる
+ * - 最上段は四隅積み（中央空け）で配置
  */
 function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: number): BoxSlot[] {
   if (fraction <= 0 || perLayer <= 0) return [];
 
   const fullLayers = Math.floor(fraction / perLayer);
   const remainder = fraction % perLayer;
+
+  // 端数なし（全段満杯）
+  if (remainder === 0) {
+    return allSlots.slice(0, fraction);
+  }
+
+  // 端数が半分超→普通に下段満杯+最上段に四隅積み
+  // 端数が半分以下→最上段の箱数を増やすため、下段から1個ずつ減らす
+  let topCount = remainder;
+  let belowFullLayers = fullLayers;
+
+  // 端数が少なすぎる場合(perLayerの半分以下)、1段減らして分散
+  if (remainder <= Math.floor(perLayer / 2) && belowFullLayers > 0) {
+    belowFullLayers -= 1;
+    topCount = fraction - belowFullLayers * perLayer; // 例: 19-2*6=7 → 最上段7個(>6なので2段に)
+    // topCountがperLayerを超える場合は2段に分ける
+    if (topCount > perLayer) {
+      belowFullLayers += 1;
+      topCount = fraction - belowFullLayers * perLayer;
+    }
+  }
+
   const result: BoxSlot[] = [];
 
-  // 満杯の段をそのまま追加
-  for (let i = 0; i < fullLayers * perLayer && i < allSlots.length; i++) {
+  // 満杯の段
+  for (let i = 0; i < belowFullLayers * perLayer && i < allSlots.length; i++) {
     result.push(allSlots[i]);
   }
 
-  // 端数段: 四隅積み（中央空け）
-  if (remainder > 0 && fullLayers * perLayer < allSlots.length) {
-    const topLayerStart = fullLayers * perLayer;
+  // 最上段: 四隅積み（中央空け）
+  if (topCount > 0) {
+    const topLayerStart = belowFullLayers * perLayer;
     const topLayerSlots = allSlots.slice(topLayerStart, topLayerStart + perLayer);
 
     if (topLayerSlots.length > 0) {
-      // 四隅→辺→中央の順にソート
       const sorted = [...topLayerSlots].sort((a, b) => cornerScore(a, topLayerSlots) - cornerScore(b, topLayerSlots));
-      for (let i = 0; i < Math.min(remainder, sorted.length); i++) {
+      for (let i = 0; i < Math.min(topCount, sorted.length); i++) {
         result.push(sorted[i]);
       }
     }
