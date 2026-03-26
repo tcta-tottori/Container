@@ -1059,20 +1059,35 @@ export default function Home() {
         {/* フローティングマイクボタン（右下固定） */}
         {viewMode === 'work' && isSupported && (
           <button onClick={toggleListening}
+            className={isListening ? 'mic-btn-recording' : ''}
             style={{
               position: 'fixed', bottom: 20, right: 20, zIndex: 100,
-              width: 52, height: 52, borderRadius: '50%',
-              background: isListening ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #4a7af7, #6b52d4)',
-              border: 'none', cursor: 'pointer',
-              boxShadow: isListening ? '0 4px 20px rgba(239,68,68,0.4)' : '0 4px 20px rgba(107,82,212,0.4)',
+              width: 56, height: 56, borderRadius: '50%',
+              background: isListening
+                ? 'radial-gradient(circle at 35% 35%, #ff6b6b, #dc2626 60%, #991b1b)'
+                : 'radial-gradient(circle at 35% 35%, #7c9bff, #4a6ef7 50%, #3b52d4 80%, #2a3aaa)',
+              border: isListening ? '2px solid rgba(255,100,100,0.6)' : '2px solid rgba(255,255,255,0.15)',
+              cursor: 'pointer',
+              boxShadow: isListening
+                ? '0 0 24px rgba(239,68,68,0.5), 0 0 48px rgba(239,68,68,0.2), inset 0 1px 2px rgba(255,255,255,0.2)'
+                : '0 4px 20px rgba(74,110,247,0.35), 0 0 40px rgba(107,82,212,0.15), inset 0 1px 2px rgba(255,255,255,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              animation: isListening ? 'gentle-pulse 1.5s ease-in-out infinite' : 'none',
+              transition: 'all 0.3s ease',
               paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}>
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              {!isListening && <><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></>}
             </svg>
+            {isListening && (
+              <span style={{
+                position: 'absolute', inset: -4, borderRadius: '50%',
+                border: '2px solid rgba(239,68,68,0.5)',
+                animation: 'mic-ring-pulse 1.5s ease-out infinite',
+              }} />
+            )}
           </button>
         )}
         <UpdateNotification />
