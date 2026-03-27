@@ -329,41 +329,24 @@ function buildGenericSlots(
 function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: number): BoxSlot[] {
   if (fraction <= 0 || perLayer <= 0) return [];
 
-  // allSlotsが足りない場合、既存パターンを繰り返して拡張
-  const neededSlots = Math.ceil(fraction / perLayer) * perLayer;
-  let extended = allSlots;
-  if (allSlots.length < neededSlots && allSlots.length >= perLayer) {
-    extended = [...allSlots];
-    const templateH = extended[0].h;
-    while (extended.length < neededSlots) {
-      const idx = extended.length;
-      const sourceIdx = idx % allSlots.length;
-      const layerIdx = Math.floor(idx / perLayer);
-      extended.push({
-        ...allSlots[sourceIdx],
-        z: PALLET_H_PX + layerIdx * templateH,
-      });
-    }
-  }
-
   const fullLayers = Math.floor(fraction / perLayer);
   const remainder = fraction % perLayer;
 
   // 端数なし（全段満杯）
   if (remainder === 0) {
-    return extended.slice(0, fraction);
+    return allSlots.slice(0, fraction);
   }
 
   const result: BoxSlot[] = [];
 
-  // 満杯の段
-  for (let i = 0; i < fullLayers * perLayer && i < extended.length; i++) {
-    result.push(extended[i]);
+  // 満杯の段（下段は全て満杯 → 上段の箱は必ず支えがある）
+  for (let i = 0; i < fullLayers * perLayer && i < allSlots.length; i++) {
+    result.push(allSlots[i]);
   }
 
   // 最上段: 四隅→辺→中央の順に配置（中央から抜く）
   const layerStart = fullLayers * perLayer;
-  const layerSlots = extended.slice(layerStart, layerStart + perLayer);
+  const layerSlots = allSlots.slice(layerStart, layerStart + perLayer);
 
   if (layerSlots.length > 0 && remainder > 0) {
     const sorted = [...layerSlots].sort((a, b) => cornerScore(a, layerSlots) - cornerScore(b, layerSlots));
@@ -450,7 +433,7 @@ export default function PalletDiagram({
   const pd = palletDcm * cm2px;
   const bh = bhCm * cm2px;
 
-  const layers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements) || 3;
+  let layers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements) || 3;
 
   // Build slots
   let allSlots: BoxSlot[];
@@ -465,8 +448,55 @@ export default function PalletDiagram({
     allSlots = buildNabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
   } else {
-    allSlots = buildGenericSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
-    perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
+    // qtyPerPalletを使って現実的な段数・個数/段を決定
+    // まずデフォルト寸法でのperLayerを計算
+    const defaultPerLayer = Math.max(1, Math.floor(pw / (bwCm * cm2px))) * Math.max(1, Math.floor(pd / (bdCm * cm2px)));
+
+    if (qtyPerPallet > 0 && qtyPerPallet > defaultPerLayer * 5) {
+      // デフォルト寸法では5段でも収まらない → qtyPerPalletから逆算
+      // 5段想定で1段あたりの個数を決定
+      const targetPerLayer = Math.ceil(qtyPerPallet / 5);
+      // targetPerLayerに合うグリッドを探す（cols×rows >= targetPerLayer）
+      const sqrtTarget = Math.ceil(Math.sqrt(targetPerLayer));
+      const cols = sqrtTarget;
+      const rows = Math.ceil(targetPerLayer / cols);
+      const actualPerLayer = cols * rows;
+      const boxW = pw / cols;
+      const boxD = pd / rows;
+      const actualLayers = Math.min(5, Math.ceil(qtyPerPallet / actualPerLayer));
+      allSlots = [];
+      for (let layer = 0; layer < actualLayers; layer++) {
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            allSlots.push({
+              x: c * boxW,
+              y: r * boxD,
+              z: PALLET_H_PX + layer * bh,
+              w: boxW, d: boxD, h: bh,
+            });
+          }
+        }
+      }
+      perLayer = actualPerLayer;
+      layers = actualLayers;
+    } else {
+      allSlots = buildGenericSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
+      perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
+    }
+  }
+
+  // 端数表示: allSlotsが足りない場合、必要な段数まで拡張
+  const displayQty = isFull ? perLayer * layers : fraction;
+  if (displayQty > allSlots.length && perLayer > 0) {
+    const neededLayers = Math.ceil(displayQty / perLayer);
+    const templateH = allSlots.length > 0 ? allSlots[0].h : bh;
+    for (let l = layers; l < neededLayers; l++) {
+      for (let i = 0; i < perLayer; i++) {
+        const src = allSlots[i];
+        allSlots.push({ ...src, z: PALLET_H_PX + l * templateH });
+      }
+    }
+    layers = neededLayers;
   }
 
   // Determine rendered slots
