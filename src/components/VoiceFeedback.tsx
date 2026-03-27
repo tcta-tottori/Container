@@ -27,17 +27,7 @@ export default function VoiceFeedback({ transcript, isListening }: VoiceFeedback
           {transcript}
         </div>
       )}
-      {isListening && !transcript && (
-        <div className="text-xs px-3 py-1.5 rounded-full listening-pulse"
-          style={{
-            background: 'rgba(239,68,68,0.08)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(239,68,68,0.2)',
-            color: '#dc2626',
-          }}>
-          音声認識中
-        </div>
-      )}
+      {/* 音声認識中の表示はマイクボタン点滅のみ — テキスト表示なし */}
     </div>
   );
 }

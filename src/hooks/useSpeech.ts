@@ -261,12 +261,16 @@ export function useSpeech() {
     speak(text);
   }, []);
 
-  /** OK確認アナウンス（品名コールなし） */
-  const announceOk = useCallback((_itemName: string, remainingPallets: number) => {
-    if (remainingPallets > 0) {
-      speak(`残り${remainingPallets}パレット。`);
-    } else {
+  /** OK確認アナウンス（残りパレット+端数のみ） */
+  const announceOk = useCallback((_itemName: string, remainingPallets: number, fractionCases?: number) => {
+    if (remainingPallets <= 0 && (!fractionCases || fractionCases <= 0)) {
       speak('完了。');
+    } else if (remainingPallets > 0 && fractionCases && fractionCases > 0) {
+      speak(`残り${remainingPallets}パレットと${fractionCases}ケース。`);
+    } else if (remainingPallets > 0) {
+      speak(`残り${remainingPallets}パレット。`);
+    } else if (fractionCases && fractionCases > 0) {
+      speak(`残り${fractionCases}ケース。`);
     }
   }, []);
 
