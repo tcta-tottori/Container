@@ -359,6 +359,8 @@ export default function ItemDetailPanel({
   const [fullscreenPallet, setFullscreenPallet] = useState<'full' | 'fraction' | null>(null);
   const [fsRotateY, setFsRotateY] = useState(-35);
   const fsTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
+  const [fractionZoom, setFractionZoom] = useState<'idle' | 'zoomIn' | 'spin' | 'zoomOut'>('idle');
+  const fractionRef = useRef<HTMLDivElement>(null);
   const [animKey, setAnimKey] = useState(item.id);
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
@@ -464,6 +466,27 @@ export default function ItemDetailPanel({
   const animPL = useCountUp(plTarget ?? 0, animKey, isTransitioning);
   const animCT = useCountUp(ctTarget ?? 0, animKey, isTransitioning);
   const animPCS = useCountUp(pcsTarget ?? 0, animKey, isTransitioning);
+
+  // 端数パレットズームアニメーション
+  const isFractionOnly = item.palletCount === 0 && inspectionDeducted > 0;
+  const triggerFractionZoom = useCallback(() => {
+    if (fractionZoom !== 'idle') return;
+    setFractionZoom('zoomIn');
+    setTimeout(() => setFractionZoom('spin'), 600);
+    setTimeout(() => setFractionZoom('zoomOut'), 2200);
+    setTimeout(() => setFractionZoom('idle'), 2800);
+  }, [fractionZoom]);
+
+  // 端数のみ表示時: 切替アニメーション完了後に自動ズーム
+  useEffect(() => {
+    if (!isFractionOnly || isTransitioning) return;
+    const t = setTimeout(triggerFractionZoom, 2000);
+    return () => clearTimeout(t);
+  }, [animKey, isFractionOnly, isTransitioning, triggerFractionZoom]);
+
+  // 端数パレットのスワイプ操作
+  const fractionDragRef = useRef<{ startX: number; startY: number; rotY: number } | null>(null);
+  const [frDragX, setFrDragX] = useState(0);
 
   return (
     <div className="detail-root" style={{ background: '#1a1d2e' }}>
@@ -636,13 +659,30 @@ export default function ItemDetailPanel({
               </div>
             )}
             {inspectionDeducted > 0 && (
-              <div key={`fr-${animKey}`} style={{
+              <div key={`fr-${animKey}`} ref={fractionRef} style={{
                 flex: item.palletCount > 0 ? '0 0 35%' : 1,
                 height: item.palletCount > 0 ? '75%' : '100%',
-                minWidth: 0, cursor: 'pointer',
+                minWidth: 0, cursor: 'grab',
                 alignSelf: 'flex-start',
+                transform: frDragX ? `translateX(${frDragX}px)` : undefined,
+                transition: frDragX ? 'none' : 'transform 0.3s ease',
+                touchAction: 'pan-y',
               }}
-                onClick={(e) => { e.stopPropagation(); setFullscreenPallet('fraction'); }}>
+                onClick={(e) => { e.stopPropagation(); triggerFractionZoom(); }}
+                onTouchStart={(e) => { fractionDragRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, rotY: 0 }; }}
+                onTouchMove={(e) => {
+                  if (!fractionDragRef.current) return;
+                  const dx = e.touches[0].clientX - fractionDragRef.current.startX;
+                  setFrDragX(dx * 0.6);
+                }}
+                onTouchEnd={() => { fractionDragRef.current = null; setFrDragX(0); }}
+                onMouseDown={(e) => { fractionDragRef.current = { startX: e.clientX, startY: e.clientY, rotY: 0 }; }}
+                onMouseMove={(e) => {
+                  if (!fractionDragRef.current || !e.buttons) return;
+                  setFrDragX((e.clientX - fractionDragRef.current.startX) * 0.6);
+                }}
+                onMouseUp={() => { fractionDragRef.current = null; setFrDragX(0); }}
+              >
                 <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} />
               </div>
             )}
@@ -771,6 +811,48 @@ export default function ItemDetailPanel({
       </div>
 
       {/* パレット全画面表示モーダル */}
+      {/* 端数パレットズームアニメーション */}
+      {fractionZoom !== 'idle' && inspectionDeducted > 0 && (
+        <>
+          <style>{`
+            @keyframes frZoomIn {
+              0% { transform: scale(1); }
+              100% { transform: scale(2.2); }
+            }
+            @keyframes frZoomOut {
+              0% { transform: scale(2.2); opacity: 1; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+            @keyframes frFadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }
+          `}</style>
+          {/* 暗いぼかし背景 */}
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 50,
+            background: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(3px)',
+            animation: fractionZoom === 'zoomOut' ? 'frFadeOut 0.6s ease both' : 'fadeIn 0.3s ease both',
+            pointerEvents: 'none',
+          }} />
+          {/* ズーム中のパレット */}
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 51,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            pointerEvents: 'none',
+          }}>
+            <div style={{
+              width: isFractionOnly ? '60%' : '35%',
+              height: '50%',
+              transform: fractionZoom === 'spin' ? 'scale(2.2)' : undefined,
+              animation: fractionZoom === 'zoomIn' ? 'frZoomIn 0.6s ease both'
+                : fractionZoom === 'zoomOut' ? 'frZoomOut 0.6s ease both'
+                : undefined,
+            }}>
+              <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} />
+            </div>
+          </div>
+        </>
+      )}
+
       {fullscreenPallet && (
         <div
           onClick={() => {

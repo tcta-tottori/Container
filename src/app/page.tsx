@@ -816,10 +816,10 @@ export default function Home() {
         <style>{`
           @keyframes neonPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
           @keyframes dotFlow { 0%,20% { opacity: 0.15; } 40% { opacity: 1; } 60%,100% { opacity: 0.15; } }
+          @keyframes cubeRotate { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
         `}</style>
-        {/* 白ネオンキューブ（丸グロー + アイコン） */}
-        <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28 }}>
-          {/* 丸い背景グロー（切れ目なし） */}
+        {/* 白ネオンキューブ（丸グロー + 中心軸回転） */}
+        <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28, perspective: 200 }}>
           <div style={{
             position: 'absolute', inset: -10,
             borderRadius: '50%',
@@ -827,7 +827,7 @@ export default function Home() {
             animation: 'neonPulse 2.5s ease-in-out infinite',
           }} />
           <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
-            style={{ position: 'relative', animation: 'neonPulse 2.5s ease-in-out infinite' }}>
+            style={{ position: 'relative', animation: 'cubeRotate 4s linear infinite', transformOrigin: 'center center' }}>
             <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none">
               <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
               <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
