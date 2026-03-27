@@ -359,8 +359,10 @@ export default function ItemDetailPanel({
   const [fullscreenPallet, setFullscreenPallet] = useState<'full' | 'fraction' | null>(null);
   const [fsRotateY, setFsRotateY] = useState(-35);
   const fsTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
-  const [fractionZoom, setFractionZoom] = useState<'idle' | 'zoomIn' | 'spin' | 'zoomOut'>('idle');
-  const fractionRef = useRef<HTMLDivElement>(null);
+  const [fractionZoom, setFractionZoom] = useState<'idle' | 'zoomIn' | 'show' | 'zoomOut'>('idle');
+  const [fzRotateY, setFzRotateY] = useState(0);
+  const fzTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
+  const fzAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [animKey, setAnimKey] = useState(item.id);
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
@@ -467,24 +469,50 @@ export default function ItemDetailPanel({
   const animCT = useCountUp(ctTarget ?? 0, animKey, isTransitioning);
   const animPCS = useCountUp(pcsTarget ?? 0, animKey, isTransitioning);
 
-  // 端数パレットズームアニメーション（1度のみ、タップで発動）
-  const fractionZoomDoneRef = useRef(false);
-  const triggerFractionZoom = useCallback(() => {
-    if (fractionZoom !== 'idle' || fractionZoomDoneRef.current) return;
-    fractionZoomDoneRef.current = true;
+  // 端数パレットズーム: タップで開く・再タップ or 5秒で閉じる
+  const closeFractionZoom = useCallback(() => {
+    if (fzAutoTimerRef.current) clearTimeout(fzAutoTimerRef.current);
+    fzAutoTimerRef.current = null;
+    setFractionZoom('zoomOut');
+    setTimeout(() => { setFractionZoom('idle'); setFzRotateY(0); }, 500);
+  }, []);
+
+  const openFractionZoom = useCallback((autoClose = false) => {
+    if (fractionZoom === 'show' || fractionZoom === 'zoomIn') {
+      closeFractionZoom();
+      return;
+    }
+    if (fractionZoom === 'zoomOut') return;
+    setFzRotateY(0);
     setFractionZoom('zoomIn');
-    // zoomIn(0.8s) → spin(回転待ち~2s) → zoomOut(0.8s)
-    setTimeout(() => setFractionZoom('spin'), 800);
-    setTimeout(() => setFractionZoom('zoomOut'), 2800);
-    setTimeout(() => setFractionZoom('idle'), 3600);
-  }, [fractionZoom]);
+    setTimeout(() => setFractionZoom('show'), 500);
+    if (autoClose) {
+      if (fzAutoTimerRef.current) clearTimeout(fzAutoTimerRef.current);
+      fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000);
+    }
+  }, [fractionZoom, closeFractionZoom]);
 
-  // 品目切替時にリセット
-  useEffect(() => { fractionZoomDoneRef.current = false; }, [animKey]);
+  // タップ時: 手動ズーム（何度でも可、5秒自動閉じ）
+  const handleFractionTap = useCallback(() => {
+    if (fractionZoom === 'show' || fractionZoom === 'zoomIn') {
+      closeFractionZoom();
+    } else {
+      openFractionZoom(true);
+    }
+  }, [fractionZoom, openFractionZoom, closeFractionZoom]);
 
-  // 端数パレットのスワイプ操作
-  const fractionDragRef = useRef<{ startX: number; startY: number; rotY: number } | null>(null);
-  const [frDragX, setFrDragX] = useState(0);
+  // 品目切替時: 端数のみになった場合に自動ズーム（その品名で1度のみ）
+  const autoZoomDoneRef = useRef<Set<string>>(new Set());
+  const isFractionOnly = item.palletCount === 0 && inspectionDeducted > 0;
+  useEffect(() => {
+    if (!isFractionOnly || isTransitioning) return;
+    if (autoZoomDoneRef.current.has(item.id)) return;
+    // 作業シート初回表示はスキップ（切替アニメーション後のみ）
+    if (animKey === item.id && prevItemIdRef.current === item.id) return;
+    autoZoomDoneRef.current.add(item.id);
+    const t = setTimeout(() => openFractionZoom(true), 500);
+    return () => clearTimeout(t);
+  }, [animKey, item.id, isFractionOnly, isTransitioning, openFractionZoom]);
 
   return (
     <div className="detail-root" style={{ background: '#1a1d2e' }}>
@@ -657,30 +685,13 @@ export default function ItemDetailPanel({
               </div>
             )}
             {inspectionDeducted > 0 && (
-              <div key={`fr-${animKey}`} ref={fractionRef} style={{
+              <div key={`fr-${animKey}`} style={{
                 flex: item.palletCount > 0 ? '0 0 35%' : 1,
                 height: item.palletCount > 0 ? '75%' : '100%',
-                minWidth: 0, cursor: 'grab',
+                minWidth: 0, cursor: 'pointer',
                 alignSelf: 'flex-start',
-                transform: frDragX ? `translateX(${frDragX}px)` : undefined,
-                transition: frDragX ? 'none' : 'transform 0.3s ease',
-                touchAction: 'pan-y',
               }}
-                onClick={(e) => { e.stopPropagation(); triggerFractionZoom(); }}
-                onTouchStart={(e) => { fractionDragRef.current = { startX: e.touches[0].clientX, startY: e.touches[0].clientY, rotY: 0 }; }}
-                onTouchMove={(e) => {
-                  if (!fractionDragRef.current) return;
-                  const dx = e.touches[0].clientX - fractionDragRef.current.startX;
-                  setFrDragX(dx * 0.6);
-                }}
-                onTouchEnd={() => { fractionDragRef.current = null; setFrDragX(0); }}
-                onMouseDown={(e) => { fractionDragRef.current = { startX: e.clientX, startY: e.clientY, rotY: 0 }; }}
-                onMouseMove={(e) => {
-                  if (!fractionDragRef.current || !e.buttons) return;
-                  setFrDragX((e.clientX - fractionDragRef.current.startX) * 0.6);
-                }}
-                onMouseUp={() => { fractionDragRef.current = null; setFrDragX(0); }}
-              >
+                onClick={(e) => { e.stopPropagation(); handleFractionTap(); }}>
                 <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} />
               </div>
             )}
@@ -809,32 +820,64 @@ export default function ItemDetailPanel({
       </div>
 
       {/* パレット全画面表示モーダル */}
-      {/* 端数パレット上半分ズームアニメーション */}
+      {/* 端数パレット上半分ズーム表示 */}
       {fractionZoom !== 'idle' && inspectionDeducted > 0 && (
         <>
           <style>{`
-            @keyframes frOverlayIn { 0% { opacity: 0; } 100% { opacity: 1; } }
-            @keyframes frOverlayOut { 0% { opacity: 1; } 100% { opacity: 0; } }
+            @keyframes fzBlurIn { 0% { backdrop-filter: blur(0); opacity: 0; } 100% { backdrop-filter: blur(2px); opacity: 1; } }
+            @keyframes fzBlurOut { 0% { backdrop-filter: blur(2px); opacity: 1; } 100% { backdrop-filter: blur(0); opacity: 0; } }
+            @keyframes fzZoomIn { 0% { transform: scale(0) rotate(0deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+            @keyframes fzZoomOut { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0); opacity: 0; } }
           `}</style>
-          {/* 上半分のみ暗いぼかしオーバーレイ */}
+          {/* 上半分ぼかし（暗くしない） */}
           <div className="detail-upper" style={{
             position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
-            background: 'rgba(0,0,0,0.45)',
-            backdropFilter: 'blur(3px)',
-            animation: fractionZoom === 'zoomOut' ? 'frOverlayOut 0.8s ease both' : 'frOverlayIn 0.4s ease both',
-            pointerEvents: 'none',
+            background: 'rgba(0,0,0,0.08)',
+            animation: fractionZoom === 'zoomOut' ? 'fzBlurOut 0.5s ease both' : 'fzBlurIn 0.3s ease both',
+            pointerEvents: fractionZoom === 'show' ? 'auto' : 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 0, gap: 0,
-          }}>
+            padding: 0, gap: 0, touchAction: 'none', cursor: 'grab',
+          }}
+            onClick={(e) => { if (!fzTouchRef.current) { e.stopPropagation(); closeFractionZoom(); } }}
+            onTouchStart={(e) => { fzTouchRef.current = { startX: e.touches[0].clientX, startRotY: fzRotateY }; }}
+            onTouchMove={(e) => {
+              if (!fzTouchRef.current) return;
+              e.preventDefault();
+              setFzRotateY(fzTouchRef.current.startRotY + (e.touches[0].clientX - fzTouchRef.current.startX) * 0.5);
+              // スワイプ中は自動閉じタイマーリセット
+              if (fzAutoTimerRef.current) { clearTimeout(fzAutoTimerRef.current); fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000); }
+            }}
+            onTouchEnd={() => {
+              if (fzTouchRef.current) {
+                const dx = Math.abs(fzRotateY - fzTouchRef.current.startRotY);
+                fzTouchRef.current = null;
+                if (dx > 3) return; // スワイプ時はclickで閉じない
+              }
+            }}
+            onMouseDown={(e) => { fzTouchRef.current = { startX: e.clientX, startRotY: fzRotateY }; }}
+            onMouseMove={(e) => {
+              if (!fzTouchRef.current || !e.buttons) return;
+              setFzRotateY(fzTouchRef.current.startRotY + (e.clientX - fzTouchRef.current.startX) * 0.5);
+              if (fzAutoTimerRef.current) { clearTimeout(fzAutoTimerRef.current); fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000); }
+            }}
+            onMouseUp={() => {
+              if (fzTouchRef.current) {
+                const dx = Math.abs(fzRotateY - fzTouchRef.current.startRotY);
+                fzTouchRef.current = null;
+                if (dx > 3) return;
+              }
+            }}
+          >
             <div style={{
               width: '55%', maxHeight: '80%',
-              transition: 'transform 0.8s cubic-bezier(0.4,0,0.2,1), opacity 0.8s ease',
-              transform: fractionZoom === 'zoomIn' ? 'scale(0.5)' :
-                         fractionZoom === 'spin' ? 'scale(1)' :
-                         'scale(0.5)',
-              opacity: fractionZoom === 'zoomOut' ? 0.3 : 1,
+              animation: fractionZoom === 'zoomIn' ? 'fzZoomIn 0.5s cubic-bezier(0.2,0.8,0.3,1) both'
+                : fractionZoom === 'zoomOut' ? 'fzZoomOut 0.5s ease both'
+                : undefined,
             }}>
-              <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} />
+              <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet}
+                type={item.type} itemName={item.itemName} measurements={item.measurements}
+                overrideRotateY={fractionZoom === 'show' ? fzRotateY : undefined}
+              />
             </div>
           </div>
         </>

@@ -11,6 +11,7 @@ interface PalletDiagramProps {
   type: ItemType;
   itemName?: string;
   measurements?: string;
+  overrideRotateY?: number;
 }
 
 /* ===== Constants ===== */
@@ -436,7 +437,7 @@ function isJPIType(itemName?: string): boolean {
 
 /* ===== Main Component ===== */
 export default function PalletDiagram({
-  palletCount, fraction, qtyPerPallet, type, itemName, measurements,
+  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY,
 }: PalletDiagramProps) {
   const isFull = palletCount > 0;
   const isFraction = !isFull && fraction > 0;
@@ -586,9 +587,11 @@ export default function PalletDiagram({
           width: pw, height: totalHeight,
           position: 'relative',
           transformStyle: 'preserve-3d',
-          ...(rotate
-            ? { animation: `${animName} 15s linear infinite` }
-            : { transform: 'rotateX(-25deg) rotateY(-35deg)' }
+          ...(overrideRotateY !== undefined
+            ? { transform: `rotateX(-25deg) rotateY(${overrideRotateY}deg)` }
+            : rotate
+              ? { animation: `${animName} 15s linear infinite` }
+              : { transform: 'rotateX(-25deg) rotateY(-35deg)' }
           ),
         }}>
         {/* Pallet base */}

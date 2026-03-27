@@ -816,12 +816,8 @@ export default function Home() {
         <style>{`
           @keyframes neonPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
           @keyframes dotFlow { 0%,20% { opacity: 0.15; } 40% { opacity: 1; } 60%,100% { opacity: 0.15; } }
-          @keyframes cube3dSpin {
-            0% { transform: rotateX(-25deg) rotateY(-35deg); }
-            100% { transform: rotateX(-25deg) rotateY(325deg); }
-          }
         `}</style>
-        {/* 3Dキューブ（元のアイソメアイコンの質感を保ちつつ3D回転） */}
+        {/* キューブアイコン（2D・アニメーションなし） */}
         <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28 }}>
           <div style={{
             position: 'absolute', inset: -16,
@@ -829,35 +825,14 @@ export default function Home() {
             background: 'radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, transparent 70%)',
             animation: 'neonPulse 2.5s ease-in-out infinite',
           }} />
-          <div style={{
-            width: 72, height: 72, perspective: 300,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <div style={{
-              width: 34, height: 34, position: 'relative',
-              transformStyle: 'preserve-3d',
-              animation: 'cube3dSpin 6s cubic-bezier(0.4,0,0.2,1) infinite',
-            }}>
-              {([
-                { transform: 'translateZ(17px)', opacity: 0.85 },
-                { transform: 'rotateY(180deg) translateZ(17px)', opacity: 0.35 },
-                { transform: 'rotateY(90deg) translateZ(17px)', opacity: 0.55 },
-                { transform: 'rotateY(-90deg) translateZ(17px)', opacity: 0.65 },
-                { transform: 'rotateX(90deg) translateZ(17px)', opacity: 0.5 },
-                { transform: 'rotateX(-90deg) translateZ(17px)', opacity: 0.3 },
-              ]).map((f, i) => (
-                <div key={i} style={{
-                  position: 'absolute', width: 34, height: 34,
-                  border: `2.5px solid rgba(255,255,255,${f.opacity})`,
-                  borderRadius: 2,
-                  background: `linear-gradient(135deg, rgba(255,255,255,${f.opacity * 0.06}) 0%, rgba(255,255,255,${f.opacity * 0.02}) 100%)`,
-                  boxShadow: `inset 0 0 8px rgba(255,255,255,${f.opacity * 0.05}), 0 0 ${4 + i}px rgba(255,255,255,${f.opacity * 0.15})`,
-                  backfaceVisibility: 'hidden' as const,
-                  transform: f.transform,
-                }} />
-              ))}
-            </div>
-          </div>
+          <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
+            style={{ position: 'relative', animation: 'neonPulse 2.5s ease-in-out infinite' }}>
+            <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none">
+              <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
+              <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
+              <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
+            </g>
+          </svg>
         </div>
         {/* Loading + 5ドット（白ネオン） */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
