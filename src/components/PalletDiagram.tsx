@@ -337,10 +337,10 @@ function cornerScore(slot: BoxSlot, layer: BoxSlot[]): number {
  * 端数パレットのスロット生成
  *
  * ルール:
- * - 最上面は必ず四隅にハコがあるように積む
- * - 上面がぴったりにならない場合は四隅以外を中央から抜く
- * - 端数が4未満の場合は下段を1段繰り上げて四隅を確保
- * - 全ての箱は下段に支えがある（浮き箱なし）
+ * - 下段は全て満杯、最上段のみ端数
+ * - 最上段は四隅→辺→中央の順に配置（中央から抜く）
+ * - 端数>=4なら四隅確保、<4なら可能な隅に配置
+ * - 全ての箱は満杯の下段に支えがあり浮き箱なし
  */
 function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: number): BoxSlot[] {
   if (fraction <= 0 || perLayer <= 0) return [];
@@ -354,60 +354,14 @@ function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: num
   }
 
   const result: BoxSlot[] = [];
-  let belowFullLayers = fullLayers;
 
-  // 端数4未満 → 四隅を確保するため1段繰り上げ
-  if (remainder < 4 && belowFullLayers > 0 && perLayer >= 4) {
-    belowFullLayers -= 1;
-    const distributed = fraction - belowFullLayers * perLayer;
-    // distributed = perLayer + remainder（例: 6+1=7）
-
-    // 満杯の段
-    for (let i = 0; i < belowFullLayers * perLayer && i < allSlots.length; i++) {
-      result.push(allSlots[i]);
-    }
-
-    // 四隅確保のため2段に分配
-    const topCount = 4; // 最上段は四隅の4個
-    const lowerCount = distributed - topCount;
-
-    // 下段（四隅＋α）: 四隅を必ず含む → 上段の支えになる
-    const lowerLayerIdx = belowFullLayers;
-    const lowerStart = lowerLayerIdx * perLayer;
-    const lowerSlots = allSlots.slice(lowerStart, lowerStart + perLayer);
-    if (lowerSlots.length > 0) {
-      if (lowerCount >= perLayer) {
-        // 満杯
-        for (const s of lowerSlots) result.push(s);
-      } else {
-        const sorted = [...lowerSlots].sort((a, b) => cornerScore(a, lowerSlots) - cornerScore(b, lowerSlots));
-        for (let i = 0; i < Math.min(lowerCount, sorted.length); i++) {
-          result.push(sorted[i]);
-        }
-      }
-    }
-
-    // 上段（四隅の4個）: 下段の四隅位置に支えがあるので浮かない
-    const upperLayerIdx = belowFullLayers + 1;
-    const upperStart = upperLayerIdx * perLayer;
-    const upperSlots = allSlots.slice(upperStart, upperStart + perLayer);
-    if (upperSlots.length > 0) {
-      const sorted = [...upperSlots].sort((a, b) => cornerScore(a, upperSlots) - cornerScore(b, upperSlots));
-      for (let i = 0; i < Math.min(topCount, sorted.length); i++) {
-        result.push(sorted[i]);
-      }
-    }
-
-    return result;
-  }
-
-  // 満杯の段
-  for (let i = 0; i < belowFullLayers * perLayer && i < allSlots.length; i++) {
+  // 満杯の段（全て満杯 → 最上段の箱は必ず支えがある）
+  for (let i = 0; i < fullLayers * perLayer && i < allSlots.length; i++) {
     result.push(allSlots[i]);
   }
 
   // 最上段: 四隅→辺→中央の順に配置（中央から抜く）
-  const layerStart = belowFullLayers * perLayer;
+  const layerStart = fullLayers * perLayer;
   const layerSlots = allSlots.slice(layerStart, layerStart + perLayer);
 
   if (layerSlots.length > 0 && remainder > 0) {
