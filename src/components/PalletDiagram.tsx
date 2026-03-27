@@ -323,8 +323,8 @@ function buildGenericSlots(
  *
  * ルール:
  * - 下段は全て満杯、最上段のみ端数
- * - 最上段は四隅積み（端→中央の順に配置、中央から抜く）
- * - 上段に浮く箱が出ないよう、段間の再分配はしない
+ * - 最上段は手前の列から順に詰めて配置（実際のパレット積みと同じ）
+ * - 隣接して詰めることで浮き箱・隙間のない見た目にする
  */
 function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: number): BoxSlot[] {
   if (fraction <= 0 || perLayer <= 0) return [];
@@ -344,36 +344,13 @@ function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: num
     result.push(allSlots[i]);
   }
 
-  // 最上段: 四隅→辺→中央の順に配置（中央から抜く）
+  // 最上段: 手前列から順に詰めて配置（隙間なし）
   const layerStart = fullLayers * perLayer;
-  const layerSlots = allSlots.slice(layerStart, layerStart + perLayer);
-
-  if (layerSlots.length > 0 && remainder > 0) {
-    const sorted = [...layerSlots].sort((a, b) => cornerScore(a, layerSlots) - cornerScore(b, layerSlots));
-    for (let i = 0; i < Math.min(remainder, sorted.length); i++) {
-      result.push(sorted[i]);
-    }
+  for (let i = 0; i < remainder && (layerStart + i) < allSlots.length; i++) {
+    result.push(allSlots[layerStart + i]);
   }
 
   return result;
-}
-
-/**
- * 四隅積みスコア（距離ベース）
- * 端からの距離で連続的にスコアリング: 0=四隅, 小さい値=辺寄り, 大きい値=中央
- * 不規則な配置（JPI 7個/段など）でも正しく四隅を判定できる
- */
-function cornerScore(slot: BoxSlot, layer: BoxSlot[]): number {
-  const xs = layer.map(s => s.x);
-  const ys = layer.map(s => s.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const rangeX = maxX - minX || 1;
-  const rangeY = maxY - minY || 1;
-  // 端からの正規化距離（0=端、0.5=中央）
-  const dx = Math.min(slot.x - minX, maxX - slot.x) / rangeX;
-  const dy = Math.min(slot.y - minY, maxY - slot.y) / rangeY;
-  return dx + dy;
 }
 
 /* ===== Default box dimensions ===== */
