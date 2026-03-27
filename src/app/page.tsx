@@ -37,43 +37,55 @@ function LoadingOverlay({ message, progress }: { message: string; progress: numb
       animation: 'fadeIn 0.15s ease both',
     }}>
       <style>{`
-        @keyframes spinFast { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes spinLoad3D {
+          0% { transform: rotateX(-20deg) rotateY(0deg); }
+          100% { transform: rotateX(-20deg) rotateY(360deg); }
+        }
+        @keyframes pulseGlow {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 0.8; }
+        }
       `}</style>
       <div style={{
         background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
         border: '1.5px solid rgba(255,255,255,0.15)',
         borderRadius: 24, padding: '32px 40px', textAlign: 'center',
-        boxShadow: '0 0 40px rgba(255,255,255,0.05), 0 24px 60px rgba(0,0,0,0.6)',
+        boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 24px 60px rgba(0,0,0,0.6)',
         width: '90%', maxWidth: 300,
       }}>
-        {/* 白ネオンスピナー（中身空白、緩急回転） */}
-        <div style={{ position: 'relative', width: 56, height: 56, margin: '0 auto 16px' }}>
-          <svg width="56" height="56" viewBox="0 0 56 56" style={{ animation: 'spinFast 0.8s cubic-bezier(0.4,0,0.2,1) infinite' }}>
-            <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-            <circle cx="28" cy="28" r="24" fill="none" stroke="#fff" strokeWidth="3"
-              strokeLinecap="round" strokeDasharray="80 70"
-              style={{ filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.5)) drop-shadow(0 0 12px rgba(255,255,255,0.2))' }} />
+        {/* ネオンリング（切れ目なし・3D回転） */}
+        <div style={{ position: 'relative', width: 56, height: 56, margin: '0 auto 16px', perspective: 200 }}>
+          <svg width="56" height="56" viewBox="0 0 56 56" style={{
+            animation: 'spinLoad3D 6s linear infinite',
+            transformStyle: 'preserve-3d',
+          }}>
+            <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
+            <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2.5"
+              style={{
+                filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.25)) drop-shadow(0 0 6px rgba(255,255,255,0.08))',
+                animation: 'pulseGlow 3s ease-in-out infinite',
+              }} />
           </svg>
         </div>
 
-        {/* メッセージ（白ネオン） */}
+        {/* メッセージ */}
         <p style={{
           color: '#fff', fontSize: 12, fontWeight: 600, margin: '0 0 12px', lineHeight: 1.5,
-          textShadow: '0 0 8px rgba(255,255,255,0.3)',
+          textShadow: '0 0 6px rgba(255,255,255,0.15)',
         }}>
           {message}
         </p>
 
-        {/* 進捗率（白ネオン大きめ） */}
+        {/* 進捗率 */}
         <p style={{
           color: '#fff', fontSize: 20, fontWeight: 800, margin: '0 0 10px',
           fontFamily: 'var(--font-mono)',
-          textShadow: '0 0 10px rgba(255,255,255,0.6), 0 0 20px rgba(255,255,255,0.3)',
+          textShadow: '0 0 8px rgba(255,255,255,0.3), 0 0 16px rgba(255,255,255,0.12)',
         }}>
           {Math.round(progress)}%
         </p>
 
-        {/* プログレスバー（白ネオン） */}
+        {/* プログレスバー */}
         <div style={{
           width: '100%', height: 4, borderRadius: 2,
           background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
@@ -81,8 +93,8 @@ function LoadingOverlay({ message, progress }: { message: string; progress: numb
         }}>
           <div style={{
             height: '100%', borderRadius: 2,
-            background: '#fff',
-            boxShadow: '0 0 8px rgba(255,255,255,0.5), 0 0 16px rgba(255,255,255,0.2)',
+            background: 'rgba(255,255,255,0.85)',
+            boxShadow: '0 0 5px rgba(255,255,255,0.25), 0 0 10px rgba(255,255,255,0.08)',
             width: `${progress}%`,
             transition: 'width 0.3s ease',
           }} />
