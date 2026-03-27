@@ -361,6 +361,7 @@ export default function ItemDetailPanel({
   const fsTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
   const [fractionZoom, setFractionZoom] = useState<'idle' | 'zoomIn' | 'show' | 'zoomOut'>('idle');
   const [fzRotateY, setFzRotateY] = useState(0);
+  const [fzManual, setFzManual] = useState(false);
   const fzTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
   const fzAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [animKey, setAnimKey] = useState(item.id);
@@ -525,7 +526,7 @@ export default function ItemDetailPanel({
     if (fzAutoTimerRef.current) clearTimeout(fzAutoTimerRef.current);
     fzAutoTimerRef.current = null;
     setFractionZoom('zoomOut');
-    setTimeout(() => { setFractionZoom('idle'); setFzRotateY(0); }, 500);
+    setTimeout(() => { setFractionZoom('idle'); setFzRotateY(0); setFzManual(false); }, 500);
   }, []);
 
   const openFractionZoom = useCallback((autoClose = false) => {
@@ -535,6 +536,7 @@ export default function ItemDetailPanel({
     }
     if (fractionZoom === 'zoomOut') return;
     setFzRotateY(0);
+    setFzManual(false);
     setFractionZoom('zoomIn');
     setTimeout(() => setFractionZoom('show'), 500);
     if (autoClose) {
@@ -662,6 +664,15 @@ export default function ItemDetailPanel({
             <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: accentColor, display: 'inline-block' }} />
             {item.type}
           </span>
+          {isCurrentNabe && (
+            <span className="type-badge" style={{
+              backgroundColor: (currentNabeIs180 ? '#3b82f6' : '#22c55e') + '40', color: '#fff',
+              border: '1.5px solid ' + (currentNabeIs180 ? '#3b82f6' : '#22c55e') + '70', fontWeight: 700, fontSize: 12,
+            }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: currentNabeIs180 ? '#3b82f6' : '#22c55e', display: 'inline-block' }} />
+              {currentNabeIs180 ? '180' : '100'}
+            </span>
+          )}
           {itemColor && (
             <span className="type-badge" style={{
               backgroundColor: itemColor === '黒' ? 'rgba(30,30,30,0.8)' : itemColor === '白' ? 'rgba(240,240,240,0.9)' : 'rgba(200,160,50,0.4)',
@@ -690,16 +701,6 @@ export default function ItemDetailPanel({
 
         {/* 品名（下から出現）— 右側の種類数表示と重ならないようwidth制限 */}
         <div key={`name-${animKey}`} className="anim-slide-up" style={{ position: 'relative', zIndex: 3, maxWidth: 'calc(100% - 130px)' }}>
-          {/* 鍋: サイズバッジ（左上） */}
-          {isCurrentNabe && (
-            <span style={{
-              display: 'inline-block', fontSize: 11, fontWeight: 800, fontFamily: 'var(--font-mono)',
-              padding: '1px 8px', borderRadius: 10, marginBottom: 2,
-              color: '#fff', letterSpacing: 0.5,
-              background: currentNabeIs180 ? '#3b82f6' : '#22c55e',
-              boxShadow: `0 0 8px ${currentNabeIs180 ? '#3b82f680' : '#22c55e80'}`,
-            }}>{currentNabeIs180 ? '180' : '100'}</span>
-          )}
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
               color: nabeColor || '#f0f0f0',
@@ -748,8 +749,7 @@ export default function ItemDetailPanel({
           </div>
           <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
             {item.palletCount > 0 && item.qtyPerPallet > 0 && (
-              <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
-                onClick={(e) => { e.stopPropagation(); setFullscreenPallet('full'); }}>
+              <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
                 <PalletDiagram palletCount={item.palletCount} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} />
               </div>
             )}
@@ -912,8 +912,8 @@ export default function ItemDetailPanel({
             onTouchMove={(e) => {
               if (!fzTouchRef.current) return;
               e.preventDefault();
+              setFzManual(true);
               setFzRotateY(fzTouchRef.current.startRotY + (e.touches[0].clientX - fzTouchRef.current.startX) * 0.5);
-              // スワイプ中は自動閉じタイマーリセット
               if (fzAutoTimerRef.current) { clearTimeout(fzAutoTimerRef.current); fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000); }
             }}
             onTouchEnd={() => {
@@ -926,6 +926,7 @@ export default function ItemDetailPanel({
             onMouseDown={(e) => { fzTouchRef.current = { startX: e.clientX, startRotY: fzRotateY }; }}
             onMouseMove={(e) => {
               if (!fzTouchRef.current || !e.buttons) return;
+              setFzManual(true);
               setFzRotateY(fzTouchRef.current.startRotY + (e.clientX - fzTouchRef.current.startX) * 0.5);
               if (fzAutoTimerRef.current) { clearTimeout(fzAutoTimerRef.current); fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000); }
             }}
@@ -945,7 +946,7 @@ export default function ItemDetailPanel({
             }}>
               <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet}
                 type={item.type} itemName={item.itemName} measurements={item.measurements}
-                overrideRotateY={fractionZoom === 'show' ? fzRotateY : undefined}
+                overrideRotateY={fractionZoom === 'show' && fzManual ? fzRotateY : undefined}
               />
             </div>
           </div>
