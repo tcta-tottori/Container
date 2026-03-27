@@ -28,13 +28,13 @@ import * as XLSX from 'xlsx';
 type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
 
 /* ===== おしゃれな読込ポップアップ ===== */
-function LoadingOverlay({ message, progress }: { message: string; progress: number }) {
+function LoadingOverlay({ message, progress, closing }: { message: string; progress: number; closing?: boolean }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 300,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(16px)',
-      animation: 'fadeIn 0.15s ease both',
+      animation: closing ? 'loadFadeOut 0.5s ease both' : 'fadeIn 0.15s ease both',
     }}>
       <style>{`
         @keyframes spinLoad3D {
@@ -44,6 +44,10 @@ function LoadingOverlay({ message, progress }: { message: string; progress: numb
         @keyframes pulseGlow {
           0%, 100% { opacity: 0.5; }
           50% { opacity: 0.8; }
+        }
+        @keyframes loadFadeOut {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
         }
       `}</style>
       <div style={{
@@ -194,6 +198,7 @@ export default function Home() {
   const [manualOpen, setManualOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingClosing, setLoadingClosing] = useState(false);
   const [jkpShipments, setJkpShipments] = useState<JkpShipment[]>([]);
   const jkpUserLoadedRef = useRef(false);
   const [appReady, setAppReady] = useState(false);
@@ -317,6 +322,19 @@ export default function Home() {
     }
   }, [state.completedIds.size, state.items.length, announceProgress, state.items, state.completedIds]);
 
+  // 読込完了→100%表示1秒→フェードアウト
+  const closeLoading = useCallback(() => {
+    setLoadingProgress(100);
+    setTimeout(() => {
+      setLoadingClosing(true);
+      setTimeout(() => {
+        setLoadingMsg(null);
+        setLoadingProgress(0);
+        setLoadingClosing(false);
+      }, 500); // フェードアウト0.5秒
+    }, 1000); // 100%表示1秒
+  }, []);
+
   const handleFileLoaded = useCallback(
     async (file: File) => {
       loadedContainerRef.current = null;
@@ -369,10 +387,10 @@ export default function Home() {
         // 表示完了まで少し待機
         await new Promise((r) => setTimeout(r, 200));
       } finally {
-        setLoadingMsg(null); setLoadingProgress(0);
+        closeLoading();
       }
     },
-    [loadData, loadMaster]
+    [loadData, loadMaster, closeLoading]
   );
 
   const handleAqssLoaded = useCallback(
@@ -393,10 +411,10 @@ export default function Home() {
         setLoadingMsg(`AQSS読込完了: ${totalUpdated}件更新`);
         await new Promise((r) => setTimeout(r, 1000));
       } finally {
-        setLoadingMsg(null); setLoadingProgress(0);
+        closeLoading();
       }
     },
-    [state.items, updateItem]
+    [state.items, updateItem, closeLoading]
   );
 
   // AQSSファイルのみでコンテナを新規作成
@@ -433,10 +451,10 @@ export default function Home() {
 
         await new Promise((r) => setTimeout(r, 500));
       } finally {
-        setLoadingMsg(null); setLoadingProgress(0);
+        closeLoading();
       }
     },
-    [loadData, loadMaster]
+    [loadData, loadMaster, closeLoading]
   );
 
   // マスターデータ（CNS品目一覧）をファイルから読込
@@ -481,10 +499,10 @@ export default function Home() {
         saveRecentFile(file, 1, masterItems.length, 'master');
         await new Promise((r) => setTimeout(r, 1500));
       } finally {
-        setLoadingMsg(null); setLoadingProgress(0);
+        closeLoading();
       }
     },
-    [loadMaster, state.items, updateItem]
+    [loadMaster, state.items, updateItem, closeLoading]
   );
 
   const handleJkpLoaded = useCallback(
@@ -568,10 +586,10 @@ export default function Home() {
         setLoadingMsg(`JKP読込エラー: ${e instanceof Error ? e.message : String(e)}`);
         await new Promise((r) => setTimeout(r, 3000));
       } finally {
-        setLoadingMsg(null); setLoadingProgress(0);
+        closeLoading();
       }
     },
-    [loadData, loadMaster]
+    [loadData, loadMaster, closeLoading]
   );
 
   const handleAnnounce = useCallback(() => {
@@ -850,7 +868,7 @@ export default function Home() {
     return (
       <>
         <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} />
-        {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} />}
+        {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
       </>
     );
   }
@@ -908,7 +926,7 @@ export default function Home() {
     <>
       {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
-      {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} />}
+      {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 
       {/* メニューオーバーレイ */}
       {menuOpen && (
@@ -1104,7 +1122,7 @@ export default function Home() {
                     }
                     await new Promise((r) => setTimeout(r, 1500));
                   } finally {
-                    setLoadingMsg(null); setLoadingProgress(0);
+                    closeLoading();
                   }
                 }}
               />

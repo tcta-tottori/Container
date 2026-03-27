@@ -51,7 +51,7 @@ export default function HeaderBar({
       setCurrentDate(`${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}(${days[now.getDay()]})`);
     };
     update();
-    const iv = setInterval(update, 10000);
+    const iv = setInterval(update, 1000);
     return () => clearInterval(iv);
   }, []);
 
