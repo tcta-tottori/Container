@@ -459,19 +459,11 @@ export default function PalletDiagram({
   let palletWcm: number;
   let palletDcm: number;
   if (isNabe) {
-    // 鍋パレット: 100サイズはぴったり収まる、180サイズは幅方向にはみ出る
-    const is180 = itemName ? (itemName.includes('180') || /18[RWCS]/.test(itemName)) : false;
-    const smallDim = Math.min(bwCm, bdCm);
-    const largeDim = Math.max(bwCm, bdCm);
-    if (is180) {
-      // 180: パレット110cm、箱3×42=126cmではみ出る
-      palletWcm = 110;
-      palletDcm = largeDim * 2; // 奥行は箱2列分
-    } else {
-      // 100: 箱3×38=114cmがパレットにぴったり収まる
-      palletWcm = smallDim * 3;
-      palletDcm = largeDim * 2;
-    }
+    // 鍋パレット: 物理パレット110×110cmを中心に表示
+    // 100サイズ(3×38=114): ほぼパレットに収まる
+    // 180サイズ(3×42=126): パレットからはみ出る
+    palletWcm = 110;
+    palletDcm = 110;
   } else if (isJPI) {
     const smallDim = Math.min(bwCm, bdCm);
     const largeDim = Math.max(bwCm, bdCm);

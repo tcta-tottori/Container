@@ -51,11 +51,26 @@ export function useSpeech() {
 
     let text = `${spokenName}。${qtyText}。`;
 
-    // ポリカバーは検査で1ケース抜く（端数から1引く）
+    // ポリカバーは検査で1ケース抜く（端数から1引く）。鍋は検査なし。
     if (isPolycover) {
       const afterInspection = fractionCeil - 1;
       if (afterInspection >= 0) {
         text += `検査を抜いて${afterInspection}ケース。`;
+      }
+    }
+
+    // 鍋: サイズ違いの注意コール
+    const isNabe = item.type === '鍋';
+    if (isNabe && allItems && allItems.length > 0) {
+      const currentIs180 = item.itemName.includes('180') || /18[RWCS]/.test(item.itemName);
+      const currentSize = currentIs180 ? '180' : '100';
+      const otherSize = currentIs180 ? '100' : '180';
+      const otherSizeItems = allItems.filter(o => o.id !== item.id && o.type === '鍋' && (
+        currentIs180 ? !(o.itemName.includes('180') || /18[RWCS]/.test(o.itemName))
+          : (o.itemName.includes('180') || /18[RWCS]/.test(o.itemName))
+      ));
+      if (otherSizeItems.length > 0) {
+        text += `注意、これは${currentSize}サイズです。${otherSize}サイズが${otherSizeItems.length}種類あります。`;
       }
     }
 
@@ -191,12 +206,22 @@ export function useSpeech() {
       : '荷降ろしを開始します。';
 
     // === 内容物コール: 「〇〇がN種類」形式 ===
+    // 鍋コンテナ: サイズ別にコール
+    if (totalTypeCounts['鍋'] > 0) {
+      let count100 = 0, count180 = 0;
+      for (const it of items) {
+        if (it.type !== '鍋') continue;
+        if (it.itemName.includes('180') || /18[RWCS]/.test(it.itemName)) count180++;
+        else count100++;
+      }
+      if (count100 > 0) text += `100サイズが${count100}種類。`;
+      if (count180 > 0) text += `180サイズが${count180}種類。`;
+    }
     const typeLabels: [string, string][] = [
       ['ポリカバー', 'ポリカバー'],
       ['ジャーポット', 'ジャーポット'],
       ['箱', '箱'],
       ['部品', '部品'],
-      ['鍋', '鍋'],
       ['ヤーマン部品', 'ヤーマン部品'],
       ['その他', 'その他'],
     ];

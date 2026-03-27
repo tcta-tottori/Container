@@ -403,14 +403,34 @@ export default function ItemDetailPanel({
     }
   }, [onDecrementPallet]);
   const itemColor = extractColor(item.itemName);
-  const similarItems = allItems.filter(
+  // 鍋は類似品なし、関連として同じサイズのものを表示
+  const isCurrentNabe = item.type === '鍋';
+  const currentNabeIs180 = isCurrentNabe && (item.itemName.includes('180') || /18[RWCS]/.test(item.itemName));
+  const similarItems = isCurrentNabe ? [] : allItems.filter(
     (o) => o.id !== item.id && areSimilarItems(item.itemName, o.itemName)
   );
-  const relatedText = relatedItems.map((r) => r.itemName).join('  /  ');
+  const nabeRelatedItems = isCurrentNabe ? allItems.filter(o => {
+    if (o.id === item.id || o.type !== '鍋') return false;
+    const o180 = o.itemName.includes('180') || /18[RWCS]/.test(o.itemName);
+    return currentNabeIs180 === o180; // 同じサイズのみ
+  }).slice(0, 6) : [];
+  const effectiveRelatedItems = isCurrentNabe ? nabeRelatedItems : relatedItems;
+  const relatedText = effectiveRelatedItems.map((r) => r.itemName).join('  /  ');
 
+  const isNabeContainer = allItems.some(it => it.type === '鍋');
   const activeItems = allItems.filter((it) => !completedIds.has(it.id));
   const doneItems = allItems.filter((it) => completedIds.has(it.id));
-  const sortedItems = [...activeItems, ...doneItems];
+  // 鍋コンテナ: ①サイズ(100→180) ②機種名でソート
+  const nabeSort = (a: ContainerItem, b: ContainerItem) => {
+    if (!isNabeContainer) return 0;
+    const a180 = a.itemName.includes('180') || /18[RWCS]/.test(a.itemName) ? 1 : 0;
+    const b180 = b.itemName.includes('180') || /18[RWCS]/.test(b.itemName) ? 1 : 0;
+    if (a180 !== b180) return a180 - b180;
+    return a.itemName.localeCompare(b.itemName);
+  };
+  const sortedItems = isNabeContainer
+    ? [...activeItems.sort(nabeSort), ...doneItems.sort(nabeSort)]
+    : [...activeItems, ...doneItems];
 
   const displayItemName = item.itemName.replace(/ポリカバー/g, '').replace(/^[\s\-]+|[\s\-]+$/g, '') || item.itemName;
 
@@ -431,7 +451,6 @@ export default function ItemDetailPanel({
 
   const typeCounts = new Map<string, number>();
   // 鍋コンテナ: サイズ別に分離（100→180の順で表示）
-  const isNabeContainer = allItems.some(it => it.type === '鍋');
   if (isNabeContainer) {
     // 100を先に登録して順序を保証
     typeCounts.set('鍋100', 0);
@@ -492,7 +511,9 @@ export default function ItemDetailPanel({
   const isTransitioning = animKey !== item.id;
   const plTarget = isTransitioning ? undefined : item.palletCount;
   const rawFraction = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-  const inspectionDeducted = rawFraction > 0 ? rawFraction - 1 : 0;
+  // 鍋は検査を抜かない、それ以外は1ケース抜く
+  const isNabeItem = item.type === '鍋';
+  const inspectionDeducted = isNabeItem ? rawFraction : (rawFraction > 0 ? rawFraction - 1 : 0);
   const ctTarget = isTransitioning ? undefined : inspectionDeducted;
   const pcsTarget = isTransitioning ? undefined : Math.ceil(item.totalQty);
   const animPL = useCountUp(plTarget ?? 0, animKey, isTransitioning);
@@ -669,6 +690,16 @@ export default function ItemDetailPanel({
 
         {/* 品名（下から出現）— 右側の種類数表示と重ならないようwidth制限 */}
         <div key={`name-${animKey}`} className="anim-slide-up" style={{ position: 'relative', zIndex: 3, maxWidth: 'calc(100% - 130px)' }}>
+          {/* 鍋: サイズバッジ（左上） */}
+          {isCurrentNabe && (
+            <span style={{
+              display: 'inline-block', fontSize: 11, fontWeight: 800, fontFamily: 'var(--font-mono)',
+              padding: '1px 8px', borderRadius: 10, marginBottom: 2,
+              color: '#fff', letterSpacing: 0.5,
+              background: currentNabeIs180 ? '#3b82f6' : '#22c55e',
+              boxShadow: `0 0 8px ${currentNabeIs180 ? '#3b82f680' : '#22c55e80'}`,
+            }}>{currentNabeIs180 ? '180' : '100'}</span>
+          )}
           <MarqueeText text={displayItemName} className="detail-item-name"
             style={{
               color: nabeColor || '#f0f0f0',
@@ -773,7 +804,7 @@ export default function ItemDetailPanel({
         <div style={{ flexShrink: 0, minHeight: 32, zIndex: 2 }}>
           {similarItems.length > 0 ? (
             <SimilarItemsMarquee item={item} similarItems={similarItems} />
-          ) : relatedItems.length > 0 ? (
+          ) : effectiveRelatedItems.length > 0 ? (
             <div style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '4px 12px', borderRadius: 20,
