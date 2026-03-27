@@ -834,14 +834,14 @@ export default function Home() {
             </g>
           </svg>
         </div>
-        {/* Loading + 5ドット（白ネオン） */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+        {/* Loading文字 + ドット（下に配置） */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <span style={{
             fontSize: 16, fontWeight: 600, color: '#fff', fontFamily: 'Inter, sans-serif',
             letterSpacing: 3,
             textShadow: '0 0 10px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.35), 0 0 40px rgba(255,255,255,0.15)',
           }}>Loading</span>
-          <div style={{ display: 'flex', gap: 3, marginLeft: 2 }}>
+          <div style={{ display: 'flex', gap: 4 }}>
             {[0, 1, 2, 3, 4].map(i => (
               <span key={i} style={{
                 display: 'inline-block', width: 5, height: 5, borderRadius: '50%',

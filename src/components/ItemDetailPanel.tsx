@@ -430,8 +430,13 @@ export default function ItemDetailPanel({
   const currentDims = item.measurements ? parseMeas(item.measurements) : null;
 
   const typeCounts = new Map<string, number>();
-  // For nabe items, split by size (100 vs 180) instead of grouping by type
+  // 鍋コンテナ: サイズ別に分離（100→180の順で表示）
   const isNabeContainer = allItems.some(it => it.type === '鍋');
+  if (isNabeContainer) {
+    // 100を先に登録して順序を保証
+    typeCounts.set('鍋100', 0);
+    typeCounts.set('鍋180', 0);
+  }
   for (const it of allItems) {
     if (it.type === '鍋' && isNabeContainer) {
       const is180 = it.itemName.includes('180') || /18[RWCS]/.test(it.itemName);
@@ -441,6 +446,8 @@ export default function ItemDetailPanel({
       typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
     }
   }
+  // 0件のエントリを除去
+  typeCounts.forEach((v, k) => { if (v === 0) typeCounts.delete(k); });
 
   // リスト行の背景色（メニューカラーと統一・ダーク系）
   const TYPE_ROW_BG: Record<string, string> = {
@@ -900,7 +907,7 @@ export default function ItemDetailPanel({
             }}
           >
             <div style={{
-              width: '80%', height: '80%',
+              width: '90%', height: '90%', transform: fractionZoom === 'show' ? 'scale(1.8)' : undefined,
               animation: fractionZoom === 'zoomIn' ? 'fzZoomIn 0.5s cubic-bezier(0.2,0.8,0.3,1) both'
                 : fractionZoom === 'zoomOut' ? 'fzZoomOut 0.5s ease both'
                 : undefined,

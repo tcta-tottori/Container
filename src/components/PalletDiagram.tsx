@@ -181,15 +181,22 @@ function buildNabeSlots(
   const boxD = largeCm * cm2px;
   const cols = 3;
   const rows = Math.max(1, Math.floor(pd / boxD));
-  const gapX = Math.max(0, (pw - cols * boxW) / (cols + 1));
-  const gapY = Math.max(0, (pd - rows * boxD) / (rows + 1));
+  const totalBoxW = cols * boxW;
+  const totalBoxD = rows * boxD;
+  // 箱をパレット中央に配置（はみ出す場合もセンター）
+  const offsetX = (pw - totalBoxW) / 2;
+  const offsetY = (pd - totalBoxD) / 2;
+  const gapX = totalBoxW <= pw ? Math.max(0, (pw - totalBoxW) / (cols + 1)) : 0;
+  const gapY = totalBoxD <= pd ? Math.max(0, (pd - totalBoxD) / (rows + 1)) : 0;
+  const startX = totalBoxW <= pw ? gapX : offsetX;
+  const startY = totalBoxD <= pd ? gapY : offsetY;
   const slots: BoxSlot[] = [];
   for (let layer = 0; layer < layers; layer++) {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         slots.push({
-          x: gapX + c * (boxW + gapX),
-          y: gapY + r * (boxD + gapY),
+          x: startX + c * (boxW + (totalBoxW <= pw ? gapX : 0)),
+          y: startY + r * (boxD + (totalBoxD <= pd ? gapY : 0)),
           z: PALLET_H_PX + layer * bhPx,
           w: boxW, d: boxD, h: bhPx,
         });
@@ -451,16 +458,25 @@ export default function PalletDiagram({
   // Calculate pallet dimensions in cm
   let palletWcm: number;
   let palletDcm: number;
-  if (isJPI) {
-    // JPI: 7個/段 — 手前3個(通常) + 奥4個(90°回転、2列×2行)
+  if (isNabe) {
+    // 鍋パレット: 100サイズはぴったり収まる、180サイズは幅方向にはみ出る
+    const is180 = itemName ? (itemName.includes('180') || /18[RWCS]/.test(itemName)) : false;
     const smallDim = Math.min(bwCm, bdCm);
     const largeDim = Math.max(bwCm, bdCm);
-    palletWcm = smallDim * 3;            // 3×38 = 114cm
-    palletDcm = largeDim + smallDim * 2;  // 55 + 38×2 = 131cm
-  } else if (isNabe) {
-    // Nabe: physical pallet size 110×110cm (boxes may overhang)
-    palletWcm = 110;
-    palletDcm = 110;
+    if (is180) {
+      // 180: パレット110cm、箱3×42=126cmではみ出る
+      palletWcm = 110;
+      palletDcm = largeDim * 2; // 奥行は箱2列分
+    } else {
+      // 100: 箱3×38=114cmがパレットにぴったり収まる
+      palletWcm = smallDim * 3;
+      palletDcm = largeDim * 2;
+    }
+  } else if (isJPI) {
+    const smallDim = Math.min(bwCm, bdCm);
+    const largeDim = Math.max(bwCm, bdCm);
+    palletWcm = smallDim * 3;
+    palletDcm = largeDim + smallDim * 2;
   } else {
     palletWcm = 110;
     palletDcm = 110;
@@ -481,12 +497,14 @@ export default function PalletDiagram({
   if (isJarPot) {
     allSlots = buildJarPotSlots(bh, layers, pw, pd);
     perLayer = 4;
+  } else if (isNabe) {
+    // 鍋はどの種目（JPI含む）でも統一で1段6個
+
+    allSlots = buildNabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
+    perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
   } else if (isJPI) {
     allSlots = buildJPI7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = 7;
-  } else if (isNabe) {
-    allSlots = buildNabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
-    perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
   } else {
     // qtyPerPalletを使って現実的な段数・個数/段を決定
     // まずデフォルト寸法でのperLayerを計算
