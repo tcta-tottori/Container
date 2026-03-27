@@ -814,19 +814,27 @@ export default function Home() {
         zIndex: 999,
       }}>
         <style>{`
-          @keyframes neonPulse { 0%,100% { opacity: 0.7; filter: drop-shadow(0 0 6px rgba(255,255,255,0.4)); } 50% { opacity: 1; filter: drop-shadow(0 0 14px rgba(255,255,255,0.7)) drop-shadow(0 0 30px rgba(255,255,255,0.3)); } }
+          @keyframes neonPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
           @keyframes dotFlow { 0%,20% { opacity: 0.15; } 40% { opacity: 1; } 60%,100% { opacity: 0.15; } }
         `}</style>
-        {/* 白ネオンキューブ枠のみ */}
-        <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
-          style={{ marginBottom: 28, animation: 'neonPulse 2.5s ease-in-out infinite' }}>
-          <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none"
-            style={{ filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.5)) drop-shadow(0 0 16px rgba(255,255,255,0.25))' }}>
-            <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
-            <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
-            <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
-          </g>
-        </svg>
+        {/* 白ネオンキューブ（丸グロー + アイコン） */}
+        <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28 }}>
+          {/* 丸い背景グロー（切れ目なし） */}
+          <div style={{
+            position: 'absolute', inset: -10,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 40%, transparent 70%)',
+            animation: 'neonPulse 2.5s ease-in-out infinite',
+          }} />
+          <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
+            style={{ position: 'relative', animation: 'neonPulse 2.5s ease-in-out infinite' }}>
+            <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none">
+              <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
+              <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
+              <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
+            </g>
+          </svg>
+        </div>
         {/* Loading + 5ドット（白ネオン） */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
           <span style={{
