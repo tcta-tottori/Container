@@ -322,89 +322,75 @@ function buildGenericSlots(
  * 端数パレットのスロット生成
  *
  * ルール:
- * - 最上段の端数が perLayer の半分以下の場合、見栄えが悪いので
- *   1つ下の段から箱を減らして最上段に分散させる
- * - 最上段は四隅積み（中央空け）で配置
+ * - 下段は全て満杯、最上段のみ端数
+ * - 最上段は四隅積み（端→中央の順に配置、中央から抜く）
+ * - 上段に浮く箱が出ないよう、段間の再分配はしない
  */
 function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: number): BoxSlot[] {
   if (fraction <= 0 || perLayer <= 0) return [];
+
+  // allSlotsが足りない場合、既存パターンを繰り返して拡張
+  const neededSlots = Math.ceil(fraction / perLayer) * perLayer;
+  let extended = allSlots;
+  if (allSlots.length < neededSlots && allSlots.length >= perLayer) {
+    extended = [...allSlots];
+    const templateH = extended[0].h;
+    while (extended.length < neededSlots) {
+      const idx = extended.length;
+      const sourceIdx = idx % allSlots.length;
+      const layerIdx = Math.floor(idx / perLayer);
+      extended.push({
+        ...allSlots[sourceIdx],
+        z: PALLET_H_PX + layerIdx * templateH,
+      });
+    }
+  }
 
   const fullLayers = Math.floor(fraction / perLayer);
   const remainder = fraction % perLayer;
 
   // 端数なし（全段満杯）
   if (remainder === 0) {
-    return allSlots.slice(0, fraction);
-  }
-
-  // 端数が少なすぎる場合(perLayerの半分以下)、満杯段を1段減らし
-  // 最上2段に分散させる（例: 19個=2段満杯(12)+1段満杯(6)+最上段1個 → 2段満杯(12)+上2段に3-4個ずつ）
-  let belowFullLayers = fullLayers;
-  let topLayers: number[] = [remainder]; // 最上段の各段の箱数
-
-  // 最上段が4未満（四隅に満たない）の場合、1段減らして分散
-  // 四隅は必ず埋める: 最低4箱を最上段に確保
-  if (remainder > 0 && remainder < 4 && belowFullLayers > 0) {
-    belowFullLayers -= 1;
-    const distributed = fraction - belowFullLayers * perLayer;
-    if (distributed <= perLayer) {
-      topLayers = [distributed]; // 1段に収まる
-    } else {
-      const upperCount = Math.max(4, Math.floor(distributed / 2));
-      const lowerCount = distributed - upperCount;
-      topLayers = [lowerCount, upperCount];
-    }
-  } else if (remainder > 0 && remainder <= Math.floor(perLayer / 2) && belowFullLayers > 0) {
-    belowFullLayers -= 1;
-    const distributed = fraction - belowFullLayers * perLayer;
-    const upperCount = Math.max(4, Math.floor(distributed / 2));
-    const lowerCount = distributed - upperCount;
-    topLayers = [lowerCount, upperCount];
+    return extended.slice(0, fraction);
   }
 
   const result: BoxSlot[] = [];
 
   // 満杯の段
-  for (let i = 0; i < belowFullLayers * perLayer && i < allSlots.length; i++) {
-    result.push(allSlots[i]);
+  for (let i = 0; i < fullLayers * perLayer && i < extended.length; i++) {
+    result.push(extended[i]);
   }
 
-  // 端数段（1段または2段）: 四隅積み（中央空け）
-  for (let tl = 0; tl < topLayers.length; tl++) {
-    const count = topLayers[tl];
-    if (count <= 0) continue;
-    const layerIdx = belowFullLayers + tl;
-    const layerStart = layerIdx * perLayer;
-    const layerSlots = allSlots.slice(layerStart, layerStart + perLayer);
+  // 最上段: 四隅→辺→中央の順に配置（中央から抜く）
+  const layerStart = fullLayers * perLayer;
+  const layerSlots = extended.slice(layerStart, layerStart + perLayer);
 
-    if (layerSlots.length > 0) {
-      if (count >= perLayer) {
-        // 満杯
-        for (const s of layerSlots) result.push(s);
-      } else {
-        // 四隅→辺→中央の順に配置
-        const sorted = [...layerSlots].sort((a, b) => cornerScore(a, layerSlots) - cornerScore(b, layerSlots));
-        for (let i = 0; i < Math.min(count, sorted.length); i++) {
-          result.push(sorted[i]);
-        }
-      }
+  if (layerSlots.length > 0 && remainder > 0) {
+    const sorted = [...layerSlots].sort((a, b) => cornerScore(a, layerSlots) - cornerScore(b, layerSlots));
+    for (let i = 0; i < Math.min(remainder, sorted.length); i++) {
+      result.push(sorted[i]);
     }
   }
 
   return result;
 }
 
-/** 四隅積みスコア: 0=四隅, 1=辺, 2=中央 */
+/**
+ * 四隅積みスコア（距離ベース）
+ * 端からの距離で連続的にスコアリング: 0=四隅, 小さい値=辺寄り, 大きい値=中央
+ * 不規則な配置（JPI 7個/段など）でも正しく四隅を判定できる
+ */
 function cornerScore(slot: BoxSlot, layer: BoxSlot[]): number {
   const xs = layer.map(s => s.x);
   const ys = layer.map(s => s.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const isEdgeX = Math.abs(slot.x - minX) < 1 || Math.abs(slot.x - maxX) < 1;
-  const isEdgeY = Math.abs(slot.y - minY) < 1 || Math.abs(slot.y - maxY) < 1;
-  if (isEdgeX && isEdgeY) return 0; // 四隅
-  if (isEdgeX || isEdgeY) return 1; // 辺
-  return 2; // 中央
+  const rangeX = maxX - minX || 1;
+  const rangeY = maxY - minY || 1;
+  // 端からの正規化距離（0=端、0.5=中央）
+  const dx = Math.min(slot.x - minX, maxX - slot.x) / rangeX;
+  const dy = Math.min(slot.y - minY, maxY - slot.y) / rangeY;
+  return dx + dy;
 }
 
 /* ===== Default box dimensions ===== */
