@@ -50,6 +50,11 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
       const last = event.results[event.results.length - 1];
       if (!last.isFinal) return;
 
+      // アナウンス中は認識結果を無視（ループ防止）
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
+        return;
+      }
+
       const transcript = last[0].transcript;
       setLastTranscript(transcript);
       clearToast();
