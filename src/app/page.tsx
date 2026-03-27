@@ -1105,7 +1105,7 @@ export default function Home() {
         {/* フローティングマイクボタン（右下固定） */}
         {viewMode === 'work' && isSupported && (
           <button onClick={toggleListening}
-            className={isListening ? 'mic-btn-recording' : ''}
+            className={`mic-float-btn ${isListening ? 'mic-btn-recording' : ''}`}
             style={{
               position: 'fixed', bottom: 20, right: 20, zIndex: 100,
               width: 56, height: 56, borderRadius: '50%',

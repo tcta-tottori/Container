@@ -342,14 +342,24 @@ function buildFractionSlots(allSlots: BoxSlot[], perLayer: number, fraction: num
   let belowFullLayers = fullLayers;
   let topLayers: number[] = [remainder]; // 最上段の各段の箱数
 
-  if (remainder > 0 && remainder <= Math.floor(perLayer / 2) && belowFullLayers > 0) {
-    // 1段減らして2段に分散
+  // 最上段が4未満（四隅に満たない）の場合、1段減らして分散
+  // 四隅は必ず埋める: 最低4箱を最上段に確保
+  if (remainder > 0 && remainder < 4 && belowFullLayers > 0) {
     belowFullLayers -= 1;
     const distributed = fraction - belowFullLayers * perLayer;
-    // 2段に均等分配: 下段を多めに
-    const upperCount = Math.floor(distributed / 2);
+    if (distributed <= perLayer) {
+      topLayers = [distributed]; // 1段に収まる
+    } else {
+      const upperCount = Math.max(4, Math.floor(distributed / 2));
+      const lowerCount = distributed - upperCount;
+      topLayers = [lowerCount, upperCount];
+    }
+  } else if (remainder > 0 && remainder <= Math.floor(perLayer / 2) && belowFullLayers > 0) {
+    belowFullLayers -= 1;
+    const distributed = fraction - belowFullLayers * perLayer;
+    const upperCount = Math.max(4, Math.floor(distributed / 2));
     const lowerCount = distributed - upperCount;
-    topLayers = [lowerCount, upperCount]; // 下段が多い, 上段が少ない
+    topLayers = [lowerCount, upperCount];
   }
 
   const result: BoxSlot[] = [];

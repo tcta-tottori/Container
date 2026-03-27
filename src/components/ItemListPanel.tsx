@@ -28,18 +28,27 @@ function SwipeCompleteRow({ children, onSwipe, onClick, style }: {
       rowRef.current.style.transition = 'none';
     }
   }, []);
+  const parentRef = useRef<HTMLDivElement>(null);
   const onTE = useCallback(() => {
     if (rowRef.current) {
       rowRef.current.style.transition = 'transform 0.25s ease, opacity 0.25s ease';
       if (dx.current > 80) {
         rowRef.current.style.transform = 'translateX(100%)';
         rowRef.current.style.opacity = '0';
-        setTimeout(() => onSwipe(), 260);
+        setTimeout(() => {
+          // 親要素もスライドアウトして消す
+          if (parentRef.current) {
+            parentRef.current.style.transition = 'max-height 0.3s ease, opacity 0.2s ease';
+            parentRef.current.style.maxHeight = '0';
+            parentRef.current.style.opacity = '0';
+          }
+          setTimeout(() => onSwipe(), 300);
+        }, 260);
       } else { rowRef.current.style.transform = 'translateX(0)'; }
     }
   }, [onSwipe]);
   return (
-    <div style={{ overflow: 'hidden', position: 'relative' }}>
+    <div ref={parentRef} style={{ overflow: 'hidden', position: 'relative', maxHeight: 200 }}>
       <div style={{
         position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%',
         background: 'linear-gradient(90deg, #00ff88, #22ff66)',

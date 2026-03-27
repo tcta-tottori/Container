@@ -13,7 +13,7 @@ import SizeDiagram, { parseMeas } from './SizeDiagram';
  * - key変更: 0.4秒待機→1秒で0→targetまでカウントアップ
  * - target変更(key同一): 0.5秒で旧値→新値にスムーズ遷移（カウントダウン/アップ）
  */
-function useCountUp(target: number, key: string): number {
+function useCountUp(target: number, key: string, freeze?: boolean): number {
   const [value, setValue] = useState(target);
   const rafRef = useRef<number>(0);
   const targetRef = useRef(target);
@@ -46,7 +46,7 @@ function useCountUp(target: number, key: string): number {
 
   // target が変わったとき（key同一 = パレット減少等）: スムーズ遷移
   useEffect(() => {
-    if (keyRef.current !== key) return;
+    if (keyRef.current !== key || freeze) return;
     const from = prevValueRef.current;
     const to = target;
     if (from === to) return;
@@ -443,13 +443,16 @@ export default function ItemDetailPanel({
     '--hero-c4': accentColor + '22',
   } as React.CSSProperties;
 
-  // カウントアップアニメーション
-  const animPL = useCountUp(item.palletCount, animKey);
-  // CT: 検査抜き（端数から1個引いた値）。端数0の場合はそのまま0。
+  // カウントアップアニメーション（フェードアウト中は値をフリーズ）
+  const isTransitioning = animKey !== item.id;
+  const plTarget = isTransitioning ? undefined : item.palletCount;
   const rawFraction = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
   const inspectionDeducted = rawFraction > 0 ? rawFraction - 1 : 0;
-  const animCT = useCountUp(inspectionDeducted, animKey);
-  const animPCS = useCountUp(Math.ceil(item.totalQty), animKey);
+  const ctTarget = isTransitioning ? undefined : inspectionDeducted;
+  const pcsTarget = isTransitioning ? undefined : Math.ceil(item.totalQty);
+  const animPL = useCountUp(plTarget ?? 0, animKey, isTransitioning);
+  const animCT = useCountUp(ctTarget ?? 0, animKey, isTransitioning);
+  const animPCS = useCountUp(pcsTarget ?? 0, animKey, isTransitioning);
 
   return (
     <div className="detail-root" style={{ background: '#1a1d2e' }}>
