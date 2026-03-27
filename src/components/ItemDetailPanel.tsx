@@ -430,8 +430,16 @@ export default function ItemDetailPanel({
   const currentDims = item.measurements ? parseMeas(item.measurements) : null;
 
   const typeCounts = new Map<string, number>();
+  // For nabe items, split by size (100 vs 180) instead of grouping by type
+  const isNabeContainer = allItems.some(it => it.type === '鍋');
   for (const it of allItems) {
-    typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
+    if (it.type === '鍋' && isNabeContainer) {
+      const is180 = it.itemName.includes('180') || /18[RWCS]/.test(it.itemName);
+      const sizeKey = is180 ? '鍋180' : '鍋100';
+      typeCounts.set(sizeKey, (typeCounts.get(sizeKey) || 0) + 1);
+    } else {
+      typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
+    }
   }
 
   // リスト行の背景色（メニューカラーと統一・ダーク系）
@@ -449,7 +457,22 @@ export default function ItemDetailPanel({
     'ヤーマン部品': { base: '#1a1608', c1: '#3d320a', c2: '#292406', c3: '#4a3c0d' },
     'その他': { base: '#101218', c1: '#1a2030', c2: '#141822', c3: '#1e2838' },
   };
-  const heroBg = HERO_BG[item.type] || HERO_BG['その他'];
+  // 鍋はnabeColorからダーク背景を動的生成
+  const heroBg = (() => {
+    if (item.type === '鍋' && nabeColor) {
+      const hex = nabeColor.replace('#', '');
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return {
+        base: `rgb(${Math.round(r * 0.1 + 8)},${Math.round(g * 0.1 + 8)},${Math.round(b * 0.1 + 8)})`,
+        c1: `rgb(${Math.round(r * 0.24 + 5)},${Math.round(g * 0.24 + 5)},${Math.round(b * 0.24 + 5)})`,
+        c2: `rgb(${Math.round(r * 0.16 + 4)},${Math.round(g * 0.16 + 4)},${Math.round(b * 0.16 + 4)})`,
+        c3: `rgb(${Math.round(r * 0.29 + 6)},${Math.round(g * 0.29 + 6)},${Math.round(b * 0.29 + 6)})`,
+      };
+    }
+    return HERO_BG[item.type] || HERO_BG['その他'];
+  })();
 
   const heroVars = {
     '--hero-c1': heroBg.c1,
@@ -552,13 +575,18 @@ export default function ItemDetailPanel({
               border: '1.5px solid rgba(255,255,255,0.7)',
               boxShadow: '0 0 12px rgba(255,255,255,0.25), 0 0 24px rgba(255,255,255,0.1), inset 0 0 4px rgba(255,255,255,0.1)',
             }}>
-              {Array.from(typeCounts.entries()).reverse().map(([type, count]) => {
-                const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
-                const completedOfType = allItems.filter(it => it.type === type && completedIds.has(it.id)).length;
+              {Array.from(typeCounts.entries()).reverse().map(([typeKey, count]) => {
+                const nabeBarColor = typeKey === '鍋100' ? '#22c55e' : typeKey === '鍋180' ? '#3b82f6' : null;
+                const tc = nabeBarColor ? { accent: nabeBarColor } : (COLOR_MAP[typeKey as keyof typeof COLOR_MAP] || COLOR_MAP['その他']);
+                const completedOfType = typeKey === '鍋100'
+                  ? allItems.filter(it => it.type === '鍋' && !(it.itemName.includes('180') || /18[RWCS]/.test(it.itemName)) && completedIds.has(it.id)).length
+                  : typeKey === '鍋180'
+                  ? allItems.filter(it => it.type === '鍋' && (it.itemName.includes('180') || /18[RWCS]/.test(it.itemName)) && completedIds.has(it.id)).length
+                  : allItems.filter(it => it.type === typeKey && completedIds.has(it.id)).length;
                 const remainingOfType = count - completedOfType;
                 const pct = (remainingOfType / allItems.length) * 100;
                 return pct > 0 ? (
-                  <div key={type} style={{
+                  <div key={typeKey} style={{
                     width: `${pct}%`, height: '100%',
                     background: `linear-gradient(180deg, ${tc.accent}dd, ${tc.accent}88)`,
                     transition: 'width 0.5s ease',
@@ -572,11 +600,14 @@ export default function ItemDetailPanel({
               display: 'flex', alignItems: 'center', gap: 8, marginTop: 8,
               fontSize: 11, fontFamily: 'var(--font-mono)', fontWeight: 600,
             }}>
-              {Array.from(typeCounts.entries()).map(([type, count]) => {
-                const tc = COLOR_MAP[type as keyof typeof COLOR_MAP] || COLOR_MAP['その他'];
+              {Array.from(typeCounts.entries()).map(([typeKey, count]) => {
+                const nabeBarColor = typeKey === '鍋100' ? '#22c55e' : typeKey === '鍋180' ? '#3b82f6' : null;
+                const tc = nabeBarColor ? { accent: nabeBarColor } : (COLOR_MAP[typeKey as keyof typeof COLOR_MAP] || COLOR_MAP['その他']);
+                const label = typeKey === '鍋100' ? '100' : typeKey === '鍋180' ? '180' : null;
                 return (
-                  <span key={type} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span key={typeKey} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: tc.accent, display: 'inline-block' }} />
+                    {label && <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 9 }}>{label}</span>}
                     <span style={{ color: 'rgba(255,255,255,0.7)' }}>{count}</span>
                   </span>
                 );
@@ -869,7 +900,7 @@ export default function ItemDetailPanel({
             }}
           >
             <div style={{
-              width: '55%', maxHeight: '80%',
+              width: '80%', height: '80%',
               animation: fractionZoom === 'zoomIn' ? 'fzZoomIn 0.5s cubic-bezier(0.2,0.8,0.3,1) both'
                 : fractionZoom === 'zoomOut' ? 'fzZoomOut 0.5s ease both'
                 : undefined,

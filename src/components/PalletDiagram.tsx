@@ -458,11 +458,9 @@ export default function PalletDiagram({
     palletWcm = smallDim * 3;            // 3×38 = 114cm
     palletDcm = largeDim + smallDim * 2;  // 55 + 38×2 = 131cm
   } else if (isNabe) {
-    // Nabe 6個/段: pallet width = 3 × smaller box dim, depth = 2 × larger box dim
-    const smallDim = Math.min(bwCm, bdCm);
-    const largeDim = Math.max(bwCm, bdCm);
-    palletWcm = smallDim * 3;
-    palletDcm = largeDim * 2;
+    // Nabe: physical pallet size 110×110cm (boxes may overhang)
+    palletWcm = 110;
+    palletDcm = 110;
   } else {
     palletWcm = 110;
     palletDcm = 110;
