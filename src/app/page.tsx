@@ -816,24 +816,48 @@ export default function Home() {
         <style>{`
           @keyframes neonPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
           @keyframes dotFlow { 0%,20% { opacity: 0.15; } 40% { opacity: 1; } 60%,100% { opacity: 0.15; } }
-          @keyframes cubeRotate { 0% { transform: rotateY(0deg); } 100% { transform: rotateY(360deg); } }
+          @keyframes cube3dRotate {
+            0% { transform: rotateX(-20deg) rotateY(0deg); }
+            100% { transform: rotateX(-20deg) rotateY(360deg); }
+          }
         `}</style>
-        {/* 白ネオンキューブ（丸グロー + 中心軸回転） */}
-        <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28, perspective: 200 }}>
+        {/* 3Dキューブ（CSS 3D + 丸グロー） */}
+        <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28 }}>
           <div style={{
-            position: 'absolute', inset: -10,
+            position: 'absolute', inset: -16,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 40%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, transparent 70%)',
             animation: 'neonPulse 2.5s ease-in-out infinite',
           }} />
-          <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
-            style={{ position: 'relative', animation: 'cubeRotate 4s linear infinite', transformOrigin: 'center center' }}>
-            <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none">
-              <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
-              <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
-              <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
-            </g>
-          </svg>
+          <div style={{
+            width: 72, height: 72, perspective: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              width: 36, height: 36, position: 'relative',
+              transformStyle: 'preserve-3d',
+              animation: 'cube3dRotate 5s linear infinite',
+            }}>
+              {/* 6面の立方体 */}
+              {([
+                { ry: '0deg',   tz: 18, opacity: 0.9  },  // front
+                { ry: '180deg', tz: 18, opacity: 0.4  },  // back
+                { ry: '90deg',  tz: 18, opacity: 0.6  },  // right
+                { ry: '-90deg', tz: 18, opacity: 0.7  },  // left
+                { rx: '90deg',  tz: 18, opacity: 0.5  },  // top
+                { rx: '-90deg', tz: 18, opacity: 0.35 },  // bottom
+              ] as const).map((f, i) => (
+                <div key={i} style={{
+                  position: 'absolute', width: 36, height: 36,
+                  border: `2px solid rgba(255,255,255,${f.opacity})`,
+                  borderRadius: 3,
+                  background: `rgba(255,255,255,${f.opacity * 0.04})`,
+                  backfaceVisibility: 'hidden' as const,
+                  transform: `rotate${'rx' in f ? 'X' : 'Y'}(${('rx' in f ? f.rx : f.ry)}) translateZ(${f.tz}px)`,
+                }} />
+              ))}
+            </div>
+          </div>
         </div>
         {/* Loading + 5ドット（白ネオン） */}
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
