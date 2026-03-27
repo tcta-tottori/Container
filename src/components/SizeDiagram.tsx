@@ -319,19 +319,64 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
               </div>
             </>
           ) : (
-            /* ポリカバー/その他: 「重要安全部品」のみ（シールは左面に） */
-            <div style={{
-              position: 'absolute', inset: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backfaceVisibility: 'hidden',
-            }}>
-              <span style={{
-                fontSize: bigTextSize, fontWeight: 900,
-                color: 'rgba(60,40,20,0.65)', lineHeight: 1.2,
-                textAlign: 'center', letterSpacing: '1px',
-                writingMode: sw < sh ? 'vertical-rl' : undefined,
-              }}>重要<br/>安全部品</span>
-            </div>
+            /* ポリカバー/その他: 写真準拠 — 重要安全部品 + UPPER LID ASSY + JRI,JPV専用 + ラベルシール */
+            <>
+              {/* 重要安全部品（中央やや上・大きく） */}
+              <div style={{
+                position: 'absolute', top: '15%', left: '8%', right: '8%',
+                backfaceVisibility: 'hidden', textAlign: 'center',
+              }}>
+                <span style={{
+                  fontSize: bigTextSize, fontWeight: 900,
+                  color: 'rgba(60,40,20,0.7)', lineHeight: 1.3,
+                  letterSpacing: '1.5px',
+                }}>重要<br/>安全部品</span>
+              </div>
+              {/* UPPER LID ASSY（重要安全部品の下） */}
+              <div style={{
+                position: 'absolute', top: '58%', left: '8%',
+                backfaceVisibility: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sw * 0.05, 2), fontWeight: 700,
+                  color: 'rgba(60,40,20,0.4)', fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.3px',
+                }}>UPPER LID ASSY</span>
+              </div>
+              {/* JRI,JPV専用（左下） */}
+              <div style={{
+                position: 'absolute', bottom: '6%', left: '6%',
+                backfaceVisibility: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sw * 0.06, 2.5), fontWeight: 800,
+                  color: 'rgba(60,40,20,0.5)', letterSpacing: '0.5px',
+                }}>JRI,JPV専用</span>
+              </div>
+              {/* 白ラベルシール（右下） */}
+              <div style={{
+                position: 'absolute', bottom: '14%', right: '6%',
+                width: Math.max(sw * 0.35, 12), height: Math.max(sh * 0.2, 7),
+                background: '#f5f5f0',
+                border: '0.5px solid rgba(0,0,0,0.2)',
+                borderRadius: 1,
+                display: 'flex', flexDirection: 'column',
+                padding: '1px 2px', gap: 0,
+                backfaceVisibility: 'hidden', overflow: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sw * 0.035, 1.8), fontWeight: 600,
+                  color: 'rgba(0,0,0,0.5)', fontFamily: 'var(--font-mono)',
+                  lineHeight: 1.2,
+                }}>JRI0000402</span>
+                {[1, 2].map((i) => (
+                  <div key={i} style={{
+                    height: 0.5, background: 'rgba(0,0,0,0.08)',
+                    margin: '0.5px 0', width: `${50 + i * 20}%`,
+                  }} />
+                ))}
+              </div>
+            </>
           )}
         </div>
 
@@ -465,6 +510,35 @@ export default function SizeDiagram({ measurements, cbm, type, maxContainerDim, 
                     lineHeight: 1,
                   }}>{c}</div>
                 ))}
+              </div>
+            </>
+          )}
+          {/* ポリカバー: 右側面にSIZE表示 + 会社名 */}
+          {(type === 'ポリカバー' || type === 'その他') && !isPot && !isJarPot && (
+            <>
+              <div style={{
+                position: 'absolute', top: '8%', right: '6%',
+                backfaceVisibility: 'hidden',
+              }}>
+                <span style={{
+                  fontSize: Math.max(sd * 0.07, 2.5), fontWeight: 700,
+                  color: 'rgba(40,30,15,0.5)', fontFamily: 'var(--font-mono)',
+                  whiteSpace: 'nowrap',
+                }}>SIZE:{Math.round(w * 10)}x{Math.round(d * 10)}x{Math.round(h * 10)}mm</span>
+              </div>
+              <div style={{
+                position: 'absolute', bottom: '10%', left: '6%', right: '6%',
+                backfaceVisibility: 'hidden',
+              }}>
+                <div style={{
+                  fontSize: Math.max(sd * 0.06, 2), fontWeight: 800,
+                  color: 'rgba(40,30,15,0.5)', lineHeight: 1.3,
+                }}>新建高電業(深圳)有限公司</div>
+                <div style={{
+                  fontSize: Math.max(sd * 0.035, 1.5), fontWeight: 600,
+                  color: 'rgba(40,30,15,0.35)', fontFamily: 'var(--font-mono)',
+                  lineHeight: 1.2, marginTop: 0.5,
+                }}>KENCORP ELECTRIC(SHENZHEN)CO.,LIMITED</div>
               </div>
             </>
           )}
