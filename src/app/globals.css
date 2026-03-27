@@ -337,27 +337,29 @@ body {
   height: 50%; flex-shrink: 0; overflow: hidden;
 }
 .hero-animated {
-  background: linear-gradient(135deg, #0c0e18 0%, #10131e 40%, #0e1118 70%, #121620 100%);
+  background: var(--hero-bg, #0c0e18);
 }
 .hero-glow-layer {
-  position: absolute; inset: -80% -60%;
-  width: 220%; height: 260%;
-  pointer-events: none; z-index: 0;
-  animation: heroMist1 8s ease-in-out infinite alternate;
-  will-change: transform, opacity;
-  opacity: 1;
-  filter: blur(30px);
-}
-/* 2層目の靄 */
-.hero-animated::after {
-  content: '';
-  position: absolute; inset: -60% -50%;
+  position: absolute; inset: -60% -40%;
   width: 200%; height: 220%;
   pointer-events: none; z-index: 0;
-  background: inherit;
-  animation: heroMist2 11s ease-in-out infinite alternate-reverse;
+  animation: heroMist1 10s ease-in-out infinite alternate;
+  will-change: transform, opacity;
+  opacity: 0.8;
   filter: blur(40px);
-  opacity: 0.7;
+}
+/* 2層目の靄（ゆっくり揺らぎ） */
+.hero-animated::after {
+  content: '';
+  position: absolute; inset: -40% -30%;
+  width: 180%; height: 180%;
+  pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 50% 40% at 60% 40%, var(--hero-c1, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 50% at 30% 70%, var(--hero-c2, transparent) 0%, transparent 55%);
+  animation: heroMist2 14s ease-in-out infinite alternate-reverse;
+  filter: blur(50px);
+  opacity: 0.5;
   mix-blend-mode: screen;
 }
 @keyframes heroMist1 {

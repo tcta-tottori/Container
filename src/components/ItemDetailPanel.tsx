@@ -435,12 +435,23 @@ export default function ItemDetailPanel({
     'ポリカバー': '#162218', 'ジャーポット': '#1e1520', '箱': '#151e2c', '部品': '#1c1628', '鍋': '#1e1518', 'ヤーマン部品': '#1c1a14', 'その他': '#1a1a1e',
   };
 
-  // CSS変数でaccent色を渡す（鍋は機種カラー）
+  // 種類別のダークグラデーション背景色
+  const HERO_BG: Record<string, { base: string; c1: string; c2: string; c3: string }> = {
+    'ポリカバー': { base: '#081a12', c1: '#0a3d22', c2: '#06291a', c3: '#0d4a2a' },
+    'ジャーポット': { base: '#1a0818', c1: '#3d0a35', c2: '#29061e', c3: '#4a0d42' },
+    '箱': { base: '#1a1008', c1: '#3d280a', c2: '#291c06', c3: '#4a300d' },
+    '部品': { base: '#12081a', c1: '#280a3d', c2: '#1c0629', c3: '#300d4a' },
+    '鍋': { base: '#1a0808', c1: '#3d0a0a', c2: '#290606', c3: '#4a0d0d' },
+    'ヤーマン部品': { base: '#1a1608', c1: '#3d320a', c2: '#292406', c3: '#4a3c0d' },
+    'その他': { base: '#101218', c1: '#1a2030', c2: '#141822', c3: '#1e2838' },
+  };
+  const heroBg = HERO_BG[item.type] || HERO_BG['その他'];
+
   const heroVars = {
-    '--hero-c1': accentColor + '30',
-    '--hero-c2': accentColor + '18',
-    '--hero-c3': accentColor + '10',
-    '--hero-c4': accentColor + '22',
+    '--hero-c1': heroBg.c1,
+    '--hero-c2': heroBg.c2,
+    '--hero-c3': heroBg.c3,
+    '--hero-bg': heroBg.base,
   } as React.CSSProperties;
 
   // カウントアップアニメーション（フェードアウト中は値をフリーズ）
@@ -460,13 +471,21 @@ export default function ItemDetailPanel({
       <div className="detail-upper hero-animated" style={{
         position: 'relative', overflow: 'hidden', ...heroVars,
       }}>
-        {/* アニメーション背景レイヤー */}
+        {/* 深いグラデーション背景 + ノイズテクスチャ */}
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 0,
+          background: `
+            radial-gradient(ellipse 120% 80% at 70% 30%, var(--hero-c1) 0%, transparent 60%),
+            radial-gradient(ellipse 100% 100% at 20% 80%, var(--hero-c3) 0%, transparent 50%),
+            radial-gradient(ellipse 80% 60% at 90% 70%, var(--hero-c2) 0%, transparent 55%),
+            var(--hero-bg)
+          `,
+        }} />
+        {/* 動く靄レイヤー */}
         <div className="hero-glow-layer" style={{
           background: `
-            radial-gradient(ellipse 80% 60% at 20% 80%, var(--hero-c1) 0%, transparent 60%),
-            radial-gradient(ellipse 70% 80% at 80% 20%, var(--hero-c2) 0%, transparent 55%),
-            radial-gradient(ellipse 50% 50% at 50% 50%, var(--hero-c3) 0%, transparent 50%),
-            radial-gradient(ellipse 60% 70% at 70% 70%, var(--hero-c4) 0%, transparent 60%)
+            radial-gradient(ellipse 60% 50% at 30% 40%, var(--hero-c1) 0%, transparent 50%),
+            radial-gradient(ellipse 50% 60% at 70% 60%, var(--hero-c3) 0%, transparent 50%)
           `,
         }} />
 
