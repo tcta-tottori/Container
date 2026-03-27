@@ -37,18 +37,8 @@ function LoadingOverlay({ message, progress, closing }: { message: string; progr
       animation: closing ? 'loadFadeOut 0.5s ease both' : 'fadeIn 0.15s ease both',
     }}>
       <style>{`
-        @keyframes spinLoad3D {
-          0% { transform: rotateX(-20deg) rotateY(0deg); }
-          100% { transform: rotateX(-20deg) rotateY(360deg); }
-        }
-        @keyframes pulseGlow {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 0.8; }
-        }
-        @keyframes loadFadeOut {
-          0% { opacity: 1; }
-          100% { opacity: 0; }
-        }
+        @keyframes spinCircle { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes loadFadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }
       `}</style>
       <div style={{
         background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
@@ -57,18 +47,13 @@ function LoadingOverlay({ message, progress, closing }: { message: string; progr
         boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 24px 60px rgba(0,0,0,0.6)',
         width: '90%', maxWidth: 300,
       }}>
-        {/* ネオンリング（切れ目なし・3D回転） */}
-        <div style={{ position: 'relative', width: 56, height: 56, margin: '0 auto 16px', perspective: 200 }}>
-          <svg width="56" height="56" viewBox="0 0 56 56" style={{
-            animation: 'spinLoad3D 6s linear infinite',
-            transformStyle: 'preserve-3d',
-          }}>
-            <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
-            <circle cx="28" cy="28" r="24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2.5"
-              style={{
-                filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.25)) drop-shadow(0 0 6px rgba(255,255,255,0.08))',
-                animation: 'pulseGlow 3s ease-in-out infinite',
-              }} />
+        {/* サークル読込アニメーション */}
+        <div style={{ width: 48, height: 48, margin: '0 auto 16px' }}>
+          <svg width="48" height="48" viewBox="0 0 48 48" style={{ animation: 'spinCircle 0.9s linear infinite' }}>
+            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="3"
+              strokeLinecap="round" strokeDasharray="90 36"
+              style={{ filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.2))' }} />
           </svg>
         </div>
 
