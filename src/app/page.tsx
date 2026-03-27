@@ -577,17 +577,15 @@ export default function Home() {
     announceProgress(state.items, state.completedIds);
   }, [state.items, state.completedIds, announceProgress]);
 
-  // OKコマンドの10秒クールダウン
-  const okCooldownRef = useRef(false);
+  // OKコマンドの5秒クールダウン
+  const okCooldownRef = useRef(0);
 
   /** OKコマンド: パレット1つ消費、なくなったら自動完了 */
   const handleConfirmOk = useCallback(() => {
     if (!currentItem) return;
-    if (okCooldownRef.current) return; // 10秒クールダウン中
-
-    // クールダウン開始
-    okCooldownRef.current = true;
-    setTimeout(() => { okCooldownRef.current = false; }, 10000);
+    // 5秒クールダウン（タイムスタンプベースで確実に解除）
+    if (Date.now() - okCooldownRef.current < 5000) return;
+    okCooldownRef.current = Date.now();
 
     // 端数の検査抜き数
     const rawFrac = currentItem.fraction % 1 !== 0 ? Math.ceil(currentItem.fraction) : currentItem.fraction;
