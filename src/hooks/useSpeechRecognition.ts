@@ -46,14 +46,11 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
     recognition.continuous = true;
     recognition.interimResults = false;
 
+    let lastCommandTime = 0;
+
     recognition.onresult = (event: { results: SpeechRecognitionResultList }) => {
       const last = event.results[event.results.length - 1];
       if (!last.isFinal) return;
-
-      // アナウンス中は認識結果を無視（ループ防止）
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
-        return;
-      }
 
       const transcript = last[0].transcript;
       setLastTranscript(transcript);
@@ -61,6 +58,11 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
 
       const action = matchVoiceCommand(transcript);
       if (action) {
+        // ループ防止: 前回コマンドから2秒以内、またはアナウンス中はスキップ
+        const now = Date.now();
+        if (now - lastCommandTime < 2000) return;
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) return;
+        lastCommandTime = now;
         onCommand(action, transcript);
       }
     };
