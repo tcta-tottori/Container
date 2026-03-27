@@ -816,12 +816,12 @@ export default function Home() {
         <style>{`
           @keyframes neonPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
           @keyframes dotFlow { 0%,20% { opacity: 0.15; } 40% { opacity: 1; } 60%,100% { opacity: 0.15; } }
-          @keyframes cube3dRotate {
-            0% { transform: rotateX(-20deg) rotateY(0deg); }
-            100% { transform: rotateX(-20deg) rotateY(360deg); }
+          @keyframes cube3dSpin {
+            0% { transform: rotateX(-25deg) rotateY(-35deg); }
+            100% { transform: rotateX(-25deg) rotateY(325deg); }
           }
         `}</style>
-        {/* 3Dキューブ（CSS 3D + 丸グロー） */}
+        {/* 3Dキューブ（元のアイソメアイコンの質感を保ちつつ3D回転） */}
         <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28 }}>
           <div style={{
             position: 'absolute', inset: -16,
@@ -830,30 +830,30 @@ export default function Home() {
             animation: 'neonPulse 2.5s ease-in-out infinite',
           }} />
           <div style={{
-            width: 72, height: 72, perspective: 200,
+            width: 72, height: 72, perspective: 300,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <div style={{
-              width: 36, height: 36, position: 'relative',
+              width: 34, height: 34, position: 'relative',
               transformStyle: 'preserve-3d',
-              animation: 'cube3dRotate 5s linear infinite',
+              animation: 'cube3dSpin 6s cubic-bezier(0.4,0,0.2,1) infinite',
             }}>
-              {/* 6面の立方体 */}
               {([
-                { ry: '0deg',   tz: 18, opacity: 0.9  },  // front
-                { ry: '180deg', tz: 18, opacity: 0.4  },  // back
-                { ry: '90deg',  tz: 18, opacity: 0.6  },  // right
-                { ry: '-90deg', tz: 18, opacity: 0.7  },  // left
-                { rx: '90deg',  tz: 18, opacity: 0.5  },  // top
-                { rx: '-90deg', tz: 18, opacity: 0.35 },  // bottom
-              ] as const).map((f, i) => (
+                { transform: 'translateZ(17px)', opacity: 0.85 },
+                { transform: 'rotateY(180deg) translateZ(17px)', opacity: 0.35 },
+                { transform: 'rotateY(90deg) translateZ(17px)', opacity: 0.55 },
+                { transform: 'rotateY(-90deg) translateZ(17px)', opacity: 0.65 },
+                { transform: 'rotateX(90deg) translateZ(17px)', opacity: 0.5 },
+                { transform: 'rotateX(-90deg) translateZ(17px)', opacity: 0.3 },
+              ]).map((f, i) => (
                 <div key={i} style={{
-                  position: 'absolute', width: 36, height: 36,
-                  border: `2px solid rgba(255,255,255,${f.opacity})`,
-                  borderRadius: 3,
-                  background: `rgba(255,255,255,${f.opacity * 0.04})`,
+                  position: 'absolute', width: 34, height: 34,
+                  border: `2.5px solid rgba(255,255,255,${f.opacity})`,
+                  borderRadius: 2,
+                  background: `linear-gradient(135deg, rgba(255,255,255,${f.opacity * 0.06}) 0%, rgba(255,255,255,${f.opacity * 0.02}) 100%)`,
+                  boxShadow: `inset 0 0 8px rgba(255,255,255,${f.opacity * 0.05}), 0 0 ${4 + i}px rgba(255,255,255,${f.opacity * 0.15})`,
                   backfaceVisibility: 'hidden' as const,
-                  transform: `rotate${'rx' in f ? 'X' : 'Y'}(${('rx' in f ? f.rx : f.ry)}) translateZ(${f.tz}px)`,
+                  transform: f.transform,
                 }} />
               ))}
             </div>

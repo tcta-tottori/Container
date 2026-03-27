@@ -467,22 +467,20 @@ export default function ItemDetailPanel({
   const animCT = useCountUp(ctTarget ?? 0, animKey, isTransitioning);
   const animPCS = useCountUp(pcsTarget ?? 0, animKey, isTransitioning);
 
-  // 端数パレットズームアニメーション
-  const isFractionOnly = item.palletCount === 0 && inspectionDeducted > 0;
+  // 端数パレットズームアニメーション（1度のみ、タップで発動）
+  const fractionZoomDoneRef = useRef(false);
   const triggerFractionZoom = useCallback(() => {
-    if (fractionZoom !== 'idle') return;
+    if (fractionZoom !== 'idle' || fractionZoomDoneRef.current) return;
+    fractionZoomDoneRef.current = true;
     setFractionZoom('zoomIn');
-    setTimeout(() => setFractionZoom('spin'), 600);
-    setTimeout(() => setFractionZoom('zoomOut'), 2200);
-    setTimeout(() => setFractionZoom('idle'), 2800);
+    // zoomIn(0.8s) → spin(回転待ち~2s) → zoomOut(0.8s)
+    setTimeout(() => setFractionZoom('spin'), 800);
+    setTimeout(() => setFractionZoom('zoomOut'), 2800);
+    setTimeout(() => setFractionZoom('idle'), 3600);
   }, [fractionZoom]);
 
-  // 端数のみ表示時: 切替アニメーション完了後に自動ズーム
-  useEffect(() => {
-    if (!isFractionOnly || isTransitioning) return;
-    const t = setTimeout(triggerFractionZoom, 2000);
-    return () => clearTimeout(t);
-  }, [animKey, isFractionOnly, isTransitioning, triggerFractionZoom]);
+  // 品目切替時にリセット
+  useEffect(() => { fractionZoomDoneRef.current = false; }, [animKey]);
 
   // 端数パレットのスワイプ操作
   const fractionDragRef = useRef<{ startX: number; startY: number; rotY: number } | null>(null);
@@ -811,41 +809,30 @@ export default function ItemDetailPanel({
       </div>
 
       {/* パレット全画面表示モーダル */}
-      {/* 端数パレットズームアニメーション */}
+      {/* 端数パレット上半分ズームアニメーション */}
       {fractionZoom !== 'idle' && inspectionDeducted > 0 && (
         <>
           <style>{`
-            @keyframes frZoomIn {
-              0% { transform: scale(1); }
-              100% { transform: scale(2.2); }
-            }
-            @keyframes frZoomOut {
-              0% { transform: scale(2.2); opacity: 1; }
-              100% { transform: scale(1); opacity: 1; }
-            }
-            @keyframes frFadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }
+            @keyframes frOverlayIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+            @keyframes frOverlayOut { 0% { opacity: 1; } 100% { opacity: 0; } }
           `}</style>
-          {/* 暗いぼかし背景 */}
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 50,
-            background: 'rgba(0,0,0,0.5)',
+          {/* 上半分のみ暗いぼかしオーバーレイ */}
+          <div className="detail-upper" style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
+            background: 'rgba(0,0,0,0.45)',
             backdropFilter: 'blur(3px)',
-            animation: fractionZoom === 'zoomOut' ? 'frFadeOut 0.6s ease both' : 'fadeIn 0.3s ease both',
+            animation: fractionZoom === 'zoomOut' ? 'frOverlayOut 0.8s ease both' : 'frOverlayIn 0.4s ease both',
             pointerEvents: 'none',
-          }} />
-          {/* ズーム中のパレット */}
-          <div style={{
-            position: 'absolute', inset: 0, zIndex: 51,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            pointerEvents: 'none',
+            padding: 0, gap: 0,
           }}>
             <div style={{
-              width: isFractionOnly ? '60%' : '35%',
-              height: '50%',
-              transform: fractionZoom === 'spin' ? 'scale(2.2)' : undefined,
-              animation: fractionZoom === 'zoomIn' ? 'frZoomIn 0.6s ease both'
-                : fractionZoom === 'zoomOut' ? 'frZoomOut 0.6s ease both'
-                : undefined,
+              width: '55%', maxHeight: '80%',
+              transition: 'transform 0.8s cubic-bezier(0.4,0,0.2,1), opacity 0.8s ease',
+              transform: fractionZoom === 'zoomIn' ? 'scale(0.5)' :
+                         fractionZoom === 'spin' ? 'scale(1)' :
+                         'scale(0.5)',
+              opacity: fractionZoom === 'zoomOut' ? 0.3 : 1,
             }}>
               <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} />
             </div>
