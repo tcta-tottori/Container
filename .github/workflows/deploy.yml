@@ -7,6 +7,7 @@ on:
       - master
       - claude/init-container-app-0RJFr
       - claude/timer-ui-updates-DBaNV
+      - claude/fix-palette-box-display-36k8A
 
 permissions:
   contents: read
