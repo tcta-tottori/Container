@@ -62,9 +62,9 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
 
       const action = matchVoiceCommand(transcript);
       if (action) {
-        // ループ防止: 前回コマンドから2秒以内、またはアナウンス中はスキップ
+        // ループ防止: 前回コマンドから3秒以内、またはアナウンス中はスキップ
         const now = Date.now();
-        if (now - lastCommandTime < 2000) return;
+        if (now - lastCommandTime < 3000) return;
         if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) return;
         lastCommandTime = now;
         onCommand(action, transcript);
@@ -128,7 +128,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
         setSpeakingText(null);
         if (pausedForSpeechRef.current && isListening) {
           pausedForSpeechRef.current = false;
-          // コール終了後1秒待ってから再開（エコー・残響を確実に回避）
+          // コール終了後2秒待ってから再開（エコー・残響を確実に回避）
           setTimeout(() => {
             if (recognitionRef.current === null && isListening) {
               startListening();
@@ -136,7 +136,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               try { (recognitionRef.current as any).start(); } catch { /* already started */ }
             }
-          }, 1000);
+          }, 2000);
         }
       }
     );
