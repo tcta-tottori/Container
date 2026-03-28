@@ -125,7 +125,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
         setIsSpeaking(false);
         if (pausedForSpeechRef.current && isListening) {
           pausedForSpeechRef.current = false;
-          // 少し待ってから再開（音声出力のエコーを避ける）
+          // コール終了後1秒待ってから再開（エコー・残響を確実に回避）
           setTimeout(() => {
             if (recognitionRef.current === null && isListening) {
               startListening();
@@ -133,7 +133,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               try { (recognitionRef.current as any).start(); } catch { /* already started */ }
             }
-          }, 300);
+          }, 1000);
         }
       }
     );
