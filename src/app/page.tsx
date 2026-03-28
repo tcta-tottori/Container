@@ -18,6 +18,8 @@ import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
 import VoiceFeedback from '@/components/VoiceFeedback';
+import ThemeToggle from '@/components/ThemeToggle';
+import { useTheme } from '@/hooks/useTheme';
 import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
@@ -172,6 +174,7 @@ export default function Home() {
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
   const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceProgress } =
     useSpeech();
+  const { theme, toggleTheme } = useTheme();
 
   const prevItemRef = useRef<string | null>(null);
   const loadedContainerRef = useRef<string | null>(null);
@@ -838,6 +841,10 @@ export default function Home() {
             ))}
           </div>
         </div>
+        {/* テーマ切替ボタン（読込画面: マイクボタンと同じ位置） */}
+        <div style={{ position: 'fixed', bottom: 20, zIndex: 100, left: '50%', transform: 'translateX(-50%)' }}>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} size={22} />
+        </div>
       </div>
     );
   }
@@ -987,6 +994,8 @@ export default function Home() {
           completionLog={state.completionLog}
           onContainerAnnounce={handleContainerSummary}
           hasItems={state.items.length > 0}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
 
         {/* メインエリア */}

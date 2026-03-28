@@ -3,6 +3,8 @@
 import { useRef, useState, useEffect } from 'react';
 import { Container } from '@/lib/types';
 import { CompletionLogEntry } from '@/hooks/useContainerData';
+import ThemeToggle from './ThemeToggle';
+import { Theme } from '@/hooks/useTheme';
 
 export interface ItemTimeLog {
   itemName: string;
@@ -23,6 +25,8 @@ interface HeaderBarProps {
   completionLog: CompletionLogEntry[];
   onContainerAnnounce?: () => void;
   hasItems?: boolean;
+  theme?: Theme;
+  onToggleTheme?: () => void;
 }
 
 export default function HeaderBar({
@@ -35,6 +39,8 @@ export default function HeaderBar({
   onResetWorkTimer,
   itemTimeLogs,
   completionLog,
+  theme,
+  onToggleTheme,
 }: HeaderBarProps) {
   const [popupOpen, setPopupOpen] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
@@ -84,6 +90,10 @@ export default function HeaderBar({
           </option>
         ))}
       </select>
+
+      {theme && onToggleTheme && (
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} size={18} />
+      )}
 
       <div className="flex-1" />
 
