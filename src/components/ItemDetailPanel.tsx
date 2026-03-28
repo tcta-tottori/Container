@@ -795,7 +795,7 @@ export default function ItemDetailPanel({
             </span>
           </div>
           <div className="detail-sf-item detail-sf-total anim-slide-up" style={{ minWidth: 0, animationDelay: '0.3s' }}>
-            <span className="detail-sf-num-sm" style={{ color: 'rgba(255,255,255,0.6)', display: 'inline-block', minWidth: '4ch', textAlign: 'right' }}>{animPCS.toLocaleString()}</span>
+            <span className="detail-sf-num-sm detail-sf-pcs" style={{ color: 'rgba(255,255,255,0.6)', display: 'inline-block', textAlign: 'right' }}>{animPCS.toLocaleString()}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.4)' }}>pcs</span>
           </div>
         </div>
