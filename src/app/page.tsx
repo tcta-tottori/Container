@@ -599,13 +599,14 @@ export default function Home() {
   /** OKコマンド: パレット1つ消費、なくなったら自動完了 */
   const handleConfirmOk = useCallback(() => {
     if (!currentItem) return;
-    // 5秒クールダウン（タイムスタンプベースで確実に解除）
-    if (Date.now() - okCooldownRef.current < 5000) return;
+    // 7秒クールダウン（タイムスタンプベースで確実に解除、コール残響回避）
+    if (Date.now() - okCooldownRef.current < 7000) return;
     okCooldownRef.current = Date.now();
 
-    // 端数の検査抜き数
+    // 端数の検査抜き数（鍋は検査なし）
     const rawFrac = currentItem.fraction % 1 !== 0 ? Math.ceil(currentItem.fraction) : currentItem.fraction;
-    const fractionDeducted = rawFrac > 0 ? rawFrac - 1 : 0;
+    const isNabeType = currentItem.type === '鍋';
+    const fractionDeducted = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
 
     // パレット0・端数0 → 完了処理
     if (currentItem.palletCount <= 0 && currentItem.fraction <= 0) {
