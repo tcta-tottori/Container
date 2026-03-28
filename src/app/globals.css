@@ -92,9 +92,9 @@ body {
   50% { color: rgba(245,158,11,0.3); }
 }
 
-/* Mic button + voice feedback positioning */
-@media (orientation: landscape) { .mic-float-btn { right: 50% !important; transform: translateX(50%); } }
-.voice-feedback-float { right: 84px; }
+/* Mic button: always centered */
+.mic-float-btn { left: 50% !important; right: auto !important; transform: translateX(-50%); }
+.voice-feedback-float { right: auto; left: calc(50% + 40px); }
 @media (orientation: landscape) { .voice-feedback-float { right: auto; left: calc(50% + 40px); } }
 
 /* Header date: landscape only */
@@ -432,6 +432,9 @@ body {
 .detail-stats-free {
   display: flex; align-items: flex-end; justify-content: center;
   gap: 24px; padding: 4px 0 2px; flex-shrink: 0;
+}
+@media (orientation: landscape) {
+  .detail-stats-free { padding-right: 60px; }
 }
 .detail-sf-item { display: flex; align-items: flex-end; gap: 4px; }
 .detail-sf-num {
