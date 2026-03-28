@@ -10,9 +10,10 @@ export default function VoiceFeedback({ transcript }: VoiceFeedbackProps) {
 
   return (
     <div className="voice-feedback-float" style={{
-      position: 'fixed', bottom: 24, zIndex: 99,
+      position: 'fixed', bottom: 84, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 99,
       pointerEvents: 'none',
-      display: 'flex', alignItems: 'center', gap: 8,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
       animation: 'fadeIn 0.2s ease both',
     }}>
       <div style={{
