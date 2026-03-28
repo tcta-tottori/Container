@@ -1153,7 +1153,7 @@ export default function Home() {
             <button onClick={toggleListening}
               className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
               style={{
-                position: 'fixed', bottom: 20, right: 20, zIndex: 100,
+                position: 'fixed', bottom: 20, zIndex: 100,
                 width: 56, height: 56, borderRadius: '50%',
                 background: isSpeaking
                   ? 'radial-gradient(circle at 35% 35%, #b48eff, #8b5cf6 50%, #6d28d9 80%, #4c1d95)'
