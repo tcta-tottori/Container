@@ -705,7 +705,6 @@ export default function Home() {
     if (!currentItem) return;
     const name = currentItem.itemName;
     const remaining = state.items.length - 1;
-    if (!window.confirm(`「${name}」を完了しますか？`)) return;
     deleteCurrent();
     announceComplete(name);
     if (remaining === 0) {
@@ -801,7 +800,7 @@ export default function Home() {
     [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, handleConfirmOk, handleContainerSummary, handleProgress]
   );
 
-  const { isListening, isSupported, lastTranscript, toggleListening } =
+  const { isListening, isSpeaking, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
   // 初期ロード中はスプラッシュ画面
@@ -1125,24 +1124,30 @@ export default function Home() {
         {/* フローティングマイクボタン（右下固定） */}
         {viewMode === 'work' && isSupported && (
           <button onClick={toggleListening}
-            className={`mic-float-btn ${isListening ? 'mic-btn-recording' : ''}`}
+            className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
             style={{
               position: 'fixed', bottom: 20, right: 20, zIndex: 100,
               width: 56, height: 56, borderRadius: '50%',
-              background: isListening
-                ? 'radial-gradient(circle at 35% 35%, #ff6b6b, #dc2626 60%, #991b1b)'
-                : 'radial-gradient(circle at 35% 35%, #7c9bff, #4a6ef7 50%, #3b52d4 80%, #2a3aaa)',
-              border: isListening ? '2px solid rgba(255,100,100,0.6)' : '2px solid rgba(255,255,255,0.15)',
+              background: isSpeaking
+                ? 'radial-gradient(circle at 35% 35%, #888, #666 60%, #444)'
+                : isListening
+                  ? 'radial-gradient(circle at 35% 35%, #ff6b6b, #dc2626 60%, #991b1b)'
+                  : 'radial-gradient(circle at 35% 35%, #7c9bff, #4a6ef7 50%, #3b52d4 80%, #2a3aaa)',
+              border: isSpeaking ? '2px solid rgba(150,150,150,0.4)'
+                : isListening ? '2px solid rgba(255,100,100,0.6)' : '2px solid rgba(255,255,255,0.15)',
               cursor: 'pointer',
-              boxShadow: isListening
-                ? '0 0 24px rgba(239,68,68,0.5), 0 0 48px rgba(239,68,68,0.2), inset 0 1px 2px rgba(255,255,255,0.2)'
-                : '0 4px 20px rgba(74,110,247,0.35), 0 0 40px rgba(107,82,212,0.15), inset 0 1px 2px rgba(255,255,255,0.15)',
+              boxShadow: isSpeaking
+                ? '0 4px 12px rgba(0,0,0,0.3), inset 0 1px 2px rgba(255,255,255,0.1)'
+                : isListening
+                  ? '0 0 24px rgba(239,68,68,0.5), 0 0 48px rgba(239,68,68,0.2), inset 0 1px 2px rgba(255,255,255,0.2)'
+                  : '0 4px 20px rgba(74,110,247,0.35), 0 0 40px rgba(107,82,212,0.15), inset 0 1px 2px rgba(255,255,255,0.15)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.3s ease',
               paddingBottom: 'env(safe-area-inset-bottom, 0px)',
             }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+              stroke={isSpeaking ? '#aaa' : '#fff'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ filter: isSpeaking ? 'none' : 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}>
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
               <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
               {!isListening && <><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></>}
