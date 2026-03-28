@@ -72,23 +72,11 @@ export function useSpeech() {
       }
     }
 
-    // 鍋: サイズ違いの注意コール
+    // 鍋: 類似品・サイズ違いアナウンスは不要
     const isNabe = item.type === '鍋';
-    if (isNabe && allItems && allItems.length > 0) {
-      const currentIs180 = item.itemName.includes('180') || /18[RWCS]/.test(item.itemName);
-      const currentSize = currentIs180 ? '180' : '100';
-      const otherSize = currentIs180 ? '100' : '180';
-      const otherSizeItems = allItems.filter(o => o.id !== item.id && o.type === '鍋' && (
-        currentIs180 ? !(o.itemName.includes('180') || /18[RWCS]/.test(o.itemName))
-          : (o.itemName.includes('180') || /18[RWCS]/.test(o.itemName))
-      ));
-      if (otherSizeItems.length > 0) {
-        text += `注意、これは${currentSize}サイズです。${otherSize}サイズが${otherSizeItems.length}種類あります。`;
-      }
-    }
 
-    // 似た名前のアイテムがある場合に警告
-    if (allItems && allItems.length > 0) {
+    // 似た名前のアイテムがある場合に警告（鍋以外）
+    if (!isNabe && allItems && allItems.length > 0) {
       const similarItems = allItems.filter(
         (other) => other.id !== item.id && areSimilarItems(item.itemName, other.itemName)
       );
