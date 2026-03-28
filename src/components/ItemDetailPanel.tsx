@@ -476,8 +476,9 @@ export default function ItemDetailPanel({
     'ポリカバー': '#162218', 'ジャーポット': '#1e1520', '箱': '#151e2c', '部品': '#1c1628', '鍋': '#1e1518', 'ヤーマン部品': '#1c1a14', 'その他': '#1a1a1e',
   };
 
-  // 種類別のダークグラデーション背景色
-  const HERO_BG: Record<string, { base: string; c1: string; c2: string; c3: string }> = {
+  // 種類別の背景色（ダーク/ライト）
+  const isLightMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
+  const HERO_BG_DARK: Record<string, { base: string; c1: string; c2: string; c3: string }> = {
     'ポリカバー': { base: '#081a12', c1: '#0a3d22', c2: '#06291a', c3: '#0d4a2a' },
     'ジャーポット': { base: '#1a0818', c1: '#3d0a35', c2: '#29061e', c3: '#4a0d42' },
     '箱': { base: '#1a1008', c1: '#3d280a', c2: '#291c06', c3: '#4a300d' },
@@ -486,13 +487,31 @@ export default function ItemDetailPanel({
     'ヤーマン部品': { base: '#1a1608', c1: '#3d320a', c2: '#292406', c3: '#4a3c0d' },
     'その他': { base: '#101218', c1: '#1a2030', c2: '#141822', c3: '#1e2838' },
   };
-  // 鍋はnabeColorからダーク背景を動的生成
+  const HERO_BG_LIGHT: Record<string, { base: string; c1: string; c2: string; c3: string }> = {
+    'ポリカバー': { base: '#e0f2e8', c1: '#c8e6d0', c2: '#d4eedc', c3: '#b8dfc4' },
+    'ジャーポット': { base: '#f0e4f5', c1: '#e0c8eb', c2: '#e8d4f0', c3: '#d8bce5' },
+    '箱': { base: '#e8efe0', c1: '#d4dfc4', c2: '#dee8d0', c3: '#c8d5b8' },
+    '部品': { base: '#e6e0f2', c1: '#d0c4e6', c2: '#d8ccea', c3: '#c4b8df' },
+    '鍋': { base: '#f5ece0', c1: '#ebdcc8', c2: '#f0e4d4', c3: '#e5d2bc' },
+    'ヤーマン部品': { base: '#f2f0e0', c1: '#e6e0c8', c2: '#eae8d4', c3: '#dfd8bc' },
+    'その他': { base: '#eaeaea', c1: '#ddd', c2: '#e2e2e2', c3: '#d5d5d5' },
+  };
+  const HERO_BG = isLightMode ? HERO_BG_LIGHT : HERO_BG_DARK;
+  // 鍋はnabeColorから背景を動的生成
   const heroBg = (() => {
     if (item.type === '鍋' && nabeColor) {
       const hex = nabeColor.replace('#', '');
       const r = parseInt(hex.slice(0, 2), 16);
       const g = parseInt(hex.slice(2, 4), 16);
       const b = parseInt(hex.slice(4, 6), 16);
+      if (isLightMode) {
+        return {
+          base: `rgb(${Math.round(r * 0.15 + 215)},${Math.round(g * 0.15 + 215)},${Math.round(b * 0.15 + 215)})`,
+          c1: `rgb(${Math.round(r * 0.2 + 195)},${Math.round(g * 0.2 + 195)},${Math.round(b * 0.2 + 195)})`,
+          c2: `rgb(${Math.round(r * 0.18 + 205)},${Math.round(g * 0.18 + 205)},${Math.round(b * 0.18 + 205)})`,
+          c3: `rgb(${Math.round(r * 0.22 + 190)},${Math.round(g * 0.22 + 190)},${Math.round(b * 0.22 + 190)})`,
+        };
+      }
       return {
         base: `rgb(${Math.round(r * 0.1 + 8)},${Math.round(g * 0.1 + 8)},${Math.round(b * 0.1 + 8)})`,
         c1: `rgb(${Math.round(r * 0.24 + 5)},${Math.round(g * 0.24 + 5)},${Math.round(b * 0.24 + 5)})`,
@@ -847,12 +866,12 @@ export default function ItemDetailPanel({
                 <MarqueeText text={displayName}
                   className="detail-list-name"
                   style={isDone
-                    ? { color: '#666', textDecoration: 'line-through' }
-                    : isActive ? { fontWeight: 700, color: '#ff9800' } : { color: itNabeColor || 'rgba(255,255,255,0.85)' }
+                    ? { color: '#999', textDecoration: 'line-through' }
+                    : isActive ? { fontWeight: 700, color: '#e67e00' } : { color: isLightMode ? '#1a1a2e' : (itNabeColor || 'rgba(255,255,255,0.85)') }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : itAccent, fontWeight: 600 }}>{fmtNum(it.palletCount)}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#555' : isActive ? '#ff9800' : 'rgba(255,255,255,0.7)' }}>{fmtNum(it.fraction)}</span>
-                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#555' : 'rgba(255,255,255,0.55)' }}>
+                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e67e00' : isLightMode ? '#1a6030' : itAccent, fontWeight: 600 }}>{fmtNum(it.palletCount)}</span>
+                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e67e00' : isLightMode ? '#1a1a2e' : 'rgba(255,255,255,0.7)' }}>{fmtNum(it.fraction)}</span>
+                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#999' : isLightMode ? '#555' : 'rgba(255,255,255,0.55)' }}>
                   {Math.ceil(it.totalQty).toLocaleString()}
                 </span>
               </>
@@ -869,12 +888,22 @@ export default function ItemDetailPanel({
               );
             }
 
+            // ライトモード用の明るい背景色
+            const lightTypeBg: Record<string, string> = {
+              'ポリカバー': '#e8f5e9', 'ジャーポット': '#f3e5f5', '箱': '#e3f2fd',
+              '部品': '#ede7f6', '鍋': '#fff3e0', 'ヤーマン部品': '#fff8e1', 'その他': '#f5f5f5',
+            };
+            const isLight = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
+            const finalRowBg = isLight
+              ? (isDone ? '#f5f5f5' : isActive ? '#fff3d8' : (lightTypeBg[it.type] || '#f5f5f5'))
+              : rowBg;
+
             return (
               <SwipeRow key={it.id}
                 onSwipe={() => onCompleteItem?.(it.id)}
                 className={`detail-list-row ${isActive ? 'active' : ''}`}
                 style={{
-                  background: rowBg,
+                  background: finalRowBg,
                   borderLeftColor: isActive ? '#ff6d00' : itAccent,
                   borderLeftWidth: isActive ? 4 : 3,
                 }}
