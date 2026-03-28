@@ -122,9 +122,27 @@
 [data-theme="light"] .menu-overlay { background: rgba(255,255,255,0.9) !important; }
 
 /* 読込画面 */
-[data-theme="light"] .filedrop-root { background: var(--bg-primary) !important; }
-[data-theme="light"] .filedrop-root * { color: var(--text-primary); }
-[data-theme="light"] .drop-zone-root { color: var(--text-primary); }
+[data-theme="light"] .filedrop-root { background: var(--bg-primary) !important; color: #1a1a2e; }
+[data-theme="light"] .filedrop-root p { color: #444 !important; }
+[data-theme="light"] .filedrop-root h1 { color: #1a1a2e !important; }
+[data-theme="light"] .filedrop-root .ver-badge-shimmer {
+  color: #444 !important; text-shadow: none !important;
+  border-color: rgba(0,0,0,0.15) !important;
+  background: rgba(107,82,212,0.08) !important;
+}
+[data-theme="light"] .filedrop-root div[style*="dashed"] {
+  border-color: rgba(0,0,0,0.15) !important;
+  background: rgba(0,0,0,0.02) !important;
+}
+[data-theme="light"] .filedrop-root button {
+  border-color: rgba(0,0,0,0.08) !important;
+  background: rgba(0,0,0,0.02) !important;
+}
+[data-theme="light"] .filedrop-root span { color: inherit; }
+[data-theme="light"] .filedrop-root div[style*="rgba(52,211,153"] {
+  background: rgba(52,211,153,0.08) !important;
+  border-color: rgba(52,211,153,0.2) !important;
+}
 
 * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
 *::-webkit-scrollbar { width: 3px; }

@@ -798,7 +798,9 @@ export default function Home() {
       <div style={{
         position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)',
+        background: theme === 'light'
+          ? '#f5f5f0'
+          : 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)',
         zIndex: 999,
       }}>
         <style>{`
@@ -807,15 +809,17 @@ export default function Home() {
         `}</style>
         {/* キューブアイコン（2D・アニメーションなし） */}
         <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28 }}>
-          <div style={{
-            position: 'absolute', inset: -16,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, transparent 70%)',
-            animation: 'neonPulse 2.5s ease-in-out infinite',
-          }} />
+          {theme === 'dark' && (
+            <div style={{
+              position: 'absolute', inset: -16,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, transparent 70%)',
+              animation: 'neonPulse 2.5s ease-in-out infinite',
+            }} />
+          )}
           <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
-            style={{ position: 'relative', animation: 'neonPulse 2.5s ease-in-out infinite' }}>
-            <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none">
+            style={{ position: 'relative', animation: theme === 'dark' ? 'neonPulse 2.5s ease-in-out infinite' : undefined }}>
+            <g transform="translate(32,32)" stroke={theme === 'light' ? '#555' : '#fff'} strokeWidth="3" strokeLinejoin="round" fill="none">
               <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
               <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
               <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
@@ -825,16 +829,18 @@ export default function Home() {
         {/* Loading文字 + ドット（下に配置） */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <span style={{
-            fontSize: 16, fontWeight: 600, color: '#fff', fontFamily: 'Inter, sans-serif',
+            fontSize: 16, fontWeight: 600,
+            color: theme === 'light' ? '#555' : '#fff',
+            fontFamily: 'Inter, sans-serif',
             letterSpacing: 3,
-            textShadow: '0 0 10px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.35), 0 0 40px rgba(255,255,255,0.15)',
+            textShadow: theme === 'light' ? 'none' : '0 0 10px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.35), 0 0 40px rgba(255,255,255,0.15)',
           }}>Loading</span>
           <div style={{ display: 'flex', gap: 4 }}>
             {[0, 1, 2, 3, 4].map(i => (
               <span key={i} style={{
                 display: 'inline-block', width: 5, height: 5, borderRadius: '50%',
-                background: '#fff',
-                boxShadow: '0 0 6px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.3)',
+                background: theme === 'light' ? '#999' : '#fff',
+                boxShadow: theme === 'light' ? 'none' : '0 0 6px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.3)',
                 animation: `dotFlow 2s ease-in-out ${i * 0.3}s infinite`,
               }} />
             ))}
