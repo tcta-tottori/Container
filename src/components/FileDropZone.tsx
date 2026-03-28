@@ -47,7 +47,7 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
   { ver: '2.0', date: '2026-03-26', changes: [

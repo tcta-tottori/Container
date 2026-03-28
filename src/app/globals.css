@@ -5,22 +5,67 @@
 @tailwind utilities;
 
 :root {
-  --bg-primary: #f0f2f5;
-  --bg-secondary: #ffffff;
-  --bg-elevated: #ffffff;
-  --bg-card: #ffffff;
-  --border-subtle: rgba(0, 0, 0, 0.06);
-  --border-accent: rgba(0, 0, 0, 0.12);
-  --text-primary: #1a1a2e;
-  --text-secondary: #4a4a6a;
-  --text-muted: #8e8ea8;
-  --shadow-sm: 0 1px 4px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.1);
+  /* ===== Dark theme (default) ===== */
+  --bg-primary: #1a1d2e;
+  --bg-secondary: #1e2130;
+  --bg-elevated: #252838;
+  --bg-card: #1e2130;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-accent: rgba(255, 255, 255, 0.12);
+  --text-primary: #f0f0f0;
+  --text-secondary: rgba(255,255,255,0.7);
+  --text-muted: rgba(255,255,255,0.45);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+  --header-bg: #1a1d2e;
+  --list-bg: #1a1d2e;
+  --list-row-border: rgba(255,255,255,0.05);
+  --list-header-bg: #1e2130;
+  --overlay-bg: rgba(0,0,0,0.8);
   --font-display: 'Zen Kaku Gothic New', 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif;
   --font-body: 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif;
   --font-mono: 'Inter', sans-serif;
 }
+
+/* ===== Light theme ===== */
+[data-theme="light"] {
+  --bg-primary: #f5f5f0;
+  --bg-secondary: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-card: #ffffff;
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-accent: rgba(0, 0, 0, 0.15);
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a4a6a;
+  --text-muted: #8e8ea8;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.1);
+  --header-bg: #ffffff;
+  --list-bg: #f5f5f0;
+  --list-row-border: rgba(0,0,0,0.06);
+  --list-header-bg: #eeeee8;
+  --overlay-bg: rgba(255,255,255,0.85);
+}
+[data-theme="light"] body { background: var(--bg-primary); color: var(--text-primary); }
+[data-theme="light"] .app-header { background: var(--header-bg); border-bottom-color: var(--border-subtle); box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+[data-theme="light"] .header-select { background: var(--bg-secondary); color: var(--text-primary); border-color: var(--border-accent); }
+[data-theme="light"] .header-btn { color: var(--text-primary); }
+[data-theme="light"] .detail-list-section { background: var(--list-bg) !important; }
+[data-theme="light"] .detail-list-header { background: var(--list-header-bg) !important; }
+[data-theme="light"] .detail-list-header span { color: var(--text-muted) !important; }
+[data-theme="light"] .detail-list-row { border-bottom-color: var(--list-row-border); color: var(--text-primary); }
+[data-theme="light"] .detail-list-row.active { animation-name: row-glow-light; }
+[data-theme="light"] .list-panel-side { border-left-color: var(--border-subtle) !important; background: var(--list-bg); }
+@keyframes row-glow-light {
+  0%, 100% { background: #fff8e8; box-shadow: 0 0 6px rgba(255,152,0,0.1); }
+  50% { background: #fff0d0; box-shadow: 0 0 12px rgba(255,152,0,0.2), 0 -3px 8px rgba(255,152,0,0.06), 0 3px 8px rgba(255,152,0,0.06); }
+}
+[data-theme="light"] .detail-root { background: var(--bg-primary) !important; }
+[data-theme="light"] .detail-upper.hero-animated { filter: saturate(1.2) brightness(1.1); }
+[data-theme="light"] .type-badge { backdrop-filter: blur(4px); }
+[data-theme="light"] .menu-overlay { background: var(--overlay-bg) !important; }
 
 * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
 *::-webkit-scrollbar { width: 3px; }
@@ -28,11 +73,12 @@
 *::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.1); border-radius: 4px; }
 
 body {
-  background: #1a1d2e;
+  background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-body);
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* ===== App layout ===== */
@@ -56,11 +102,12 @@ body {
 .app-header {
   display: flex; align-items: center;
   height: 48px; padding: 0 6px;
-  background: #1a1d2e;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border-subtle);
   gap: 4px; flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
+  transition: background 0.3s ease;
 }
 .header-btn {
   display: flex; align-items: center; justify-content: center;
