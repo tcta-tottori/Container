@@ -170,7 +170,7 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceOk, announceProgress } =
+  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceProgress } =
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
@@ -269,12 +269,18 @@ export default function Home() {
       prevItemRef.current = currentItem.id;
       if (firstItemSkipRef.current) {
         firstItemSkipRef.current = false;
-        return; // 最初の品目コールをスキップ
+        return;
       }
-      // 完了コールとの重複回避（1.5秒待機）
-      setTimeout(() => announceItem(currentItem, state.items), 1500);
+      // 完了済みアイテムはアナウンスしない
+      if (state.completedIds.has(currentItem.id)) return;
+      // 完了コールとの重複回避（2秒待機）
+      setTimeout(() => {
+        // 再度チェック（タイムアウト中に完了した可能性）
+        if (state.completedIds.has(currentItem.id)) return;
+        announceItem(currentItem, state.items);
+      }, 2000);
     }
-  }, [currentItem, state.autoAnnounce, announceItem, state.items]);
+  }, [currentItem, state.autoAnnounce, announceItem, state.items, state.completedIds]);
 
   // コンテナ読み込み時の概要アナウンス（初回のみ）
   useEffect(() => {
@@ -596,25 +602,44 @@ export default function Home() {
   // OKコマンドの5秒クールダウン
   const okCooldownRef = useRef(0);
 
-  /** OKコマンド: パレット1つ消費、なくなったら自動完了 */
+  /** OKコマンド: パレット1つ減らす。パレット0で端数のみ→完了。 */
   const handleConfirmOk = useCallback(() => {
     if (!currentItem) return;
-    // 7秒クールダウン（タイムスタンプベースで確実に解除、コール残響回避）
+    // 7秒クールダウン
     if (Date.now() - okCooldownRef.current < 7000) return;
     okCooldownRef.current = Date.now();
 
-    // 端数の検査抜き数（鍋は検査なし）
+    const pl = currentItem.palletCount;
     const rawFrac = currentItem.fraction % 1 !== 0 ? Math.ceil(currentItem.fraction) : currentItem.fraction;
     const isNabeType = currentItem.type === '鍋';
-    const fractionDeducted = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
+    const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
 
-    // パレット0・端数0 → 完了処理
-    if (currentItem.palletCount <= 0 && currentItem.fraction <= 0) {
-      completeItem(currentItem.id);
-      announceOk('', 0, 0);
-      const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
-      if (remaining <= 0) setTimeout(() => announceAllComplete(), 1500);
-      return;
+    if (pl > 0) {
+      // パレットを1つ減らす
+      decreaseQty();
+      const newPl = pl - 1;
+      if (newPl <= 0 && frac <= 0) {
+        // パレット0・端数0 → 完了
+        speak('完了。');
+        setTimeout(() => {
+          completeItem(currentItem.id);
+        }, 300);
+      } else {
+        // 残りをコール
+        if (newPl > 0 && frac > 0) {
+          speak(`残り${newPl}パレットと${frac}ケース。`);
+        } else if (newPl > 0) {
+          speak(`残り${newPl}パレット。`);
+        } else {
+          speak(`残り${frac}ケース。`);
+        }
+      }
+    } else {
+      // パレット0（端数のみ or 全て0）→ 完了
+      speak('完了。');
+      setTimeout(() => {
+        completeItem(currentItem.id);
+      }, 300);
     }
 
     // 消費時間を記録
@@ -622,29 +647,7 @@ export default function Home() {
       const elapsed = Math.floor((Date.now() - state.itemStartTime) / 1000);
       setItemTimeLogs(prev => [...prev, { itemName: currentItem.itemName, elapsed, timestamp: Date.now() }]);
     }
-
-    // パレットがあればパレット1つ減らす
-    if (currentItem.palletCount > 0) {
-      decreaseQty();
-      const newPallet = currentItem.palletCount - 1;
-      if (newPallet <= 0 && currentItem.fraction <= 0) {
-        setTimeout(() => {
-          completeItem(currentItem.id);
-          announceOk('', 0, 0);
-          const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
-          if (remaining <= 0) setTimeout(() => announceAllComplete(), 1500);
-        }, 100);
-      } else {
-        announceOk('', newPallet, fractionDeducted);
-      }
-    } else {
-      // パレット0でケースのみの場合は完了
-      completeItem(currentItem.id);
-      announceOk('', 0, 0);
-      const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
-      if (remaining <= 0) setTimeout(() => announceAllComplete(), 1500);
-    }
-  }, [currentItem, decreaseQty, completeItem, state.items, state.completedIds, state.itemStartTime, announceOk, announceAllComplete]);
+  }, [currentItem, decreaseQty, completeItem, speak, state.itemStartTime]);
 
   const handleIncrease = useCallback(() => {
     increaseQty();
@@ -660,47 +663,29 @@ export default function Home() {
   const handleDecrease = useCallback(() => {
     if (!currentItem) return;
 
-    // Auto-complete if pallet is already 0
+    // パレット0 → 完了
     if (currentItem.palletCount === 0) {
-      const name = currentItem.itemName;
-      const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
       completeItem(currentItem.id);
-      announceComplete(name);
-      if (remaining <= 0) {
-        setTimeout(() => announceAllComplete(), 1500);
-      }
+      speak('完了。');
       return;
     }
 
     decreaseQty();
-    // 消費時間を記録（パレット減少）
-    if (state.itemStartTime) {
-      const elapsed = Math.floor((Date.now() - state.itemStartTime) / 1000);
-      setItemTimeLogs(prev => [...prev, {
-        itemName: currentItem.itemName,
-        elapsed,
-        timestamp: Date.now(),
-      }]);
+    const newPl = currentItem.palletCount - 1;
+    const rawFrac = currentItem.fraction % 1 !== 0 ? Math.ceil(currentItem.fraction) : currentItem.fraction;
+    const isNabeType = currentItem.type === '鍋';
+    const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
+
+    if (newPl > 0 && frac > 0) {
+      speak(`残り${newPl}パレットと${frac}ケース。`);
+    } else if (newPl > 0) {
+      speak(`残り${newPl}パレット。`);
+    } else if (frac > 0) {
+      speak(`残り${frac}ケース。`);
+    } else {
+      speak('完了。');
+      setTimeout(() => completeItem(currentItem.id), 300);
     }
-    setTimeout(() => {
-      const el = document.querySelector('[data-pallet-count]');
-      if (el) {
-        const p = Number(el.getAttribute('data-pallet-count'));
-        const fraction = currentItem.fraction;
-        const fractionCeil = Math.max(0, (fraction % 1 !== 0 ? Math.ceil(fraction) : fraction) - 1); // 検査抜き
-        let qtyText = '';
-        if (p > 0 && fractionCeil > 0) {
-          qtyText = `残り${p}パレットと${fractionCeil}ケース`;
-        } else if (p > 0) {
-          qtyText = `残り${p}パレット`;
-        } else if (fractionCeil > 0) {
-          qtyText = `残り${fractionCeil}ケース`;
-        } else {
-          qtyText = '残りなし';
-        }
-        speak(qtyText);
-      }
-    }, 50);
   }, [currentItem, decreaseQty, speak, state.itemStartTime, state.items, state.completedIds, completeItem, announceComplete, announceAllComplete]);
 
   const handleComplete = useCallback(() => {
