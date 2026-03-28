@@ -1123,43 +1123,85 @@ export default function Home() {
 
         {/* フローティングマイクボタン（右下固定） */}
         {viewMode === 'work' && isSupported && (
-          <button onClick={toggleListening}
-            className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
-            style={{
-              position: 'fixed', bottom: 20, right: 20, zIndex: 100,
-              width: 56, height: 56, borderRadius: '50%',
-              background: isSpeaking
-                ? 'radial-gradient(circle at 35% 35%, #888, #666 60%, #444)'
-                : isListening
-                  ? 'radial-gradient(circle at 35% 35%, #ff6b6b, #dc2626 60%, #991b1b)'
-                  : 'radial-gradient(circle at 35% 35%, #7c9bff, #4a6ef7 50%, #3b52d4 80%, #2a3aaa)',
-              border: isSpeaking ? '2px solid rgba(150,150,150,0.4)'
-                : isListening ? '2px solid rgba(255,100,100,0.6)' : '2px solid rgba(255,255,255,0.15)',
-              cursor: 'pointer',
-              boxShadow: isSpeaking
-                ? '0 4px 12px rgba(0,0,0,0.3), inset 0 1px 2px rgba(255,255,255,0.1)'
-                : isListening
-                  ? '0 0 24px rgba(239,68,68,0.5), 0 0 48px rgba(239,68,68,0.2), inset 0 1px 2px rgba(255,255,255,0.2)'
-                  : '0 4px 20px rgba(74,110,247,0.35), 0 0 40px rgba(107,82,212,0.15), inset 0 1px 2px rgba(255,255,255,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.3s ease',
-              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-            }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
-              stroke={isSpeaking ? '#aaa' : '#fff'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              style={{ filter: isSpeaking ? 'none' : 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}>
-              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-              {!isListening && <><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></>}
-            </svg>
-            {isListening && (
-              <span style={{
-                position: 'absolute', inset: -4, borderRadius: '50%',
-                border: '2px solid rgba(239,68,68,0.5)',
-                animation: 'mic-ring-pulse 1.5s ease-out infinite',
-              }} />
+          <>
+            {isSpeaking && (
+              <style>{`
+                @keyframes speakBar1 { 0%,100% { height: 20%; } 50% { height: 80%; } }
+                @keyframes speakBar2 { 0%,100% { height: 40%; } 40% { height: 95%; } }
+                @keyframes speakBar3 { 0%,100% { height: 60%; } 30% { height: 100%; } 70% { height: 35%; } }
+                @keyframes speakBar4 { 0%,100% { height: 50%; } 60% { height: 90%; } }
+                @keyframes speakBar5 { 0%,100% { height: 30%; } 45% { height: 75%; } }
+                @keyframes speakBar6 { 0%,100% { height: 15%; } 55% { height: 65%; } }
+                @keyframes speakBar7 { 0%,100% { height: 25%; } 35% { height: 70%; } }
+              `}</style>
             )}
-          </button>
+            <button onClick={toggleListening}
+              className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
+              style={{
+                position: 'fixed', bottom: 20, right: 20, zIndex: 100,
+                width: 56, height: 56, borderRadius: '50%',
+                background: isSpeaking
+                  ? 'radial-gradient(circle at 35% 35%, #b48eff, #8b5cf6 50%, #6d28d9 80%, #4c1d95)'
+                  : isListening
+                    ? 'radial-gradient(circle at 35% 35%, #ff6b6b, #dc2626 60%, #991b1b)'
+                    : 'radial-gradient(circle at 35% 35%, #7c9bff, #4a6ef7 50%, #3b52d4 80%, #2a3aaa)',
+                border: isSpeaking ? '2px solid rgba(167,139,250,0.6)'
+                  : isListening ? '2px solid rgba(255,100,100,0.6)' : '2px solid rgba(255,255,255,0.15)',
+                cursor: 'pointer',
+                boxShadow: isSpeaking
+                  ? '0 0 24px rgba(139,92,246,0.5), 0 0 48px rgba(139,92,246,0.2), inset 0 1px 2px rgba(255,255,255,0.15)'
+                  : isListening
+                    ? '0 0 24px rgba(239,68,68,0.5), 0 0 48px rgba(239,68,68,0.2), inset 0 1px 2px rgba(255,255,255,0.2)'
+                    : '0 4px 20px rgba(74,110,247,0.35), 0 0 40px rgba(107,82,212,0.15), inset 0 1px 2px rgba(255,255,255,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.3s ease',
+                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              }}>
+              {isSpeaking ? (
+                /* 音声コール中: 音声波形アイコン（7本の棒が不規則に伸縮） */
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 24 }}>
+                  {[
+                    { dur: '0.8s', delay: '0s', anim: 'speakBar1' },
+                    { dur: '0.6s', delay: '0.1s', anim: 'speakBar2' },
+                    { dur: '0.7s', delay: '0.05s', anim: 'speakBar3' },
+                    { dur: '0.5s', delay: '0.15s', anim: 'speakBar4' },
+                    { dur: '0.65s', delay: '0.08s', anim: 'speakBar5' },
+                    { dur: '0.75s', delay: '0.12s', anim: 'speakBar6' },
+                    { dur: '0.55s', delay: '0.03s', anim: 'speakBar7' },
+                  ].map((b, i) => (
+                    <div key={i} style={{
+                      width: 3, borderRadius: 2,
+                      background: '#fff',
+                      boxShadow: '0 0 4px rgba(255,255,255,0.5)',
+                      animation: `${b.anim} ${b.dur} ease-in-out ${b.delay} infinite`,
+                    }} />
+                  ))}
+                </div>
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}>
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  {!isListening && <><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></>}
+                </svg>
+              )}
+              {isListening && !isSpeaking && (
+                <span style={{
+                  position: 'absolute', inset: -4, borderRadius: '50%',
+                  border: '2px solid rgba(239,68,68,0.5)',
+                  animation: 'mic-ring-pulse 1.5s ease-out infinite',
+                }} />
+              )}
+              {isSpeaking && (
+                <span style={{
+                  position: 'absolute', inset: -4, borderRadius: '50%',
+                  border: '2px solid rgba(167,139,250,0.5)',
+                  animation: 'mic-ring-pulse 1.5s ease-out infinite',
+                }} />
+              )}
+            </button>
+          </>
         )}
         <UpdateNotification />
       </div>
