@@ -436,6 +436,7 @@ body {
   .detail-sf-num { font-size: 56px !important; letter-spacing: -2px !important; }
   .detail-sf-pcs { font-size: 24px !important; }
   .detail-sf-label { font-size: 11px !important; }
+  .detail-sf-total { margin-left: 8px; }
 }
 .detail-sf-item { display: flex; align-items: flex-end; gap: 3px; }
 .detail-sf-num {

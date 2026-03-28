@@ -801,7 +801,7 @@ export default function Home() {
     [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, handleConfirmOk, handleContainerSummary, handleProgress]
   );
 
-  const { isListening, isSpeaking, isSupported, lastTranscript, toggleListening } =
+  const { isListening, isSpeaking, speakingText, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
   // 初期ロード中はスプラッシュ画面
@@ -918,6 +918,27 @@ export default function Home() {
     <>
       {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
+      {/* 音声コール中のテキスト表示（マイクボタンの上） */}
+      {isSpeaking && speakingText && (
+        <div style={{
+          position: 'fixed', bottom: 84, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 101, pointerEvents: 'none',
+          maxWidth: '80vw', textAlign: 'center',
+          animation: 'fadeIn 0.2s ease both',
+        }}>
+          <div style={{
+            padding: '6px 14px', borderRadius: 16,
+            background: 'rgba(139,92,246,0.2)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid rgba(167,139,250,0.3)',
+            color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: 500,
+            lineHeight: 1.4,
+            boxShadow: '0 4px 16px rgba(139,92,246,0.2)',
+          }}>
+            {speakingText}
+          </div>
+        </div>
+      )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 
       {/* メニューオーバーレイ */}
