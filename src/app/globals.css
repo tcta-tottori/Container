@@ -429,25 +429,27 @@ body {
 /* 数量（大フォント装飾） */
 .detail-stats-free {
   display: flex; align-items: flex-end; justify-content: center;
-  gap: 24px; padding: 4px 0 2px; flex-shrink: 0;
+  gap: 16px; padding: 4px 0 2px; flex-shrink: 0;
 }
 @media (orientation: landscape) {
-  .detail-stats-free { justify-content: flex-start; padding-left: 2%; padding-right: 80px; gap: 16px; }
-  .detail-sf-num { font-size: 60px !important; }
-  .detail-sf-num-sm { font-size: 30px !important; }
-  .detail-sf-label { font-size: 12px !important; }
+  .detail-stats-free { justify-content: flex-start; padding-left: 2%; padding-right: 80px; gap: 10px; }
+  .detail-sf-num { font-size: 56px !important; letter-spacing: -2px !important; }
+  .detail-sf-pcs { font-size: 24px !important; }
+  .detail-sf-label { font-size: 11px !important; }
 }
-.detail-sf-item { display: flex; align-items: flex-end; gap: 4px; }
+.detail-sf-item { display: flex; align-items: flex-end; gap: 3px; }
 .detail-sf-num {
-  font-family: var(--font-mono); font-size: 64px;
+  font-family: var(--font-mono); font-size: 58px;
   font-weight: 900; font-variant-numeric: tabular-nums;
   letter-spacing: -2px; line-height: 0.78;
 }
 .detail-sf-num-sm {
-  font-family: var(--font-mono); font-size: 28px;
+  font-family: var(--font-mono); font-size: 26px;
   font-weight: 700; font-variant-numeric: tabular-nums;
   line-height: 0.78;
 }
+/* PCS: 桁数が多いときに自動縮小 */
+.detail-sf-pcs { font-size: clamp(18px, 5vw, 26px); white-space: nowrap; }
 .detail-sf-label {
   font-family: var(--font-body); font-size: 13px;
   color: var(--text-muted); font-weight: 700; line-height: 1;
