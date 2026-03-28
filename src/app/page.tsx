@@ -921,19 +921,19 @@ export default function Home() {
       {/* 音声コール中のテキスト表示（マイクボタンの上） */}
       {isSpeaking && speakingText && (
         <div style={{
-          position: 'fixed', bottom: 84, left: '50%', transform: 'translateX(-50%)',
+          position: 'fixed', bottom: 84, left: 8, right: 8,
           zIndex: 101, pointerEvents: 'none',
-          maxWidth: '80vw', textAlign: 'center',
+          textAlign: 'center',
           animation: 'fadeIn 0.2s ease both',
         }}>
           <div style={{
-            padding: '6px 14px', borderRadius: 16,
-            background: 'rgba(139,92,246,0.2)',
-            backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(167,139,250,0.3)',
-            color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: 500,
-            lineHeight: 1.4,
-            boxShadow: '0 4px 16px rgba(139,92,246,0.2)',
+            padding: '10px 16px', borderRadius: 16,
+            background: 'rgba(20,10,40,0.92)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(167,139,250,0.35)',
+            color: '#fff', fontSize: 15, fontWeight: 600,
+            lineHeight: 1.5,
+            boxShadow: '0 4px 24px rgba(139,92,246,0.25)',
           }}>
             {speakingText}
           </div>
