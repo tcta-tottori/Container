@@ -143,6 +143,7 @@
   background: rgba(52,211,153,0.08) !important;
   border-color: rgba(52,211,153,0.2) !important;
 }
+[data-theme="light"] .filedrop-root div[style*="rgba(52,211,153"] div { color: #444 !important; }
 
 * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
 *::-webkit-scrollbar { width: 3px; }
