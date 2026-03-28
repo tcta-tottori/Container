@@ -510,17 +510,24 @@ body {
   padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.05);
   font-size: 13px; color: rgba(255,255,255,0.85);
   border-left: 3px solid transparent;
-  cursor: pointer; transition: background 0.12s ease;
+  cursor: pointer; transition: background 0.12s ease, box-shadow 0.3s ease;
   font-family: var(--font-body);
 }
 .detail-list-row:active { background: rgba(255,255,255,0.04); }
 .detail-list-row.active {
   border-left-width: 4px;
-  animation: row-blink 1.8s ease-in-out infinite;
+  animation: row-glow 1.8s ease-in-out infinite;
+  position: relative; z-index: 1;
 }
-@keyframes row-blink {
-  0%, 100% { background: #2a1f10; }
-  50% { background: #3a2a14; }
+@keyframes row-glow {
+  0%, 100% {
+    background: #2a1f10;
+    box-shadow: 0 0 8px rgba(255,152,0,0.15), 0 0 20px rgba(255,152,0,0.05);
+  }
+  50% {
+    background: #3d2a10;
+    box-shadow: 0 0 16px rgba(255,152,0,0.35), 0 0 40px rgba(255,152,0,0.12), 0 -4px 12px rgba(255,152,0,0.08), 0 4px 12px rgba(255,152,0,0.08);
+  }
 }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes wheelSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
