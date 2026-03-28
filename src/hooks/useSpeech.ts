@@ -5,10 +5,10 @@ import { ContainerItem } from '@/lib/types';
 import { itemNameForSpeech, areSimilarItems, getSimilarityReason, extractColor } from '@/lib/typeDetector';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
-let _onSpeakStart: (() => void) | null = null;
+let _onSpeakStart: ((text: string) => void) | null = null;
 let _onSpeakEnd: (() => void) | null = null;
 
-export function setSpeakCallbacks(onStart: () => void, onEnd: () => void) {
+export function setSpeakCallbacks(onStart: (text: string) => void, onEnd: () => void) {
   _onSpeakStart = onStart;
   _onSpeakEnd = onEnd;
 }
@@ -23,8 +23,7 @@ function speak(text: string): void {
   const voices = window.speechSynthesis.getVoices();
   const jaVoice = voices.find((v) => v.lang.startsWith('ja'));
   if (jaVoice) u.voice = jaVoice;
-  // 音声コール中は録音を一時停止
-  u.onstart = () => { _onSpeakStart?.(); };
+  u.onstart = () => { _onSpeakStart?.(text); };
   u.onend = () => { _onSpeakEnd?.(); };
   u.onerror = () => { _onSpeakEnd?.(); };
   window.speechSynthesis.speak(u);

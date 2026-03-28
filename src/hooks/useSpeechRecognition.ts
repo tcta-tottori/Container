@@ -12,6 +12,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speakingText, setSpeakingText] = useState<string | null>(null);
   const [lastTranscript, setLastTranscript] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recognitionRef = useRef<any>(null);
@@ -113,8 +114,9 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
   // 音声コール中は録音を一時停止してループ防止
   useEffect(() => {
     setSpeakCallbacks(
-      () => {
+      (text: string) => {
         setIsSpeaking(true);
+        setSpeakingText(text);
         if (recognitionRef.current) {
           pausedForSpeechRef.current = true;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,6 +125,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
       },
       () => {
         setIsSpeaking(false);
+        setSpeakingText(null);
         if (pausedForSpeechRef.current && isListening) {
           pausedForSpeechRef.current = false;
           // コール終了後1秒待ってから再開（エコー・残響を確実に回避）
@@ -153,6 +156,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
   return {
     isListening,
     isSpeaking,
+    speakingText,
     isSupported,
     lastTranscript,
     toggleListening,
