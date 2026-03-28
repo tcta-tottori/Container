@@ -48,24 +48,50 @@
   --list-header-bg: #eeeee8;
   --overlay-bg: rgba(255,255,255,0.85);
 }
+/* ===== Light theme overrides ===== */
 [data-theme="light"] body { background: var(--bg-primary); color: var(--text-primary); }
 [data-theme="light"] .app-header { background: var(--header-bg); border-bottom-color: var(--border-subtle); box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 [data-theme="light"] .header-select { background: var(--bg-secondary); color: var(--text-primary); border-color: var(--border-accent); }
-[data-theme="light"] .header-btn { color: var(--text-primary); }
+[data-theme="light"] .header-btn { color: var(--text-secondary); }
+[data-theme="light"] .header-work-elapsed { color: #c27800 !important; }
+
+/* 上半分ヒーロー: 明るい背景に変換 */
+[data-theme="light"] .detail-upper.hero-animated {
+  filter: saturate(0.8) brightness(2.2) contrast(0.7);
+}
+[data-theme="light"] .detail-upper .detail-item-name { color: #1a1a2e !important; text-shadow: none !important; }
+[data-theme="light"] .detail-upper .detail-badges .type-badge { border-width: 2px; }
+
+/* リスト */
+[data-theme="light"] .detail-root { background: var(--bg-primary) !important; }
 [data-theme="light"] .detail-list-section { background: var(--list-bg) !important; }
 [data-theme="light"] .detail-list-header { background: var(--list-header-bg) !important; }
 [data-theme="light"] .detail-list-header span { color: var(--text-muted) !important; }
-[data-theme="light"] .detail-list-row { border-bottom-color: var(--list-row-border); color: var(--text-primary); }
-[data-theme="light"] .detail-list-row.active { animation-name: row-glow-light; }
-[data-theme="light"] .list-panel-side { border-left-color: var(--border-subtle) !important; background: var(--list-bg); }
-@keyframes row-glow-light {
-  0%, 100% { background: #fff8e8; box-shadow: 0 0 6px rgba(255,152,0,0.1); }
-  50% { background: #fff0d0; box-shadow: 0 0 12px rgba(255,152,0,0.2), 0 -3px 8px rgba(255,152,0,0.06), 0 3px 8px rgba(255,152,0,0.06); }
+[data-theme="light"] .detail-list-row {
+  border-bottom-color: var(--list-row-border);
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.6);
 }
-[data-theme="light"] .detail-root { background: var(--bg-primary) !important; }
-[data-theme="light"] .detail-upper.hero-animated { filter: saturate(1.2) brightness(1.1); }
-[data-theme="light"] .type-badge { backdrop-filter: blur(4px); }
+[data-theme="light"] .detail-list-row.active { animation-name: row-glow-light; }
+@keyframes row-glow-light {
+  0%, 100% { background: #fff8e8; box-shadow: 0 0 6px rgba(255,152,0,0.12); }
+  50% { background: #ffeecc; box-shadow: 0 0 14px rgba(255,152,0,0.25), 0 -3px 8px rgba(255,152,0,0.08), 0 3px 8px rgba(255,152,0,0.08); }
+}
+[data-theme="light"] .list-panel-side { border-left-color: var(--border-subtle) !important; background: var(--list-bg); }
+
+/* 数量表示 */
+[data-theme="light"] .detail-sf-num { color: var(--text-primary) !important; text-shadow: none !important; }
+[data-theme="light"] .detail-sf-num-sm { color: var(--text-secondary) !important; }
+[data-theme="light"] .detail-sf-label { color: var(--text-muted) !important; }
+
+/* 類似品・関連バー */
+[data-theme="light"] .detail-upper [style*="rgba(255,255,255,0.05)"] { background: rgba(0,0,0,0.04) !important; }
+
+/* メニュー */
 [data-theme="light"] .menu-overlay { background: var(--overlay-bg) !important; }
+
+/* 読込画面 */
+[data-theme="light"] .filedrop-root { background: var(--bg-primary) !important; }
 
 * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
 *::-webkit-scrollbar { width: 3px; }
