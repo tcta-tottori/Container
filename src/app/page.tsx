@@ -271,7 +271,8 @@ export default function Home() {
         firstItemSkipRef.current = false;
         return; // 最初の品目コールをスキップ
       }
-      announceItem(currentItem, state.items);
+      // 完了コールとの重複回避（1.5秒待機）
+      setTimeout(() => announceItem(currentItem, state.items), 1500);
     }
   }, [currentItem, state.autoAnnounce, announceItem, state.items]);
 
@@ -1001,15 +1002,6 @@ export default function Home() {
                       completeItem(id);
                       if (item) {
                         announceComplete(item.itemName);
-                        // 次の品目をアナウンス（少し待ってから）
-                        setTimeout(() => {
-                          const remaining = state.items.filter(it => !state.completedIds.has(it.id) && it.id !== id);
-                          if (remaining.length > 0) {
-                            announceItem(remaining[0], state.items);
-                          } else {
-                            announceAllComplete();
-                          }
-                        }, 1500);
                       }
                     }}
                     onUncompleteItem={uncompleteItem}
@@ -1150,7 +1142,13 @@ export default function Home() {
                 @keyframes speakBar7 { 0%,100% { height: 25%; } 35% { height: 70%; } }
               `}</style>
             )}
-            <button onClick={toggleListening}
+            <button onClick={() => {
+              if (isSpeaking && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                return;
+              }
+              toggleListening();
+            }}
               className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
               style={{
                 position: 'fixed', bottom: 20, zIndex: 100,

@@ -432,9 +432,10 @@ body {
   gap: 24px; padding: 4px 0 2px; flex-shrink: 0;
 }
 @media (orientation: landscape) {
-  .detail-stats-free { justify-content: flex-start; padding-left: 2%; padding-right: 80px; gap: 12px; }
-  .detail-sf-num { font-size: 44px !important; }
-  .detail-sf-num-sm { font-size: 22px !important; }
+  .detail-stats-free { justify-content: flex-start; padding-left: 2%; padding-right: 80px; gap: 16px; }
+  .detail-sf-num { font-size: 60px !important; }
+  .detail-sf-num-sm { font-size: 30px !important; }
+  .detail-sf-label { font-size: 12px !important; }
 }
 .detail-sf-item { display: flex; align-items: flex-end; gap: 4px; }
 .detail-sf-num {
