@@ -55,43 +55,76 @@
 [data-theme="light"] .header-btn { color: var(--text-secondary); }
 [data-theme="light"] .header-work-elapsed { color: #c27800 !important; }
 
-/* 上半分ヒーロー: 明るい背景に変換 */
+/* 上半分ヒーロー: filterではなく背景色を直接オーバーライド */
 [data-theme="light"] .detail-upper.hero-animated {
-  filter: saturate(0.8) brightness(2.2) contrast(0.7);
+  background: #e8eee8 !important;
+  filter: none !important;
 }
+[data-theme="light"] .detail-upper.hero-animated::after { display: none; }
+[data-theme="light"] .hero-glow-layer { display: none !important; }
+[data-theme="light"] .detail-upper [style*="radial-gradient"] { opacity: 0.15 !important; }
+/* 上半分テキスト: 全て黒ベース */
 [data-theme="light"] .detail-upper .detail-item-name { color: #1a1a2e !important; text-shadow: none !important; }
-[data-theme="light"] .detail-upper .detail-badges .type-badge { border-width: 2px; }
+[data-theme="light"] .detail-upper .detail-badges .type-badge {
+  border-width: 2px; backdrop-filter: blur(4px);
+  background: rgba(255,255,255,0.7) !important;
+}
+[data-theme="light"] .detail-upper [style*="color: rgba(255,255,255"] { color: var(--text-secondary) !important; }
+[data-theme="light"] .detail-upper [style*="color: '#fff'"] { color: var(--text-primary) !important; }
+[data-theme="light"] .detail-upper .detail-sf-num { color: #1a1a2e !important; text-shadow: none !important; }
+[data-theme="light"] .detail-upper .detail-sf-label { color: #666 !important; }
+/* KTE/KENコード */
+[data-theme="light"] .detail-upper span[style*="color: rgba(255,255,255,0.7)"] { color: #444 !important; }
+/* 進捗率 */
+[data-theme="light"] .detail-upper span[style*="font-size: 18"] { color: #1a1a2e !important; text-shadow: none !important; }
+/* 種類数表示 */
+[data-theme="light"] .detail-upper span[style*="color: rgba(255,255,255,0.4)"] { color: #888 !important; }
+[data-theme="light"] .detail-upper span[style*="color: rgba(255,255,255,0.7)"] { color: #555 !important; }
+/* 寸法テキスト */
+[data-theme="light"] .detail-upper div[style*="font-weight: 800"][style*="font-size: 11"] { color: #2a6030 !important; text-shadow: none !important; }
 
-/* リスト */
-[data-theme="light"] .detail-root { background: var(--bg-primary) !important; }
-[data-theme="light"] .detail-list-section { background: var(--list-bg) !important; }
-[data-theme="light"] .detail-list-header { background: var(--list-header-bg) !important; }
-[data-theme="light"] .detail-list-header span { color: var(--text-muted) !important; }
+/* リスト: 種類ごとの明るい背景色 */
+[data-theme="light"] .detail-root { background: #f0f0ec !important; }
+[data-theme="light"] .detail-list-section { background: #f0f0ec !important; }
+[data-theme="light"] .detail-list-header { background: #e5e5e0 !important; }
+[data-theme="light"] .detail-list-header span { color: #666 !important; }
 [data-theme="light"] .detail-list-row {
-  border-bottom-color: var(--list-row-border);
-  color: var(--text-primary);
-  background: rgba(255,255,255,0.6);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  color: #1a1a2e;
+  background: #ffffff;
 }
-[data-theme="light"] .detail-list-row.active { animation-name: row-glow-light; }
+[data-theme="light"] .detail-list-row .detail-list-name { color: #1a1a2e !important; }
+[data-theme="light"] .detail-list-row .detail-list-num { color: #1a1a2e !important; }
+[data-theme="light"] .detail-list-row .detail-list-total { color: #555 !important; }
+[data-theme="light"] .detail-list-row.active {
+  animation-name: row-glow-light;
+  color: #1a1a2e;
+}
 @keyframes row-glow-light {
-  0%, 100% { background: #fff8e8; box-shadow: 0 0 6px rgba(255,152,0,0.12); }
-  50% { background: #ffeecc; box-shadow: 0 0 14px rgba(255,152,0,0.25), 0 -3px 8px rgba(255,152,0,0.08), 0 3px 8px rgba(255,152,0,0.08); }
+  0%, 100% { background: #fff3d8; box-shadow: 0 0 8px rgba(255,152,0,0.15); }
+  50% { background: #ffe8b0; box-shadow: 0 0 16px rgba(255,152,0,0.3), 0 -4px 10px rgba(255,152,0,0.1), 0 4px 10px rgba(255,152,0,0.1); }
 }
-[data-theme="light"] .list-panel-side { border-left-color: var(--border-subtle) !important; background: var(--list-bg); }
+[data-theme="light"] .list-panel-side { border-left-color: rgba(0,0,0,0.08) !important; background: #f0f0ec; }
 
-/* 数量表示 */
-[data-theme="light"] .detail-sf-num { color: var(--text-primary) !important; text-shadow: none !important; }
-[data-theme="light"] .detail-sf-num-sm { color: var(--text-secondary) !important; }
-[data-theme="light"] .detail-sf-label { color: var(--text-muted) !important; }
+/* 数量表示（下部） */
+[data-theme="light"] .detail-sf-num { color: #1a1a2e !important; text-shadow: none !important; }
+[data-theme="light"] .detail-sf-num-sm, [data-theme="light"] .detail-sf-pcs { color: #333 !important; }
+[data-theme="light"] .detail-sf-label { color: #888 !important; }
 
 /* 類似品・関連バー */
-[data-theme="light"] .detail-upper [style*="rgba(255,255,255,0.05)"] { background: rgba(0,0,0,0.04) !important; }
+[data-theme="light"] .detail-upper div[style*="border-radius: 20"] {
+  background: rgba(0,0,0,0.04) !important;
+  border-color: rgba(0,0,0,0.1) !important;
+}
+[data-theme="light"] .detail-upper div[style*="border-radius: 20"] span { color: #444 !important; }
 
 /* メニュー */
-[data-theme="light"] .menu-overlay { background: var(--overlay-bg) !important; }
+[data-theme="light"] .menu-overlay { background: rgba(255,255,255,0.9) !important; }
 
 /* 読込画面 */
 [data-theme="light"] .filedrop-root { background: var(--bg-primary) !important; }
+[data-theme="light"] .filedrop-root * { color: var(--text-primary); }
+[data-theme="light"] .drop-zone-root { color: var(--text-primary); }
 
 * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
 *::-webkit-scrollbar { width: 3px; }
