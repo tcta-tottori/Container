@@ -996,7 +996,22 @@ export default function Home() {
                     allItems={state.items}
                     completedIds={state.completedIds}
                     onSelectItem={handleSelectItem}
-                    onCompleteItem={completeItem}
+                    onCompleteItem={(id: string) => {
+                      const item = state.items.find(it => it.id === id);
+                      completeItem(id);
+                      if (item) {
+                        announceComplete(item.itemName);
+                        // 次の品目をアナウンス（少し待ってから）
+                        setTimeout(() => {
+                          const remaining = state.items.filter(it => !state.completedIds.has(it.id) && it.id !== id);
+                          if (remaining.length > 0) {
+                            announceItem(remaining[0], state.items);
+                          } else {
+                            announceAllComplete();
+                          }
+                        }, 1500);
+                      }
+                    }}
                     onUncompleteItem={uncompleteItem}
                     onDecrementPallet={handleDecrease}
                   />

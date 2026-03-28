@@ -288,12 +288,14 @@ function SwipeRow({ children, onSwipe, style, className }: {
   }, [onSwipe]);
 
   return (
-    <div style={{ overflow: 'hidden', position: 'relative' }}>
+    <div style={{ overflow: 'visible', position: 'relative' }}>
       <div style={{
         position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%',
         background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
+        boxShadow: '0 0 20px rgba(34,197,94,0.5), 0 0 40px rgba(34,197,94,0.2), inset 0 0 10px rgba(255,255,255,0.1)',
         display: 'flex', alignItems: 'center', paddingLeft: 16,
         color: '#fff', fontSize: 12, fontWeight: 700, gap: 4,
+        textShadow: '0 0 8px rgba(255,255,255,0.6)',
       }}>✓ 完了</div>
       <div ref={rowRef} className={className} style={{ ...style, position: 'relative', zIndex: 1 }}
         onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE}
