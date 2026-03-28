@@ -242,7 +242,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
   const gradientStyle = 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)';
 
   return (
-    <div className="flex items-center justify-center h-screen w-screen"
+    <div className="filedrop-root flex items-center justify-center h-screen w-screen"
       style={{ background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)', overflow: 'auto' }}>
       <div className="drop-zone-root" style={{ width: '100%', maxWidth: 800, padding: '0 20px' }}>
 
