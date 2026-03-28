@@ -94,8 +94,6 @@ body {
 
 /* Mic button: always centered */
 .mic-float-btn { left: 50% !important; right: auto !important; transform: translateX(-50%); }
-.voice-feedback-float { right: auto; left: calc(50% + 40px); }
-@media (orientation: landscape) { .voice-feedback-float { right: auto; left: calc(50% + 40px); } }
 
 /* Header date: landscape only */
 .header-date-landscape { display: none; }
@@ -434,7 +432,7 @@ body {
   gap: 24px; padding: 4px 0 2px; flex-shrink: 0;
 }
 @media (orientation: landscape) {
-  .detail-stats-free { padding-right: 60px; }
+  .detail-stats-free { justify-content: flex-start; padding-left: 10%; padding-right: 80px; gap: 20px; }
 }
 .detail-sf-item { display: flex; align-items: flex-end; gap: 4px; }
 .detail-sf-num {
