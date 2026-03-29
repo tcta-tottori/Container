@@ -62,6 +62,18 @@
 }
 [data-theme="light"] .detail-upper.hero-animated::after { opacity: 0.25; }
 [data-theme="light"] .hero-glow-layer { opacity: 0.35 !important; filter: blur(50px) !important; }
+/* バッジ: 背景を半透明黒にして鮮やかな背景でも視認できるように */
+[data-theme="light"] .detail-upper .detail-badges .type-badge {
+  background: rgba(0,0,0,0.35) !important;
+  border-color: rgba(255,255,255,0.25) !important;
+  backdrop-filter: blur(8px);
+}
+/* 数量PL/CT/PCS: 白文字を維持 */
+[data-theme="light"] .detail-upper .detail-sf-num { color: #fff !important; }
+[data-theme="light"] .detail-upper .detail-sf-label { color: rgba(255,255,255,0.6) !important; }
+[data-theme="light"] .detail-upper .detail-sf-pcs { color: rgba(255,255,255,0.7) !important; }
+/* 寸法テキスト: 白文字 */
+[data-theme="light"] .detail-upper .anim-fade-in { color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,0.4) !important; }
 /* 時計・日付 */
 [data-theme="light"] .header-clock { color: #1a1a2e !important; }
 [data-theme="light"] .header-date-landscape { color: rgba(0,0,0,0.4) !important; }
