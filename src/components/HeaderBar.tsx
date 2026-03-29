@@ -115,7 +115,7 @@ export default function HeaderBar({
       >
         {workElapsed}
       </span>
-      <span style={{
+      <span className="header-clock" style={{
         fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
         color: 'rgba(255,255,255,0.85)', fontVariantNumeric: 'tabular-nums',
         letterSpacing: 0.5, flexShrink: 0, marginRight: 16,

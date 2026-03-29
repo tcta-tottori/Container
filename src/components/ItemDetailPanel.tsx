@@ -488,13 +488,13 @@ export default function ItemDetailPanel({
     'その他': { base: '#101218', c1: '#1a2030', c2: '#141822', c3: '#1e2838' },
   };
   const HERO_BG_LIGHT: Record<string, { base: string; c1: string; c2: string; c3: string }> = {
-    'ポリカバー': { base: '#e0f2e8', c1: '#c8e6d0', c2: '#d4eedc', c3: '#b8dfc4' },
-    'ジャーポット': { base: '#f0e4f5', c1: '#e0c8eb', c2: '#e8d4f0', c3: '#d8bce5' },
-    '箱': { base: '#e8efe0', c1: '#d4dfc4', c2: '#dee8d0', c3: '#c8d5b8' },
-    '部品': { base: '#e6e0f2', c1: '#d0c4e6', c2: '#d8ccea', c3: '#c4b8df' },
-    '鍋': { base: '#f5ece0', c1: '#ebdcc8', c2: '#f0e4d4', c3: '#e5d2bc' },
-    'ヤーマン部品': { base: '#f2f0e0', c1: '#e6e0c8', c2: '#eae8d4', c3: '#dfd8bc' },
-    'その他': { base: '#eaeaea', c1: '#ddd', c2: '#e2e2e2', c3: '#d5d5d5' },
+    'ポリカバー': { base: '#78d68a', c1: '#4ec06a', c2: '#60d090', c3: '#3ab85e' },
+    'ジャーポット': { base: '#c07ae0', c1: '#a855d8', c2: '#b568e0', c3: '#9540cc' },
+    '箱': { base: '#d4b060', c1: '#c8a040', c2: '#ccac58', c3: '#c09838' },
+    '部品': { base: '#8a7ad0', c1: '#7060c8', c2: '#7e6cd0', c3: '#6450c0' },
+    '鍋': { base: '#e08070', c1: '#d06050', c2: '#d87060', c3: '#c84840' },
+    'ヤーマン部品': { base: '#c8b860', c1: '#b8a840', c2: '#c0b050', c3: '#b0a038' },
+    'その他': { base: '#90a0b0', c1: '#7888a0', c2: '#8898a8', c3: '#687898' },
   };
   const HERO_BG = isLightMode ? HERO_BG_LIGHT : HERO_BG_DARK;
   // 鍋はnabeColorから背景を動的生成
@@ -506,10 +506,10 @@ export default function ItemDetailPanel({
       const b = parseInt(hex.slice(4, 6), 16);
       if (isLightMode) {
         return {
-          base: `rgb(${Math.round(r * 0.15 + 215)},${Math.round(g * 0.15 + 215)},${Math.round(b * 0.15 + 215)})`,
-          c1: `rgb(${Math.round(r * 0.2 + 195)},${Math.round(g * 0.2 + 195)},${Math.round(b * 0.2 + 195)})`,
-          c2: `rgb(${Math.round(r * 0.18 + 205)},${Math.round(g * 0.18 + 205)},${Math.round(b * 0.18 + 205)})`,
-          c3: `rgb(${Math.round(r * 0.22 + 190)},${Math.round(g * 0.22 + 190)},${Math.round(b * 0.22 + 190)})`,
+          base: `rgb(${Math.min(255, Math.round(r * 0.6 + 100))},${Math.min(255, Math.round(g * 0.6 + 100))},${Math.min(255, Math.round(b * 0.6 + 100))})`,
+          c1: `rgb(${Math.min(255, Math.round(r * 0.7 + 80))},${Math.min(255, Math.round(g * 0.7 + 80))},${Math.min(255, Math.round(b * 0.7 + 80))})`,
+          c2: `rgb(${Math.min(255, Math.round(r * 0.65 + 90))},${Math.min(255, Math.round(g * 0.65 + 90))},${Math.min(255, Math.round(b * 0.65 + 90))})`,
+          c3: `rgb(${Math.min(255, Math.round(r * 0.75 + 70))},${Math.min(255, Math.round(g * 0.75 + 70))},${Math.min(255, Math.round(b * 0.75 + 70))})`,
         };
       }
       return {
