@@ -12,6 +12,7 @@ interface PalletDiagramProps {
   itemName?: string;
   measurements?: string;
   overrideRotateY?: number;
+  wireframe?: boolean;
 }
 
 /* ===== Constants ===== */
@@ -117,12 +118,42 @@ function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: n
   );
 }
 
+/* ===== Wireframe neon face (light mode) ===== */
+function wireframeFace(opacity: number): React.CSSProperties {
+  return {
+    background: 'transparent',
+    border: `1px solid rgba(255,255,255,${opacity})`,
+    boxShadow: `inset 0 0 3px rgba(255,255,255,${opacity * 0.3}), 0 0 4px rgba(255,255,255,${opacity * 0.2})`,
+    borderRadius: 1,
+    boxSizing: 'border-box' as const,
+    backfaceVisibility: 'visible' as const,
+  };
+}
+
 /* ===== CSS 3D Cardboard Box (properly positioned in 3D space) ===== */
-function Box3D({ x, y, w, d, h, topBase, palletDepth }: {
+function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe }: {
   x: number; y: number; w: number; d: number; h: number;
-  topBase: number; palletDepth: number;
+  topBase: number; palletDepth: number; wireframe?: boolean;
 }) {
   const zOffset = palletDepth / 2 - y - d / 2;
+
+  if (wireframe) {
+    return (
+      <div style={{
+        position: 'absolute', left: x, top: topBase,
+        width: w, height: h,
+        transformStyle: 'preserve-3d',
+        transform: `translateZ(${zOffset}px)`,
+      }}>
+        <div style={{ position: 'absolute', width: w, height: h, transform: `translateZ(${d / 2}px)`, ...wireframeFace(0.7) }} />
+        <div style={{ position: 'absolute', width: w, height: h, transform: `rotateY(180deg) translateZ(${d / 2}px)`, ...wireframeFace(0.4) }} />
+        <div style={{ position: 'absolute', width: d, height: h, left: (w - d) / 2, transform: `rotateY(-90deg) translateZ(${w / 2}px)`, ...wireframeFace(0.5) }} />
+        <div style={{ position: 'absolute', width: d, height: h, left: (w - d) / 2, transform: `rotateY(90deg) translateZ(${w / 2}px)`, ...wireframeFace(0.55) }} />
+        <div style={{ position: 'absolute', width: w, height: d, top: (h - d) / 2, transform: `rotateX(90deg) translateZ(${h / 2}px)`, ...wireframeFace(0.6) }} />
+        <div style={{ position: 'absolute', width: w, height: d, top: (h - d) / 2, transform: `rotateX(-90deg) translateZ(${h / 2}px)`, ...wireframeFace(0.3) }} />
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -444,7 +475,7 @@ function isJPIType(itemName?: string): boolean {
 
 /* ===== Main Component ===== */
 export default function PalletDiagram({
-  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY,
+  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe,
 }: PalletDiagramProps) {
   const isFull = palletCount > 0;
   const isFraction = !isFull && fraction > 0;
@@ -615,6 +646,7 @@ export default function PalletDiagram({
               w={slot.w} d={slot.d} h={slot.h}
               topBase={boxTop}
               palletDepth={pd}
+              wireframe={wireframe}
             />
           );
         })}
