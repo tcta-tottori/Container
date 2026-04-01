@@ -398,6 +398,14 @@ export function linkItemsWithMaster(
     if (master.type) {
       updated.type = master.type;
     }
+    // 品名をマスタから補完（AQSS等で中国語名の場合にマスタの品名で上書き）
+    if (master.itemName && /[\u4e00-\u9fff]/.test(updated.itemName) && !/ポリカバー|ジャーポット/.test(updated.itemName)) {
+      updated.itemName = master.itemName;
+    }
+    // 代表機種をマスタから補完
+    if (master.representModel && !updated.representModel) {
+      updated.representModel = master.representModel;
+    }
     // サイズをマスタから補完（J列）
     if (master.size && !updated.size) {
       updated.size = master.size;
@@ -421,6 +429,11 @@ export function linkItemsWithMaster(
       }
     }
     // パレット数・端数を自動計算（qtyPerPalletが設定済みで、元データにパレット情報がない場合）
+    // caseCountが0の場合、totalQtyとpackingQtyから逆算
+    if (updated.caseCount === 0 && updated.totalQty > 0 && updated.packingQty > 0) {
+      updated.caseCount = Math.ceil(updated.totalQty / updated.packingQty);
+      updated.fraction = updated.caseCount;
+    }
     if (updated.qtyPerPallet > 0 && updated.caseCount > 0 && item.palletCount === 0) {
       updated.palletCount = Math.floor(updated.caseCount / updated.qtyPerPallet);
       updated.fraction = updated.caseCount % updated.qtyPerPallet;
