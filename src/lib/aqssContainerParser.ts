@@ -68,20 +68,31 @@ function parseInvoice(wb: XLSX.WorkBook): {
 
   // データ行を検出（NO.列に数字がある行）
   const rows: InvoiceRow[] = [];
+  // カンマ区切り数値を安全にパースするヘルパー
+  const toNum = (v: unknown) => Number(String(v || '0').replace(/,/g, '')) || 0;
+
   for (let i = 16; i < allRows.length; i++) {
     const r = allRows[i];
     if (!r) continue;
-    const no = Number(r[0]);
-    if (isNaN(no) || no <= 0) continue;
+    const no = toNum(r[0]);
+    if (no <= 0) continue;
 
     const partNumber = String(r[8] || '').trim();
     if (!partNumber) continue;
 
+    // ITEM列から品名を抽出（中国語部分を除去、余分な接尾辞を除去）
+    let rawItem = String(r[4] || '').trim();
+    // 中国語テキスト + 半角スペースの後にモデル名がある場合、モデル名部分を抽出
+    const modelMatch = rawItem.match(/[A-Z]{2,}[\-+]?[A-Z]?\d*[A-Z]*\(?[A-Z]*\)?/i);
+    if (modelMatch) rawItem = modelMatch[0];
+    // "10/箱" 等の接尾辞を除去
+    rawItem = rawItem.replace(/\d+\/箱.*$/, '').trim();
+
     rows.push({
       partNumber,
       description: String(r[1] || '').trim(),
-      itemName: String(r[4] || '').trim(),
-      quantity: Number(r[10]) || 0,
+      itemName: rawItem,
+      quantity: toNum(r[10]),
     });
   }
 
@@ -106,13 +117,14 @@ function parsePackingList(wb: XLSX.WorkBook): PackingRow[] {
     // LOT NOがある行 = ペアのヘッダ行
     if (!lotNo || lotNo === 'LOT NO.') { i++; continue; }
 
-    const cartons = Number(r1[7]) || 0;
-    const gwPerUnit = Number(r1[12]) || 0;
+    const toN = (v: unknown) => Number(String(v || '0').replace(/,/g, '')) || 0;
+    const cartons = toN(r1[7]);
+    const gwPerUnit = toN(r1[12]);
     const meas = String(r1[14] || '').trim();
 
     const modelNo = String(r2[2] || '').trim();
-    const quantity = Number(r2[5]) || 0;
-    const totalCbm = Number(r2[14]) || 0;
+    const quantity = toN(r2[5]);
+    const totalCbm = toN(r2[14]);
 
     items.push({
       lotNo,
