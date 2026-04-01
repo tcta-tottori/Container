@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { getRecentFiles, base64ToFile, RecentFile, FileType } from '@/lib/recentFiles';
 import { fetchMasterFileLastUpdate } from '@/lib/masterLoader';
+import GoogleDriveButton from './GoogleDriveButton';
 
 /** 判別されたファイルの役割 */
 export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'unknown';
@@ -428,6 +429,17 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           <input ref={inputRef} type="file" accept=".xlsx,.xls" multiple
             onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
             className="hidden" />
+        </div>
+
+        {/* Google ドライブからファイルを読込 */}
+        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
+          <GoogleDriveButton
+            onFilesLoaded={(files) => handleFiles(files)}
+            onLoading={(msg) => {
+              // LoadingOverlayを表示する場合は親に通知
+              if (msg) console.log('[GoogleDrive]', msg);
+            }}
+          />
         </div>
 
         {/* マスタファイル最終更新情報 */}
