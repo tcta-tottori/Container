@@ -177,7 +177,8 @@ export default function Home() {
 
   const prevItemRef = useRef<string | null>(null);
   const currentItemRef = useRef(currentItem);
-  currentItemRef.current = currentItem; // 常に最新を保持
+  currentItemRef.current = currentItem;
+  const suppressAnnounceRef = useRef(false); // 常に最新を保持
   const loadedContainerRef = useRef<string | null>(null);
   const masterLoadedRef = useRef(false);
   const linkedRef = useRef<string | null>(null);
@@ -277,9 +278,13 @@ export default function Home() {
       }
       // 完了済みアイテムはアナウンスしない
       if (state.completedIds.has(currentItem.id)) return;
+      // OKコマンド後の自動遷移ではアナウンスしない
+      if (suppressAnnounceRef.current) {
+        suppressAnnounceRef.current = false;
+        return;
+      }
       // 完了コールとの重複回避（2秒待機）
       setTimeout(() => {
-        // 再度チェック（タイムアウト中に完了した可能性）
         if (state.completedIds.has(currentItem.id)) return;
         announceItem(currentItem, state.items);
       }, 2000);
@@ -624,6 +629,7 @@ export default function Home() {
       const newPl = pl - 1;
       if (newPl <= 0 && frac <= 0) {
         speak('完了。');
+        suppressAnnounceRef.current = true;
         setTimeout(() => completeItem(item.id), 300);
       } else if (newPl > 0 && frac > 0) {
         speak(`残り${newPl}パレットと${frac}ケース。`);
@@ -634,6 +640,7 @@ export default function Home() {
       }
     } else {
       speak('完了。');
+      suppressAnnounceRef.current = true;
       setTimeout(() => completeItem(item.id), 300);
     }
 
@@ -659,6 +666,7 @@ export default function Home() {
     if (!item) return;
 
     if (item.palletCount === 0) {
+      suppressAnnounceRef.current = true;
       completeItem(item.id);
       speak('完了。');
       return;
@@ -678,6 +686,7 @@ export default function Home() {
       speak(`残り${frac}ケース。`);
     } else {
       speak('完了。');
+      suppressAnnounceRef.current = true;
       setTimeout(() => completeItem(item.id), 300);
     }
   }, [decreaseQty, speak, completeItem]);
