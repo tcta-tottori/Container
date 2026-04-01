@@ -118,12 +118,12 @@ function PalletBase3D({ pw, pd, ph, topOffset }: { pw: number; pd: number; ph: n
   );
 }
 
-/* ===== Wireframe neon face (light mode) ===== */
+/* ===== Wireframe neon face with translucent fill (light mode) ===== */
 function wireframeFace(opacity: number): React.CSSProperties {
   return {
-    background: 'transparent',
-    border: `1px solid rgba(255,255,255,${opacity})`,
-    boxShadow: `inset 0 0 3px rgba(255,255,255,${opacity * 0.3}), 0 0 4px rgba(255,255,255,${opacity * 0.2})`,
+    background: `rgba(255,230,100,${opacity * 0.15})`,
+    border: `1.2px solid rgba(255,255,255,${Math.min(1, opacity + 0.1)})`,
+    boxShadow: `inset 0 0 4px rgba(255,240,150,${opacity * 0.12}), 0 0 3px rgba(255,255,255,${opacity * 0.15})`,
     borderRadius: 1,
     boxSizing: 'border-box' as const,
     backfaceVisibility: 'visible' as const,
