@@ -176,6 +176,8 @@ export default function Home() {
   const { theme, toggleTheme } = useTheme();
 
   const prevItemRef = useRef<string | null>(null);
+  const currentItemRef = useRef(currentItem);
+  currentItemRef.current = currentItem; // 常に最新を保持
   const loadedContainerRef = useRef<string | null>(null);
   const masterLoadedRef = useRef(false);
   const linkedRef = useRef<string | null>(null);
@@ -606,50 +608,40 @@ export default function Home() {
 
   /** OKコマンド: パレット1つ減らす。パレット0で端数のみ→完了。 */
   const handleConfirmOk = useCallback(() => {
-    if (!currentItem) return;
+    const item = currentItemRef.current;
+    if (!item) return;
     // 7秒クールダウン
     if (Date.now() - okCooldownRef.current < 7000) return;
     okCooldownRef.current = Date.now();
 
-    const pl = currentItem.palletCount;
-    const rawFrac = currentItem.fraction % 1 !== 0 ? Math.ceil(currentItem.fraction) : currentItem.fraction;
-    const isNabeType = currentItem.type === '鍋';
+    const pl = item.palletCount;
+    const rawFrac = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
+    const isNabeType = item.type === '鍋';
     const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
 
     if (pl > 0) {
-      // パレットを1つ減らす
       decreaseQty();
       const newPl = pl - 1;
       if (newPl <= 0 && frac <= 0) {
-        // パレット0・端数0 → 完了
         speak('完了。');
-        setTimeout(() => {
-          completeItem(currentItem.id);
-        }, 300);
+        setTimeout(() => completeItem(item.id), 300);
+      } else if (newPl > 0 && frac > 0) {
+        speak(`残り${newPl}パレットと${frac}ケース。`);
+      } else if (newPl > 0) {
+        speak(`残り${newPl}パレット。`);
       } else {
-        // 残りをコール
-        if (newPl > 0 && frac > 0) {
-          speak(`残り${newPl}パレットと${frac}ケース。`);
-        } else if (newPl > 0) {
-          speak(`残り${newPl}パレット。`);
-        } else {
-          speak(`残り${frac}ケース。`);
-        }
+        speak(`残り${frac}ケース。`);
       }
     } else {
-      // パレット0（端数のみ or 全て0）→ 完了
       speak('完了。');
-      setTimeout(() => {
-        completeItem(currentItem.id);
-      }, 300);
+      setTimeout(() => completeItem(item.id), 300);
     }
 
-    // 消費時間を記録
     if (state.itemStartTime) {
       const elapsed = Math.floor((Date.now() - state.itemStartTime) / 1000);
-      setItemTimeLogs(prev => [...prev, { itemName: currentItem.itemName, elapsed, timestamp: Date.now() }]);
+      setItemTimeLogs(prev => [...prev, { itemName: item.itemName, elapsed, timestamp: Date.now() }]);
     }
-  }, [currentItem, decreaseQty, completeItem, speak, state.itemStartTime]);
+  }, [decreaseQty, completeItem, speak, state.itemStartTime]);
 
   const handleIncrease = useCallback(() => {
     increaseQty();
@@ -663,19 +655,19 @@ export default function Home() {
   }, [increaseQty, announcePalletChange]);
 
   const handleDecrease = useCallback(() => {
-    if (!currentItem) return;
+    const item = currentItemRef.current;
+    if (!item) return;
 
-    // パレット0 → 完了
-    if (currentItem.palletCount === 0) {
-      completeItem(currentItem.id);
+    if (item.palletCount === 0) {
+      completeItem(item.id);
       speak('完了。');
       return;
     }
 
     decreaseQty();
-    const newPl = currentItem.palletCount - 1;
-    const rawFrac = currentItem.fraction % 1 !== 0 ? Math.ceil(currentItem.fraction) : currentItem.fraction;
-    const isNabeType = currentItem.type === '鍋';
+    const newPl = item.palletCount - 1;
+    const rawFrac = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
+    const isNabeType = item.type === '鍋';
     const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
 
     if (newPl > 0 && frac > 0) {
@@ -686,9 +678,9 @@ export default function Home() {
       speak(`残り${frac}ケース。`);
     } else {
       speak('完了。');
-      setTimeout(() => completeItem(currentItem.id), 300);
+      setTimeout(() => completeItem(item.id), 300);
     }
-  }, [currentItem, decreaseQty, speak, state.itemStartTime, state.items, state.completedIds, completeItem, announceComplete, announceAllComplete]);
+  }, [decreaseQty, speak, completeItem]);
 
   const handleComplete = useCallback(() => {
     if (!currentItem) return;
