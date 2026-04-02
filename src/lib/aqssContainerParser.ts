@@ -40,6 +40,19 @@ function parseInvoice(wb: XLSX.WorkBook): {
 } {
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws) return { rows: [], date: '', invoiceNo: '', deliveryNo: '' };
+
+  // !refが不正確な場合があるため、実際のセル範囲を再計算
+  const cellKeys = Object.keys(ws).filter(k => !k.startsWith('!'));
+  if (cellKeys.length > 0) {
+    let maxR = 0, maxC = 0;
+    for (const k of cellKeys) {
+      const decoded = XLSX.utils.decode_cell(k);
+      if (decoded.r > maxR) maxR = decoded.r;
+      if (decoded.c > maxC) maxC = decoded.c;
+    }
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+  }
+
   const allRows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1, defval: '' });
 
   let date = '';
@@ -111,6 +124,19 @@ function parseInvoice(wb: XLSX.WorkBook): {
 function parsePackingList(wb: XLSX.WorkBook): PackingRow[] {
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws) return [];
+
+  // !refが不正確な場合があるため、実際のセル範囲を再計算
+  const cellKeys = Object.keys(ws).filter(k => !k.startsWith('!'));
+  if (cellKeys.length > 0) {
+    let maxR = 0, maxC = 0;
+    for (const k of cellKeys) {
+      const decoded = XLSX.utils.decode_cell(k);
+      if (decoded.r > maxR) maxR = decoded.r;
+      if (decoded.c > maxC) maxC = decoded.c;
+    }
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+  }
+
   const allRows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1, defval: '' });
 
   // データ行を検出（2行ペア: ヘッダ行 + 詳細行）
