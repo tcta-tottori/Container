@@ -171,7 +171,7 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceProgress } =
+  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary, announceProgress } =
     useSpeech();
   const { theme, toggleTheme } = useTheme();
 
@@ -699,10 +699,8 @@ export default function Home() {
     announceComplete(name);
     if (remaining === 0) {
       setTimeout(() => announceAllComplete(), 1500);
-    } else {
-      setTimeout(() => announceRemaining(remaining), 1500);
     }
-  }, [currentItem, state.items.length, deleteCurrent, announceComplete, announceAllComplete, announceRemaining]);
+  }, [currentItem, state.items.length, deleteCurrent, announceComplete, announceAllComplete]);
 
   const handleSelectItem = useCallback(
     (idx: number) => {
@@ -755,8 +753,15 @@ export default function Home() {
             speak(`${itemNameForSpeech(currentItem.itemName)}、${qText}。`);
           }
           break;
-        case 'QUERY_REMAINING':
-          speak(`残り${state.items.length}品目です。`); break;
+        case 'QUERY_REMAINING': {
+          const rem = state.items.filter(it => !state.completedIds.has(it.id));
+          const typeCts: Record<string, number> = {};
+          for (const it of rem) typeCts[it.type] = (typeCts[it.type] || 0) + 1;
+          const pts: string[] = [];
+          for (const [t, c] of Object.entries(typeCts)) pts.push(`${t}が${c}種類`);
+          speak(pts.join('、') + '。');
+          break;
+        }
         case 'QUERY_PALLET':
           if (currentItem) speak(`パレット${currentItem.palletCount}枚です。`);
           break;
@@ -782,7 +787,7 @@ export default function Home() {
           for (const it of remaining) counts[it.type] = (counts[it.type] || 0) + 1;
           const parts: string[] = [];
           for (const [t, c] of Object.entries(counts)) parts.push(`${t}が${c}種類`);
-          speak(`残り${remaining.length}品目。${parts.join('、')}。`);
+          speak(parts.join('、') + '。');
           break;
         }
       }
