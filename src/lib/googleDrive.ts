@@ -7,8 +7,9 @@
  * - OAuth2トークンをlocalStorageに保持
  */
 
-const GOOGLE_CLIENT_ID = ''; // 環境変数またはユーザー設定から
-const GOOGLE_API_KEY = '';   // 環境変数またはユーザー設定から
+const GOOGLE_CLIENT_ID = '1010616579476-mpvmmbt5dqpn5nfso0jj9dc8q0n03ff1.apps.googleusercontent.com';
+const GOOGLE_API_KEY = 'AIzaSyBsizrSkJoyFT7ybcRsqUb44xKtqBvzAOE';
+const DEFAULT_FOLDER_ID = '1k_y7D1gjFoaHrSuseOTXAtKONrQXVz9F';
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 // const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 
@@ -23,7 +24,7 @@ export function getGoogleConfig(): { clientId: string; apiKey: string; folderId:
   return {
     clientId: localStorage.getItem(STORAGE_KEY_CLIENT_ID) || GOOGLE_CLIENT_ID || '',
     apiKey: localStorage.getItem(STORAGE_KEY_API_KEY) || GOOGLE_API_KEY || '',
-    folderId: localStorage.getItem(STORAGE_KEY_FOLDER_ID) || '',
+    folderId: localStorage.getItem(STORAGE_KEY_FOLDER_ID) || DEFAULT_FOLDER_ID || '',
   };
 }
 
