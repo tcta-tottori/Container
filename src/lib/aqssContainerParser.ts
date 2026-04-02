@@ -80,13 +80,21 @@ function parseInvoice(wb: XLSX.WorkBook): {
     const partNumber = String(r[8] || '').trim();
     if (!partNumber) continue;
 
-    // ITEM列から品名を抽出（中国語部分を除去、余分な接尾辞を除去）
+    // ITEM列から品名を抽出
     let rawItem = String(r[4] || '').trim();
-    // 中国語テキスト + 半角スペースの後にモデル名がある場合、モデル名部分を抽出
-    const modelMatch = rawItem.match(/[A-Z]{2,}[\-+]?[A-Z]?\d*[A-Z]*\(?[A-Z]*\)?/i);
-    if (modelMatch) rawItem = modelMatch[0];
-    // "10/箱" 等の接尾辞を除去
-    rawItem = rawItem.replace(/\d+\/箱.*$/, '').trim();
+    // 中国語文字を除去し、残った英数字・記号部分を品名とする
+    let cleaned = rawItem
+      .replace(/[\u4e00-\u9fff\u3400-\u4dbf]+/g, ' ')  // CJK漢字を空白に
+      .replace(/\(\s*\)/g, '')             // 空の括弧を除去
+      .replace(/\s+/g, ' ')
+      .trim();
+    // "10/箱" "12箱" "10箱" 等の接尾辞を除去
+    cleaned = cleaned.replace(/\s*\d+\/?箱.*$/g, '').trim();
+    // "220V" "110V" 等の電圧表記を除去
+    cleaned = cleaned.replace(/\s+\d+V$/g, '').trim();
+    // 先頭の記号・空白を除去
+    cleaned = cleaned.replace(/^[\s\-\/]+/, '').trim();
+    rawItem = cleaned || rawItem;
 
     rows.push({
       partNumber,
