@@ -12,6 +12,7 @@ export default function GoogleDriveButton({ onFilesLoaded, onLoading }: GoogleDr
   const [showSetup, setShowSetup] = useState(false);
   const [clientId, setClientId] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [folderId, setFolderId] = useState('');
   const configured = isGoogleConfigured();
 
   const handlePick = useCallback(async () => {
@@ -46,11 +47,11 @@ export default function GoogleDriveButton({ onFilesLoaded, onLoading }: GoogleDr
 
   const handleSaveConfig = useCallback(() => {
     if (clientId.trim() && apiKey.trim()) {
-      saveGoogleConfig(clientId.trim(), apiKey.trim());
+      saveGoogleConfig(clientId.trim(), apiKey.trim(), folderId.trim() || undefined);
       clearGoogleToken();
       setShowSetup(false);
     }
-  }, [clientId, apiKey]);
+  }, [clientId, apiKey, folderId]);
 
   return (
     <>
@@ -113,6 +114,20 @@ export default function GoogleDriveButton({ onFilesLoaded, onLoading }: GoogleDr
                     color: '#fff', fontSize: 12, fontFamily: 'var(--font-mono)',
                     outline: 'none',
                   }} />
+              </div>
+              <div>
+                <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: 600 }}>フォルダID（任意）</label>
+                <input value={folderId} onChange={e => setFolderId(e.target.value)}
+                  placeholder="GoogleドライブのフォルダURLから取得"
+                  style={{
+                    width: '100%', padding: '8px 10px', borderRadius: 8, marginTop: 4,
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#fff', fontSize: 12, fontFamily: 'var(--font-mono)',
+                    outline: 'none',
+                  }} />
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, margin: '3px 0 0', lineHeight: 1.4 }}>
+                  drive.google.com/drive/folders/<b>xxxxxx</b> のxxxxxx部分
+                </p>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button onClick={() => setShowSetup(false)} style={{

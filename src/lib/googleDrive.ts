@@ -15,20 +15,23 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 const STORAGE_KEY_TOKEN = 'cns-google-token';
 const STORAGE_KEY_CLIENT_ID = 'cns-google-client-id';
 const STORAGE_KEY_API_KEY = 'cns-google-api-key';
+const STORAGE_KEY_FOLDER_ID = 'cns-google-folder-id';
 
-// ユーザー設定のClient ID / API Keyを取得・保存
-export function getGoogleConfig(): { clientId: string; apiKey: string } {
-  if (typeof window === 'undefined') return { clientId: '', apiKey: '' };
+// ユーザー設定のClient ID / API Key / Folder IDを取得・保存
+export function getGoogleConfig(): { clientId: string; apiKey: string; folderId: string } {
+  if (typeof window === 'undefined') return { clientId: '', apiKey: '', folderId: '' };
   return {
     clientId: localStorage.getItem(STORAGE_KEY_CLIENT_ID) || GOOGLE_CLIENT_ID || '',
     apiKey: localStorage.getItem(STORAGE_KEY_API_KEY) || GOOGLE_API_KEY || '',
+    folderId: localStorage.getItem(STORAGE_KEY_FOLDER_ID) || '',
   };
 }
 
-export function saveGoogleConfig(clientId: string, apiKey: string): void {
+export function saveGoogleConfig(clientId: string, apiKey: string, folderId?: string): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY_CLIENT_ID, clientId);
   localStorage.setItem(STORAGE_KEY_API_KEY, apiKey);
+  if (folderId) localStorage.setItem(STORAGE_KEY_FOLDER_ID, folderId);
 }
 
 export function isGoogleConfigured(): boolean {
@@ -116,7 +119,7 @@ export async function authenticateGoogle(): Promise<string> {
 
 // Google Pickerでファイル選択
 export async function openGooglePicker(): Promise<{ id: string; name: string; mimeType: string }[] | null> {
-  const { apiKey } = getGoogleConfig();
+  const { apiKey, folderId } = getGoogleConfig();
   let token = getStoredGoogleToken();
 
   if (!token) {
@@ -131,13 +134,17 @@ export async function openGooglePicker(): Promise<{ id: string; name: string; mi
     const view = new google.picker.DocsView(google.picker.ViewId.DOCS);
     view.setMimeTypes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel');
     view.setMode(google.picker.DocsViewMode.LIST);
+    // 指定フォルダ内のみ表示
+    if (folderId) {
+      view.setParent(folderId);
+    }
 
     const picker = new google.picker.PickerBuilder()
       .addView(view)
       .setOAuthToken(token)
       .setDeveloperKey(apiKey)
       .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-      .setTitle('Excelファイルを選択')
+      .setTitle(folderId ? 'CNSフォルダからファイルを選択' : 'Excelファイルを選択')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .setCallback((data: any) => {
         if (data.action === google.picker.Action.PICKED) {
