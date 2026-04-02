@@ -55,24 +55,37 @@ export default function GoogleDriveButton({ onFilesLoaded, onLoading }: GoogleDr
 
   return (
     <>
-      <button onClick={handlePick} style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '8px 14px', borderRadius: 12,
-        background: configured ? 'rgba(66,133,244,0.08)' : 'rgba(255,255,255,0.03)',
-        border: `1.5px solid ${configured ? 'rgba(66,133,244,0.25)' : 'rgba(255,255,255,0.08)'}`,
-        cursor: 'pointer', transition: 'all 0.2s',
-        color: configured ? '#4285f4' : 'rgba(255,255,255,0.4)',
-        fontSize: 12, fontWeight: 600,
-      }}>
-        {/* Google Drive icon */}
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <path d="M7.71 3.5L1.15 15l3.43 5.99L11.14 9.5z" fill="#0066DA"/>
-          <path d="M16.29 3.5H7.71l6.57 11.5h8.57z" fill="#00AC47"/>
-          <path d="M22.85 15H14.28l-3.43 6h8.57z" fill="#EA4335"/>
-          <path d="M14.28 15l3.43-6-1.42-2.5L7.71 3.5l6.57 11.5z" fill="#00832D" opacity="0.5"/>
-        </svg>
-        {configured ? 'Google ドライブ' : 'Google ドライブ設定'}
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button onClick={handlePick} style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 14px', borderRadius: 12,
+          background: configured ? 'rgba(66,133,244,0.08)' : 'rgba(255,255,255,0.03)',
+          border: `1.5px solid ${configured ? 'rgba(66,133,244,0.25)' : 'rgba(255,255,255,0.08)'}`,
+          cursor: 'pointer', transition: 'all 0.2s',
+          color: configured ? '#4285f4' : 'rgba(255,255,255,0.4)',
+          fontSize: 12, fontWeight: 600,
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M7.71 3.5L1.15 15l3.43 5.99L11.14 9.5z" fill="#0066DA"/>
+            <path d="M16.29 3.5H7.71l6.57 11.5h8.57z" fill="#00AC47"/>
+            <path d="M22.85 15H14.28l-3.43 6h8.57z" fill="#EA4335"/>
+            <path d="M14.28 15l3.43-6-1.42-2.5L7.71 3.5l6.57 11.5z" fill="#00832D" opacity="0.5"/>
+          </svg>
+          {configured ? 'Google ドライブ' : 'Google ドライブ設定'}
+        </button>
+        {configured && (
+          <button onClick={() => setShowSetup(true)} title="設定変更" style={{
+            width: 28, height: 28, borderRadius: 8, border: '1px solid rgba(66,133,244,0.2)',
+            background: 'transparent', cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', color: 'rgba(66,133,244,0.5)',
+            fontSize: 12, transition: 'all 0.2s',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        )}
+      </div>
 
       {/* 設定ダイアログ */}
       {showSetup && (
