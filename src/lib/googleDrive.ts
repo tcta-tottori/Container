@@ -26,11 +26,13 @@ export function isGoogleConfigured(): boolean {
 // OAuth2トークンの管理
 export function getStoredGoogleToken(): string {
   if (typeof window === 'undefined') return '';
-  // 古いlocalStorage設定をクリア（固定値に移行済み）
+  // 古いlocalStorage設定をクリア
   localStorage.removeItem('cns-google-client-id');
   localStorage.removeItem('cns-google-api-key');
   localStorage.removeItem('cns-google-folder-id');
-  return localStorage.getItem(STORAGE_KEY_TOKEN) || '';
+  // 古いトークンもクリア（403対策）
+  localStorage.removeItem(STORAGE_KEY_TOKEN);
+  return '';
 }
 
 function storeGoogleToken(token: string): void {
@@ -101,7 +103,7 @@ export async function authenticateGoogle(): Promise<string> {
         resolve(response.access_token);
       },
     });
-    tokenClient.requestAccessToken({ prompt: 'consent' });
+    tokenClient.requestAccessToken({ prompt: '' });
   });
 }
 
