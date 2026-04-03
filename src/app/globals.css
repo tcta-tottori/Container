@@ -125,6 +125,13 @@
   50% { background: #ffe8b0; box-shadow: 0 0 16px rgba(255,152,0,0.3), 0 -4px 10px rgba(255,152,0,0.1), 0 4px 10px rgba(255,152,0,0.1); }
 }
 [data-theme="light"] .list-panel-side { border-left-color: rgba(0,0,0,0.08) !important; background: #f0f0ec; }
+[data-theme="light"] .list-panel-side .detail-list-row {
+  background: #ffffff;
+  color: #1a1a2e;
+}
+[data-theme="light"] .list-panel-side .detail-list-name { color: #1a1a2e !important; }
+[data-theme="light"] .list-panel-side .detail-list-num { color: #1a1a2e !important; }
+[data-theme="light"] .list-panel-side .detail-list-total { color: #555 !important; }
 
 /* 数量表示（下部） */
 [data-theme="light"] .detail-sf-num { color: #1a1a2e !important; text-shadow: none !important; }
@@ -167,6 +174,10 @@
 [data-theme="light"] .filedrop-root div[style*="rgba(52,211,153"] span { color: #1a6040 !important; }
 
 /* ライトモード: パレット図のみワイヤーフレーム（箱サイズ図はそのまま） */
+
+[data-theme="light"] .filedrop-root button[style*="gradient"] {
+  color: #1a1a2e !important;
+}
 
 * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
 *::-webkit-scrollbar { width: 3px; }
