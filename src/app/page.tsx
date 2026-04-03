@@ -784,21 +784,32 @@ export default function Home() {
           break;
         }
         case 'MASA_CHEER': {
-          // 男性の声で「がんばれ まさ」（既存のspeak関数とは別の音声設定）
+          // 男性の声で「がんばれ まさ」
           if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
             window.speechSynthesis.cancel();
-            const u = new SpeechSynthesisUtterance('がんばれ、まさ！');
-            u.lang = 'ja-JP';
-            u.rate = 0.95;
-            u.pitch = 0.7; // 低めのピッチで男性的に
-            u.volume = 1.0;
             const voices = window.speechSynthesis.getVoices();
-            // 男性の日本語音声を優先的に探す
-            const maleVoice = voices.find(v => v.lang.startsWith('ja') && /male|男|otoko|haruka/i.test(v.name) === false && v.name.toLowerCase().includes('male'))
-              || voices.find(v => v.lang.startsWith('ja') && /takumi|ichiro|kenji|男/i.test(v.name))
-              || voices.find(v => v.lang.startsWith('ja'));
-            if (maleVoice) u.voice = maleVoice;
-            window.speechSynthesis.speak(u);
+            // 1. 日本語の男性音声を探す（Android/iOS/Windowsに存在する場合がある）
+            const jaMale = voices.find(v => v.lang.startsWith('ja') && /male|男|takumi|ichiro|kenji|kenichi|otoya/i.test(v.name));
+            if (jaMale) {
+              const u = new SpeechSynthesisUtterance('がんばれ、まさ！');
+              u.lang = 'ja-JP';
+              u.voice = jaMale;
+              u.rate = 0.9;
+              u.pitch = 0.8;
+              u.volume = 1.0;
+              window.speechSynthesis.speak(u);
+            } else {
+              // 2. 英語の男性音声でローマ字読み（ほぼ全環境で男性音声あり）
+              const enMale = voices.find(v => v.lang.startsWith('en') && /male|daniel|james|google us english/i.test(v.name))
+                || voices.find(v => v.lang.startsWith('en-') && !/female|zira|samantha|karen|moira|fiona/i.test(v.name));
+              const u = new SpeechSynthesisUtterance('Gamba-re, Masa!');
+              u.lang = 'en-US';
+              if (enMale) u.voice = enMale;
+              u.rate = 0.85;
+              u.pitch = 0.6;
+              u.volume = 1.0;
+              window.speechSynthesis.speak(u);
+            }
           }
           break;
         }
