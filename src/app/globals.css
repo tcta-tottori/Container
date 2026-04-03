@@ -109,29 +109,34 @@
 [data-theme="light"] .detail-list-header { background: #e5e5e0 !important; }
 [data-theme="light"] .detail-list-header span { color: #666 !important; }
 [data-theme="light"] .detail-list-row {
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-  color: #1a1a2e;
-  background: #ffffff;
+  border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+  color: #1a1a2e !important;
+  background: #ffffff !important;
 }
 [data-theme="light"] .detail-list-row .detail-list-name { color: #1a1a2e !important; }
 [data-theme="light"] .detail-list-row .detail-list-num { color: #1a1a2e !important; }
 [data-theme="light"] .detail-list-row .detail-list-total { color: #555 !important; }
+[data-theme="light"] .detail-list-row .detail-list-dot { opacity: 1 !important; }
 [data-theme="light"] .detail-list-row.active {
   animation-name: row-glow-light;
-  color: #1a1a2e;
+  color: #1a1a2e !important;
+  background: #fff3d8 !important;
 }
 @keyframes row-glow-light {
   0%, 100% { background: #fff3d8; box-shadow: 0 0 8px rgba(255,152,0,0.15); }
   50% { background: #ffe8b0; box-shadow: 0 0 16px rgba(255,152,0,0.3), 0 -4px 10px rgba(255,152,0,0.1), 0 4px 10px rgba(255,152,0,0.1); }
 }
-[data-theme="light"] .list-panel-side { border-left-color: rgba(0,0,0,0.08) !important; background: #f0f0ec; }
+[data-theme="light"] .list-panel-side { border-left-color: rgba(0,0,0,0.08) !important; background: #f0f0ec !important; }
 [data-theme="light"] .list-panel-side .detail-list-row {
-  background: #ffffff;
-  color: #1a1a2e;
+  background: #ffffff !important;
+  color: #1a1a2e !important;
 }
+[data-theme="light"] .list-panel-side .detail-list-row.active { background: #fff3d8 !important; }
 [data-theme="light"] .list-panel-side .detail-list-name { color: #1a1a2e !important; }
 [data-theme="light"] .list-panel-side .detail-list-num { color: #1a1a2e !important; }
 [data-theme="light"] .list-panel-side .detail-list-total { color: #555 !important; }
+[data-theme="light"] .list-panel-side .detail-list-header { background: #e5e5e0 !important; }
+[data-theme="light"] .list-panel-side .detail-list-header span { color: #666 !important; }
 
 /* 数量表示（下部） */
 [data-theme="light"] .detail-sf-num { color: #1a1a2e !important; text-shadow: none !important; }
