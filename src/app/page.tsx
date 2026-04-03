@@ -171,7 +171,7 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary, announceProgress } =
+  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
     useSpeech();
   const { theme, toggleTheme } = useTheme();
 
@@ -308,20 +308,7 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
 
-  // 進捗マイルストーンアナウンス（50%, 80%）
-  useEffect(() => {
-    if (state.items.length === 0) return;
-    const pct = state.completedIds.size / state.items.length * 100;
-    // 50%: 残り半分コール、80%: あと少しコール
-    if (pct >= 50 && !announcedThresholdsRef.current.has(50)) {
-      announcedThresholdsRef.current.add(50);
-      setTimeout(() => speak('残り半分です。'), 2500);
-    }
-    if (pct >= 80 && !announcedThresholdsRef.current.has(80)) {
-      announcedThresholdsRef.current.add(80);
-      setTimeout(() => speak('あと少しです。頑張りましょう。'), 2500);
-    }
-  }, [state.completedIds.size, state.items.length, announceProgress, state.items, state.completedIds]);
+  // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
@@ -605,8 +592,14 @@ export default function Home() {
   }, [state.containers, state.selectedContainerIdx, state.items, state.completedIds, workRawSeconds, announceContainerSummary]);
 
   const handleProgress = useCallback(() => {
-    announceProgress(state.items, state.completedIds);
-  }, [state.items, state.completedIds, announceProgress]);
+    // 進捗コールは種類数のみ（進捗率は廃止）
+    const rem = state.items.filter(it => !state.completedIds.has(it.id));
+    const cts: Record<string, number> = {};
+    for (const it of rem) cts[it.type] = (cts[it.type] || 0) + 1;
+    const pts: string[] = [];
+    for (const [t, c] of Object.entries(cts)) pts.push(`${t}が${c}種類`);
+    speak(pts.length > 0 ? pts.join('、') + '。' : '全品目完了です。');
+  }, [state.items, state.completedIds, speak]);
 
   // OKコマンドの5秒クールダウン
   const okCooldownRef = useRef(0);

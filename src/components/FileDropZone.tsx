@@ -651,13 +651,13 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                         style={{
                           display: 'flex', alignItems: 'center', gap: 10,
                           padding: '10px 12px', borderRadius: 12,
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.12)',
+                          background: 'rgba(255,255,255,0.08)',
                           cursor: 'pointer', textAlign: 'left', width: '100%',
                           transition: 'background 0.15s',
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
                       >
                         <span style={{
                           fontSize: 9, fontWeight: 800, color: '#fff',
@@ -667,14 +667,14 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                         }}>{typeLabel}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{
-                            color: '#fff', fontSize: 13, fontWeight: 600, margin: 0,
+                            color: '#fff', fontSize: 14, fontWeight: 700, margin: 0,
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           }}>{entry.name}</p>
-                          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, margin: '3px 0 0' }}>
+                          <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, margin: '3px 0 0' }}>
                             {infoText}
                           </p>
                         </div>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
                           {fmtDate(entry.date)}
                         </span>
                       </button>
