@@ -877,7 +877,7 @@ export default function Home() {
     );
   }
 
-  if (state.containers.length === 0 && !(jkpUserLoadedRef.current && jkpShipments.length > 0)) {
+  if (state.containers.length === 0) {
     return (
       <>
         <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} />
@@ -900,29 +900,6 @@ export default function Home() {
         </div>
         {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
       </>
-    );
-  }
-
-  // JKPデータのみ（コンテナなし、ユーザー明示読込時のみ）: JKPスケジュールページ表示
-  if (state.containers.length === 0 && jkpUserLoadedRef.current && jkpShipments.length > 0) {
-    return (
-      <div className="app-layout" style={{ background: 'var(--bg-primary)' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
-          background: '#1a1d2e', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
-        }}>
-          <button onClick={() => { setJkpShipments([]); setViewMode('work'); }}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 4 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-          </button>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>JKP出荷スケジュール</span>
-        </div>
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <JkpSchedulePage shipments={jkpShipments} />
-        </div>
-      </div>
     );
   }
 

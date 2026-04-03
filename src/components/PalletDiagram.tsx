@@ -482,7 +482,7 @@ export default function PalletDiagram({
   if (!isFull && !isFraction) return null;
 
   const [bwCm, bdCm, bhCm] = getBoxDimsCm(measurements, itemName);
-  const isNabe = type === '鍋' || type === 'ポリカバー';
+  const isNabe = type === '鍋';
   const isJPI = isJPIType(itemName);
   const isJarPot = type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName || '');
 
