@@ -783,6 +783,25 @@ export default function Home() {
           speak(parts.join('、') + '。');
           break;
         }
+        case 'MASA_CHEER': {
+          // 男性の声で「がんばれ まさ」（既存のspeak関数とは別の音声設定）
+          if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance('がんばれ、まさ！');
+            u.lang = 'ja-JP';
+            u.rate = 0.95;
+            u.pitch = 0.7; // 低めのピッチで男性的に
+            u.volume = 1.0;
+            const voices = window.speechSynthesis.getVoices();
+            // 男性の日本語音声を優先的に探す
+            const maleVoice = voices.find(v => v.lang.startsWith('ja') && /male|男|otoko|haruka/i.test(v.name) === false && v.name.toLowerCase().includes('male'))
+              || voices.find(v => v.lang.startsWith('ja') && /takumi|ichiro|kenji|男/i.test(v.name))
+              || voices.find(v => v.lang.startsWith('ja'));
+            if (maleVoice) u.voice = maleVoice;
+            window.speechSynthesis.speak(u);
+          }
+          break;
+        }
       }
     },
     [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, handleConfirmOk, handleContainerSummary, handleProgress]

@@ -14,7 +14,8 @@ export type VoiceAction =
   | 'CONTAINER_SUMMARY'
   | 'QUERY_PROGRESS'
   | 'UNDO_DECREASE'
-  | 'QUERY_TYPE_COUNT';
+  | 'QUERY_TYPE_COUNT'
+  | 'MASA_CHEER';
 
 /** キーワード → アクション マッピング */
 const VOICE_COMMANDS: [string, VoiceAction][] = [
@@ -65,6 +66,8 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
   ['もとにもど', 'UNDO_DECREASE'],
   ['何種類', 'QUERY_TYPE_COUNT'],
   ['なんしゅるい', 'QUERY_TYPE_COUNT'],
+  ['まさ', 'MASA_CHEER'],
+  ['マサ', 'MASA_CHEER'],
 ];
 
 /**
