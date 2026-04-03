@@ -9,40 +9,27 @@
 
 const GOOGLE_CLIENT_ID = '1010616579476-mpvmmbt5dqpn5nfso0jj9dc8q0n03ff1.apps.googleusercontent.com';
 const GOOGLE_API_KEY = 'AIzaSyBsizrSkJoyFT7ybcRsqUb44xKtqBvzAOE';
-const DEFAULT_FOLDER_ID = '1k_y7D1gjFoaHrSuseOTXAtKONrQXVz9F';
+const GOOGLE_FOLDER_ID = '1k_y7D1gjFoaHrSuseOTXAtKONrQXVz9F';
 const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
-// const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 
 const STORAGE_KEY_TOKEN = 'cns-google-token';
-const STORAGE_KEY_CLIENT_ID = 'cns-google-client-id';
-const STORAGE_KEY_API_KEY = 'cns-google-api-key';
-const STORAGE_KEY_FOLDER_ID = 'cns-google-folder-id';
 
-// ユーザー設定のClient ID / API Key / Folder IDを取得・保存
+// 固定設定を返す（localStorage不使用）
 export function getGoogleConfig(): { clientId: string; apiKey: string; folderId: string } {
-  if (typeof window === 'undefined') return { clientId: '', apiKey: '', folderId: '' };
-  return {
-    clientId: localStorage.getItem(STORAGE_KEY_CLIENT_ID) || GOOGLE_CLIENT_ID || '',
-    apiKey: localStorage.getItem(STORAGE_KEY_API_KEY) || GOOGLE_API_KEY || '',
-    folderId: localStorage.getItem(STORAGE_KEY_FOLDER_ID) || DEFAULT_FOLDER_ID || '',
-  };
-}
-
-export function saveGoogleConfig(clientId: string, apiKey: string, folderId?: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY_CLIENT_ID, clientId);
-  localStorage.setItem(STORAGE_KEY_API_KEY, apiKey);
-  if (folderId) localStorage.setItem(STORAGE_KEY_FOLDER_ID, folderId);
+  return { clientId: GOOGLE_CLIENT_ID, apiKey: GOOGLE_API_KEY, folderId: GOOGLE_FOLDER_ID };
 }
 
 export function isGoogleConfigured(): boolean {
-  const { clientId, apiKey } = getGoogleConfig();
-  return !!(clientId && apiKey);
+  return true;
 }
 
 // OAuth2トークンの管理
 export function getStoredGoogleToken(): string {
   if (typeof window === 'undefined') return '';
+  // 古いlocalStorage設定をクリア（固定値に移行済み）
+  localStorage.removeItem('cns-google-client-id');
+  localStorage.removeItem('cns-google-api-key');
+  localStorage.removeItem('cns-google-folder-id');
   return localStorage.getItem(STORAGE_KEY_TOKEN) || '';
 }
 
