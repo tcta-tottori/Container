@@ -771,7 +771,7 @@ export default function ItemDetailPanel({
           <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
             {item.palletCount > 0 && item.qtyPerPallet > 0 && (
               <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
-                <PalletDiagram palletCount={item.palletCount} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={isLightMode} />
+                <PalletDiagram palletCount={item.palletCount} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false} />
               </div>
             )}
             {inspectionDeducted > 0 && (
@@ -782,7 +782,7 @@ export default function ItemDetailPanel({
                 alignSelf: 'flex-start',
               }}
                 onClick={(e) => { e.stopPropagation(); handleFractionTap(); }}>
-                <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={isLightMode} />
+                <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false} />
               </div>
             )}
           </div>
@@ -978,7 +978,7 @@ export default function ItemDetailPanel({
               <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet}
                 type={item.type} itemName={item.itemName} measurements={item.measurements}
                 overrideRotateY={fractionZoom === 'show' && fzManual ? fzRotateY : undefined}
-                wireframe={isLightMode}
+                wireframe={false}
               />
             </div>
           </div>
@@ -1033,7 +1033,7 @@ export default function ItemDetailPanel({
               palletCount={fullscreenPallet === 'full' ? item.palletCount : 0}
               fraction={fullscreenPallet === 'fraction' ? inspectionDeducted : 0}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-              measurements={item.measurements} wireframe={isLightMode}
+              measurements={item.measurements} wireframe={false}
             />
           </div>
           <div style={{ position: 'absolute', bottom: 32, color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
