@@ -3,7 +3,8 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { getRecentFiles, base64ToFile, RecentFile, FileType } from '@/lib/recentFiles';
 import { fetchMasterFileLastUpdate } from '@/lib/masterLoader';
-import GoogleDriveButton from './GoogleDriveButton';
+import { getStoredToken } from '@/lib/githubSave';
+import { openGooglePicker, downloadFromDrive } from '@/lib/googleDrive';
 
 /** 判別されたファイルの役割 */
 export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'unknown';
@@ -152,8 +153,13 @@ function CnsLogo({ size = 56 }: { size?: number }) {
 export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showGitHub, setShowGitHub] = useState(false);
+  const [ghFiles, setGhFiles] = useState<{ name: string; sha: string; download_url: string }[]>([]);
+  const [ghLoading, setGhLoading] = useState(false);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
   const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [masterLastUpdate, setMasterLastUpdate] = useState<{ date: string; message: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -239,6 +245,49 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
     const d = new Date(iso);
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
+
+  const fetchGitHubXlsxFiles = useCallback(async () => {
+    setGhLoading(true);
+    try {
+      const token = getStoredToken() || process.env.NEXT_PUBLIC_GITHUB_TOKEN || '';
+      const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
+      if (token) headers['Authorization'] = `token ${token}`;
+      const res = await fetch(
+        `https://api.github.com/repos/tcta-tottori/Container/contents/?ref=main&t=${Date.now()}`,
+        { headers, cache: 'no-store' }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const xlsxFiles = (data as { name: string; sha: string; download_url: string }[])
+          .filter((f) => f.name.endsWith('.xlsx') || f.name.endsWith('.xls'));
+        setGhFiles(xlsxFiles);
+      }
+    } catch (e) {
+      console.warn('[GitHub] list files error', e);
+    } finally {
+      setGhLoading(false);
+    }
+  }, []);
+
+  const loadGitHubFile = useCallback(async (fileName: string) => {
+    setShowGitHub(false);
+    try {
+      const token = getStoredToken() || process.env.NEXT_PUBLIC_GITHUB_TOKEN || '';
+      const headers: Record<string, string> = { Accept: 'application/vnd.github.v3.raw' };
+      if (token) headers['Authorization'] = `token ${token}`;
+      const res = await fetch(
+        `https://api.github.com/repos/tcta-tottori/Container/contents/${encodeURIComponent(fileName)}?ref=main&t=${Date.now()}`,
+        { headers, cache: 'no-store' }
+      );
+      if (res.ok) {
+        const buffer = await res.arrayBuffer();
+        const file = new File([buffer], fileName, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        handleFiles([file]);
+      }
+    } catch (e) {
+      console.warn('[GitHub] download file error', e);
+    }
+  }, [handleFiles]);
 
   const gradientStyle = 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)';
 
@@ -431,93 +480,286 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             className="hidden" />
         </div>
 
-        {/* Google ドライブからファイルを読込 */}
-        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
-          <GoogleDriveButton
-            onFilesLoaded={(files) => handleFiles(files)}
-            onLoading={(msg) => {
-              // LoadingOverlayを表示する場合は親に通知
-              if (msg) console.log('[GoogleDrive]', msg);
+        {/* マスタファイル最終更新情報 (hidden) */}
+
+        {/* ===== ボタン行: [Google ドライブ] [GitHub] [履歴] ===== */}
+        <div style={{
+          marginTop: 14, display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap',
+        }}>
+          {/* Google ドライブ ボタン (styled pill) */}
+          <button
+            onClick={async () => {
+              try {
+                const picked = await openGooglePicker();
+                if (!picked || picked.length === 0) return;
+                const files: File[] = [];
+                for (const p of picked) {
+                  const file = await downloadFromDrive(p.id, p.name);
+                  files.push(file);
+                }
+                handleFiles(files);
+              } catch (err) {
+                console.error('Google Drive error:', err);
+              }
             }}
-          />
+            className="cns-action-btn"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '9px 20px', borderRadius: 50,
+              background: 'linear-gradient(135deg, rgba(66,133,244,0.25) 0%, rgba(107,82,212,0.25) 50%, rgba(155,69,201,0.25) 100%)',
+              border: '1.5px solid rgba(66,133,244,0.35)',
+              cursor: 'pointer', transition: 'all 0.3s ease',
+              color: '#8ab4ff', fontSize: 12, fontWeight: 700,
+              boxShadow: '0 0 16px rgba(66,133,244,0.15), 0 0 32px rgba(107,82,212,0.08)',
+              textShadow: '0 0 12px rgba(138,180,255,0.5)',
+              letterSpacing: 0.3,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(66,133,244,0.4) 0%, rgba(107,82,212,0.4) 50%, rgba(155,69,201,0.4) 100%)';
+              e.currentTarget.style.boxShadow = '0 0 24px rgba(66,133,244,0.3), 0 0 48px rgba(107,82,212,0.15)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(66,133,244,0.25) 0%, rgba(107,82,212,0.25) 50%, rgba(155,69,201,0.25) 100%)';
+              e.currentTarget.style.boxShadow = '0 0 16px rgba(66,133,244,0.15), 0 0 32px rgba(107,82,212,0.08)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path d="M7.71 3.5L1.15 15l3.43 5.99L11.14 9.5z" fill="#4285F4"/>
+              <path d="M16.29 3.5H7.71l6.57 11.5h8.57z" fill="#00AC47"/>
+              <path d="M22.85 15H14.28l-3.43 6h8.57z" fill="#EA4335"/>
+            </svg>
+            Google ドライブ
+          </button>
+
+          {/* GitHub ボタン */}
+          <button
+            onClick={() => { setShowGitHub(true); fetchGitHubXlsxFiles(); }}
+            className="cns-action-btn"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '9px 20px', borderRadius: 50,
+              background: 'linear-gradient(135deg, rgba(155,69,201,0.2) 0%, rgba(192,84,154,0.2) 50%, rgba(245,158,11,0.15) 100%)',
+              border: '1.5px solid rgba(155,69,201,0.35)',
+              cursor: 'pointer', transition: 'all 0.3s ease',
+              color: '#c89aff', fontSize: 12, fontWeight: 700,
+              boxShadow: '0 0 16px rgba(155,69,201,0.12), 0 0 32px rgba(192,84,154,0.06)',
+              textShadow: '0 0 12px rgba(200,154,255,0.5)',
+              letterSpacing: 0.3,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(155,69,201,0.35) 0%, rgba(192,84,154,0.35) 50%, rgba(245,158,11,0.25) 100%)';
+              e.currentTarget.style.boxShadow = '0 0 24px rgba(155,69,201,0.25), 0 0 48px rgba(192,84,154,0.12)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(155,69,201,0.2) 0%, rgba(192,84,154,0.2) 50%, rgba(245,158,11,0.15) 100%)';
+              e.currentTarget.style.boxShadow = '0 0 16px rgba(155,69,201,0.12), 0 0 32px rgba(192,84,154,0.06)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+            </svg>
+            GitHub
+          </button>
+
+          {/* 履歴ボタン */}
+          <button
+            onClick={() => setShowHistory(true)}
+            className="cns-action-btn"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '9px 20px', borderRadius: 50,
+              background: 'linear-gradient(135deg, rgba(96,165,250,0.2) 0%, rgba(52,211,153,0.15) 100%)',
+              border: '1.5px solid rgba(96,165,250,0.3)',
+              cursor: 'pointer', transition: 'all 0.3s ease',
+              color: '#7dd3fc', fontSize: 12, fontWeight: 700,
+              boxShadow: '0 0 16px rgba(96,165,250,0.12), 0 0 32px rgba(52,211,153,0.06)',
+              textShadow: '0 0 12px rgba(125,211,252,0.5)',
+              letterSpacing: 0.3,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(96,165,250,0.35) 0%, rgba(52,211,153,0.25) 100%)';
+              e.currentTarget.style.boxShadow = '0 0 24px rgba(96,165,250,0.25), 0 0 48px rgba(52,211,153,0.12)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(96,165,250,0.2) 0%, rgba(52,211,153,0.15) 100%)';
+              e.currentTarget.style.boxShadow = '0 0 16px rgba(96,165,250,0.12), 0 0 32px rgba(52,211,153,0.06)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            履歴
+            {recentFiles.length > 0 && (
+              <span style={{
+                fontSize: 9, fontWeight: 800, background: 'rgba(96,165,250,0.3)',
+                padding: '1px 6px', borderRadius: 10, marginLeft: -2,
+              }}>{recentFiles.length}</span>
+            )}
+          </button>
         </div>
 
-        {/* マスタファイル最終更新情報 */}
-        {masterLastUpdate && (
+        {/* ===== 履歴ポップアップ ===== */}
+        {showHistory && (
           <div style={{
-            marginTop: 12, padding: '8px 12px', borderRadius: 10,
-            background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.12)',
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" style={{ flexShrink: 0 }}>
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-            </svg>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.55)', marginBottom: 1 }}>
-                CNS_品目一覧_全集約版.xlsx
+            position: 'fixed', inset: 0, zIndex: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+          }} onClick={() => setShowHistory(false)}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: '24px', width: '90%', maxWidth: 400,
+              maxHeight: '80vh', overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7dd3fc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                  </svg>
+                  <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>最近のファイル</span>
+                </div>
+                <button onClick={() => setShowHistory(false)} style={{
+                  width: 28, height: 28, borderRadius: 8, border: 'none',
+                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                }}>✕</button>
               </div>
-              <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                更新: {(() => {
-                  const d = new Date(masterLastUpdate.date);
-                  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-                })()}
-                {' · '}
-                {masterLastUpdate.message.split('\n')[0]}
-              </div>
+              {recentFiles.length === 0 ? (
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>
+                  まだファイルがありません
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {recentFiles.map((entry) => {
+                    const ft: FileType = entry.fileType || (classifyFile(entry.name).role === 'jkp' ? 'jkp' : classifyFile(entry.name).role === 'master' ? 'master' : classifyFile(entry.name).role.startsWith('aqss') ? 'aqss' : 'container');
+                    const typeLabel = ft === 'jkp' ? 'JKP' : ft === 'aqss' ? 'AQSS' : ft === 'master' ? 'マスタ' : 'CN';
+                    const typeColor = ft === 'jkp' ? '#f97316' : ft === 'aqss' ? '#8b5cf6' : ft === 'master' ? '#34d399' : '#60a5fa';
+                    const infoText = ft === 'jkp'
+                      ? `${entry.itemCount}品目`
+                      : ft === 'master'
+                      ? `${entry.itemCount}品目`
+                      : `${entry.containerCount}CN · ${entry.itemCount}品目`;
+                    return (
+                      <button key={entry.name + entry.date} onClick={() => { setShowHistory(false); loadRecent(entry); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '10px 12px', borderRadius: 12,
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          background: 'rgba(255,255,255,0.03)',
+                          cursor: 'pointer', textAlign: 'left', width: '100%',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                      >
+                        <span style={{
+                          fontSize: 8, fontWeight: 800, color: typeColor,
+                          background: `${typeColor}18`, padding: '3px 7px',
+                          borderRadius: 6, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
+                          flexShrink: 0, minWidth: 32, textAlign: 'center',
+                        }}>{typeLabel}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{
+                            color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: 500, margin: 0,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>{entry.name}</p>
+                          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, margin: '2px 0 0' }}>
+                            {infoText}
+                          </p>
+                        </div>
+                        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                          {fmtDate(entry.date)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* 最近のファイル */}
-        {recentFiles.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600, letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 6, paddingLeft: 2 }}>
-              最近のファイル
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {recentFiles.map((entry) => {
-                const ft: FileType = entry.fileType || (classifyFile(entry.name).role === 'jkp' ? 'jkp' : classifyFile(entry.name).role === 'master' ? 'master' : classifyFile(entry.name).role.startsWith('aqss') ? 'aqss' : 'container');
-                const typeLabel = ft === 'jkp' ? 'JKP' : ft === 'aqss' ? 'AQSS' : ft === 'master' ? 'マスタ' : 'CN';
-                const typeColor = ft === 'jkp' ? '#f97316' : ft === 'aqss' ? '#8b5cf6' : ft === 'master' ? '#34d399' : '#60a5fa';
-                const infoText = ft === 'jkp'
-                  ? `${entry.itemCount}品目`
-                  : ft === 'master'
-                  ? `${entry.itemCount}品目`
-                  : `${entry.containerCount}CN · ${entry.itemCount}品目`;
-                return (
-                  <button key={entry.name + entry.date} onClick={() => loadRecent(entry)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '10px 12px', borderRadius: 12,
-                      border: `1px solid rgba(255,255,255,0.06)`,
-                      background: 'rgba(255,255,255,0.02)',
-                      cursor: 'pointer', textAlign: 'left', width: '100%',
-                      transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.02)')}
-                  >
-                    <span style={{
-                      fontSize: 8, fontWeight: 800, color: typeColor,
-                      background: `${typeColor}18`, padding: '3px 7px',
-                      borderRadius: 6, fontFamily: 'var(--font-mono)', letterSpacing: 0.5,
-                      flexShrink: 0, minWidth: 32, textAlign: 'center',
-                    }}>{typeLabel}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{
-                        color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: 500, margin: 0,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>{entry.name}</p>
-                      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, margin: '2px 0 0' }}>
-                        {infoText}
-                      </p>
-                    </div>
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
-                      {fmtDate(entry.date)}
-                    </span>
-                  </button>
-                );
-              })}
+        {/* ===== GitHub ポップアップ ===== */}
+        {showGitHub && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+          }} onClick={() => setShowGitHub(false)}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: '24px', width: '90%', maxWidth: 400,
+              maxHeight: '80vh', overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#c89aff">
+                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                  </svg>
+                  <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>GitHub Repository</span>
+                </div>
+                <button onClick={() => setShowGitHub(false)} style={{
+                  width: 28, height: 28, borderRadius: 8, border: 'none',
+                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                }}>✕</button>
+              </div>
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, marginBottom: 12 }}>
+                tcta-tottori/Container - .xlsx ファイル一覧
+              </p>
+              {ghLoading ? (
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  <div style={{
+                    width: 24, height: 24, border: '2px solid rgba(200,154,255,0.2)',
+                    borderTop: '2px solid #c89aff', borderRadius: '50%',
+                    margin: '0 auto 8px', animation: 'spin 0.8s linear infinite',
+                  }} />
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>読み込み中...</p>
+                </div>
+              ) : ghFiles.length === 0 ? (
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', padding: '20px 0' }}>
+                  Excelファイルが見つかりません
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {ghFiles.map((gf) => (
+                    <button key={gf.name} onClick={() => loadGitHubFile(gf.name)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '10px 12px', borderRadius: 12,
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        background: 'rgba(255,255,255,0.03)',
+                        cursor: 'pointer', textAlign: 'left', width: '100%',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(200,154,255,0.08)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                    >
+                      <span style={{
+                        fontSize: 14, flexShrink: 0, filter: 'grayscale(0.3)',
+                      }}>📊</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{
+                          color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: 500, margin: 0,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>{gf.name}</p>
+                      </div>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
