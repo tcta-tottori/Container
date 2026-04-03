@@ -15,7 +15,12 @@ export type VoiceAction =
   | 'QUERY_PROGRESS'
   | 'UNDO_DECREASE'
   | 'QUERY_TYPE_COUNT'
-  | 'MASA_CHEER';
+  | 'MASA_CHEER'
+  | 'WEATHER'
+  | 'TEMPERATURE'
+  | 'TOTTORI_NEWS'
+  | 'FINANCE_NEWS'
+  | 'STOP_SPEECH';
 
 /** キーワード → アクション マッピング */
 const VOICE_COMMANDS: [string, VoiceAction][] = [
@@ -68,6 +73,22 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
   ['なんしゅるい', 'QUERY_TYPE_COUNT'],
   ['まさ', 'MASA_CHEER'],
   ['マサ', 'MASA_CHEER'],
+  ['今日の天気', 'WEATHER'],
+  ['天気', 'WEATHER'],
+  ['てんき', 'WEATHER'],
+  ['気温', 'TEMPERATURE'],
+  ['きおん', 'TEMPERATURE'],
+  ['鳥取のニュース', 'TOTTORI_NEWS'],
+  ['とっとりのニュース', 'TOTTORI_NEWS'],
+  ['ニュース', 'TOTTORI_NEWS'],
+  ['金融', 'FINANCE_NEWS'],
+  ['株', 'FINANCE_NEWS'],
+  ['かぶ', 'FINANCE_NEWS'],
+  ['ファイナンス', 'FINANCE_NEWS'],
+  ['ストップ', 'STOP_SPEECH'],
+  ['止めて', 'STOP_SPEECH'],
+  ['やめて', 'STOP_SPEECH'],
+  ['とめて', 'STOP_SPEECH'],
 ];
 
 /**

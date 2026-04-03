@@ -14,6 +14,7 @@ import { saveRecentFile } from '@/lib/recentFiles';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
+import { fetchWeather, weatherToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews } from '@/lib/weatherNews';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
@@ -788,6 +789,38 @@ export default function Home() {
         }
         case 'MASA_CHEER': {
           speak('がんばれ、まさ！');
+          break;
+        }
+        case 'WEATHER': {
+          speak('天気を取得中...');
+          fetchWeather().then(w => {
+            if (w) speak(weatherToSpeech(w));
+            else speak('天気情報を取得できませんでした。');
+          });
+          break;
+        }
+        case 'TEMPERATURE': {
+          speak('気温を取得中...');
+          fetchWeather().then(w => {
+            if (w) speak(temperatureToSpeech(w));
+            else speak('気温情報を取得できませんでした。');
+          });
+          break;
+        }
+        case 'TOTTORI_NEWS': {
+          speak('ニュースを取得中...');
+          fetchTottoriNews().then(text => speak(text));
+          break;
+        }
+        case 'FINANCE_NEWS': {
+          speak('金融ニュースを取得中...');
+          fetchFinanceNews().then(text => speak(text));
+          break;
+        }
+        case 'STOP_SPEECH': {
+          if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+          }
           break;
         }
       }
