@@ -23,26 +23,25 @@ export function isGoogleConfigured(): boolean {
   return true;
 }
 
-// OAuth2トークンの管理
+// OAuth2トークンの管理（メモリ内に保持、localStorage不使用）
+let _cachedToken = '';
+
 export function getStoredGoogleToken(): string {
   if (typeof window === 'undefined') return '';
-  // 古いlocalStorage設定をクリア
+  // 古いlocalStorage設定をクリア（1回のみ）
   localStorage.removeItem('cns-google-client-id');
   localStorage.removeItem('cns-google-api-key');
   localStorage.removeItem('cns-google-folder-id');
-  // 古いトークンもクリア（403対策）
   localStorage.removeItem(STORAGE_KEY_TOKEN);
-  return '';
+  return _cachedToken;
 }
 
 function storeGoogleToken(token: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY_TOKEN, token);
+  _cachedToken = token;
 }
 
 export function clearGoogleToken(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(STORAGE_KEY_TOKEN);
+  _cachedToken = '';
 }
 
 // GAPIスクリプトのロード

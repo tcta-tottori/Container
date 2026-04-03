@@ -499,6 +499,9 @@ export default function Home() {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('JKPファイルを読み込み中...');
+      setLoadingProgress(5);
+      // UIの更新を待つ
+      await new Promise(r => setTimeout(r, 50));
       try {
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array' });
