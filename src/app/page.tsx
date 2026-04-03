@@ -499,6 +499,9 @@ export default function Home() {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('JKPファイルを読み込み中...');
+      setLoadingProgress(5);
+      // UIの更新を待つ
+      await new Promise(r => setTimeout(r, 50));
       try {
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array' });
@@ -784,30 +787,7 @@ export default function Home() {
           break;
         }
         case 'MASA_CHEER': {
-          if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            const voices = window.speechSynthesis.getVoices();
-            const jaMale = voices.find(v => v.lang.startsWith('ja') && /male|男|takumi|ichiro|kenji|kenichi|otoya/i.test(v.name));
-            if (jaMale) {
-              const u = new SpeechSynthesisUtterance('がんばれ まさ！');
-              u.lang = 'ja-JP';
-              u.voice = jaMale;
-              u.rate = 0.85;
-              u.pitch = 0.01;
-              u.volume = 1.0;
-              window.speechSynthesis.speak(u);
-            } else {
-              const enMale = voices.find(v => v.lang.startsWith('en') && /male|daniel|james|google us english/i.test(v.name))
-                || voices.find(v => v.lang.startsWith('en-') && !/female|zira|samantha|karen|moira|fiona/i.test(v.name));
-              const u = new SpeechSynthesisUtterance('ganbare masa!');
-              u.lang = 'en-US';
-              if (enMale) u.voice = enMale;
-              u.rate = 0.8;
-              u.pitch = 0.01;
-              u.volume = 1.0;
-              window.speechSynthesis.speak(u);
-            }
-          }
+          speak('がんばれ、まさ！');
           break;
         }
       }
