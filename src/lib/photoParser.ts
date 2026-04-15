@@ -1,56 +1,128 @@
 import { Container, ContainerItem } from './types';
 import { detectItemType } from './typeDetector';
 import { sortItems } from './sorter';
+import { geminiExtractContainer, getGeminiKey } from './geminiApi';
 
 /**
- * コンテナ日程の写真（JPG/PNG等）をOCRで読み込み、Container に変換する。
+ * コンテナ日程の写真（JPG/PNG等）を解析し、Container に変換する。
  *
  * 対応書式（添付画像の書式）:
  *   ヘッダー左上: 「4月15日 26K0308」などの日付＋コンテナ番号
  *   列: 品番 / 品名 / 代表機種 / 入荷数量 / ケース数 / パレット枚数 / 端数
  *
- * tesseract.js を動的インポートして Japanese+English OCR を実行。
- * 精度は環境・画像品質に依存するため、結果は管理ページ等で編集する想定。
+ * 優先順位:
+ *   1. Gemini API キーが設定されていれば Gemini Vision で構造化抽出（高精度）
+ *   2. キー未設定時は tesseract.js の Japanese OCR を使用（精度低）
  */
 
 export interface PhotoParseResult {
   container: Container | null;
   rawText: string;
   errors: string[];
+  /** 使用した抽出エンジン */
+  engine: 'gemini' | 'tesseract' | 'none';
 }
 
 export type PhotoProgressFn = (progress: number, message: string) => void;
 
-/** 品番パターン: 3TGxxx / 3YMxxx / 3XXxxx 系 (10〜12桁英数) */
+/** 品番パターン: 3TGxxx / 3YMxxx 系 */
 const PART_NUMBER_RE = /\b(3[A-Z]{2}[A-Z0-9]{6,12})\b/;
-
-/** 日付＋コンテナ番号パターン: 「4月15日 26K0308」など */
 const HEADER_DATE_RE = /(\d{1,2})月(\d{1,2})日[\s　]*([0-9A-Z]{4,10})?/;
 
-/** 数字列抽出（カンマ区切りにも対応） */
 function extractNumbers(text: string): number[] {
   const matches = text.match(/-?\d+(?:[.,]\d+)?/g);
   if (!matches) return [];
-  return matches
-    .map((s) => Number(s.replace(/,/g, '')))
-    .filter((n) => !isNaN(n));
+  return matches.map((s) => Number(s.replace(/,/g, ''))).filter((n) => !isNaN(n));
 }
 
-/** OCR結果のクセを整形（全角数字→半角、ゼロ/オー混同の簡易補正など） */
 function normalizeOcrText(text: string): string {
   return text
-    // 全角数字→半角
     .replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
-    // 全角英字→半角
     .replace(/[Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
-    // 全角ハイフン・マイナスの統一
     .replace(/[‐－―ｰ]/g, '-')
-    // 全角スペース→半角
     .replace(/　/g, ' ');
 }
 
-/** 1行のOCRテキストを ContainerItem に変換。失敗時 null */
-function parseRow(
+/** 今日の日付を YYYY-MM-DD で */
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** "MM-DD" → "YYYY-MM-DD" (YYYY は現在年) */
+function normalizeDate(input: string): string {
+  if (!input) return todayIso();
+  const d = new Date();
+  const m = input.match(/(\d{1,2})[^\d]+(\d{1,2})/);
+  if (!m) return todayIso();
+  const mm = String(Number(m[1])).padStart(2, '0');
+  const dd = String(Number(m[2])).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+// =============== Gemini 経路 ===============
+
+async function parseWithGemini(
+  file: File,
+  onProgress?: PhotoProgressFn,
+): Promise<PhotoParseResult> {
+  onProgress?.(20, 'Gemini APIに画像を送信中...');
+
+  let gemini;
+  try {
+    gemini = await geminiExtractContainer(file);
+  } catch (e) {
+    return {
+      container: null,
+      rawText: '',
+      errors: [`Gemini抽出失敗: ${e instanceof Error ? e.message : String(e)}`],
+      engine: 'gemini',
+    };
+  }
+
+  onProgress?.(85, `${gemini.items.length}品目を受信。変換中...`);
+
+  const containerNo = gemini.containerNo || 'PHOTO';
+  const date = normalizeDate(gemini.date);
+
+  const items: ContainerItem[] = gemini.items
+    .filter((g) => g.partNumber || g.itemName)
+    .map((g, idx) => ({
+      id: `${containerNo}-photo-${idx}`,
+      partNumber: g.partNumber,
+      itemName: g.itemName,
+      representModel: g.representModel,
+      type: detectItemType(g.itemName, 0, g.palletCount, g.partNumber),
+      packingQty: 0,
+      totalQty: g.totalQty,
+      caseCount: g.caseCount,
+      palletCount: g.palletCount,
+      fraction: g.fraction,
+      qtyPerPallet: 0,
+    }));
+
+  if (items.length === 0) {
+    return {
+      container: null,
+      rawText: JSON.stringify(gemini),
+      errors: ['Geminiが品目を検出できませんでした'],
+      engine: 'gemini',
+    };
+  }
+
+  onProgress?.(95, `${items.length}品目を抽出`);
+
+  return {
+    container: { date, containerNo, items: sortItems(items) },
+    rawText: JSON.stringify(gemini, null, 2),
+    errors: [],
+    engine: 'gemini',
+  };
+}
+
+// =============== Tesseract 経路（フォールバック） ===============
+
+function parseTesseractRow(
   line: string,
   containerNo: string,
   rowIndex: number,
@@ -62,29 +134,18 @@ function parseRow(
   if (!partMatch) return null;
   const partNumber = partMatch[1];
 
-  // 品番以降を対象にする
   const afterPart = normalized.slice(partMatch.index! + partNumber.length).trim();
-
-  // 末尾の数字列を抽出（入荷数量/ケース数/パレット枚数/端数 の 2〜4個）
   const nums = extractNumbers(afterPart);
 
-  // 末尾の連続した数字トークンだけ使う: 空白で分割してから末尾から数値を取る
   const tokens = afterPart.split(/\s+/).filter(Boolean);
   const trailingNums: number[] = [];
   for (let i = tokens.length - 1; i >= 0; i--) {
     const t = tokens[i].replace(/,/g, '');
-    if (/^-?\d+(?:\.\d+)?$/.test(t)) {
-      trailingNums.unshift(Number(t));
-    } else {
-      break;
-    }
+    if (/^-?\d+(?:\.\d+)?$/.test(t)) trailingNums.unshift(Number(t));
+    else break;
   }
-
-  // 末尾数値群を優先（OCRで他箇所に誤認識された数字が混ざるため）
   const trailing = trailingNums.length >= 2 ? trailingNums : nums;
 
-  // 4列揃っている想定: 入荷数量, ケース数, パレット枚数, 端数
-  //   少ない場合は末尾優先で詰める
   let totalQty = 0, caseCount = 0, palletCount = 0, fraction = 0;
   if (trailing.length >= 4) {
     [totalQty, caseCount, palletCount, fraction] = trailing.slice(-4);
@@ -96,13 +157,11 @@ function parseRow(
     totalQty = trailing[0];
   }
 
-  // 品名と代表機種は末尾数値列を除いた残り
   const nameTokensEnd = tokens.length - trailingNums.length;
   const nameTokens = tokens.slice(0, nameTokensEnd);
   let itemName = '';
   let representModel = '';
   if (nameTokens.length >= 2) {
-    // 最後のトークンを代表機種、それ以外を品名とする
     representModel = nameTokens[nameTokens.length - 1];
     itemName = nameTokens.slice(0, -1).join(' ');
   } else if (nameTokens.length === 1) {
@@ -110,17 +169,14 @@ function parseRow(
     representModel = nameTokens[0].replace(/ポリカバー|カバー$/, '');
   }
 
-  // 品名が空で数値のみだった場合は無効行とみなす
   if (!itemName && !representModel) return null;
 
-  const type = detectItemType(itemName, 0, palletCount, partNumber);
-
-  const item: ContainerItem = {
+  return {
     id: `${containerNo}-photo-${rowIndex}`,
     partNumber,
     itemName,
     representModel,
-    type,
+    type: detectItemType(itemName, 0, palletCount, partNumber),
     packingQty: 0,
     totalQty,
     caseCount,
@@ -128,36 +184,25 @@ function parseRow(
     fraction,
     qtyPerPallet: 0,
   };
-  return item;
 }
 
-/** 画像上部のヘッダー「4月15日 26K0308」から日付・コンテナ番号を抽出 */
-function parseHeader(text: string): { date: string; containerNo: string } {
-  const now = new Date();
-  const defaultDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
+function parseTesseractHeader(text: string): { date: string; containerNo: string } {
   const match = normalizeOcrText(text).match(HEADER_DATE_RE);
-  if (!match) return { date: defaultDate, containerNo: 'PHOTO' };
+  if (!match) return { date: todayIso(), containerNo: 'PHOTO' };
   const [, mm, dd, cn] = match;
+  const d = new Date();
   const month = String(Number(mm)).padStart(2, '0');
   const day = String(Number(dd)).padStart(2, '0');
-  const date = `${now.getFullYear()}-${month}-${day}`;
-  return { date, containerNo: cn || 'PHOTO' };
+  return { date: `${d.getFullYear()}-${month}-${day}`, containerNo: cn || 'PHOTO' };
 }
 
-/**
- * 写真ファイルから Container を抽出する。
- * tesseract.js を動的インポートして使用。
- */
-export async function parsePhotoFile(
+async function parseWithTesseract(
   file: File,
   onProgress?: PhotoProgressFn,
 ): Promise<PhotoParseResult> {
   onProgress?.(5, 'OCRエンジンを準備中...');
 
-  // 動的インポート（バンドルサイズ軽減）
   const mod = await import('tesseract.js');
-  // ESM / CJS 差異を吸収
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Tesseract: any = (mod as any).default || mod;
 
@@ -170,8 +215,6 @@ export async function parsePhotoFile(
         if (m.status === 'recognizing text') {
           const pct = 30 + Math.round(m.progress * 60);
           onProgress?.(pct, `文字認識中... ${Math.round(m.progress * 100)}%`);
-        } else if (m.status === 'loading tesseract core' || m.status === 'initializing tesseract') {
-          onProgress?.(20, 'エンジンを読込中...');
         } else if (m.status === 'loading language traineddata') {
           onProgress?.(25, '日本語辞書を読込中...');
         }
@@ -183,35 +226,64 @@ export async function parsePhotoFile(
       container: null,
       rawText: '',
       errors: [`OCR失敗: ${e instanceof Error ? e.message : String(e)}`],
+      engine: 'tesseract',
     };
   }
 
   onProgress?.(92, '表データを解析中...');
 
-  const { date, containerNo } = parseHeader(rawText);
+  const { date, containerNo } = parseTesseractHeader(rawText);
   const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
   const items: ContainerItem[] = [];
   const errors: string[] = [];
   let idx = 0;
   for (const line of lines) {
-    // ヘッダー行（品番/品名など）は除外
     if (/品番|品名|代表機種|入荷数量|ケース数|パレット/.test(line)) continue;
-    const item = parseRow(line, containerNo, idx++);
+    const item = parseTesseractRow(line, containerNo, idx++);
     if (item) items.push(item);
   }
 
   if (items.length === 0) {
     errors.push('写真から品目を検出できませんでした');
-    return { container: null, rawText, errors };
+    return { container: null, rawText, errors, engine: 'tesseract' };
   }
 
-  const container: Container = {
-    date,
-    containerNo,
-    items: sortItems(items),
-  };
-
   onProgress?.(98, `${items.length}品目を検出`);
-  return { container, rawText, errors };
+  return {
+    container: { date, containerNo, items: sortItems(items) },
+    rawText,
+    errors,
+    engine: 'tesseract',
+  };
+}
+
+// =============== 公開API ===============
+
+/**
+ * 写真ファイルから Container を抽出する。
+ * Gemini API キーが設定されていれば Gemini を優先使用。
+ */
+export async function parsePhotoFile(
+  file: File,
+  onProgress?: PhotoProgressFn,
+): Promise<PhotoParseResult> {
+  const hasGeminiKey = !!getGeminiKey();
+
+  if (hasGeminiKey) {
+    const result = await parseWithGemini(file, onProgress);
+    // Gemini 失敗時は Tesseract にフォールバック（エラー通知付き）
+    if (!result.container) {
+      onProgress?.(10, 'Gemini失敗 → OCRにフォールバック...');
+      const fallback = await parseWithTesseract(file, onProgress);
+      return {
+        ...fallback,
+        errors: [...result.errors, ...fallback.errors],
+      };
+    }
+    return result;
+  }
+
+  // キーなし → Tesseract のみ
+  return parseWithTesseract(file, onProgress);
 }
