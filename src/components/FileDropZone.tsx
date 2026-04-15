@@ -661,11 +661,20 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               letterSpacing: 0.3,
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0 0 6h.5"/>
-              <path d="M12 2a3 3 0 0 1 3 3v1h2a3 3 0 0 1 0 6h-.5"/>
-              <path d="M7 12v3a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3v-3"/>
-              <circle cx="12" cy="15" r="1.2" fill="currentColor"/>
+            <svg width="15" height="15" viewBox="0 0 24 24" aria-label="Gemini">
+              <defs>
+                <linearGradient id="gemini-btn-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#4285F4"/>
+                  <stop offset="35%" stopColor="#9B72CB"/>
+                  <stop offset="70%" stopColor="#D96570"/>
+                  <stop offset="100%" stopColor="#F9AB00"/>
+                </linearGradient>
+              </defs>
+              <path
+                d="M12 2c0 3-2 8-8 10 6 2 8 7 8 10 0-3 2-8 8-10-6-2-8-7-8-10z"
+                fill={aiKeySaved ? 'url(#gemini-btn-grad)' : 'rgba(255,255,255,0.35)'}
+                style={{ filter: aiKeySaved ? 'drop-shadow(0 0 3px rgba(155,114,203,0.5))' : 'none' }}
+              />
             </svg>
             AI写真 {aiKeySaved ? 'ON' : 'OFF'}
           </button>
@@ -847,12 +856,21 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0 0 6h.5"/>
-                    <path d="M12 2a3 3 0 0 1 3 3v1h2a3 3 0 0 1 0 6h-.5"/>
-                    <path d="M7 12v3a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3v-3"/>
+                  <svg width="20" height="20" viewBox="0 0 24 24" aria-label="Gemini">
+                    <defs>
+                      <linearGradient id="gemini-modal-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#4285F4"/>
+                        <stop offset="35%" stopColor="#9B72CB"/>
+                        <stop offset="70%" stopColor="#D96570"/>
+                        <stop offset="100%" stopColor="#F9AB00"/>
+                      </linearGradient>
+                    </defs>
+                    <path d="M12 2c0 3-2 8-8 10 6 2 8 7 8 10 0-3 2-8 8-10-6-2-8-7-8-10z"
+                      fill="url(#gemini-modal-grad)"
+                      style={{ filter: 'drop-shadow(0 0 4px rgba(155,114,203,0.5))' }}
+                    />
                   </svg>
-                  <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>写真読込 AI 設定</span>
+                  <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>写真読込 AI 設定 (Gemini)</span>
                 </div>
                 <button onClick={() => setShowAiSettings(false)} style={{
                   width: 28, height: 28, borderRadius: 8, border: 'none',
