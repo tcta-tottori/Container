@@ -5,6 +5,10 @@ import { getRecentFiles, base64ToFile, RecentFile, FileType } from '@/lib/recent
 import { fetchMasterFileLastUpdate } from '@/lib/masterLoader';
 import { getStoredToken } from '@/lib/githubSave';
 import { openGooglePicker, downloadFromDrive } from '@/lib/googleDrive';
+import {
+  getGeminiKey, setGeminiKey, clearGeminiKey,
+  getGeminiModel, setGeminiModel, GEMINI_MODELS, verifyGeminiKey,
+} from '@/lib/geminiApi';
 
 /** 判別されたファイルの役割 */
 export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'photo' | 'unknown';
@@ -171,6 +175,12 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
   const [ghLoading, setGhLoading] = useState(false);
   const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
   const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
+  const [showAiSettings, setShowAiSettings] = useState(false);
+  const [aiKeyDraft, setAiKeyDraft] = useState('');
+  const [aiModelDraft, setAiModelDraft] = useState('gemini-2.0-flash');
+  const [aiKeySaved, setAiKeySaved] = useState(false);
+  const [aiTestState, setAiTestState] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
+  const [aiTestMsg, setAiTestMsg] = useState('');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [masterLastUpdate, setMasterLastUpdate] = useState<{ date: string; message: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -181,6 +191,9 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
     fetchMasterFileLastUpdate().then((info) => {
       if (info) setMasterLastUpdate(info);
     });
+    // Gemini API キー状態
+    setAiKeySaved(!!getGeminiKey());
+    setAiModelDraft(getGeminiModel());
   }, []);
 
   // ファイル名で自動判別・振り分け
@@ -621,6 +634,41 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               }}>{recentFiles.length}</span>
             )}
           </button>
+
+          {/* AI設定ボタン（Gemini APIキー） */}
+          <button
+            onClick={() => {
+              setAiKeyDraft(getGeminiKey());
+              setAiModelDraft(getGeminiModel());
+              setAiTestState('idle'); setAiTestMsg('');
+              setShowAiSettings(true);
+            }}
+            className="cns-action-btn"
+            title="写真読込（Gemini API）設定"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '9px 20px', borderRadius: 50,
+              background: aiKeySaved
+                ? 'linear-gradient(135deg, rgba(52,211,153,0.25) 0%, rgba(96,165,250,0.2) 100%)'
+                : 'linear-gradient(135deg, rgba(248,113,113,0.15) 0%, rgba(245,158,11,0.15) 100%)',
+              border: `1.5px solid ${aiKeySaved ? 'rgba(52,211,153,0.4)' : 'rgba(248,113,113,0.35)'}`,
+              cursor: 'pointer', transition: 'all 0.3s ease',
+              color: aiKeySaved ? '#6ee7b7' : '#fca5a5', fontSize: 12, fontWeight: 700,
+              boxShadow: aiKeySaved
+                ? '0 0 16px rgba(52,211,153,0.15), 0 0 32px rgba(96,165,250,0.06)'
+                : '0 0 16px rgba(248,113,113,0.12)',
+              textShadow: aiKeySaved ? '0 0 12px rgba(110,231,183,0.5)' : '0 0 12px rgba(252,165,165,0.4)',
+              letterSpacing: 0.3,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0 0 6h.5"/>
+              <path d="M12 2a3 3 0 0 1 3 3v1h2a3 3 0 0 1 0 6h-.5"/>
+              <path d="M7 12v3a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3v-3"/>
+              <circle cx="12" cy="15" r="1.2" fill="currentColor"/>
+            </svg>
+            AI写真 {aiKeySaved ? 'ON' : 'OFF'}
+          </button>
         </div>
 
         {/* ===== 履歴ポップアップ ===== */}
@@ -779,6 +827,160 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ===== AI写真 (Gemini) 設定ポップアップ ===== */}
+        {showAiSettings && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+          }} onClick={() => setShowAiSettings(false)}>
+            <div onClick={(e) => e.stopPropagation()} style={{
+              background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: '24px', width: '92%', maxWidth: 440,
+              maxHeight: '85vh', overflowY: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2a3 3 0 0 0-3 3v1H7a3 3 0 0 0 0 6h.5"/>
+                    <path d="M12 2a3 3 0 0 1 3 3v1h2a3 3 0 0 1 0 6h-.5"/>
+                    <path d="M7 12v3a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3v-3"/>
+                  </svg>
+                  <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>写真読込 AI 設定</span>
+                </div>
+                <button onClick={() => setShowAiSettings(false)} style={{
+                  width: 28, height: 28, borderRadius: 8, border: 'none',
+                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
+                }}>✕</button>
+              </div>
+
+              <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, lineHeight: 1.6, marginBottom: 14 }}>
+                Google Gemini API を使って写真から高精度に品目を抽出します。<br/>
+                API キーは <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer"
+                  style={{ color: '#8ab4ff', textDecoration: 'underline' }}>Google AI Studio</a> で無料取得できます（Flash モデルは無料枠あり）。
+              </p>
+
+              <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                API キー
+              </label>
+              <input
+                type="password"
+                value={aiKeyDraft}
+                onChange={(e) => setAiKeyDraft(e.target.value)}
+                placeholder="AIza..."
+                autoComplete="off"
+                style={{
+                  width: '100%', padding: '10px 12px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                  color: '#fff', fontSize: 13, fontFamily: 'var(--font-mono)',
+                  outline: 'none', boxSizing: 'border-box', marginBottom: 12,
+                }}
+              />
+
+              <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                モデル
+              </label>
+              <select
+                value={aiModelDraft}
+                onChange={(e) => setAiModelDraft(e.target.value)}
+                style={{
+                  width: '100%', padding: '10px 12px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                  color: '#fff', fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                  marginBottom: 14,
+                }}
+              >
+                {GEMINI_MODELS.map((m) => (
+                  <option key={m.id} value={m.id} style={{ background: '#1e2235', color: '#fff' }}>
+                    {m.label} — {m.note}
+                  </option>
+                ))}
+              </select>
+
+              {aiTestState !== 'idle' && (
+                <div style={{
+                  marginBottom: 12, padding: '8px 12px', borderRadius: 10, fontSize: 11,
+                  background: aiTestState === 'ok' ? 'rgba(52,211,153,0.12)'
+                    : aiTestState === 'fail' ? 'rgba(248,113,113,0.12)'
+                    : 'rgba(96,165,250,0.1)',
+                  color: aiTestState === 'ok' ? '#6ee7b7'
+                    : aiTestState === 'fail' ? '#fca5a5'
+                    : '#93c5fd',
+                  border: `1px solid ${aiTestState === 'ok' ? 'rgba(52,211,153,0.25)'
+                    : aiTestState === 'fail' ? 'rgba(248,113,113,0.25)'
+                    : 'rgba(96,165,250,0.2)'}`,
+                }}>
+                  {aiTestState === 'testing' ? '接続テスト中...' : aiTestMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <button
+                  onClick={async () => {
+                    if (!aiKeyDraft.trim()) { setAiTestState('fail'); setAiTestMsg('APIキーを入力してください'); return; }
+                    setAiTestState('testing');
+                    try {
+                      const ok = await verifyGeminiKey(aiKeyDraft.trim(), aiModelDraft);
+                      if (ok) { setAiTestState('ok'); setAiTestMsg('接続OK'); }
+                      else { setAiTestState('fail'); setAiTestMsg('APIキーが無効、またはモデル権限なし'); }
+                    } catch (e) {
+                      setAiTestState('fail');
+                      setAiTestMsg(`テスト失敗: ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                  }}
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 10,
+                    background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.35)',
+                    color: '#93c5fd', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  接続テスト
+                </button>
+                <button
+                  onClick={() => {
+                    setGeminiKey(aiKeyDraft.trim());
+                    setGeminiModel(aiModelDraft);
+                    setAiKeySaved(!!aiKeyDraft.trim());
+                    setAiTestState('ok'); setAiTestMsg('保存しました');
+                  }}
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 10,
+                    background: 'linear-gradient(135deg, rgba(52,211,153,0.3), rgba(96,165,250,0.3))',
+                    border: '1px solid rgba(52,211,153,0.4)',
+                    color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  保存
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  clearGeminiKey();
+                  setAiKeyDraft('');
+                  setAiKeySaved(false);
+                  setAiTestState('ok'); setAiTestMsg('キーを削除しました');
+                }}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 10,
+                  background: 'transparent', border: '1px solid rgba(248,113,113,0.25)',
+                  color: '#fca5a5', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                保存済みキーを削除
+              </button>
+
+              <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, lineHeight: 1.5, marginTop: 12 }}>
+                ※ キーはこの端末の localStorage にのみ保存されます。<br/>
+                ※ 未設定時は Tesseract.js によるローカル OCR（精度低）にフォールバックします。
+              </p>
             </div>
           </div>
         )}
