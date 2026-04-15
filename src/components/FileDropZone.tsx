@@ -661,20 +661,31 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               letterSpacing: 0.3,
             }}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" aria-label="Gemini">
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-label="Gemini"
+              style={{
+                filter: aiKeySaved
+                  ? 'drop-shadow(0 0 3px rgba(234,67,53,0.4))'
+                  : 'grayscale(1) opacity(0.5)',
+              }}
+            >
               <defs>
-                <linearGradient id="gemini-btn-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#4285F4"/>
-                  <stop offset="35%" stopColor="#9B72CB"/>
-                  <stop offset="70%" stopColor="#D96570"/>
-                  <stop offset="100%" stopColor="#F9AB00"/>
+                <linearGradient id="gem-btn-tl" x1="4" y1="12" x2="12" y2="2" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stopColor="#4285F4"/><stop offset="1" stopColor="#EA4335"/>
+                </linearGradient>
+                <linearGradient id="gem-btn-bl" x1="4" y1="12" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stopColor="#4285F4"/><stop offset="1" stopColor="#34A853"/>
+                </linearGradient>
+                <linearGradient id="gem-btn-br" x1="12" y1="22" x2="20" y2="12" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stopColor="#34A853"/><stop offset="1" stopColor="#FBBC04"/>
+                </linearGradient>
+                <linearGradient id="gem-btn-tr" x1="20" y1="12" x2="12" y2="2" gradientUnits="userSpaceOnUse">
+                  <stop offset="0" stopColor="#FBBC04"/><stop offset="1" stopColor="#EA4335"/>
                 </linearGradient>
               </defs>
-              <path
-                d="M12 2c0 3-2 8-8 10 6 2 8 7 8 10 0-3 2-8 8-10-6-2-8-7-8-10z"
-                fill={aiKeySaved ? 'url(#gemini-btn-grad)' : 'rgba(255,255,255,0.35)'}
-                style={{ filter: aiKeySaved ? 'drop-shadow(0 0 3px rgba(155,114,203,0.5))' : 'none' }}
-              />
+              <path d="M 12 2 C 12 5, 10 10, 4 12 L 12 12 Z" fill="url(#gem-btn-tl)"/>
+              <path d="M 4 12 C 10 14, 12 19, 12 22 L 12 12 Z" fill="url(#gem-btn-bl)"/>
+              <path d="M 12 22 C 12 19, 14 14, 20 12 L 12 12 Z" fill="url(#gem-btn-br)"/>
+              <path d="M 20 12 C 14 10, 12 5, 12 2 L 12 12 Z" fill="url(#gem-btn-tr)"/>
             </svg>
             AI写真 {aiKeySaved ? 'ON' : 'OFF'}
           </button>
@@ -856,19 +867,26 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" aria-label="Gemini">
+                  <svg width="22" height="22" viewBox="0 0 24 24" aria-label="Gemini"
+                    style={{ filter: 'drop-shadow(0 0 4px rgba(234,67,53,0.3))' }}>
                     <defs>
-                      <linearGradient id="gemini-modal-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#4285F4"/>
-                        <stop offset="35%" stopColor="#9B72CB"/>
-                        <stop offset="70%" stopColor="#D96570"/>
-                        <stop offset="100%" stopColor="#F9AB00"/>
+                      <linearGradient id="gem-mod-tl" x1="4" y1="12" x2="12" y2="2" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stopColor="#4285F4"/><stop offset="1" stopColor="#EA4335"/>
+                      </linearGradient>
+                      <linearGradient id="gem-mod-bl" x1="4" y1="12" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stopColor="#4285F4"/><stop offset="1" stopColor="#34A853"/>
+                      </linearGradient>
+                      <linearGradient id="gem-mod-br" x1="12" y1="22" x2="20" y2="12" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stopColor="#34A853"/><stop offset="1" stopColor="#FBBC04"/>
+                      </linearGradient>
+                      <linearGradient id="gem-mod-tr" x1="20" y1="12" x2="12" y2="2" gradientUnits="userSpaceOnUse">
+                        <stop offset="0" stopColor="#FBBC04"/><stop offset="1" stopColor="#EA4335"/>
                       </linearGradient>
                     </defs>
-                    <path d="M12 2c0 3-2 8-8 10 6 2 8 7 8 10 0-3 2-8 8-10-6-2-8-7-8-10z"
-                      fill="url(#gemini-modal-grad)"
-                      style={{ filter: 'drop-shadow(0 0 4px rgba(155,114,203,0.5))' }}
-                    />
+                    <path d="M 12 2 C 12 5, 10 10, 4 12 L 12 12 Z" fill="url(#gem-mod-tl)"/>
+                    <path d="M 4 12 C 10 14, 12 19, 12 22 L 12 12 Z" fill="url(#gem-mod-bl)"/>
+                    <path d="M 12 22 C 12 19, 14 14, 20 12 L 12 12 Z" fill="url(#gem-mod-br)"/>
+                    <path d="M 20 12 C 14 10, 12 5, 12 2 L 12 12 Z" fill="url(#gem-mod-tr)"/>
                   </svg>
                   <span style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>写真読込 AI 設定 (Gemini)</span>
                 </div>
