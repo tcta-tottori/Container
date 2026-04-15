@@ -8,6 +8,7 @@ on:
       - claude/init-container-app-0RJFr
       - claude/timer-ui-updates-DBaNV
       - claude/fix-palette-box-display-36k8A
+      - claude/add-photo-schedule-reading-Wx3tS
 
 permissions:
   contents: read

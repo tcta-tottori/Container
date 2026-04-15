@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
+import { parsePhotoFile } from '@/lib/photoParser';
 import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel, parseMasterExcel, fetchJkpFromGitHub } from '@/lib/masterLoader';
 import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
@@ -494,6 +495,52 @@ export default function Home() {
     [loadMaster, state.items, updateItem, closeLoading]
   );
 
+  // 写真（コンテナ日程の画像）を OCR で読込
+  const handlePhotoLoaded = useCallback(
+    async (file: File) => {
+      loadedContainerRef.current = null;
+      linkedRef.current = null;
+      setLoadingMsg('写真を解析中...');
+      setLoadingProgress(5);
+      try {
+        const { container, errors } = await parsePhotoFile(file, (p, msg) => {
+          setLoadingProgress(p);
+          setLoadingMsg(msg);
+        });
+        if (!container || container.items.length === 0) {
+          setLoadingMsg(errors[0] || '写真から品目を検出できませんでした');
+          await new Promise((r) => setTimeout(r, 2500));
+          return;
+        }
+
+        // マスタと紐付
+        setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+        const masterItems = await fetchMasterData();
+        if (masterItems.length > 0) {
+          loadMaster(masterItems);
+        }
+
+        setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
+        const { linkedItems, linked, total } = linkItemsWithMaster(container.items, masterItems);
+        container.items = linkedItems;
+
+        setLoadingMsg(`紐付完了: ${linked}/${total}件 (${container.items.length}品目)`);
+        loadData([container]);
+        saveRecentFile(file, 1, container.items.length, 'container');
+
+        linkedRef.current = `${container.containerNo}-0`;
+        await new Promise((r) => setTimeout(r, 500));
+      } catch (e) {
+        console.error('Photo parse error:', e);
+        setLoadingMsg(`写真読込エラー: ${e instanceof Error ? e.message : String(e)}`);
+        await new Promise((r) => setTimeout(r, 3000));
+      } finally {
+        closeLoading();
+      }
+    },
+    [loadData, loadMaster, closeLoading],
+  );
+
   const handleJkpLoaded = useCallback(
     async (file: File) => {
       jkpUserLoadedRef.current = true;  // ユーザー操作による読込
@@ -892,7 +939,7 @@ export default function Home() {
   if (state.containers.length === 0) {
     return (
       <>
-        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} />
+        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} onPhotoLoaded={handlePhotoLoaded} />
         {/* テーマ切替ボタン（読込画面右下） */}
         <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 100 }}>
           <button onClick={toggleTheme} style={{

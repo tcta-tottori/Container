@@ -7,7 +7,7 @@ import { getStoredToken } from '@/lib/githubSave';
 import { openGooglePicker, downloadFromDrive } from '@/lib/googleDrive';
 
 /** 判別されたファイルの役割 */
-export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'unknown';
+export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'photo' | 'unknown';
 
 export interface ClassifiedFile {
   file: File;
@@ -15,8 +15,19 @@ export interface ClassifiedFile {
   label: string;
 }
 
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.bmp'];
+
+/** ファイル名から画像かどうか判定 */
+export function isImageFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
 /** ファイル名からロールを自動判別 */
 export function classifyFile(name: string): { role: FileRole; label: string } {
+  if (isImageFile(name)) {
+    return { role: 'photo', label: 'コンテナ日程（写真）' };
+  }
   const upper = name.toUpperCase();
   if (upper.includes('CNS_品目一覧') || upper.includes('CNS_品目') || upper.includes('全集約版')) {
     return { role: 'master', label: 'マスターデータ' };
@@ -46,6 +57,7 @@ interface FileDropZoneProps {
   onAqssContainerLoaded?: (invoiceFile: File, packingFile?: File) => void;
   onJkpLoaded?: (file: File) => void;
   onMasterLoaded?: (file: File) => void;
+  onPhotoLoaded?: (file: File) => void;
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
@@ -150,7 +162,7 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   );
 }
 
-export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
+export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -179,11 +191,17 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
       let containerFile: File | null = null;
 
       for (const f of Array.from(files)) {
-        if (!f.name.endsWith('.xlsx') && !f.name.endsWith('.xls')) continue;
+        const lowerName = f.name.toLowerCase();
+        const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
+        const isImage = isImageFile(f.name);
+        if (!isExcel && !isImage) continue;
         const { role, label } = classifyFile(f.name);
         classified.push({ file: f, role, label });
 
-        if (role === 'aqss04l' || role === 'aqss05l') {
+        if (role === 'photo') {
+          // 画像ファイル → OCRで読込
+          if (onPhotoLoaded) onPhotoLoaded(f);
+        } else if (role === 'aqss04l' || role === 'aqss05l') {
           aqssFiles.push(f);
         } else if (role === 'jkp') {
           if (onJkpLoaded) onJkpLoaded(f);
@@ -218,7 +236,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
         }
       }
     },
-    [onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMultiFilesLoaded]
+    [onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded]
   );
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -436,10 +454,10 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             </svg>
           </div>
           <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>
-            Excelファイルをドラッグ＆ドロップ
+            Excel / 写真をドラッグ＆ドロップ
           </p>
           <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, margin: '0 0 10px' }}>
-            またはタップして選択（.xlsx / .xls）
+            またはタップして選択（.xlsx / .xls / .jpg / .png）
           </p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 5, flexWrap: 'wrap' }}>
             {[
@@ -448,6 +466,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               { label: 'AQSS', color: '#a78bfa' },
               { label: 'JKP', color: '#f59e0b' },
               { label: '气高编号', color: '#f472b6' },
+              { label: '写真', color: '#f87171' },
             ].map(({ label, color }) => (
               <span key={label} style={{
                 fontSize: 9, color, background: `${color}12`,
@@ -475,7 +494,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               ))}
             </div>
           )}
-          <input ref={inputRef} type="file" accept=".xlsx,.xls" multiple
+          <input ref={inputRef} type="file" accept=".xlsx,.xls,.jpg,.jpeg,.png,.webp,.heic,.heif,.bmp,image/*" multiple
             onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
             className="hidden" />
         </div>
