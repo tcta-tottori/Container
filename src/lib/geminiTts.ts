@@ -13,7 +13,7 @@ const TTS_ENABLED_STORAGE = 'cns_gemini_tts_enabled';
 const TTS_MODEL_STORAGE = 'cns_gemini_tts_model';
 
 /** デフォルト TTS モデル（Flash 系） */
-export const DEFAULT_GEMINI_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+export const DEFAULT_GEMINI_TTS_MODEL = 'gemini-3.1-flash-preview-tts';
 
 /** 選択可能な音声 */
 export interface GeminiVoice {
@@ -110,6 +110,26 @@ function parseSampleRate(mimeType: string): number {
 }
 
 /**
+ * 日本語読み上げ用のテキスト前処理
+ * - 誤読されやすい漢字を読み仮名に置換
+ * - 句読点の後にスペースを入れて間を明確化
+ */
+function normalizeJapaneseForTts(text: string): string {
+  return text
+    // 読み間違いされやすい単語をひらがなに寄せる
+    .replace(/荷降ろし/g, 'におろし')
+    .replace(/荷下ろし/g, 'におろし')
+    .replace(/荷卸し/g, 'におろし')
+    .replace(/荷降し/g, 'におろし')
+    // 句読点で明確に間を空ける（半角スペース挿入で TTS の休止を誘発）
+    .replace(/、/g, '、 ')
+    .replace(/。/g, '。 ')
+    .replace(/や /g, 'や、 ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Gemini TTS で音声を生成する
  */
 export async function geminiGenerateSpeech(
@@ -124,8 +144,12 @@ export async function geminiGenerateSpeech(
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+  // 日本語として自然に、句読点でしっかり間を空けて読ませるためのスタイル指示を付与
+  const normalized = normalizeJapaneseForTts(text);
+  const styled = `次の日本語を、句読点(、や。)で自然に間を空けて、はっきりと読み上げてください: ${normalized}`;
+
   const body = {
-    contents: [{ parts: [{ text }] }],
+    contents: [{ parts: [{ text: styled }] }],
     generationConfig: {
       responseModalities: ['AUDIO'],
       speechConfig: {
