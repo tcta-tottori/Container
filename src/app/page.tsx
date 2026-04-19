@@ -8,7 +8,8 @@ import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
 import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
-import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled } from '@/lib/geminiTts';
+import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled, setGeminiTtsEnabled } from '@/lib/geminiTts';
+import { getGeminiKey } from '@/lib/geminiApi';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForSpeech } from '@/lib/typeDetector';
@@ -881,9 +882,16 @@ export default function Home() {
   const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
   const [currentVoice, setCurrentVoice] = useState<string>('Kore');
   const [geminiTtsOn, setGeminiTtsOn] = useState<boolean>(false);
+  const [hasGeminiKey, setHasGeminiKey] = useState<boolean>(false);
   useEffect(() => {
     setCurrentVoice(getSelectedVoice());
     setGeminiTtsOn(isGeminiTtsEnabled());
+    setHasGeminiKey(!!getGeminiKey());
+  }, []);
+
+  const toggleGeminiTts = useCallback((enabled: boolean) => {
+    setGeminiTtsEnabled(enabled);
+    setGeminiTtsOn(enabled);
   }, []);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef(false);
@@ -895,6 +903,7 @@ export default function Home() {
       longPressFiredRef.current = true;
       setCurrentVoice(getSelectedVoice());
       setGeminiTtsOn(isGeminiTtsEnabled());
+      setHasGeminiKey(!!getGeminiKey());
       setVoiceMenuOpen(true);
     }, 500);
   }, []);
@@ -1389,11 +1398,53 @@ export default function Home() {
                     borderBottom: '1px solid rgba(255,255,255,0.1)',
                   }}>
                     <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>声の種類</div>
-                    <div style={{ color: geminiTtsOn ? '#a78bfa' : '#888', fontSize: 11 }}>
-                      {geminiTtsOn ? 'Gemini Flash TTS' : 'Gemini キー未設定'}
+                    <div style={{ color: geminiTtsOn ? '#a78bfa' : '#facc15', fontSize: 11 }}>
+                      {!hasGeminiKey
+                        ? 'Gemini キー未設定'
+                        : geminiTtsOn ? 'Gemini 3.1 Flash TTS' : 'Web Speech API'}
                     </div>
                   </div>
-                  {!geminiTtsOn && (
+
+                  {/* 音声エンジン切り替えトグル */}
+                  {hasGeminiKey && (
+                    <div style={{
+                      display: 'flex', gap: 6, marginBottom: 12,
+                      padding: 4, borderRadius: 10,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}>
+                      <button
+                        onClick={() => toggleGeminiTts(true)}
+                        style={{
+                          flex: 1, padding: '8px 10px', borderRadius: 7,
+                          background: geminiTtsOn
+                            ? 'linear-gradient(135deg, rgba(139,92,246,0.4), rgba(74,110,247,0.3))'
+                            : 'transparent',
+                          border: geminiTtsOn ? '1px solid rgba(167,139,250,0.5)' : '1px solid transparent',
+                          color: geminiTtsOn ? '#fff' : '#888', fontSize: 12, fontWeight: 600,
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                        }}
+                      >
+                        Gemini 3.1 Flash
+                      </button>
+                      <button
+                        onClick={() => toggleGeminiTts(false)}
+                        style={{
+                          flex: 1, padding: '8px 10px', borderRadius: 7,
+                          background: !geminiTtsOn
+                            ? 'linear-gradient(135deg, rgba(74,110,247,0.35), rgba(99,102,241,0.25))'
+                            : 'transparent',
+                          border: !geminiTtsOn ? '1px solid rgba(74,110,247,0.5)' : '1px solid transparent',
+                          color: !geminiTtsOn ? '#fff' : '#888', fontSize: 12, fontWeight: 600,
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                        }}
+                      >
+                        Web Speech
+                      </button>
+                    </div>
+                  )}
+
+                  {!hasGeminiKey && (
                     <div style={{
                       color: '#facc15', fontSize: 11, lineHeight: 1.5,
                       padding: '8px 10px', marginBottom: 10,
@@ -1401,7 +1452,18 @@ export default function Home() {
                       border: '1px solid rgba(250,204,21,0.2)',
                       borderRadius: 8,
                     }}>
-                      Gemini API キーを設定すると高品質な音声になります。
+                      Gemini API キーを設定すると高品質な音声(声の種類選択)が使えます。
+                    </div>
+                  )}
+                  {hasGeminiKey && !geminiTtsOn && (
+                    <div style={{
+                      color: '#94a3b8', fontSize: 11, lineHeight: 1.5,
+                      padding: '8px 10px', marginBottom: 10,
+                      background: 'rgba(148,163,184,0.06)',
+                      border: '1px solid rgba(148,163,184,0.15)',
+                      borderRadius: 8,
+                    }}>
+                      Web Speech API 使用中。声の種類選択は Gemini に切り替え後に反映されます。
                     </div>
                   )}
                   <div style={{ display: 'grid', gap: 6 }}>
