@@ -8,10 +8,17 @@ import { geminiGenerateSpeech, isGeminiTtsEnabled } from '@/lib/geminiTts';
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
 let _onSpeakEnd: (() => void) | null = null;
+// Gemini TTS 等で「リクエスト送信完了 → 音声再生開始」の通知（読込スピナー解除用）
+let _onSpeakPlay: (() => void) | null = null;
 
-export function setSpeakCallbacks(onStart: (text: string) => void, onEnd: () => void) {
+export function setSpeakCallbacks(
+  onStart: (text: string) => void,
+  onEnd: () => void,
+  onPlay?: () => void,
+) {
   _onSpeakStart = onStart;
   _onSpeakEnd = onEnd;
+  _onSpeakPlay = onPlay || null;
 }
 
 // 現在再生中の Gemini 音声と生成中のリクエストを追跡
@@ -57,7 +64,7 @@ function speakWebSpeech(text: string): void {
   const voices = window.speechSynthesis.getVoices();
   const jaVoice = voices.find((v) => v.lang.startsWith('ja'));
   if (jaVoice) u.voice = jaVoice;
-  u.onstart = () => { _onSpeakStart?.(text); };
+  u.onstart = () => { _onSpeakStart?.(text); _onSpeakPlay?.(); };
   u.onend = () => { _onSpeakEnd?.(); };
   u.onerror = () => { _onSpeakEnd?.(); };
   window.speechSynthesis.speak(u);
@@ -91,6 +98,7 @@ async function speakGemini(text: string): Promise<void> {
       if (_currentAudio === audio) _currentAudio = null;
       _onSpeakEnd?.();
     };
+    audio.onplay = () => { _onSpeakPlay?.(); };
     await audio.play();
   } catch (err) {
     if (abort.signal.aborted) return;

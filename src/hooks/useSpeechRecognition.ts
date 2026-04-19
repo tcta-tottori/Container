@@ -12,6 +12,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPreparingSpeech, setIsPreparingSpeech] = useState(false);
   const [speakingText, setSpeakingText] = useState<string | null>(null);
   const [lastTranscript, setLastTranscript] = useState<string | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -124,6 +125,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
     setSpeakCallbacks(
       (text: string) => {
         setIsSpeaking(true);
+        setIsPreparingSpeech(true);
         setSpeakingText(text);
         pausedForSpeechRef.current = true;
         // 録音を完全停止（onendでの自動再開もブロック）
@@ -135,6 +137,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
       },
       () => {
         setIsSpeaking(false);
+        setIsPreparingSpeech(false);
         setSpeakingText(null);
         // コール終了時刻を記録（onresultでのガード用）
         speakEndTimeRef.current?.(Date.now());
@@ -147,7 +150,11 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
             }
           }, 3000);
         }
-      }
+      },
+      () => {
+        // 実際に音声が再生開始したら読込状態を解除
+        setIsPreparingSpeech(false);
+      },
     );
   }, [isListening, startListening]);
 
@@ -165,6 +172,7 @@ export function useSpeechRecognition({ onCommand }: UseSpeechRecognitionProps) {
   return {
     isListening,
     isSpeaking,
+    isPreparingSpeech,
     speakingText,
     isSupported,
     lastTranscript,

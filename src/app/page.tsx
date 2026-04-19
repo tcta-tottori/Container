@@ -8,7 +8,7 @@ import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
 import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
-import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled, setGeminiTtsEnabled, getGeminiTtsModel, setGeminiTtsModel, getLastTtsError, subscribeTtsError, DEFAULT_GEMINI_TTS_MODEL } from '@/lib/geminiTts';
+import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled, setGeminiTtsEnabled, getGeminiTtsModel, setGeminiTtsModel, getLastTtsError, subscribeTtsError, DEFAULT_GEMINI_TTS_MODEL, geminiGenerateSpeech } from '@/lib/geminiTts';
 import { getGeminiKey } from '@/lib/geminiApi';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
@@ -875,7 +875,7 @@ export default function Home() {
     [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, handleConfirmOk, handleContainerSummary, handleProgress]
   );
 
-  const { isListening, isSpeaking, speakingText, isSupported, lastTranscript, toggleListening } =
+  const { isListening, isSpeaking, isPreparingSpeech, speakingText, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
   // 音声種類選択メニュー（マイクボタン長押しで開く）
@@ -903,6 +903,56 @@ export default function Home() {
     setTtsModelName(name);
     setGeminiTtsModel(name);
   }, []);
+
+  // 各音声のサンプル試聴
+  const [sampleLoadingId, setSampleLoadingId] = useState<string | null>(null);
+  const [samplePlayingId, setSamplePlayingId] = useState<string | null>(null);
+  const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
+  const sampleUrlRef = useRef<string | null>(null);
+
+  const stopSample = useCallback(() => {
+    if (sampleAudioRef.current) {
+      try { sampleAudioRef.current.pause(); } catch { /* ignore */ }
+      sampleAudioRef.current = null;
+    }
+    if (sampleUrlRef.current) {
+      try { URL.revokeObjectURL(sampleUrlRef.current); } catch { /* ignore */ }
+      sampleUrlRef.current = null;
+    }
+    setSampleLoadingId(null);
+    setSamplePlayingId(null);
+  }, []);
+
+  const playSample = useCallback(async (voiceId: string) => {
+    stopSample();
+    setSampleLoadingId(voiceId);
+    try {
+      const blob = await geminiGenerateSpeech('こんにちは、サンプル音声です。', { voice: voiceId });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      sampleAudioRef.current = audio;
+      sampleUrlRef.current = url;
+      audio.onplay = () => {
+        setSampleLoadingId(null);
+        setSamplePlayingId(voiceId);
+      };
+      const cleanup = () => {
+        if (sampleUrlRef.current === url) {
+          URL.revokeObjectURL(url);
+          sampleUrlRef.current = null;
+        }
+        if (sampleAudioRef.current === audio) sampleAudioRef.current = null;
+        setSamplePlayingId((cur) => (cur === voiceId ? null : cur));
+      };
+      audio.onended = cleanup;
+      audio.onerror = cleanup;
+      await audio.play();
+    } catch (err) {
+      console.error('サンプル再生失敗:', err);
+      setSampleLoadingId(null);
+      setSamplePlayingId(null);
+    }
+  }, [stopSample]);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef(false);
 
@@ -1299,7 +1349,7 @@ export default function Home() {
         {/* フローティングマイクボタン（右下固定） */}
         {viewMode === 'work' && isSupported && (
           <>
-            {isSpeaking && (
+            {(isSpeaking || isPreparingSpeech) && (
               <style>{`
                 @keyframes speakBar1 { 0%,100% { height: 20%; } 50% { height: 80%; } }
                 @keyframes speakBar2 { 0%,100% { height: 40%; } 40% { height: 95%; } }
@@ -1308,6 +1358,8 @@ export default function Home() {
                 @keyframes speakBar5 { 0%,100% { height: 30%; } 45% { height: 75%; } }
                 @keyframes speakBar6 { 0%,100% { height: 15%; } 55% { height: 65%; } }
                 @keyframes speakBar7 { 0%,100% { height: 25%; } 35% { height: 70%; } }
+                @keyframes ttsLoadSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                @keyframes ttsLoadDot { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
               `}</style>
             )}
             <button
@@ -1337,7 +1389,14 @@ export default function Home() {
                 transition: 'all 0.3s ease',
                 paddingBottom: 'env(safe-area-inset-bottom, 0px)',
               }}>
-              {isSpeaking ? (
+              {isPreparingSpeech ? (
+                /* Gemini TTS 取得中: 回転スピナー */
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                  style={{ animation: 'ttsLoadSpin 0.9s linear infinite' }}>
+                  <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5" fill="none" />
+                  <path d="M12 3 a9 9 0 0 1 9 9" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+                </svg>
+              ) : isSpeaking ? (
                 /* 音声コール中: 音声波形アイコン（7本の棒が不規則に伸縮） */
                 <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 24 }}>
                   {[
@@ -1385,7 +1444,7 @@ export default function Home() {
             {/* 音声種類選択メニュー（マイクボタン長押しで表示） */}
             {voiceMenuOpen && (
               <div
-                onClick={() => setVoiceMenuOpen(false)}
+                onClick={() => { stopSample(); setVoiceMenuOpen(false); }}
                 style={{
                   position: 'fixed', inset: 0, zIndex: 150,
                   background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
@@ -1535,39 +1594,85 @@ export default function Home() {
                   <div style={{ display: 'grid', gap: 6 }}>
                     {GEMINI_VOICES.map((v) => {
                       const selected = v.id === currentVoice;
+                      const sampleLoading = sampleLoadingId === v.id;
+                      const samplePlaying = samplePlayingId === v.id;
+                      const canSample = hasGeminiKey && geminiTtsOn;
                       return (
-                        <button
+                        <div
                           key={v.id}
                           onClick={() => handleSelectVoice(v.id)}
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '10px 12px', borderRadius: 10,
+                            gap: 8, padding: '10px 12px', borderRadius: 10,
                             background: selected
                               ? 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(74,110,247,0.25))'
                               : 'rgba(255,255,255,0.04)',
                             border: selected
                               ? '1.5px solid rgba(167,139,250,0.6)'
                               : '1px solid rgba(255,255,255,0.08)',
-                            color: '#fff', cursor: 'pointer', textAlign: 'left',
+                            color: '#fff', cursor: 'pointer',
                             transition: 'all 0.15s ease',
                           }}
                         >
-                          <div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 14, fontWeight: 600 }}>{v.label}</div>
                             <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{v.desc}</div>
                           </div>
-                          {selected && (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                              stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          )}
-                        </button>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {/* サンプル試聴ボタン */}
+                            {canSample && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (samplePlaying || sampleLoading) {
+                                    stopSample();
+                                  } else {
+                                    void playSample(v.id);
+                                  }
+                                }}
+                                title="サンプル試聴"
+                                style={{
+                                  width: 32, height: 32, borderRadius: '50%',
+                                  background: samplePlaying
+                                    ? 'rgba(167,139,250,0.3)'
+                                    : 'rgba(255,255,255,0.08)',
+                                  border: '1px solid rgba(255,255,255,0.15)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  cursor: 'pointer', flexShrink: 0,
+                                  color: '#fff',
+                                }}
+                              >
+                                {sampleLoading ? (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                    style={{ animation: 'ttsLoadSpin 0.9s linear infinite' }}>
+                                    <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.25)" strokeWidth="3" fill="none" />
+                                    <path d="M12 3 a9 9 0 0 1 9 9" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" />
+                                  </svg>
+                                ) : samplePlaying ? (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
+                                    <rect x="6" y="5" width="4" height="14" rx="1" />
+                                    <rect x="14" y="5" width="4" height="14" rx="1" />
+                                  </svg>
+                                ) : (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
+                                    <path d="M8 5v14l11-7z" />
+                                  </svg>
+                                )}
+                              </button>
+                            )}
+                            {selected && (
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
                   <button
-                    onClick={() => setVoiceMenuOpen(false)}
+                    onClick={() => { stopSample(); setVoiceMenuOpen(false); }}
                     style={{
                       marginTop: 12, width: '100%', padding: '10px',
                       borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
