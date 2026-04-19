@@ -15,6 +15,20 @@ const TTS_MODEL_STORAGE = 'cns_gemini_tts_model';
 /** デフォルト TTS モデル（Flash 系） */
 export const DEFAULT_GEMINI_TTS_MODEL = 'gemini-3.1-flash-preview-tts';
 
+/**
+ * 試行するモデルの優先順位リスト。
+ * 最初のモデルで 4xx エラーが出た場合、次のモデルを試す（初回の一度だけ）。
+ * 成功したモデルは WORKING_MODEL_STORAGE にキャッシュして以降再利用する。
+ */
+const TTS_MODEL_FALLBACKS = [
+  'gemini-3.1-flash-preview-tts',
+  'gemini-3.0-flash-preview-tts',
+  'gemini-2.5-flash-preview-tts',
+  'gemini-2.5-pro-preview-tts',
+];
+
+const WORKING_MODEL_STORAGE = 'cns_gemini_tts_working_model';
+
 /** 選択可能な音声 */
 export interface GeminiVoice {
   id: string;
@@ -129,27 +143,17 @@ function normalizeJapaneseForTts(text: string): string {
     .trim();
 }
 
-/**
- * Gemini TTS で音声を生成する
- */
-export async function geminiGenerateSpeech(
-  text: string,
-  options?: { voice?: string; model?: string; signal?: AbortSignal },
+/** 指定モデルで 1 回だけ TTS リクエストを投げる。失敗は throw。 */
+async function requestTtsOnce(
+  apiKey: string,
+  model: string,
+  voice: string,
+  styledText: string,
+  signal?: AbortSignal,
 ): Promise<Blob> {
-  const apiKey = getGeminiKey();
-  if (!apiKey) throw new Error('Gemini API キーが設定されていません');
-
-  const voice = options?.voice || getSelectedVoice();
-  const model = options?.model || getGeminiTtsModel();
-
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  // 日本語として自然に、句読点でしっかり間を空けて読ませるためのスタイル指示を付与
-  const normalized = normalizeJapaneseForTts(text);
-  const styled = `次の日本語を、句読点(、や。)で自然に間を空けて、はっきりと読み上げてください: ${normalized}`;
-
   const body = {
-    contents: [{ parts: [{ text: styled }] }],
+    contents: [{ parts: [{ text: styledText }] }],
     generationConfig: {
       responseModalities: ['AUDIO'],
       speechConfig: {
@@ -159,28 +163,79 @@ export async function geminiGenerateSpeech(
       },
     },
   };
-
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: options?.signal,
+    signal,
   });
-
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`Gemini TTS エラー (${res.status}): ${errText.slice(0, 200)}`);
+    const err = new Error(`Gemini TTS エラー (${res.status}): ${errText.slice(0, 200)}`);
+    // モデル未対応系のエラー (400, 404) はフォールバック対象
+    (err as Error & { status?: number }).status = res.status;
+    throw err;
   }
-
   const data = await res.json();
   const part = data?.candidates?.[0]?.content?.parts?.[0];
   const inline = part?.inlineData || part?.inline_data;
   const b64 = inline?.data;
   const mime = inline?.mimeType || inline?.mime_type || 'audio/L16;codec=pcm;rate=24000';
-
   if (!b64) throw new Error('Gemini TTS のレスポンスに音声データがありません');
-
   const pcm = base64ToUint8Array(b64);
   const sampleRate = parseSampleRate(mime);
   return pcmToWavBlob(pcm, sampleRate);
+}
+
+/**
+ * Gemini TTS で音声を生成する。
+ * モデル未対応時は自動で次のモデルにフォールバックし、成功したモデルをキャッシュ。
+ */
+export async function geminiGenerateSpeech(
+  text: string,
+  options?: { voice?: string; model?: string; signal?: AbortSignal },
+): Promise<Blob> {
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error('Gemini API キーが設定されていません');
+
+  const voice = options?.voice || getSelectedVoice();
+
+  // 日本語として自然に、句読点でしっかり間を空けて読ませるためのスタイル指示を付与
+  const normalized = normalizeJapaneseForTts(text);
+  const styled = `次の日本語を、句読点(、や。)で自然に間を空けて、はっきりと読み上げてください: ${normalized}`;
+
+  // 試行順: 明示指定 > キャッシュ済み動作モデル > ユーザー設定 > デフォルト > フォールバックチェーン
+  const cachedWorking = typeof window !== 'undefined' ? localStorage.getItem(WORKING_MODEL_STORAGE) : null;
+  const userModel = getGeminiTtsModel();
+  const explicit = options?.model;
+  const order: string[] = [];
+  if (explicit) order.push(explicit);
+  if (cachedWorking && !order.includes(cachedWorking)) order.push(cachedWorking);
+  if (userModel && !order.includes(userModel)) order.push(userModel);
+  for (const m of TTS_MODEL_FALLBACKS) {
+    if (!order.includes(m)) order.push(m);
+  }
+
+  let lastErr: Error | null = null;
+  for (const model of order) {
+    try {
+      const blob = await requestTtsOnce(apiKey, model, voice, styled, options?.signal);
+      // 成功したモデルを記憶して次回以降の試行を省略
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(WORKING_MODEL_STORAGE, model);
+      }
+      return blob;
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      if (options?.signal?.aborted) throw err;
+      // 4xx のみ次のモデルにフォールバック（ネットワーク/5xx は即時失敗）
+      if (err.status && err.status >= 400 && err.status < 500) {
+        console.warn(`[Gemini TTS] ${model} 失敗 (${err.status})、次モデルを試行`);
+        lastErr = err;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr || new Error('Gemini TTS: 利用可能なモデルが見つかりません');
 }
