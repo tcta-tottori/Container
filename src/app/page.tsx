@@ -914,6 +914,8 @@ export default function Home() {
       setCurrentVoice(getSelectedVoice());
       setGeminiTtsOn(isGeminiTtsEnabled());
       setHasGeminiKey(!!getGeminiKey());
+      setTtsModelName(getGeminiTtsModel());
+      setTtsError(getLastTtsError());
       setVoiceMenuOpen(true);
     }, 500);
   }, []);

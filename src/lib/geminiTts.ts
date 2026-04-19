@@ -47,9 +47,20 @@ export function setSelectedVoice(voiceId: string): void {
   localStorage.setItem(VOICE_STORAGE, voiceId);
 }
 
+/** 過去の誤ったモデル名を自動的に正しいデフォルトに置換する */
+const LEGACY_WRONG_MODELS = new Set([
+  'gemini-3.1-flash-preview-tts',
+  'gemini-3.0-flash-preview-tts',
+]);
+
 export function getGeminiTtsModel(): string {
   if (typeof window === 'undefined') return DEFAULT_GEMINI_TTS_MODEL;
-  return localStorage.getItem(TTS_MODEL_STORAGE) || DEFAULT_GEMINI_TTS_MODEL;
+  const stored = localStorage.getItem(TTS_MODEL_STORAGE);
+  if (stored && LEGACY_WRONG_MODELS.has(stored)) {
+    localStorage.removeItem(TTS_MODEL_STORAGE);
+    return DEFAULT_GEMINI_TTS_MODEL;
+  }
+  return stored || DEFAULT_GEMINI_TTS_MODEL;
 }
 
 export function setGeminiTtsModel(model: string): void {
