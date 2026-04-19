@@ -9,6 +9,7 @@ on:
       - claude/timer-ui-updates-DBaNV
       - claude/fix-palette-box-display-36k8A
       - claude/add-photo-schedule-reading-Wx3tS
+      - claude/add-gemini-voice-system-7J6VK
 
 permissions:
   contents: read
