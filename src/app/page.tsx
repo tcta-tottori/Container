@@ -8,7 +8,7 @@ import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
 import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
-import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled, setGeminiTtsEnabled } from '@/lib/geminiTts';
+import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled, setGeminiTtsEnabled, getGeminiTtsModel, setGeminiTtsModel, getLastTtsError, subscribeTtsError, DEFAULT_GEMINI_TTS_MODEL } from '@/lib/geminiTts';
 import { getGeminiKey } from '@/lib/geminiApi';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
@@ -883,15 +883,25 @@ export default function Home() {
   const [currentVoice, setCurrentVoice] = useState<string>('Kore');
   const [geminiTtsOn, setGeminiTtsOn] = useState<boolean>(false);
   const [hasGeminiKey, setHasGeminiKey] = useState<boolean>(false);
+  const [ttsModelName, setTtsModelName] = useState<string>(DEFAULT_GEMINI_TTS_MODEL);
+  const [ttsError, setTtsError] = useState<string | null>(null);
   useEffect(() => {
     setCurrentVoice(getSelectedVoice());
     setGeminiTtsOn(isGeminiTtsEnabled());
     setHasGeminiKey(!!getGeminiKey());
+    setTtsModelName(getGeminiTtsModel());
+    setTtsError(getLastTtsError());
+    return subscribeTtsError(setTtsError);
   }, []);
 
   const toggleGeminiTts = useCallback((enabled: boolean) => {
     setGeminiTtsEnabled(enabled);
     setGeminiTtsOn(enabled);
+  }, []);
+
+  const handleModelNameChange = useCallback((name: string) => {
+    setTtsModelName(name);
+    setGeminiTtsModel(name);
   }, []);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressFiredRef = useRef(false);
@@ -1464,6 +1474,60 @@ export default function Home() {
                       borderRadius: 8,
                     }}>
                       Web Speech API 使用中。声の種類選択は Gemini に切り替え後に反映されます。
+                    </div>
+                  )}
+
+                  {/* Gemini TTS のエラー表示 */}
+                  {hasGeminiKey && geminiTtsOn && ttsError && (
+                    <div style={{
+                      color: '#fca5a5', fontSize: 11, lineHeight: 1.5,
+                      padding: '8px 10px', marginBottom: 10,
+                      background: 'rgba(239,68,68,0.08)',
+                      border: '1px solid rgba(239,68,68,0.25)',
+                      borderRadius: 8,
+                      wordBreak: 'break-all',
+                    }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ Gemini TTS エラー</div>
+                      <div>{ttsError}</div>
+                      <div style={{ marginTop: 4, color: '#fca5a5', opacity: 0.8 }}>
+                        モデル名を変更するか「Web Speech」に切り替えてください。
+                      </div>
+                    </div>
+                  )}
+
+                  {/* モデル名入力（Gemini 使用時のみ） */}
+                  {hasGeminiKey && geminiTtsOn && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>
+                        モデル名（他システムで動く名前があればここに）
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          type="text"
+                          value={ttsModelName}
+                          onChange={(e) => handleModelNameChange(e.target.value)}
+                          placeholder={DEFAULT_GEMINI_TTS_MODEL}
+                          style={{
+                            flex: 1, padding: '8px 10px', borderRadius: 7,
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            color: '#fff', fontSize: 12,
+                            fontFamily: 'monospace',
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          onClick={() => handleModelNameChange(DEFAULT_GEMINI_TTS_MODEL)}
+                          style={{
+                            padding: '8px 10px', borderRadius: 7,
+                            background: 'rgba(255,255,255,0.04)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            color: '#aaa', fontSize: 11, cursor: 'pointer',
+                          }}
+                        >
+                          初期値
+                        </button>
+                      </div>
                     </div>
                   )}
                   <div style={{ display: 'grid', gap: 6 }}>

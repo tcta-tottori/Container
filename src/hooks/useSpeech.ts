@@ -94,10 +94,10 @@ async function speakGemini(text: string): Promise<void> {
     await audio.play();
   } catch (err) {
     if (abort.signal.aborted) return;
-    console.warn('Gemini TTS 失敗、Web Speech API にフォールバック:', err);
-    // フォールバック時は _onSpeakStart 済みなので、そのまま Web Speech へ
-    // ただし Web Speech も onstart で再度通知するので、先に end して整合性を保つ
-    speakWebSpeech(text);
+    console.error('Gemini TTS 失敗:', err);
+    // ユーザーが Gemini を明示選択しているため自動フォールバックしない。
+    // 録音再開のため _onSpeakEnd を呼んで状態を解放する。
+    _onSpeakEnd?.();
   } finally {
     if (_currentAbort === abort) _currentAbort = null;
   }

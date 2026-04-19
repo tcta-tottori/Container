@@ -69,6 +69,24 @@ export function setGeminiTtsEnabled(enabled: boolean): void {
   localStorage.setItem(TTS_ENABLED_STORAGE, enabled ? '1' : '0');
 }
 
+/** 直近の TTS エラーメッセージ（UI 表示用） */
+let _lastTtsError: string | null = null;
+const _errorListeners = new Set<(msg: string | null) => void>();
+
+export function getLastTtsError(): string | null {
+  return _lastTtsError;
+}
+
+export function setLastTtsError(msg: string | null): void {
+  _lastTtsError = msg;
+  _errorListeners.forEach((fn) => fn(msg));
+}
+
+export function subscribeTtsError(fn: (msg: string | null) => void): () => void {
+  _errorListeners.add(fn);
+  return () => { _errorListeners.delete(fn); };
+}
+
 /** base64 文字列を Uint8Array にデコード */
 function base64ToUint8Array(base64: string): Uint8Array {
   const binary = atob(base64);
@@ -169,7 +187,9 @@ export async function geminiGenerateSpeech(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
-    throw new Error(`Gemini TTS エラー (${res.status}): ${errText.slice(0, 200)}`);
+    const msg = `モデル「${model}」エラー (HTTP ${res.status}): ${errText.slice(0, 160)}`;
+    setLastTtsError(msg);
+    throw new Error(msg);
   }
 
   const data = await res.json();
@@ -178,8 +198,13 @@ export async function geminiGenerateSpeech(
   const b64 = inline?.data;
   const mime = inline?.mimeType || inline?.mime_type || 'audio/L16;codec=pcm;rate=24000';
 
-  if (!b64) throw new Error('Gemini TTS のレスポンスに音声データがありません');
+  if (!b64) {
+    const msg = `モデル「${model}」: 音声データが返ってきません`;
+    setLastTtsError(msg);
+    throw new Error(msg);
+  }
 
+  setLastTtsError(null); // 成功時はエラーをクリア
   const pcm = base64ToUint8Array(b64);
   const sampleRate = parseSampleRate(mime);
   return pcmToWavBlob(pcm, sampleRate);
