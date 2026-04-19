@@ -13,7 +13,7 @@ const TTS_ENABLED_STORAGE = 'cns_gemini_tts_enabled';
 const TTS_MODEL_STORAGE = 'cns_gemini_tts_model';
 
 /** デフォルト TTS モデル（Flash 系） */
-export const DEFAULT_GEMINI_TTS_MODEL = 'gemini-3.1-flash-preview-tts';
+export const DEFAULT_GEMINI_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
 
 /** 選択可能な音声 */
 export interface GeminiVoice {
