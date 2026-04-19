@@ -7,7 +7,8 @@ import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExce
 import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
-import { useSpeech } from '@/hooks/useSpeech';
+import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
+import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled } from '@/lib/geminiTts';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForSpeech } from '@/lib/typeDetector';
@@ -865,9 +866,7 @@ export default function Home() {
           break;
         }
         case 'STOP_SPEECH': {
-          if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-          }
+          cancelSpeech();
           break;
         }
       }
@@ -877,6 +876,57 @@ export default function Home() {
 
   const { isListening, isSpeaking, speakingText, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
+
+  // 音声種類選択メニュー（マイクボタン長押しで開く）
+  const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
+  const [currentVoice, setCurrentVoice] = useState<string>('Kore');
+  const [geminiTtsOn, setGeminiTtsOn] = useState<boolean>(false);
+  useEffect(() => {
+    setCurrentVoice(getSelectedVoice());
+    setGeminiTtsOn(isGeminiTtsEnabled());
+  }, []);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const handleMicPressStart = useCallback(() => {
+    longPressFiredRef.current = false;
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true;
+      setCurrentVoice(getSelectedVoice());
+      setGeminiTtsOn(isGeminiTtsEnabled());
+      setVoiceMenuOpen(true);
+    }, 500);
+  }, []);
+
+  const handleMicPressEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return; // 長押しの場合は通常クリックを発火しない
+    }
+    if (isSpeaking) {
+      cancelSpeech();
+      return;
+    }
+    toggleListening();
+  }, [isSpeaking, toggleListening]);
+
+  const handleMicPressCancel = useCallback(() => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressFiredRef.current = false;
+  }, []);
+
+  const handleSelectVoice = useCallback((voiceId: string) => {
+    setSelectedVoice(voiceId);
+    setCurrentVoice(voiceId);
+  }, []);
 
   // 初期ロード中はスプラッシュ画面
   if (!appReady) {
@@ -1239,13 +1289,12 @@ export default function Home() {
                 @keyframes speakBar7 { 0%,100% { height: 25%; } 35% { height: 70%; } }
               `}</style>
             )}
-            <button onClick={() => {
-              if (isSpeaking && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                return;
-              }
-              toggleListening();
-            }}
+            <button
+              onPointerDown={handleMicPressStart}
+              onPointerUp={handleMicPressEnd}
+              onPointerLeave={handleMicPressCancel}
+              onPointerCancel={handleMicPressCancel}
+              onContextMenu={(e) => e.preventDefault()}
               className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
               style={{
                 position: 'fixed', bottom: 20, zIndex: 100,
@@ -1311,6 +1360,98 @@ export default function Home() {
                 }} />
               )}
             </button>
+
+            {/* 音声種類選択メニュー（マイクボタン長押しで表示） */}
+            {voiceMenuOpen && (
+              <div
+                onClick={() => setVoiceMenuOpen(false)}
+                style={{
+                  position: 'fixed', inset: 0, zIndex: 150,
+                  background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                  display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+                  paddingBottom: 96, animation: 'fadeIn 0.18s ease both',
+                }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
+                    border: '1.5px solid rgba(255,255,255,0.15)',
+                    borderRadius: 20, padding: 16,
+                    boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+                    width: '92%', maxWidth: 360,
+                    maxHeight: '70vh', overflowY: 'auto',
+                  }}
+                >
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    marginBottom: 12, paddingBottom: 8,
+                    borderBottom: '1px solid rgba(255,255,255,0.1)',
+                  }}>
+                    <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>声の種類</div>
+                    <div style={{ color: geminiTtsOn ? '#a78bfa' : '#888', fontSize: 11 }}>
+                      {geminiTtsOn ? 'Gemini Flash TTS' : 'Gemini キー未設定'}
+                    </div>
+                  </div>
+                  {!geminiTtsOn && (
+                    <div style={{
+                      color: '#facc15', fontSize: 11, lineHeight: 1.5,
+                      padding: '8px 10px', marginBottom: 10,
+                      background: 'rgba(250,204,21,0.08)',
+                      border: '1px solid rgba(250,204,21,0.2)',
+                      borderRadius: 8,
+                    }}>
+                      Gemini API キーを設定すると高品質な音声になります。
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {GEMINI_VOICES.map((v) => {
+                      const selected = v.id === currentVoice;
+                      return (
+                        <button
+                          key={v.id}
+                          onClick={() => handleSelectVoice(v.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '10px 12px', borderRadius: 10,
+                            background: selected
+                              ? 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(74,110,247,0.25))'
+                              : 'rgba(255,255,255,0.04)',
+                            border: selected
+                              ? '1.5px solid rgba(167,139,250,0.6)'
+                              : '1px solid rgba(255,255,255,0.08)',
+                            color: '#fff', cursor: 'pointer', textAlign: 'left',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>{v.label}</div>
+                            <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{v.desc}</div>
+                          </div>
+                          {selected && (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                              stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => setVoiceMenuOpen(false)}
+                    style={{
+                      marginTop: 12, width: '100%', padding: '10px',
+                      borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'rgba(255,255,255,0.04)', color: '#ccc',
+                      fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
         <UpdateNotification />

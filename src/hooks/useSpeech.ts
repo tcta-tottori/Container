@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { itemNameForSpeech, areSimilarItems, getSimilarityReason, extractColor } from '@/lib/typeDetector';
+import { geminiGenerateSpeech, isGeminiTtsEnabled } from '@/lib/geminiTts';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
@@ -13,8 +14,41 @@ export function setSpeakCallbacks(onStart: (text: string) => void, onEnd: () => 
   _onSpeakEnd = onEnd;
 }
 
-function speak(text: string): void {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+// 現在再生中の Gemini 音声と生成中のリクエストを追跡
+let _currentAudio: HTMLAudioElement | null = null;
+let _currentAbort: AbortController | null = null;
+let _currentAudioUrl: string | null = null;
+
+/** 現在の音声コール（Gemini / Web Speech）を全てキャンセル */
+export function cancelSpeech(): void {
+  if (typeof window === 'undefined') return;
+  if (_currentAbort) {
+    try { _currentAbort.abort(); } catch { /* ignore */ }
+    _currentAbort = null;
+  }
+  if (_currentAudio) {
+    try {
+      _currentAudio.onended = null;
+      _currentAudio.onerror = null;
+      _currentAudio.pause();
+    } catch { /* ignore */ }
+    _currentAudio = null;
+  }
+  if (_currentAudioUrl) {
+    try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ }
+    _currentAudioUrl = null;
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  _onSpeakEnd?.();
+}
+
+function speakWebSpeech(text: string): void {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    _onSpeakEnd?.();
+    return;
+  }
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'ja-JP';
@@ -27,6 +61,64 @@ function speak(text: string): void {
   u.onend = () => { _onSpeakEnd?.(); };
   u.onerror = () => { _onSpeakEnd?.(); };
   window.speechSynthesis.speak(u);
+}
+
+async function speakGemini(text: string): Promise<void> {
+  const abort = new AbortController();
+  _currentAbort = abort;
+  // 生成前にコール開始を通知（録音をすぐ止めてフィードバック防止）
+  _onSpeakStart?.(text);
+  try {
+    const blob = await geminiGenerateSpeech(text, { signal: abort.signal });
+    if (abort.signal.aborted) return;
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    _currentAudio = audio;
+    _currentAudioUrl = url;
+    audio.onended = () => {
+      if (_currentAudioUrl === url) {
+        URL.revokeObjectURL(url);
+        _currentAudioUrl = null;
+      }
+      if (_currentAudio === audio) _currentAudio = null;
+      _onSpeakEnd?.();
+    };
+    audio.onerror = () => {
+      if (_currentAudioUrl === url) {
+        URL.revokeObjectURL(url);
+        _currentAudioUrl = null;
+      }
+      if (_currentAudio === audio) _currentAudio = null;
+      _onSpeakEnd?.();
+    };
+    await audio.play();
+  } catch (err) {
+    if (abort.signal.aborted) return;
+    console.warn('Gemini TTS 失敗、Web Speech API にフォールバック:', err);
+    // フォールバック時は _onSpeakStart 済みなので、そのまま Web Speech へ
+    // ただし Web Speech も onstart で再度通知するので、先に end して整合性を保つ
+    speakWebSpeech(text);
+  } finally {
+    if (_currentAbort === abort) _currentAbort = null;
+  }
+}
+
+function speak(text: string): void {
+  if (typeof window === 'undefined') return;
+  // 前回のコールを必ず止める（開始/終了コールバックは新しい speak 側で発火）
+  if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
+  if (_currentAudio) {
+    try { _currentAudio.onended = null; _currentAudio.onerror = null; _currentAudio.pause(); } catch { /* ignore */ }
+    _currentAudio = null;
+  }
+  if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+  if (isGeminiTtsEnabled()) {
+    void speakGemini(text);
+  } else {
+    speakWebSpeech(text);
+  }
 }
 
 export function useSpeech() {
