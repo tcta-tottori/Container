@@ -173,9 +173,9 @@ export async function geminiGenerateSpeech(
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-  // 日本語として自然に、句読点でしっかり間を空けて読ませるためのスタイル指示を付与
+  // スタイル指示は最小限にして生成時間を短縮（句読点のスペース挿入で間は十分確保）
   const normalized = normalizeJapaneseForTts(text);
-  const styled = `次の日本語を、句読点(、や。)で自然に間を空けて、はっきりと読み上げてください: ${normalized}`;
+  const styled = `はっきりと読む: ${normalized}`;
 
   const body = {
     contents: [{ parts: [{ text: styled }] }],
