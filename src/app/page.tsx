@@ -560,22 +560,22 @@ export default function Home() {
         const sheet1Items = parseJkpSheet1(wb);
         // 体積Ｍ３: CBM・箱寸
         const volumeMap = parseJkpVolume(wb);
-        // updata: 出荷スケジュール（船積日行で対象列を判定）
+        // updata: 出荷スケジュール（納入指示行の数量がある列のRow10日付を納入日として読込、当日〜7日）
         const { shipments, activeDates } = parseJkpUpdata(wb);
         setJkpShipments(shipments);
 
-        // 今日〜2週間先で実際に出荷数量がある日付のみ対象
+        // パーサーが既に当日〜7日に絞り込み済み
         const today = new Date().toISOString().slice(0, 10);
-        const twoWeeksLater = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-        const scheduleDates = getScheduleDatesInRange(shipments, today, twoWeeksLater);
+        const oneWeekLater = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+        const scheduleDates = getScheduleDatesInRange(shipments, today, oneWeekLater);
 
         if (scheduleDates.length === 0) {
-          setLoadingMsg(`${today}〜${twoWeeksLater}の出荷データがありません (updata:${shipments.length}件, アクティブ日:${activeDates.length}件)`);
+          setLoadingMsg(`${today}〜${oneWeekLater}の出荷データがありません (updata:${shipments.length}件, 納入日:${activeDates.length}件)`);
           await new Promise((r) => setTimeout(r, 3000));
           return;
         }
 
-        setLoadingMsg(`${scheduleDates.length}日分のデータ検出（船積日基準）。変換中...`);
+        setLoadingMsg(`${scheduleDates.length}日分のデータ検出（納入指示基準）。変換中...`);
 
         // 日付ごとにContainerを作成: "タイガー鍋(3/25)" 形式
         const containers = [];
