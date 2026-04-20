@@ -68,6 +68,9 @@ interface FileDropZoneProps {
 const APP_VERSION = '3.0';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '2.1', date: '2026-04-20', changes: [
+    { icon: '📦', text: 'PDU等ジャーポット(PDZ以外): 2個1セットラミネート表示・1段20個・段ごと交互積み' },
+  ]},
   { ver: '2.0', date: '2026-03-26', changes: [
     { icon: '🎙️', text: '操作バー廃止→マイクボタン固定化（音声メイン操作）' },
     { icon: '🗣️', text: '音声コマンド拡充（お願いします/戻して/何種類?）' },

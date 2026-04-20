@@ -25,10 +25,33 @@ function parseMeas(s: string): [number, number, number] | null {
   return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3])];
 }
 
+/* ===== Jar pot helpers ===== */
+/** PDZ判定 — 2×2パレット積みを維持 */
+function isJarPotPDZ(itemName?: string): boolean {
+  return !!itemName && /^PDZ/.test(itemName);
+}
+/** PDU等PDZ以外のジャーポット判定 — 2個1セットラミネート・1段20個 */
+function isJarPotLaminated(type: ItemType, itemName?: string): boolean {
+  if (type !== 'ジャーポット' && !/^(PDR|PDU|PVW)/.test(itemName || '')) return false;
+  return !isJarPotPDZ(itemName);
+}
+
+/** ラミネート版ジャーポット: 1段あたり10セット = 20個 */
+const LAMINATED_SETS_PER_LAYER = 10;
+const LAMINATED_ITEMS_PER_LAYER = 20;
+
 /* ===== Stack layers (exported for use by other components) ===== */
 export function calculateStackLayers(
   type: ItemType, itemName: string, qtyPerPallet: number, measurements?: string,
 ): number {
+  if (isJarPotLaminated(type, itemName)) {
+    // 1段20個で qtyPerPallet から段数を逆算（1-5段）
+    if (qtyPerPallet > 0) {
+      return Math.min(5, Math.max(1, Math.round(qtyPerPallet / LAMINATED_ITEMS_PER_LAYER)));
+    }
+    const m = itemName.match(/(30|40|50)/);
+    return m && parseInt(m[1]) >= 50 ? 4 : 5;
+  }
   if (type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName)) {
     const m = itemName.match(/(30|40|50)/);
     return m && parseInt(m[1]) >= 50 ? 4 : 5;
@@ -130,10 +153,56 @@ function wireframeFace(opacity: number): React.CSSProperties {
   };
 }
 
+/** ラミネート(2個1セット)の境界線＋透明ラップ表示
+ *  along='w': 2個をW方向に並べたラミネート(W/2で分割) — 上面＆前面に仕切り線
+ *  along='d': 2個をD方向に並べたラミネート(D/2で分割) — 上面＆側面に仕切り線
+ */
+function LaminationSeam({ w, d, h, along }: { w: number; d: number; h: number; along: 'w' | 'd' }) {
+  const seamColor = 'rgba(255,255,255,0.55)';
+  const wrapTint = 'rgba(255,255,255,0.06)';
+  return (
+    <>
+      {/* Top face: seam + subtle wrap tint */}
+      <div style={{
+        position: 'absolute', width: w, height: d, top: (h - d) / 2,
+        transform: `rotateX(90deg) translateZ(${h / 2 + 0.3}px)`,
+        pointerEvents: 'none', background: wrapTint,
+      }}>
+        {along === 'w' ? (
+          <div style={{ position: 'absolute', left: '50%', top: 0, width: 1, height: '100%', background: seamColor, transform: 'translateX(-0.5px)' }} />
+        ) : (
+          <div style={{ position: 'absolute', top: '50%', left: 0, width: '100%', height: 1, background: seamColor, transform: 'translateY(-0.5px)' }} />
+        )}
+      </div>
+      {along === 'w' && (
+        /* Front face: vertical seam at W/2 */
+        <div style={{
+          position: 'absolute', width: w, height: h,
+          transform: `translateZ(${d / 2 + 0.3}px)`,
+          pointerEvents: 'none', background: wrapTint,
+        }}>
+          <div style={{ position: 'absolute', left: '50%', top: 0, width: 1, height: '100%', background: seamColor, transform: 'translateX(-0.5px)' }} />
+        </div>
+      )}
+      {along === 'd' && (
+        /* Right side face: vertical seam at D/2 */
+        <div style={{
+          position: 'absolute', width: d, height: h, left: (w - d) / 2,
+          transform: `rotateY(90deg) translateZ(${w / 2 + 0.3}px)`,
+          pointerEvents: 'none', background: wrapTint,
+        }}>
+          <div style={{ position: 'absolute', left: '50%', top: 0, width: 1, height: '100%', background: seamColor, transform: 'translateX(-0.5px)' }} />
+        </div>
+      )}
+    </>
+  );
+}
+
 /* ===== CSS 3D Cardboard Box (properly positioned in 3D space) ===== */
-function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe }: {
+function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, laminated, laminatedAlong }: {
   x: number; y: number; w: number; d: number; h: number;
   topBase: number; palletDepth: number; wireframe?: boolean;
+  laminated?: boolean; laminatedAlong?: 'w' | 'd';
 }) {
   const zOffset = palletDepth / 2 - y - d / 2;
 
@@ -187,6 +256,7 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe }: {
       </div>
       {/* Bottom */}
       <div style={{ position: 'absolute', width: w, height: d, top: (h - d) / 2, transform: `rotateX(-90deg) translateZ(${h / 2}px)`, ...cardboardFace(0.25) }} />
+      {laminated && <LaminationSeam w={w} d={d} h={h} along={laminatedAlong || 'w'} />}
     </div>
   );
 }
@@ -301,6 +371,58 @@ function buildJPI7Slots(
           z: PALLET_H_PX + layer * bhPx,
           w: bSmall, d: bLarge, h: bhPx,
         });
+      }
+    }
+  }
+  return slots;
+}
+
+/**
+ * ラミネート版ジャーポット (PDU等PDZ以外): 1段10セット=20個
+ * 奇数段: 5列×2行（セットの長辺を前後方向＝D方向）
+ * 偶数段: 2列×5行（セットの長辺を左右方向＝W方向、つまり90°回転）
+ * 各セットはラミネート表示（中央仕切り線）
+ */
+interface LaminatedSlot extends BoxSlot {
+  along: 'w' | 'd';
+}
+function buildLaminatedJarPotSlots(
+  bhPx: number, layers: number, pw: number, pd: number,
+): LaminatedSlot[] {
+  const slots: LaminatedSlot[] = [];
+  // 各レイアウトでセット寸法(set単位)を算出
+  // 奇数段: 5 cols × 2 rows → setW = pw/5, setD = pd/2, 長辺=D（2個をD方向並べ）
+  // 偶数段: 2 cols × 5 rows → setW = pw/2, setD = pd/5, 長辺=W（2個をW方向並べ）
+  const oddSetW = pw / 5;
+  const oddSetD = pd / 2;
+  const evenSetW = pw / 2;
+  const evenSetD = pd / 5;
+
+  for (let layer = 0; layer < layers; layer++) {
+    const isOdd = layer % 2 === 0;
+    if (isOdd) {
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 5; c++) {
+          slots.push({
+            x: c * oddSetW,
+            y: r * oddSetD,
+            z: PALLET_H_PX + layer * bhPx,
+            w: oddSetW, d: oddSetD, h: bhPx,
+            along: 'd',
+          });
+        }
+      }
+    } else {
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 2; c++) {
+          slots.push({
+            x: c * evenSetW,
+            y: r * evenSetD,
+            z: PALLET_H_PX + layer * bhPx,
+            w: evenSetW, d: evenSetD, h: bhPx,
+            along: 'w',
+          });
+        }
       }
     }
   }
@@ -484,6 +606,7 @@ export default function PalletDiagram({
   const [bwCm, bdCm, bhCm] = getBoxDimsCm(measurements, itemName);
   const isNabe = type === '鍋';
   const isJPI = isJPIType(itemName);
+  const isJarPotLam = isJarPotLaminated(type, itemName);
   const isJarPot = type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName || '');
 
   // Calculate pallet dimensions in cm
@@ -517,7 +640,10 @@ export default function PalletDiagram({
   // Build slots
   let allSlots: BoxSlot[];
   let perLayer: number;
-  if (isJarPot) {
+  if (isJarPotLam) {
+    allSlots = buildLaminatedJarPotSlots(bh, layers, pw, pd);
+    perLayer = LAMINATED_SETS_PER_LAYER; // 1段10セット=20個
+  } else if (isJarPot) {
     allSlots = buildJarPotSlots(bh, layers, pw, pd);
     perLayer = 4;
   } else if (isNabe) {
@@ -566,8 +692,11 @@ export default function PalletDiagram({
     }
   }
 
+  // ラミネート版は2個=1セット表示のため、端数(個数)をセット数に換算
+  const fractionSets = isJarPotLam ? Math.ceil(fraction / 2) : fraction;
+
   // 端数表示: allSlotsが足りない場合、必要な段数まで拡張
-  const displayQty = isFull ? perLayer * layers : fraction;
+  const displayQty = isFull ? perLayer * layers : fractionSets;
   if (displayQty > allSlots.length && perLayer > 0) {
     const neededLayers = Math.ceil(displayQty / perLayer);
     const templateH = allSlots.length > 0 ? allSlots[0].h : bh;
@@ -588,7 +717,7 @@ export default function PalletDiagram({
     filled = allSlots.length;
   } else {
     // 端数: 下段は満杯、最上段のみ四隅積み
-    renderSlots = buildFractionSlots(allSlots, perLayer, fraction);
+    renderSlots = buildFractionSlots(allSlots, perLayer, fractionSets);
     filled = renderSlots.length;
   }
 
@@ -640,6 +769,7 @@ export default function PalletDiagram({
         {renderSlots.map((slot, i) => {
           if (i >= filled) return null;
           const boxTop = totalHeight - PALLET_H_PX - (slot.z - PALLET_H_PX) - slot.h;
+          const lamAlong = (slot as LaminatedSlot).along;
           return (
             <Box3D key={i}
               x={slot.x} y={slot.y}
@@ -647,6 +777,8 @@ export default function PalletDiagram({
               topBase={boxTop}
               palletDepth={pd}
               wireframe={wireframe}
+              laminated={isJarPotLam}
+              laminatedAlong={lamAlong}
             />
           );
         })}
