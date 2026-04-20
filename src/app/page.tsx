@@ -1113,8 +1113,8 @@ export default function Home() {
     <>
       {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
-      {/* 音声コール中のテキスト表示（マイクボタンの上） */}
-      {isSpeaking && speakingText && (
+      {/* 音声コール中のテキスト表示（マイクボタンの上） — 音声生成中(読込中)は非表示、再生開始後に表示 */}
+      {isSpeaking && !isPreparingSpeech && speakingText && (
         <div style={{
           position: 'fixed', bottom: 84, left: 8, right: 8,
           zIndex: 101, pointerEvents: 'none',

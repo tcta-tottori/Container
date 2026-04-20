@@ -10,6 +10,7 @@ on:
       - claude/fix-palette-box-display-36k8A
       - claude/add-photo-schedule-reading-Wx3tS
       - claude/add-gemini-voice-system-7J6VK
+      - claude/update-pallet-stacking-TCYvL
 
 permissions:
   contents: read
