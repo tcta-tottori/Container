@@ -83,11 +83,15 @@ export default function HeaderBar({
 
       {/* コンテナ選択 */}
       <select value={selectedIdx} onChange={(e) => onSelectContainer(Number(e.target.value))} className="header-select">
-        {containers.map((c, i) => (
-          <option key={c.containerNo} value={i}>
-            {c.containerNo} ({c.date.slice(5).replace('-', '/')})
-          </option>
-        ))}
+        {containers.map((c, i) => {
+          // containerNo が既に (MM/DD) 形式の日付を含む場合は末尾の (MM/DD) を追記しない
+          const hasDateSuffix = /\(\d{1,2}\/\d{1,2}\)\s*$/.test(c.containerNo);
+          return (
+            <option key={c.containerNo} value={i}>
+              {hasDateSuffix ? c.containerNo : `${c.containerNo} (${c.date.slice(5).replace('-', '/')})`}
+            </option>
+          );
+        })}
       </select>
 
       {theme && onToggleTheme && (

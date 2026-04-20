@@ -226,7 +226,19 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   console.log(`[JKP] 年マーカー行: ${yearRow >= 0 ? 'row' + yearRow : '見つからず'}`);
 
   // ── 列→日付マッピング構築（O列=col14以降のみ） ──
-  let currentYear = new Date().getFullYear();
+  // 年マーカーがある場合は厳密なカスケードを要求し、年マーカー前の列は日付化しない
+  // （年マーカーがない場合のみ現在年にフォールバック）
+  let hasYearMarkers = false;
+  if (yearRow >= 0) {
+    for (let c = 14; c <= maxCol; c++) {
+      const yr = getCell(yearRow, c);
+      if (typeof yr === 'number' && yr >= 2014 && yr <= 2030) {
+        hasYearMarkers = true;
+        break;
+      }
+    }
+  }
+  let currentYear: number | null = hasYearMarkers ? null : new Date().getFullYear();
   const colDateMap = new Map<number, string>();
 
   for (let c = 14; c <= maxCol; c++) {
@@ -236,6 +248,7 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
         currentYear = yr;
       }
     }
+    if (currentYear === null) continue;
     const dv = String(getCell(dateRow, c)).trim();
     const dm = dv.match(/^(\d{1,2})\/(\d{1,2})$/);
     if (dm) {
@@ -246,7 +259,7 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
       }
     }
   }
-  console.log(`[JKP] 日付列: ${colDateMap.size}列検出`);
+  console.log(`[JKP] 日付列: ${colDateMap.size}列検出 (年マーカー: ${hasYearMarkers ? 'あり' : 'なし'})`);
 
   // ── 読込対象範囲: 当日から1週間以内（当日〜当日+7日） ──
   const todayStr = todayLocalStr();

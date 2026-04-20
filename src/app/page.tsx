@@ -577,7 +577,7 @@ export default function Home() {
 
         setLoadingMsg(`${scheduleDates.length}日分のデータ検出（納入指示基準）。変換中...`);
 
-        // 日付ごとにContainerを作成: "タイガー鍋(3/25)" 形式
+        // 日付ごとにContainerを作成: "鍋(04/23)" 形式
         const containers = [];
         let totalItems = 0;
         for (const date of scheduleDates) {
@@ -586,7 +586,7 @@ export default function Home() {
           const dateLabel = date.slice(5).replace('-', '/');
           containers.push({
             date,
-            containerNo: `タイガー鍋(${dateLabel})`,
+            containerNo: `鍋(${dateLabel})`,
             items,
           });
           totalItems += items.length;
