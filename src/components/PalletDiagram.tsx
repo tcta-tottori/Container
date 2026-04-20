@@ -483,7 +483,9 @@ export default function PalletDiagram({
 
   const [bwCm, bdCm, bhCm] = getBoxDimsCm(measurements, itemName);
   const isNabe = type === '鍋';
-  const isJPI = isJPIType(itemName);
+  // 1段7個交互積みパターン: JPI品目、または 1パレット=7×n個 (n=1..5, 例: 35個/PL)
+  const is7PerLayer = isJPIType(itemName)
+    || (qtyPerPallet > 0 && qtyPerPallet % 7 === 0 && qtyPerPallet / 7 >= 1 && qtyPerPallet / 7 <= 5);
   const isJarPot = type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName || '');
 
   // Calculate pallet dimensions in cm
@@ -495,7 +497,7 @@ export default function PalletDiagram({
     // 180サイズ(3×42=126): パレットからはみ出る
     palletWcm = 110;
     palletDcm = 110;
-  } else if (isJPI) {
+  } else if (is7PerLayer) {
     const smallDim = Math.min(bwCm, bdCm);
     const largeDim = Math.max(bwCm, bdCm);
     palletWcm = smallDim * 3;
@@ -525,7 +527,11 @@ export default function PalletDiagram({
 
     allSlots = buildNabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
-  } else if (isJPI) {
+  } else if (is7PerLayer) {
+    // 7個/段: qtyPerPallet から必要段数を算出して反映（35→5段, 28→4段, 21→3段, …）
+    if (qtyPerPallet > 0 && qtyPerPallet % 7 === 0) {
+      layers = Math.max(1, Math.min(5, qtyPerPallet / 7));
+    }
     allSlots = buildJPI7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = 7;
   } else {
