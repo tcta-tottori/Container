@@ -11,7 +11,7 @@ import {
 } from '@/lib/geminiApi';
 
 /** 判別されたファイルの役割 */
-export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'photo' | 'unknown';
+export type FileRole = 'container' | 'master' | 'ketaka' | 'shipment_schedule' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'photo' | 'unknown';
 
 export interface ClassifiedFile {
   file: File;
@@ -36,8 +36,9 @@ export function classifyFile(name: string): { role: FileRole; label: string } {
   if (upper.includes('CNS_品目一覧') || upper.includes('CNS_品目') || upper.includes('全集約版')) {
     return { role: 'master', label: 'マスターデータ' };
   }
-  if (upper.includes('气高出货') || upper.includes('気高出荷')) {
-    return { role: 'ketaka', label: '气高编号マッピング' };
+  // 气高出货予定 / 気高出荷予定 → 船便出荷予定明細
+  if (upper.includes('气高出货') || upper.includes('気高出荷') || upper.includes('出货予定') || upper.includes('出荷予定')) {
+    return { role: 'shipment_schedule', label: '船便出荷予定明細' };
   }
   if (upper.includes('コンテナ日程')) {
     return { role: 'container_schedule', label: 'コンテナ日程' };
@@ -62,6 +63,7 @@ interface FileDropZoneProps {
   onJkpLoaded?: (file: File) => void;
   onMasterLoaded?: (file: File) => void;
   onPhotoLoaded?: (file: File) => void;
+  onShipmentScheduleLoaded?: (file: File) => void;
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
@@ -166,7 +168,7 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   );
 }
 
-export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
+export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onShipmentScheduleLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -218,6 +220,8 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           aqssFiles.push(f);
         } else if (role === 'jkp') {
           if (onJkpLoaded) onJkpLoaded(f);
+        } else if (role === 'shipment_schedule') {
+          if (onShipmentScheduleLoaded) onShipmentScheduleLoaded(f);
         } else if (role === 'master') {
           // マスターデータ（CNS品目一覧）→ 直接読込・反映
           if (onMasterLoaded) onMasterLoaded(f);
@@ -249,7 +253,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
         }
       }
     },
-    [onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded]
+    [onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onShipmentScheduleLoaded, onMultiFilesLoaded]
   );
 
   const onDrop = useCallback((e: React.DragEvent) => {
@@ -261,16 +265,22 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
     const file = base64ToFile(entry);
     const { role } = classifyFile(file.name);
     // fileType or role-based routing
-    const ft = entry.fileType || (role === 'jkp' ? 'jkp' : role === 'aqss04l' || role === 'aqss05l' ? 'aqss' : 'container');
+    const ft = entry.fileType
+      || (role === 'jkp' ? 'jkp'
+        : role === 'shipment_schedule' ? 'shipment'
+        : role === 'aqss04l' || role === 'aqss05l' ? 'aqss'
+        : 'container');
     if (ft === 'jkp') {
       if (onJkpLoaded) onJkpLoaded(file);
+    } else if (ft === 'shipment') {
+      if (onShipmentScheduleLoaded) onShipmentScheduleLoaded(file);
     } else if (ft === 'aqss') {
       if (onAqssContainerLoaded) onAqssContainerLoaded(file);
       else onFileLoaded(file);
     } else {
       onFileLoaded(file);
     }
-  }, [onFileLoaded, onJkpLoaded, onAqssContainerLoaded]);
+  }, [onFileLoaded, onJkpLoaded, onAqssContainerLoaded, onShipmentScheduleLoaded]);
 
   const fmtDate = (iso: string) => {
     const d = new Date(iso);
@@ -478,7 +488,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               { label: '品目一覧', color: '#34d399' },
               { label: 'AQSS', color: '#a78bfa' },
               { label: 'JKP', color: '#f59e0b' },
-              { label: '气高编号', color: '#f472b6' },
+              { label: '船便予定', color: '#f472b6' },
               { label: '写真', color: '#f87171' },
             ].map(({ label, color }) => (
               <span key={label} style={{
@@ -725,12 +735,16 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {recentFiles.map((entry) => {
-                    const ft: FileType = entry.fileType || (classifyFile(entry.name).role === 'jkp' ? 'jkp' : classifyFile(entry.name).role === 'master' ? 'master' : classifyFile(entry.name).role.startsWith('aqss') ? 'aqss' : 'container');
-                    const typeLabel = ft === 'jkp' ? 'JKP' : ft === 'aqss' ? 'AQSS' : ft === 'master' ? 'マスタ' : 'CN';
-                    const typeColor = ft === 'jkp' ? '#f97316' : ft === 'aqss' ? '#8b5cf6' : ft === 'master' ? '#34d399' : '#60a5fa';
-                    const infoText = ft === 'jkp'
-                      ? `${entry.itemCount}品目`
-                      : ft === 'master'
+                    const role = classifyFile(entry.name).role;
+                    const ft: FileType = entry.fileType
+                      || (role === 'jkp' ? 'jkp'
+                        : role === 'shipment_schedule' ? 'shipment'
+                        : role === 'master' ? 'master'
+                        : role.startsWith('aqss') ? 'aqss'
+                        : 'container');
+                    const typeLabel = ft === 'jkp' ? 'JKP' : ft === 'aqss' ? 'AQSS' : ft === 'master' ? 'マスタ' : ft === 'shipment' ? '船便' : 'CN';
+                    const typeColor = ft === 'jkp' ? '#f97316' : ft === 'aqss' ? '#8b5cf6' : ft === 'master' ? '#34d399' : ft === 'shipment' ? '#f472b6' : '#60a5fa';
+                    const infoText = ft === 'jkp' || ft === 'master' || ft === 'shipment'
                       ? `${entry.itemCount}品目`
                       : `${entry.containerCount}CN · ${entry.itemCount}品目`;
                     return (

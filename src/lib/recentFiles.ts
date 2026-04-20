@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'container-recent-files';
 const MAX_ENTRIES = 5;
 
-export type FileType = 'container' | 'jkp' | 'aqss' | 'master' | 'other';
+export type FileType = 'container' | 'jkp' | 'aqss' | 'master' | 'shipment' | 'other';
 
 export interface RecentFile {
   name: string;

@@ -26,11 +26,13 @@ import { useTheme } from '@/hooks/useTheme';
 import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
+import ShipmentSchedulePage from '@/components/ShipmentSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
 import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
+import { parseShipmentSchedule, ShipmentRecord } from '@/lib/shipmentScheduleParser';
 import * as XLSX from 'xlsx';
 
-type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
+type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'shipment' | 'history';
 
 /* ===== おしゃれな読込ポップアップ ===== */
 function LoadingOverlay({ message, progress, closing }: { message: string; progress: number; closing?: boolean }) {
@@ -195,6 +197,8 @@ export default function Home() {
   const [loadingClosing, setLoadingClosing] = useState(false);
   const [jkpShipments, setJkpShipments] = useState<JkpShipment[]>([]);
   const jkpUserLoadedRef = useRef(false);
+  const [shipmentRecords, setShipmentRecords] = useState<ShipmentRecord[]>([]);
+  const [shipmentRange, setShipmentRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [appReady, setAppReady] = useState(false);
 
   // 作業ページ表示中は画面スリープを防止（Wake Lock API）
@@ -633,6 +637,39 @@ export default function Home() {
     [loadData, loadMaster, closeLoading]
   );
 
+  const handleShipmentScheduleLoaded = useCallback(
+    async (file: File) => {
+      setLoadingMsg('船便出荷予定明細を読み込み中...');
+      setLoadingProgress(10);
+      await new Promise(r => setTimeout(r, 50));
+      try {
+        const buffer = await file.arrayBuffer();
+        const wb = XLSX.read(buffer, { type: 'array', cellDates: false });
+        setLoadingProgress(40);
+        const result = parseShipmentSchedule(wb);
+        setLoadingProgress(75);
+        setShipmentRecords(result.records);
+        setShipmentRange({ start: result.rangeStart, end: result.rangeEnd });
+        saveRecentFile(file, 0, result.records.length, 'shipment');
+        if (result.records.length === 0) {
+          setLoadingMsg(`対象期間 (${result.rangeStart}〜${result.rangeEnd}) に該当する明細がありません (全${result.totalRows}行)`);
+          await new Promise(r => setTimeout(r, 2500));
+        } else {
+          setLoadingMsg(`${result.records.length}件読込 (${result.rangeStart}〜${result.rangeEnd})`);
+          setViewMode('shipment');
+          await new Promise(r => setTimeout(r, 400));
+        }
+      } catch (e) {
+        console.error('Shipment schedule parse error:', e);
+        setLoadingMsg(`船便明細読込エラー: ${e instanceof Error ? e.message : String(e)}`);
+        await new Promise(r => setTimeout(r, 2500));
+      } finally {
+        closeLoading();
+      }
+    },
+    [closeLoading]
+  );
+
   const handleAnnounce = useCallback(() => {
     if (currentItem) announceItem(currentItem, state.items);
   }, [currentItem, announceItem, state.items]);
@@ -1060,7 +1097,7 @@ export default function Home() {
   if (state.containers.length === 0) {
     return (
       <>
-        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} onPhotoLoaded={handlePhotoLoaded} />
+        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} onPhotoLoaded={handlePhotoLoaded} onShipmentScheduleLoaded={handleShipmentScheduleLoaded} />
         {/* テーマ切替ボタン（読込画面右下） */}
         <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 100 }}>
           <button onClick={toggleTheme} style={{
@@ -1160,6 +1197,19 @@ export default function Home() {
               </svg>
               分析
             </button>
+            <button className={`menu-item ${viewMode === 'shipment' ? 'active' : ''}`} onClick={() => switchView('shipment')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 21h20"/><path d="M3 17l3-9h12l3 9"/><path d="M5 17V8h14v9"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/>
+              </svg>
+              船便予定
+              {shipmentRecords.length > 0 && (
+                <span style={{
+                  marginLeft: 'auto', fontSize: 10, fontWeight: 700,
+                  background: 'rgba(244,114,182,0.25)', color: '#f472b6',
+                  padding: '1px 6px', borderRadius: 8,
+                }}>{shipmentRecords.length}</span>
+              )}
+            </button>
             <button className={`menu-item ${viewMode === 'history' ? 'active' : ''}`} onClick={() => switchView('history')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -1252,6 +1302,16 @@ export default function Home() {
           {viewMode === 'jkp' && (
             <div className="full-panel">
               <JkpSchedulePage shipments={jkpShipments} />
+            </div>
+          )}
+
+          {viewMode === 'shipment' && (
+            <div className="full-panel">
+              <ShipmentSchedulePage
+                records={shipmentRecords}
+                rangeStart={shipmentRange.start}
+                rangeEnd={shipmentRange.end}
+              />
             </div>
           )}
 
