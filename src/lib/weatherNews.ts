@@ -2,76 +2,113 @@
 
 /**
  * 天気・ニュース取得API
- * - 天気: Open-Meteo API（無料、APIキー不要）
- * - ニュース: 外部APIは制限があるためRSS/スクレイピングの代替としてWeb検索を使用
+ * - 天気: 気象庁（JMA）公開JSON（鳥取県予報、東部エリア）
+ * - ニュース: Google News RSS（allorigins経由）
  */
 
-// 鳥取市気高町宝木の座標
-const HOUKI_LAT = 35.4833;
-const HOUKI_LON = 134.1167;
-
-// 天気コード→日本語
-const WMO_WEATHER: Record<number, string> = {
-  0: '快晴', 1: '晴れ', 2: 'やや曇り', 3: '曇り',
-  45: '霧', 48: '着氷霧',
-  51: '弱い霧雨', 53: '霧雨', 55: '強い霧雨',
-  61: '弱い雨', 63: '雨', 65: '強い雨',
-  66: '着氷性の弱い雨', 67: '着氷性の雨',
-  71: '弱い雪', 73: '雪', 75: '大雪',
-  77: '霧氷', 80: '弱いにわか雨', 81: 'にわか雨', 82: '強いにわか雨',
-  85: '弱いにわか雪', 86: 'にわか雪',
-  95: '雷雨', 96: '雷雨（ひょう）', 99: '激しい雷雨',
-};
+// 鳥取県の予報区コード
+const TOTTORI_PREF_CODE = '310000';
+// 鳥取県 東部（鳥取市を含む細分区域）
+const EAST_TOTTORI_CODE = '310010';
+// 気温観測点: 鳥取
+const TOTTORI_TEMP_CODE = '31312';
 
 export interface WeatherData {
-  temperature: number;
-  feelsLike: number;
-  humidity: number;
-  weatherCode: number;
   weatherDesc: string;
-  windSpeed: number;
-  maxTemp: number;
-  minTemp: number;
+  maxTemp: number | null;
+  minTemp: number | null;
   precipitationProb: number;
+}
+
+interface JmaArea {
+  area: { name: string; code: string };
+  weathers?: string[];
+  weatherCodes?: string[];
+  pops?: string[];
+  temps?: string[];
+}
+
+interface JmaTimeSeries {
+  timeDefines: string[];
+  areas: JmaArea[];
+}
+
+interface JmaForecast {
+  reportDatetime: string;
+  timeSeries: JmaTimeSeries[];
 }
 
 export async function fetchWeather(): Promise<WeatherData | null> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${HOUKI_LAT}&longitude=${HOUKI_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia/Tokyo&forecast_days=1`;
-    const res = await fetch(url);
+    const url = `https://www.jma.go.jp/bosai/forecast/data/forecast/${TOTTORI_PREF_CODE}.json`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return null;
-    const data = await res.json();
-    const current = data.current;
-    const daily = data.daily;
+    const data = (await res.json()) as JmaForecast[];
+    const today = data[0];
+    if (!today || !today.timeSeries) return null;
+
+    const todayDateStr = today.reportDatetime.substring(0, 10);
+
+    // 天気概況（鳥取県東部・今日）
+    const weatherSeries = today.timeSeries[0];
+    const weatherArea = weatherSeries?.areas.find(a => a.area.code === EAST_TOTTORI_CODE);
+    const rawDesc = weatherArea?.weathers?.[0] ?? '';
+    const weatherDesc = rawDesc.replace(/[\s　]+/g, '') || '不明';
+
+    // 降水確率（鳥取県東部・今日の最大値）
+    const popSeries = today.timeSeries[1];
+    const popArea = popSeries?.areas.find(a => a.area.code === EAST_TOTTORI_CODE);
+    let maxPop = 0;
+    popSeries?.timeDefines.forEach((t, i) => {
+      if (t.substring(0, 10) !== todayDateStr) return;
+      const raw = popArea?.pops?.[i] ?? '';
+      const pop = parseInt(raw, 10);
+      if (!isNaN(pop) && pop > maxPop) maxPop = pop;
+    });
+
+    // 気温（鳥取観測点・今日）
+    const tempSeries = today.timeSeries[2];
+    const tempArea = tempSeries?.areas.find(a => a.area.code === TOTTORI_TEMP_CODE);
+    const todayTemps: number[] = [];
+    tempSeries?.timeDefines.forEach((t, i) => {
+      if (t.substring(0, 10) !== todayDateStr) return;
+      const n = parseFloat(tempArea?.temps?.[i] ?? '');
+      if (!isNaN(n)) todayTemps.push(n);
+    });
+    const maxTemp = todayTemps.length > 0 ? Math.max(...todayTemps) : null;
+    const minTemp = todayTemps.length > 0 ? Math.min(...todayTemps) : null;
+
     return {
-      temperature: Math.round(current.temperature_2m * 10) / 10,
-      feelsLike: Math.round(current.apparent_temperature * 10) / 10,
-      humidity: current.relative_humidity_2m,
-      weatherCode: current.weather_code,
-      weatherDesc: WMO_WEATHER[current.weather_code] || '不明',
-      windSpeed: Math.round(current.wind_speed_10m * 10) / 10,
-      maxTemp: Math.round(daily.temperature_2m_max[0] * 10) / 10,
-      minTemp: Math.round(daily.temperature_2m_min[0] * 10) / 10,
-      precipitationProb: daily.precipitation_probability_max[0] || 0,
+      weatherDesc,
+      maxTemp,
+      minTemp,
+      precipitationProb: maxPop,
     };
   } catch {
     return null;
   }
 }
 
-export function weatherToSpeech(w: WeatherData): string {
-  let text = `宝木の天気。現在${w.weatherDesc}、気温${w.temperature}度、`;
-  text += `体感${w.feelsLike}度。`;
-  text += `最高${w.maxTemp}度、最低${w.minTemp}度。`;
-  if (w.precipitationProb > 0) {
-    text += `降水確率${w.precipitationProb}%。`;
+function tempRangeText(w: WeatherData): string {
+  if (w.maxTemp !== null && w.minTemp !== null && w.maxTemp !== w.minTemp) {
+    return `最高${w.maxTemp}度、最低${w.minTemp}度。`;
   }
-  text += `湿度${w.humidity}%、風速${w.windSpeed}メートル。`;
+  if (w.maxTemp !== null) return `最高${w.maxTemp}度。`;
+  if (w.minTemp !== null) return `最低${w.minTemp}度。`;
+  return '';
+}
+
+export function weatherToSpeech(w: WeatherData): string {
+  let text = `鳥取県東部の天気。${w.weatherDesc}。`;
+  text += tempRangeText(w);
+  text += `降水確率${w.precipitationProb}%。`;
   return text;
 }
 
 export function temperatureToSpeech(w: WeatherData): string {
-  return `宝木の気温。現在${w.temperature}度、体感${w.feelsLike}度。最高${w.maxTemp}度、最低${w.minTemp}度。`;
+  const range = tempRangeText(w);
+  if (!range) return '鳥取の気温情報を取得できませんでした。';
+  return `鳥取の気温。${range}`;
 }
 
 // ニュース取得（Google News RSS経由）
