@@ -312,6 +312,26 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
 
+  // 10分毎の経過時間コール + オルス声でランダム声援
+  useEffect(() => {
+    if (state.workStartTime === null) return;
+    if (workRawSeconds < 600) return;
+    const minutes = Math.floor(workRawSeconds / 60);
+    if (minutes % 10 !== 0) return;
+    const thresholdSec = minutes * 60;
+    if (announcedThresholdsRef.current.has(thresholdSec)) return;
+    announcedThresholdsRef.current.add(thresholdSec);
+
+    const cheers = ['がんばれ、まさ。', '元気出して、まさ。', 'その調子だ、じっちゃん。'];
+    const cheer = cheers[Math.floor(Math.random() * cheers.length)];
+
+    speak(`${minutes}分経過。`);
+    // 経過時間コール完了を待ってからオルス声で声援
+    setTimeout(() => {
+      speak(cheer, { voice: 'Orus' });
+    }, 3500);
+  }, [workRawSeconds, state.workStartTime, speak]);
+
   // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
 
   // 読込完了→100%表示1秒→フェードアウト

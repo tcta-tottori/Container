@@ -70,13 +70,13 @@ function speakWebSpeech(text: string): void {
   window.speechSynthesis.speak(u);
 }
 
-async function speakGemini(text: string): Promise<void> {
+async function speakGemini(text: string, voice?: string): Promise<void> {
   const abort = new AbortController();
   _currentAbort = abort;
   // 生成前にコール開始を通知（録音をすぐ止めてフィードバック防止）
   _onSpeakStart?.(text);
   try {
-    const blob = await geminiGenerateSpeech(text, { signal: abort.signal });
+    const blob = await geminiGenerateSpeech(text, { signal: abort.signal, voice });
     if (abort.signal.aborted) return;
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
@@ -111,7 +111,7 @@ async function speakGemini(text: string): Promise<void> {
   }
 }
 
-function speak(text: string): void {
+function speak(text: string, options?: { voice?: string }): void {
   if (typeof window === 'undefined') return;
   // 前回のコールを必ず止める（開始/終了コールバックは新しい speak 側で発火）
   if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
@@ -123,7 +123,7 @@ function speak(text: string): void {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
   if (isGeminiTtsEnabled()) {
-    void speakGemini(text);
+    void speakGemini(text, options?.voice);
   } else {
     speakWebSpeech(text);
   }
