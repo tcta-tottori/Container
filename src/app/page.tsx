@@ -314,6 +314,25 @@ export default function Home() {
 
   // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
 
+  // 10分ごとの定期進捗コール（作業中のみ）
+  const periodicStateRef = useRef({ items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode });
+  periodicStateRef.current = { items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode };
+  useEffect(() => {
+    if (!state.workStartTime || state.items.length === 0) return;
+    const interval = setInterval(() => {
+      const { items, completedIds, autoAnnounce, viewMode: vm } = periodicStateRef.current;
+      if (!autoAnnounce || vm !== 'work') return;
+      const remaining = items.filter((it) => !completedIds.has(it.id));
+      if (remaining.length === 0) return;
+      const cts: Record<string, number> = {};
+      for (const it of remaining) cts[it.type] = (cts[it.type] || 0) + 1;
+      const parts: string[] = [];
+      for (const [t, c] of Object.entries(cts)) parts.push(`${t}が${c}種類`);
+      speak(`定期コール。残り${remaining.length}品。${parts.join('、')}。`);
+    }, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [state.workStartTime, state.items.length, speak]);
+
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
     setLoadingProgress(100);

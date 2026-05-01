@@ -531,11 +531,18 @@ export default function ItemDetailPanel({
 
   // カウントアップアニメーション（フェードアウト中は値をフリーズ）
   const isTransitioning = animKey !== item.id;
-  const plTarget = isTransitioning ? undefined : item.palletCount;
   const rawFraction = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-  // 鍋は検査を抜かない、それ以外は1ケース抜く
+  // 鍋は検査を抜かない、それ以外は1ケース抜く。
+  // 端数=0でパレットぴったりの場合は1パレットを崩して検査分を抜く。
   const isNabeItem = item.type === '鍋';
-  const inspectionDeducted = isNabeItem ? rawFraction : (rawFraction > 0 ? rawFraction - 1 : 0);
+  const breakPalletForInspection = !isNabeItem && rawFraction === 0 && item.palletCount > 0 && item.qtyPerPallet > 0;
+  const displayPallets = breakPalletForInspection ? item.palletCount - 1 : item.palletCount;
+  const inspectionDeducted = isNabeItem
+    ? rawFraction
+    : breakPalletForInspection
+      ? item.qtyPerPallet - 1
+      : (rawFraction > 0 ? rawFraction - 1 : 0);
+  const plTarget = isTransitioning ? undefined : displayPallets;
   const ctTarget = isTransitioning ? undefined : inspectionDeducted;
   const pcsTarget = isTransitioning ? undefined : Math.ceil(item.totalQty);
   const animPL = useCountUp(plTarget ?? 0, animKey, isTransitioning);
@@ -577,7 +584,7 @@ export default function ItemDetailPanel({
 
   // 品目切替時: 端数のみになった場合に自動ズーム（その品名で1度のみ）
   const autoZoomDoneRef = useRef<Set<string>>(new Set());
-  const isFractionOnly = item.palletCount === 0 && inspectionDeducted > 0;
+  const isFractionOnly = displayPallets === 0 && inspectionDeducted > 0;
   useEffect(() => {
     if (!isFractionOnly || isTransitioning) return;
     if (autoZoomDoneRef.current.has(item.id)) return;
@@ -769,15 +776,15 @@ export default function ItemDetailPanel({
             )}
           </div>
           <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-            {item.palletCount > 0 && item.qtyPerPallet > 0 && (
+            {displayPallets > 0 && item.qtyPerPallet > 0 && (
               <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
-                <PalletDiagram palletCount={item.palletCount} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false} />
+                <PalletDiagram palletCount={displayPallets} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false} />
               </div>
             )}
             {inspectionDeducted > 0 && (
               <div key={`fr-${animKey}`} style={{
-                flex: item.palletCount > 0 ? '0 0 35%' : 1,
-                height: item.palletCount > 0 ? '75%' : '100%',
+                flex: displayPallets > 0 ? '0 0 35%' : 1,
+                height: displayPallets > 0 ? '75%' : '100%',
                 minWidth: 0, cursor: 'pointer',
                 alignSelf: 'flex-start',
               }}
