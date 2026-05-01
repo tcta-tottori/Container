@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { Container } from '@/lib/types';
 import { CompletionLogEntry } from '@/hooks/useContainerData';
+import { Theme } from '@/hooks/useTheme';
 
 export interface ItemTimeLog {
   itemName: string;
@@ -14,40 +15,57 @@ interface HeaderBarProps {
   containers: Container[];
   selectedIdx: number;
   onSelectContainer: (idx: number) => void;
-  onFileReload: (file: File) => void;
+  onFileReload?: (file: File) => void;
   workElapsed: string;
   workRawSeconds: number;
   onMenuToggle: () => void;
   onResetWorkTimer: () => void;
   itemTimeLogs: ItemTimeLog[];
   completionLog: CompletionLogEntry[];
-  onContainerAnnounce: () => void;
-  hasItems: boolean;
+  onContainerAnnounce?: () => void;
+  hasItems?: boolean;
+  theme?: Theme;
+  onToggleTheme?: () => void;
 }
 
 export default function HeaderBar({
   containers,
   selectedIdx,
   onSelectContainer,
-  onFileReload,
   workElapsed,
   workRawSeconds,
   onMenuToggle,
   onResetWorkTimer,
   itemTimeLogs,
   completionLog,
-  onContainerAnnounce,
-  hasItems,
+  theme,
+  onToggleTheme,
 }: HeaderBarProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
+  const lastFlashedAt = useRef(0);
+  const [currentTime, setCurrentTime] = useState('');
+  const [currentDate, setCurrentDate] = useState('');
 
-  // 5分ごとに経過時間を拡大表示（3秒間）
+  // リアルタイム時計+日付
   useEffect(() => {
-    if (workRawSeconds > 0 && workRawSeconds % 300 === 0) {
+    const days = ['日', '月', '火', '水', '木', '金', '土'];
+    const update = () => {
+      const now = new Date();
+      setCurrentTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+      setCurrentDate(`${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}(${days[now.getDay()]})`);
+    };
+    update();
+    const iv = setInterval(update, 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // 5分ごとに黄色点滅（5秒間）
+  useEffect(() => {
+    if (workRawSeconds > 0 && workRawSeconds % 300 === 0 && lastFlashedAt.current !== workRawSeconds) {
+      lastFlashedAt.current = workRawSeconds;
       setIsFlashing(true);
-      const timer = setTimeout(() => setIsFlashing(false), 3000);
+      const timer = setTimeout(() => setIsFlashing(false), 5000);
       return () => clearTimeout(timer);
     }
   }, [workRawSeconds]);
@@ -63,52 +81,51 @@ export default function HeaderBar({
         </svg>
       </button>
 
-      {/* ファイル読込 */}
-      <button onClick={() => inputRef.current?.click()} className="header-btn" title="ファイル読込">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-          <polyline points="14 2 14 8 20 8"/>
-          <line x1="12" y1="18" x2="12" y2="12"/>
-          <line x1="9" y1="15" x2="12" y2="12"/>
-          <line x1="15" y1="15" x2="12" y2="12"/>
-        </svg>
-      </button>
-      <input ref={inputRef} type="file" accept=".xlsx,.xls"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFileReload(f); e.target.value = ''; }}
-        className="hidden" />
-
       {/* コンテナ選択 */}
       <select value={selectedIdx} onChange={(e) => onSelectContainer(Number(e.target.value))} className="header-select">
-        {containers.map((c, i) => (
-          <option key={c.containerNo} value={i}>
-            {c.containerNo} ({c.date.slice(5).replace('-', '/')})
-          </option>
-        ))}
+        {containers.map((c, i) => {
+          // containerNo が既に (MM/DD) 形式の日付を含む場合は末尾の (MM/DD) を追記しない
+          const hasDateSuffix = /\(\d{1,2}\/\d{1,2}\)\s*$/.test(c.containerNo);
+          return (
+            <option key={c.containerNo} value={i}>
+              {hasDateSuffix ? c.containerNo : `${c.containerNo} (${c.date.slice(5).replace('-', '/')})`}
+            </option>
+          );
+        })}
       </select>
+
+      {theme && onToggleTheme && (
+        <button onClick={onToggleTheme} className="header-btn" title={theme === 'dark' ? 'ライトモード' : 'ダークモード'}>
+          {theme === 'dark' ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          )}
+        </button>
+      )}
 
       <div className="flex-1" />
 
-      {/* 作業経過時間（タップでポップアップ） */}
+      {/* 日付（横画面のみ）+ 経過時間（黄色）+ リアルタイム時計 */}
+      <span className="header-date-landscape" style={{
+        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
+        color: 'rgba(255,255,255,0.4)', flexShrink: 0, marginRight: 8,
+      }}>
+        {currentDate}
+      </span>
       <span
         className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
-        onClick={() => setPopupOpen(true)}
-        style={{ cursor: 'pointer' }}
+        style={{ color: '#f59e0b', marginRight: 6, flexShrink: 0 }}
       >
         {workElapsed}
       </span>
-      <button onClick={onContainerAnnounce} disabled={!hasItems} className="header-btn"
-        style={{
-          background: 'rgba(251,191,36,0.08)',
-          borderColor: 'rgba(251,191,36,0.2)',
-          color: '#d97706',
-          opacity: hasItems ? 1 : 0.4,
-          flexShrink: 0,
-        }}
-        title="コンテナ案内">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-        </svg>
-      </button>
+      <span className="header-clock" style={{
+        fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+        color: 'rgba(255,255,255,0.85)', fontVariantNumeric: 'tabular-nums',
+        letterSpacing: 0.5, flexShrink: 0, marginRight: 16,
+      }}>
+        {currentTime}
+      </span>
 
       {/* 経過時間ポップアップ */}
       {popupOpen && (

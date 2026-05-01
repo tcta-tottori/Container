@@ -1,6 +1,13 @@
 import * as XLSX from 'xlsx';
 import { ContainerItem, ItemType } from './types';
 import { detectItemType } from './typeDetector';
+import { getStoredToken } from './githubSave';
+
+const REPO_OWNER = 'tcta-tottori';
+const REPO_NAME = 'Container';
+const MASTER_FILE_PATH = 'CNS_品目一覧_全集約版.xlsx';
+const JKP_FILE_PATH = 'JKP_Shipping Schedule.xlsx';
+const BRANCH = 'main';
 
 /**
  * CNS品目一覧（全集約版）をパースしてContainerItem[]を返す
@@ -23,9 +30,10 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
 
     const itemName = v(2);
     const qtyPerPallet = n(8);
+    const sizeStr = v(9) || undefined;   // J列: サイズ (100, 180 等)
     const storedType = v(3) as ItemType;
-    const description = v(16) || undefined;  // ITEM DESCRIPTION (Q列)
-    const itemNameKetaka = v(10) || undefined;  // 規格(气高编号) (K列)
+    const description = v(17) || undefined;  // ITEM DESCRIPTION (R列)
+    const itemNameKetaka = v(11) || undefined;  // 規格(气高编号) (L列)
     // D列に値があればそれを最優先、なければ自動判定
     const type = storedType
       ? storedType
@@ -37,6 +45,7 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
       itemName,
       representModel: v(4),
       type,
+      size: sizeStr,
       packingQty: n(5),
       totalQty: n(6),
       caseCount: n(7),
@@ -44,18 +53,18 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
       fraction: 0,
       qtyPerPallet,
       newPartNumber: v(0) || undefined,
-      newPartNumberKetaka: v(9) || undefined,
-      itemNameKetaka: v(10) || undefined,
-      linkStatus: v(11) || undefined,
-      itemNameContainer: v(12) || undefined,
-      representModelContainer: v(13) || undefined,
-      packingQtyContainer: nOpt(14),
-      qtyPerPalletContainer: nOpt(15),
-      description: v(16) || undefined,
-      modelNo: v(17) || undefined,
-      grossWeight: nOpt(18),
-      cbm: nOpt(19),
-      measurements: v(20) || undefined,
+      newPartNumberKetaka: v(10) || undefined,  // K列
+      itemNameKetaka: v(11) || undefined,        // L列
+      linkStatus: v(12) || undefined,            // M列
+      itemNameContainer: v(13) || undefined,     // N列
+      representModelContainer: v(14) || undefined, // O列
+      packingQtyContainer: nOpt(15),             // P列
+      qtyPerPalletContainer: nOpt(16),           // Q列
+      description: v(17) || undefined,           // R列
+      modelNo: v(18) || undefined,               // S列
+      grossWeight: nOpt(19),                     // T列
+      cbm: nOpt(20),                             // U列
+      measurements: v(21) || undefined,          // V列
     });
   }
   return items;
@@ -116,45 +125,96 @@ export function parseAqssExcel(buffer: ArrayBuffer): Map<string, Partial<Contain
 }
 
 /**
- * GitHub Raw URLs（最新マスタデータ取得用）
- * ファイルはリポジトリルートに配置されている
+ * GitHub Contents API でファイルを取得（バイナリ）
+ * トークン付きで認証し、確実に最新データを返す
  */
-const GITHUB_RAW_URLS = [
-  // mainブランチ（リポジトリルート）
-  'https://raw.githubusercontent.com/tcta-tottori/Container/main/CNS_%E5%93%81%E7%9B%AE%E4%B8%80%E8%A6%A7_%E5%85%A8%E9%9B%86%E7%B4%84%E7%89%88.xlsx',
-  // public/data/ にもある場合のフォールバック
-  'https://raw.githubusercontent.com/tcta-tottori/Container/main/public/data/CNS_%E5%93%81%E7%9B%AE%E4%B8%80%E8%A6%A7_%E5%85%A8%E9%9B%86%E7%B4%84%E7%89%88.xlsx',
-];
-
-/**
- * CNS品目一覧を取得（GitHub Raw → ローカルの順でフォールバック）
- * cache-busting付きでキャッシュを回避
- */
-export async function fetchMasterData(): Promise<ContainerItem[]> {
-  const bust = `?t=${Date.now()}`;
-
-  // 1. GitHubから最新を取得（複数URLを試行）
-  for (const url of GITHUB_RAW_URLS) {
-    try {
-      const res = await fetch(url + bust, { cache: 'no-store' });
-      if (res.ok) {
-        const buffer = await res.arrayBuffer();
-        const items = parseMasterExcel(buffer);
-        if (items.length > 0) return items;
-      }
-    } catch { /* 次のURLを試す */ }
+async function fetchGitHubFile(filePath: string, token?: string): Promise<ArrayBuffer | null> {
+  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${encodeURIComponent(filePath)}?ref=${BRANCH}&t=${Date.now()}`;
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.v3.raw',
+  };
+  if (token) {
+    headers['Authorization'] = `token ${token}`;
   }
 
-  // 2. ローカルからフォールバック（basePath対応）
-  //    Next.js の basePath="/Container" を考慮
+  try {
+    const res = await fetch(url, { headers, cache: 'no-store' });
+    if (res.ok) {
+      return await res.arrayBuffer();
+    }
+    console.warn(`[GitHub API] ${filePath}: ${res.status} ${res.statusText}`);
+  } catch (e) {
+    console.warn(`[GitHub API] ${filePath}: fetch error`, e);
+  }
+  return null;
+}
+
+/**
+ * GitHub Raw URL でファイルを取得（フォールバック用、認証不要な公開リポジトリ向け）
+ */
+async function fetchGitHubRaw(filePath: string): Promise<ArrayBuffer | null> {
+  const encodedPath = encodeURIComponent(filePath).replace(/%2F/g, '/');
+  const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/${encodedPath}?t=${Date.now()}`;
+  try {
+    const res = await fetch(url, { cache: 'no-store' });
+    if (res.ok) {
+      return await res.arrayBuffer();
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+/**
+ * CNS品目一覧を取得（GitHub API → Raw URL → ローカルの順でフォールバック）
+ * GitHub Contents API（トークン付き）を最優先で使用し、確実に最新データを取得
+ */
+export async function fetchMasterData(): Promise<ContainerItem[]> {
+  const token = typeof window !== 'undefined' ? getStoredToken() : '';
+  const fallbackToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || '';
+  const effectiveToken = token || fallbackToken;
+
+  // 1. GitHub Contents API（トークン付き、最も信頼性が高い）
+  if (effectiveToken) {
+    const buffer = await fetchGitHubFile(MASTER_FILE_PATH, effectiveToken);
+    if (buffer) {
+      const items = parseMasterExcel(buffer);
+      if (items.length > 0) {
+        console.log(`[Master] GitHub API: ${items.length}件取得`);
+        return items;
+      }
+    }
+  }
+
+  // 2. GitHub Contents API（トークンなし、公開リポジトリ用）
+  {
+    const buffer = await fetchGitHubFile(MASTER_FILE_PATH);
+    if (buffer) {
+      const items = parseMasterExcel(buffer);
+      if (items.length > 0) {
+        console.log(`[Master] GitHub API (no token): ${items.length}件取得`);
+        return items;
+      }
+    }
+  }
+
+  // 3. GitHub Raw URL（フォールバック）
+  {
+    const buffer = await fetchGitHubRaw(MASTER_FILE_PATH);
+    if (buffer) {
+      const items = parseMasterExcel(buffer);
+      if (items.length > 0) {
+        console.log(`[Master] GitHub Raw: ${items.length}件取得`);
+        return items;
+      }
+    }
+  }
+
+  // 4. ローカルからフォールバック（basePath対応）
+  const bust = `?t=${Date.now()}`;
   const paths = [
-    // window.location.pathname ベースで自動検出
     ...(typeof window !== 'undefined' ? [
-      // 現在のページURLからbasePath推定
       window.location.pathname.replace(/\/[^/]*$/, '') + '/data/CNS_品目一覧_全集約版.xlsx',
-      // origin + basePath
       window.location.origin + '/Container/data/CNS_品目一覧_全集約版.xlsx',
-      // origin直下
       window.location.origin + '/data/CNS_品目一覧_全集約版.xlsx',
     ] : ['/data/CNS_品目一覧_全集約版.xlsx']),
   ];
@@ -165,12 +225,107 @@ export async function fetchMasterData(): Promise<ContainerItem[]> {
       if (res.ok) {
         const buffer = await res.arrayBuffer();
         const items = parseMasterExcel(buffer);
-        if (items.length > 0) return items;
+        if (items.length > 0) {
+          console.log(`[Master] Local: ${items.length}件取得`);
+          return items;
+        }
       }
     } catch { /* 次のパスを試す */ }
   }
 
   return [];
+}
+
+/**
+ * JKP_Shipping Schedule.xlsx を GitHub から取得
+ * GitHub Contents API（トークン付き）→ Raw URL の順でフォールバック
+ * @returns XLSX WorkBook or null
+ */
+export async function fetchJkpFromGitHub(): Promise<XLSX.WorkBook | null> {
+  const token = typeof window !== 'undefined' ? getStoredToken() : '';
+  const fallbackToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || '';
+  const effectiveToken = token || fallbackToken;
+
+  // 1. GitHub Contents API（トークン付き）
+  if (effectiveToken) {
+    const buffer = await fetchGitHubFile(JKP_FILE_PATH, effectiveToken);
+    if (buffer) {
+      try {
+        const wb = XLSX.read(buffer, { type: 'array' });
+        console.log(`[JKP] GitHub API: ファイル取得成功 (シート: ${Object.keys(wb.Sheets).join(', ')})`);
+        return wb;
+      } catch (e) {
+        console.warn('[JKP] GitHub API: parse error', e);
+      }
+    }
+  }
+
+  // 2. GitHub Contents API（トークンなし）
+  {
+    const buffer = await fetchGitHubFile(JKP_FILE_PATH);
+    if (buffer) {
+      try {
+        const wb = XLSX.read(buffer, { type: 'array' });
+        console.log(`[JKP] GitHub API (no token): ファイル取得成功`);
+        return wb;
+      } catch (e) {
+        console.warn('[JKP] GitHub API (no token): parse error', e);
+      }
+    }
+  }
+
+  // 3. GitHub Raw URL（フォールバック）
+  {
+    const buffer = await fetchGitHubRaw(JKP_FILE_PATH);
+    if (buffer) {
+      try {
+        const wb = XLSX.read(buffer, { type: 'array' });
+        console.log(`[JKP] GitHub Raw: ファイル取得成功`);
+        return wb;
+      } catch (e) {
+        console.warn('[JKP] GitHub Raw: parse error', e);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * GitHub上のファイルの最終更新情報を取得
+ * Commits APIで最新コミットの日時・メッセージを返す
+ */
+export async function fetchFileLastUpdate(filePath: string): Promise<{ date: string; message: string } | null> {
+  const token = typeof window !== 'undefined' ? getStoredToken() : '';
+  const fallbackToken = process.env.NEXT_PUBLIC_GITHUB_TOKEN || '';
+  const effectiveToken = token || fallbackToken;
+
+  const headers: Record<string, string> = {
+    Accept: 'application/vnd.github.v3+json',
+  };
+  if (effectiveToken) headers['Authorization'] = `token ${effectiveToken}`;
+
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits?path=${encodeURIComponent(filePath)}&sha=${BRANCH}&per_page=1`,
+      { headers, cache: 'no-store' }
+    );
+    if (!res.ok) return null;
+    const commits = await res.json();
+    if (!Array.isArray(commits) || commits.length === 0) return null;
+    const commit = commits[0];
+    return {
+      date: commit.commit?.committer?.date || commit.commit?.author?.date || '',
+      message: commit.commit?.message || '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** マスタファイルの最終更新情報を取得 */
+export async function fetchMasterFileLastUpdate(): Promise<{ date: string; message: string } | null> {
+  return fetchFileLastUpdate(MASTER_FILE_PATH);
 }
 
 /**
@@ -243,6 +398,18 @@ export function linkItemsWithMaster(
     if (master.type) {
       updated.type = master.type;
     }
+    // 品名をマスタから補完（AQSS等で中国語名の場合にマスタの品名で上書き）
+    if (master.itemName && /[\u4e00-\u9fff]/.test(updated.itemName) && !/ポリカバー|ジャーポット/.test(updated.itemName)) {
+      updated.itemName = master.itemName;
+    }
+    // 代表機種をマスタから補完
+    if (master.representModel && !updated.representModel) {
+      updated.representModel = master.representModel;
+    }
+    // サイズをマスタから補完（J列）
+    if (master.size && !updated.size) {
+      updated.size = master.size;
+    }
     // 1P数がマスタにあり、作業データにない場合はマスタから補完
     if (master.qtyPerPallet > 0 && updated.qtyPerPallet === 0) {
       updated.qtyPerPallet = master.qtyPerPallet;
@@ -251,9 +418,87 @@ export function linkItemsWithMaster(
     if (master.packingQty > 0 && updated.packingQty === 0) {
       updated.packingQty = master.packingQty;
     }
+    // 鍋のデフォルト1P数（マスタにもない場合のフォールバック）
+    // 60/100サイズ→30, 180サイズ→24
+    if (updated.qtyPerPallet === 0 && updated.type === '鍋') {
+      const name = updated.itemName || '';
+      if (name.includes('180') || /18[RWCS]/.test(name)) {
+        updated.qtyPerPallet = 24;
+      } else {
+        updated.qtyPerPallet = 30; // 60/100サイズ共通
+      }
+    }
+    // パレット数・端数を自動計算（qtyPerPalletが設定済みで、元データにパレット情報がない場合）
+    // caseCountが0の場合、totalQtyとpackingQtyから逆算
+    if (updated.caseCount === 0 && updated.totalQty > 0 && updated.packingQty > 0) {
+      updated.caseCount = Math.ceil(updated.totalQty / updated.packingQty);
+      updated.fraction = updated.caseCount;
+    }
+    if (updated.qtyPerPallet > 0 && updated.caseCount > 0 && item.palletCount === 0) {
+      updated.palletCount = Math.floor(updated.caseCount / updated.qtyPerPallet);
+      updated.fraction = updated.caseCount % updated.qtyPerPallet;
+    }
 
     return updated;
   });
+
+  // === 第2パス: measurements/cbm/grossWeight が空のアイテムに類似品名からフォールバック ===
+  // マスタ全体からmeasurementsを持つアイテムの品名→measurements マップ構築
+  const measByName = new Map<string, { measurements: string; cbm?: number; grossWeight?: number }>();
+  for (const m of masterItems) {
+    if (m.measurements && m.itemName) {
+      measByName.set(m.itemName, { measurements: m.measurements, cbm: m.cbm, grossWeight: m.grossWeight });
+    }
+  }
+  // 紐付済みのアイテムからもMeas.を収集（紐付でコピーされたもの）
+  for (const it of linkedItems) {
+    if (it.measurements && it.itemName && !measByName.has(it.itemName)) {
+      measByName.set(it.itemName, { measurements: it.measurements, cbm: it.cbm, grossWeight: it.grossWeight });
+    }
+  }
+
+  for (let i = 0; i < linkedItems.length; i++) {
+    const it = linkedItems[i];
+    if (it.measurements) continue; // 既にある
+
+    const baseName = extractBaseName(it.itemName);
+    const sizeCode = extractSizeCode(it.itemName); // "100", "180" 等
+    if (!baseName) continue;
+
+    let found: { measurements: string; cbm?: number; grossWeight?: number } | undefined;
+
+    // 1. 品名完全一致
+    found = measByName.get(it.itemName);
+
+    // 2. 基幹品名一致（括弧・色コード除去）
+    if (!found) {
+      for (const [name, data] of Array.from(measByName.entries())) {
+        if (extractBaseName(name) === baseName) {
+          found = data;
+          break;
+        }
+      }
+    }
+
+    // 3. プレフィックス+サイズ一致（JRI-*100*, JPV-*180* 等、最も広い検索）
+    if (!found && sizeCode) {
+      for (const [name, data] of Array.from(measByName.entries())) {
+        if (name.includes(sizeCode) && extractPrefix(name) === extractPrefix(it.itemName)) {
+          found = data;
+          break;
+        }
+      }
+    }
+
+    if (found) {
+      linkedItems[i] = {
+        ...it,
+        measurements: found.measurements,
+        cbm: it.cbm ?? found.cbm,
+        grossWeight: it.grossWeight ?? found.grossWeight,
+      };
+    }
+  }
 
   return {
     linkedItems,
@@ -261,6 +506,27 @@ export function linkItemsWithMaster(
     unlinked: items.length - linked,
     total: items.length,
   };
+}
+
+/**
+ * 品名から基幹名を抽出（括弧・色コード除去）
+ * 例: "JRI-H100(KKB)" → "JRI-H100", "JPV-X180(K)" → "JPV-X180"
+ *     "JPI-S100(WS)ポリカバー" → "JPI-S100ポリカバー"
+ */
+function extractBaseName(name: string): string {
+  return name.replace(/\([^)]*\)/g, '').replace(/[\s]+$/g, '').trim();
+}
+
+/** サイズコード抽出: "100", "180", "060" 等 */
+function extractSizeCode(name: string): string {
+  const m = name.match(/(180|100|060|06)/);
+  return m ? m[1] : '';
+}
+
+/** プレフィックス抽出: "JRI-", "JPV-", "JPI-" 等 */
+function extractPrefix(name: string): string {
+  const m = name.match(/^([A-Z]{2,4}[\-+]?)/);
+  return m ? m[1] : '';
 }
 
 /**

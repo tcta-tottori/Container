@@ -12,7 +12,15 @@ export type VoiceAction =
   | 'QUERY_FRACTION'
   | 'CONFIRM_OK'
   | 'CONTAINER_SUMMARY'
-  | 'QUERY_PROGRESS';
+  | 'QUERY_PROGRESS'
+  | 'UNDO_DECREASE'
+  | 'QUERY_TYPE_COUNT'
+  | 'MASA_CHEER'
+  | 'WEATHER'
+  | 'TEMPERATURE'
+  | 'TOTTORI_NEWS'
+  | 'FINANCE_NEWS'
+  | 'STOP_SPEECH';
 
 /** キーワード → アクション マッピング */
 const VOICE_COMMANDS: [string, VoiceAction][] = [
@@ -36,10 +44,13 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
   ['すうりょう', 'QUERY_CURRENT_QTY'],
   ['残り', 'QUERY_REMAINING'],
   ['のこり', 'QUERY_REMAINING'],
-  ['パレット', 'QUERY_PALLET'],
-  ['ぱれっと', 'QUERY_PALLET'],
+  ['パレット何枚', 'QUERY_PALLET'],
+  ['ぱれっとなんまい', 'QUERY_PALLET'],
+  ['パレット数', 'QUERY_PALLET'],
   ['端数', 'QUERY_FRACTION'],
   ['はすう', 'QUERY_FRACTION'],
+  ['お願いします', 'CONFIRM_OK'],
+  ['おねがいします', 'CONFIRM_OK'],
   ['okです', 'CONFIRM_OK'],
   ['ok', 'CONFIRM_OK'],
   ['オッケー', 'CONFIRM_OK'],
@@ -54,6 +65,30 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
   ['しんちょく', 'QUERY_PROGRESS'],
   ['状況', 'QUERY_PROGRESS'],
   ['じょうきょう', 'QUERY_PROGRESS'],
+  ['戻して', 'UNDO_DECREASE'],
+  ['もどして', 'UNDO_DECREASE'],
+  ['元に戻', 'UNDO_DECREASE'],
+  ['もとにもど', 'UNDO_DECREASE'],
+  ['何種類', 'QUERY_TYPE_COUNT'],
+  ['なんしゅるい', 'QUERY_TYPE_COUNT'],
+  ['まさ', 'MASA_CHEER'],
+  ['マサ', 'MASA_CHEER'],
+  ['今日の天気', 'WEATHER'],
+  ['天気', 'WEATHER'],
+  ['てんき', 'WEATHER'],
+  ['気温', 'TEMPERATURE'],
+  ['きおん', 'TEMPERATURE'],
+  ['鳥取のニュース', 'TOTTORI_NEWS'],
+  ['とっとりのニュース', 'TOTTORI_NEWS'],
+  ['ニュース', 'TOTTORI_NEWS'],
+  ['金融', 'FINANCE_NEWS'],
+  ['株', 'FINANCE_NEWS'],
+  ['かぶ', 'FINANCE_NEWS'],
+  ['ファイナンス', 'FINANCE_NEWS'],
+  ['ストップ', 'STOP_SPEECH'],
+  ['止めて', 'STOP_SPEECH'],
+  ['やめて', 'STOP_SPEECH'],
+  ['とめて', 'STOP_SPEECH'],
 ];
 
 /**

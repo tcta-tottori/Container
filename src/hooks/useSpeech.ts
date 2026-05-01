@@ -3,9 +3,59 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { itemNameForSpeech, areSimilarItems, getSimilarityReason, extractColor } from '@/lib/typeDetector';
+import { geminiGenerateSpeech, isGeminiTtsEnabled } from '@/lib/geminiTts';
 
-function speak(text: string): void {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+// 音声コール開始/終了のコールバック（録音一時停止用）
+let _onSpeakStart: ((text: string) => void) | null = null;
+let _onSpeakEnd: (() => void) | null = null;
+// Gemini TTS 等で「リクエスト送信完了 → 音声再生開始」の通知（読込スピナー解除用）
+let _onSpeakPlay: (() => void) | null = null;
+
+export function setSpeakCallbacks(
+  onStart: (text: string) => void,
+  onEnd: () => void,
+  onPlay?: () => void,
+) {
+  _onSpeakStart = onStart;
+  _onSpeakEnd = onEnd;
+  _onSpeakPlay = onPlay || null;
+}
+
+// 現在再生中の Gemini 音声と生成中のリクエストを追跡
+let _currentAudio: HTMLAudioElement | null = null;
+let _currentAbort: AbortController | null = null;
+let _currentAudioUrl: string | null = null;
+
+/** 現在の音声コール（Gemini / Web Speech）を全てキャンセル */
+export function cancelSpeech(): void {
+  if (typeof window === 'undefined') return;
+  if (_currentAbort) {
+    try { _currentAbort.abort(); } catch { /* ignore */ }
+    _currentAbort = null;
+  }
+  if (_currentAudio) {
+    try {
+      _currentAudio.onended = null;
+      _currentAudio.onerror = null;
+      _currentAudio.pause();
+    } catch { /* ignore */ }
+    _currentAudio = null;
+  }
+  if (_currentAudioUrl) {
+    try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ }
+    _currentAudioUrl = null;
+  }
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel();
+  }
+  _onSpeakEnd?.();
+}
+
+function speakWebSpeech(text: string): void {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    _onSpeakEnd?.();
+    return;
+  }
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'ja-JP';
@@ -14,7 +64,69 @@ function speak(text: string): void {
   const voices = window.speechSynthesis.getVoices();
   const jaVoice = voices.find((v) => v.lang.startsWith('ja'));
   if (jaVoice) u.voice = jaVoice;
+  u.onstart = () => { _onSpeakStart?.(text); _onSpeakPlay?.(); };
+  u.onend = () => { _onSpeakEnd?.(); };
+  u.onerror = () => { _onSpeakEnd?.(); };
   window.speechSynthesis.speak(u);
+}
+
+async function speakGemini(text: string): Promise<void> {
+  const abort = new AbortController();
+  _currentAbort = abort;
+  // 生成前にコール開始を通知（録音をすぐ止めてフィードバック防止）
+  _onSpeakStart?.(text);
+  try {
+    const blob = await geminiGenerateSpeech(text, { signal: abort.signal });
+    if (abort.signal.aborted) return;
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    _currentAudio = audio;
+    _currentAudioUrl = url;
+    audio.onended = () => {
+      if (_currentAudioUrl === url) {
+        URL.revokeObjectURL(url);
+        _currentAudioUrl = null;
+      }
+      if (_currentAudio === audio) _currentAudio = null;
+      _onSpeakEnd?.();
+    };
+    audio.onerror = () => {
+      if (_currentAudioUrl === url) {
+        URL.revokeObjectURL(url);
+        _currentAudioUrl = null;
+      }
+      if (_currentAudio === audio) _currentAudio = null;
+      _onSpeakEnd?.();
+    };
+    audio.onplay = () => { _onSpeakPlay?.(); };
+    await audio.play();
+  } catch (err) {
+    if (abort.signal.aborted) return;
+    console.error('Gemini TTS 失敗:', err);
+    // ユーザーが Gemini を明示選択しているため自動フォールバックしない。
+    // 録音再開のため _onSpeakEnd を呼んで状態を解放する。
+    _onSpeakEnd?.();
+  } finally {
+    if (_currentAbort === abort) _currentAbort = null;
+  }
+}
+
+function speak(text: string): void {
+  if (typeof window === 'undefined') return;
+  // 前回のコールを必ず止める（開始/終了コールバックは新しい speak 側で発火）
+  if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
+  if (_currentAudio) {
+    try { _currentAudio.onended = null; _currentAudio.onerror = null; _currentAudio.pause(); } catch { /* ignore */ }
+    _currentAudio = null;
+  }
+  if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+  if (isGeminiTtsEnabled()) {
+    void speakGemini(text);
+  } else {
+    speakWebSpeech(text);
+  }
 }
 
 export function useSpeech() {
@@ -51,16 +163,28 @@ export function useSpeech() {
 
     let text = `${spokenName}。${qtyText}。`;
 
-    // ポリカバーは検査で1ケース抜く（端数から1引く）
+    // ポリカバーは検査で1ケース抜く（端数から1引く）。鍋は検査なし。
+    // 端数=0でパレットぴったりの場合は1パレットを崩して検査分を抜く。
     if (isPolycover) {
-      const afterInspection = fractionCeil - 1;
-      if (afterInspection >= 0) {
+      if (fractionCeil > 0) {
+        const afterInspection = fractionCeil - 1;
         text += `検査を抜いて${afterInspection}ケース。`;
+      } else if (item.palletCount > 0 && item.qtyPerPallet > 0) {
+        const remainingCases = item.qtyPerPallet - 1;
+        const remainingPallets = item.palletCount - 1;
+        if (remainingPallets > 0) {
+          text += `検査を抜いて${remainingPallets}パレットと${remainingCases}ケース。`;
+        } else {
+          text += `検査を抜いて${remainingCases}ケース。`;
+        }
       }
     }
 
-    // 似た名前のアイテムがある場合に警告
-    if (allItems && allItems.length > 0) {
+    // 鍋: 類似品・サイズ違いアナウンスは不要
+    const isNabe = item.type === '鍋';
+
+    // 似た名前のアイテムがある場合に警告（鍋以外）
+    if (!isNabe && allItems && allItems.length > 0) {
       const similarItems = allItems.filter(
         (other) => other.id !== item.id && areSimilarItems(item.itemName, other.itemName)
       );
@@ -147,10 +271,9 @@ export function useSpeech() {
    *  completedIds / elapsedSeconds を渡すと進捗情報も読み上げる */
   const announceContainerSummary = useCallback((
     items: ContainerItem[],
-    containerNo: string,
-    completedIds?: Set<string>,
-    elapsedSeconds?: number,
+    ...rest: [string, Set<string>?, number?]
   ) => {
+    const completedIds = rest[1];
     if (items.length === 0) return;
 
     const done = completedIds ? items.filter((it) => completedIds.has(it.id)).length : 0;
@@ -160,16 +283,12 @@ export function useSpeech() {
     // 種類別カウント（残りのみ）
     const typeCounts: Record<string, number> = {};
     const totalTypeCounts: Record<string, number> = {};
-    let hasJarPot = false;
     const similarPairs: string[] = [];
 
     for (const it of items) {
       totalTypeCounts[it.type] = (totalTypeCounts[it.type] || 0) + 1;
       if (!completedIds || !completedIds.has(it.id)) {
         typeCounts[it.type] = (typeCounts[it.type] || 0) + 1;
-      }
-      if (/^JP[A-Z]/.test(it.itemName) || it.itemName.includes('ジャーポット')) {
-        hasJarPot = true;
       }
     }
 
@@ -189,78 +308,76 @@ export function useSpeech() {
       }
     }
 
-    let text = `コンテナ${containerNo}。合計${items.length}品目。`;
+    // === 開始コール（挨拶なし、コンテナ番号なし） ===
+    const isResume = completedIds && done > 0;
+    let text = isResume
+      ? '続きです。'
+      : '荷降ろしを開始します。';
 
-    // 進捗情報（completedIdsがある場合）
-    if (completedIds && done > 0) {
-      text += `進捗${pct}パーセント、${done}品完了、残り${remaining}品。`;
-    }
-
-    // 経過時間
-    if (elapsedSeconds && elapsedSeconds > 0) {
-      const m = Math.floor(elapsedSeconds / 60);
-      const s = elapsedSeconds % 60;
-      if (m > 0) {
-        text += `経過時間${m}分${s > 0 ? `${s}秒` : ''}。`;
-      } else {
-        text += `経過時間${s}秒。`;
+    // === 内容物コール: 「〇〇がN種類」形式 ===
+    // 鍋コンテナ: サイズ別にコール
+    if (totalTypeCounts['鍋'] > 0) {
+      let count100 = 0, count180 = 0;
+      for (const it of items) {
+        if (it.type !== '鍋') continue;
+        if (it.itemName.includes('180') || /18[RWCS]/.test(it.itemName)) count180++;
+        else count100++;
       }
+      if (count100 > 0) text += `100サイズが${count100}種類。`;
+      if (count180 > 0) text += `180サイズが${count180}種類。`;
+    }
+    const typeLabels: [string, string][] = [
+      ['ポリカバー', 'ポリカバー'],
+      ['ジャーポット', 'ジャーポット'],
+      ['箱', '箱'],
+      ['部品', '部品'],
+      ['ヤーマン部品', 'ヤーマン部品'],
+      ['その他', 'その他'],
+    ];
+    for (const [typeKey, label] of typeLabels) {
+      const count = totalTypeCounts[typeKey];
+      if (count) text += `${label}が${count}種類。`;
     }
 
-    // 種類内訳（残り）
-    const useRemaining = completedIds && done > 0;
-    const counts = useRemaining ? typeCounts : totalTypeCounts;
-    const typeNames: string[] = [];
-    if (counts['ポリカバー']) typeNames.push(`ポリカバー${counts['ポリカバー']}品`);
-    if (counts['ジャーポット']) typeNames.push(`ジャーポット${counts['ジャーポット']}品`);
-    if (counts['箱']) typeNames.push(`箱${counts['箱']}品`);
-    if (counts['部品']) typeNames.push(`部品${counts['部品']}品`);
-    if (counts['鍋']) typeNames.push(`鍋${counts['鍋']}品`);
-    if (counts['ヤーマン部品']) typeNames.push(`ヤーマン${counts['ヤーマン部品']}品`);
-    if (counts['その他']) typeNames.push(`その他${counts['その他']}品`);
-    if (typeNames.length > 0) {
-      text += (useRemaining ? '残り内訳、' : '') + typeNames.join('、') + '。';
+    // === 進捗情報（再開時） ===
+    if (isResume) {
+      text += `進捗${pct}パーセント、残り${remaining}品。`;
     }
 
-    if (hasJarPot) {
-      text += 'ジャーポットあり。';
-    }
-
+    // === 類似品警告: 種類単位で短くコール ===
     if (similarPairs.length > 0) {
-      text += `注意、類似品が${similarPairs.length}組あります。`;
-      if (similarPairs.length <= 3) {
-        text += similarPairs.join('、') + '。';
+      // 類似品がある種類を収集
+      const warnedTypes = new Set<string>();
+      for (const a of items) {
+        for (const b of items) {
+          if (a.id >= b.id) continue;
+          if (areSimilarItems(a.itemName, b.itemName)) {
+            warnedTypes.add(a.type);
+          }
+        }
+      }
+      for (const t of Array.from(warnedTypes)) {
+        text += `${t}に類似品があります。`;
       }
     }
 
     if (completedIds && remaining === 0) {
-      text += '全品目完了です。お疲れ様でした。';
+      text += '全品目完了です。';
     }
+
+    text += 'よろしくお願いします。';
 
     speak(text);
   }, []);
 
   /** 進捗状況アナウンス（完了率・残りCBM等） */
+  /** 進捗コール: 進捗率 + 種類別残りのみ */
   const announceProgress = useCallback((items: ContainerItem[], completedIds: Set<string>) => {
     const total = items.length;
     const done = items.filter((it) => completedIds.has(it.id)).length;
-    const remaining = total - done;
     const pct = total > 0 ? Math.round(done / total * 100) : 0;
 
-    let text = `進捗${pct}パーセント。${done}品目完了、残り${remaining}品目。`;
-
-    // CBM情報があれば残り容積もアナウンス
-    let totalCbm = 0, remainCbm = 0;
-    for (const it of items) {
-      if (it.cbm) {
-        const vol = it.cbm * (it.caseCount || 1);
-        totalCbm += vol;
-        if (!completedIds.has(it.id)) remainCbm += vol;
-      }
-    }
-    if (totalCbm > 0) {
-      text += `残り容積約${remainCbm.toFixed(1)}立方メートル。`;
-    }
+    let text = `進捗${pct}パーセント。`;
 
     // 種類別残り
     const typeCounts: Record<string, number> = {};
@@ -270,32 +387,24 @@ export function useSpeech() {
       }
     }
     const parts: string[] = [];
-    if (typeCounts['ポリカバー']) parts.push(`ポリカバー${typeCounts['ポリカバー']}`);
-    if (typeCounts['ジャーポット']) parts.push(`ジャーポット${typeCounts['ジャーポット']}`);
-    if (typeCounts['箱']) parts.push(`箱${typeCounts['箱']}`);
-    if (typeCounts['部品']) parts.push(`部品${typeCounts['部品']}`);
-    if (typeCounts['鍋']) parts.push(`鍋${typeCounts['鍋']}`);
-    if (typeCounts['ヤーマン部品']) parts.push(`ヤーマン${typeCounts['ヤーマン部品']}`);
-    if (typeCounts['その他']) parts.push(`その他${typeCounts['その他']}`);
-    if (parts.length > 0) {
-      text += `内訳、${parts.join('、')}。`;
+    for (const [t, c] of Object.entries(typeCounts)) {
+      parts.push(`${t}が${c}種類`);
     }
-
-    if (remaining === 0) {
-      text += '全品目完了です。お疲れ様でした。';
-    } else if (pct >= 75) {
-      text += 'もう少しです、頑張りましょう。';
-    }
+    if (parts.length > 0) text += parts.join('、') + '。';
 
     speak(text);
   }, []);
 
-  /** OK確認アナウンス */
-  const announceOk = useCallback((itemName: string, remainingPallets: number) => {
-    if (remainingPallets > 0) {
-      speak(`OK。${itemNameForSpeech(itemName)}、残り${remainingPallets}パレット。`);
-    } else {
-      speak(`OK。${itemNameForSpeech(itemName)}、完了。`);
+  /** OK確認アナウンス（残りパレット+端数のみ） */
+  const announceOk = useCallback((_itemName: string, remainingPallets: number, fractionCases?: number) => {
+    if (remainingPallets <= 0 && (!fractionCases || fractionCases <= 0)) {
+      speak('完了。');
+    } else if (remainingPallets > 0 && fractionCases && fractionCases > 0) {
+      speak(`残り${remainingPallets}パレットと${fractionCases}ケース。`);
+    } else if (remainingPallets > 0) {
+      speak(`残り${remainingPallets}パレット。`);
+    } else if (fractionCases && fractionCases > 0) {
+      speak(`残り${fractionCases}ケース。`);
     }
   }, []);
 

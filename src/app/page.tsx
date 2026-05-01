@@ -2,10 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
-import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel } from '@/lib/masterLoader';
+import { parsePhotoFile } from '@/lib/photoParser';
+import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel, parseMasterExcel, fetchJkpFromGitHub } from '@/lib/masterLoader';
+import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
-import { useSpeech } from '@/hooks/useSpeech';
+import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
+import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled, setGeminiTtsEnabled, getGeminiTtsModel, setGeminiTtsModel, getLastTtsError, subscribeTtsError, DEFAULT_GEMINI_TTS_MODEL, geminiGenerateSpeech } from '@/lib/geminiTts';
+import { getGeminiKey } from '@/lib/geminiApi';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForSpeech } from '@/lib/typeDetector';
@@ -13,10 +17,12 @@ import { saveRecentFile } from '@/lib/recentFiles';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
+import { fetchWeather, weatherToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews } from '@/lib/weatherNews';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
-import ActionBar from '@/components/ActionBar';
+// ActionBar removed - replaced by floating mic button
 import VoiceFeedback from '@/components/VoiceFeedback';
+import { useTheme } from '@/hooks/useTheme';
 import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
@@ -25,6 +31,124 @@ import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToConta
 import * as XLSX from 'xlsx';
 
 type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
+
+/* ===== おしゃれな読込ポップアップ ===== */
+function LoadingOverlay({ message, progress, closing }: { message: string; progress: number; closing?: boolean }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(16px)',
+      animation: closing ? 'loadFadeOut 0.5s ease both' : 'fadeIn 0.15s ease both',
+    }}>
+      <style>{`
+        @keyframes spinCircle { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes loadFadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }
+      `}</style>
+      <div style={{
+        background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
+        border: '1.5px solid rgba(255,255,255,0.15)',
+        borderRadius: 24, padding: '32px 40px', textAlign: 'center',
+        boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 24px 60px rgba(0,0,0,0.6)',
+        width: '90%', maxWidth: 300,
+      }}>
+        {/* サークル読込アニメーション */}
+        <div style={{ width: 48, height: 48, margin: '0 auto 16px' }}>
+          <svg width="48" height="48" viewBox="0 0 48 48" style={{ animation: 'spinCircle 0.9s linear infinite' }}>
+            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="3"
+              strokeLinecap="round" strokeDasharray="90 36"
+              style={{ filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.2))' }} />
+          </svg>
+        </div>
+
+        {/* メッセージ */}
+        <p style={{
+          color: '#fff', fontSize: 12, fontWeight: 600, margin: '0 0 12px', lineHeight: 1.5,
+          textShadow: '0 0 6px rgba(255,255,255,0.15)',
+        }}>
+          {message}
+        </p>
+
+        {/* 進捗率 */}
+        <p style={{
+          color: '#fff', fontSize: 20, fontWeight: 800, margin: '0 0 10px',
+          fontFamily: 'var(--font-mono)',
+          textShadow: '0 0 8px rgba(255,255,255,0.3), 0 0 16px rgba(255,255,255,0.12)',
+        }}>
+          {Math.round(progress)}%
+        </p>
+
+        {/* プログレスバー */}
+        <div style={{
+          width: '100%', height: 4, borderRadius: 2,
+          background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+          border: '0.5px solid rgba(255,255,255,0.1)',
+        }}>
+          <div style={{
+            height: '100%', borderRadius: 2,
+            background: 'rgba(255,255,255,0.85)',
+            boxShadow: '0 0 5px rgba(255,255,255,0.25), 0 0 10px rgba(255,255,255,0.08)',
+            width: `${progress}%`,
+            transition: 'width 0.3s ease',
+          }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===== PWA更新通知 ===== */
+function UpdateNotification() {
+  const [hasUpdate, setHasUpdate] = useState(false);
+  useEffect(() => {
+    // Service Worker更新チェック
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    const checkUpdate = async () => {
+      try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  setHasUpdate(true);
+                }
+              });
+            }
+          });
+          reg.update();
+        }
+      } catch { /* ignore */ }
+    };
+    checkUpdate();
+    // 5分ごとに更新チェック
+    const interval = setInterval(checkUpdate, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!hasUpdate) return null;
+  return (
+    <div style={{
+      position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 500, animation: 'slideUp 0.5s ease both',
+    }}>
+      <button onClick={() => window.location.reload()} style={{
+        background: 'linear-gradient(135deg, #4a7af7, #9b45c9)',
+        border: 'none', borderRadius: 24, padding: '10px 24px',
+        color: '#fff', fontSize: 13, fontWeight: 700,
+        cursor: 'pointer', boxShadow: '0 4px 24px rgba(107,82,212,0.4)',
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        新しいバージョンがあります — 更新して再読み込み
+      </button>
+    </div>
+  );
+}
 
 export default function Home() {
   const {
@@ -51,10 +175,14 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceRemaining, announceContainerSummary, announceOk, announceProgress } =
+  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
     useSpeech();
+  const { theme, toggleTheme } = useTheme();
 
   const prevItemRef = useRef<string | null>(null);
+  const currentItemRef = useRef(currentItem);
+  currentItemRef.current = currentItem;
+  const suppressAnnounceRef = useRef(false); // 常に最新を保持
   const loadedContainerRef = useRef<string | null>(null);
   const masterLoadedRef = useRef(false);
   const linkedRef = useRef<string | null>(null);
@@ -63,7 +191,11 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingClosing, setLoadingClosing] = useState(false);
   const [jkpShipments, setJkpShipments] = useState<JkpShipment[]>([]);
+  const jkpUserLoadedRef = useRef(false);
+  const [appReady, setAppReady] = useState(false);
 
   // 作業ページ表示中は画面スリープを防止（Wake Lock API）
   useEffect(() => {
@@ -86,13 +218,28 @@ export default function Home() {
     };
   }, [viewMode, state.items.length]);
 
-  // CNS品目一覧マスタデータを起動時に自動読込
+  // CNS品目一覧マスタデータ＋JKPデータを起動時に自動読込
   useEffect(() => {
     if (masterLoadedRef.current) return;
     masterLoadedRef.current = true;
-    fetchMasterData().then((items) => {
-      if (items.length > 0) loadMaster(items);
-    });
+    const init = async () => {
+      try {
+        // マスタデータ取得
+        const [masterItems] = await Promise.all([
+          fetchMasterData(),
+          fetchJkpFromGitHub().then((wb) => {
+            if (wb) {
+              const { shipments } = parseJkpUpdata(wb);
+              if (shipments.length > 0) setJkpShipments(shipments);
+            }
+          }).catch(() => {}),
+        ]);
+        if (masterItems.length > 0) loadMaster(masterItems);
+      } finally {
+        setAppReady(true);
+      }
+    };
+    init();
   }, [loadMaster]);
 
   // コンテナ品目にマスタデータを自動紐付（気高コード＋新建高コード両方で検索）
@@ -123,14 +270,30 @@ export default function Home() {
     });
   }, [state.items, state.masterItems, state.containers, state.selectedContainerIdx, updateItem]);
 
-  // 品目切替時の自動アナウンス
+  // 品目切替時の自動アナウンス（コンテナ読込直後の最初の品目はスキップ — 概要コールと混ざるため）
+  const firstItemSkipRef = useRef(true);
   useEffect(() => {
     if (!currentItem || !state.autoAnnounce) return;
     if (prevItemRef.current !== currentItem.id) {
       prevItemRef.current = currentItem.id;
-      announceItem(currentItem, state.items);
+      if (firstItemSkipRef.current) {
+        firstItemSkipRef.current = false;
+        return;
+      }
+      // 完了済みアイテムはアナウンスしない
+      if (state.completedIds.has(currentItem.id)) return;
+      // OKコマンド後の自動遷移ではアナウンスしない
+      if (suppressAnnounceRef.current) {
+        suppressAnnounceRef.current = false;
+        return;
+      }
+      // 完了コールとの重複回避（2秒待機）
+      setTimeout(() => {
+        if (state.completedIds.has(currentItem.id)) return;
+        announceItem(currentItem, state.items);
+      }, 2000);
     }
-  }, [currentItem, state.autoAnnounce, announceItem, state.items]);
+  }, [currentItem, state.autoAnnounce, announceItem, state.items, state.completedIds]);
 
   // コンテナ読み込み時の概要アナウンス（初回のみ）
   useEffect(() => {
@@ -141,6 +304,7 @@ export default function Home() {
     if (loadedContainerRef.current === key) return;
     loadedContainerRef.current = key;
     announcedThresholdsRef.current = new Set();
+    firstItemSkipRef.current = true; // 概要コール中は品目コールをスキップ
     // 少し遅延して概要アナウンス
     const timer = setTimeout(() => {
       announceContainerSummary(state.items, container.containerNo);
@@ -148,42 +312,64 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
 
-  // 進捗マイルストーンアナウンス（20%刻み — 詳細版）
+  // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
+
+  // 10分ごとの定期進捗コール（作業中のみ）
+  const periodicStateRef = useRef({ items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode });
+  periodicStateRef.current = { items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode };
   useEffect(() => {
-    if (state.items.length === 0) return;
-    const pct = state.completedIds.size / state.items.length * 100;
-    const thresholds = [20, 40, 60, 80, 100];
-    for (const t of thresholds) {
-      if (pct >= t && !announcedThresholdsRef.current.has(t)) {
-        announcedThresholdsRef.current.add(t);
-        // 完了アナウンスが終わった後に詳細進捗をアナウンス
-        setTimeout(() => {
-          announceProgress(state.items, state.completedIds);
-        }, 2500);
-        break; // Only announce one threshold at a time
-      }
-    }
-  }, [state.completedIds.size, state.items.length, announceProgress, state.items, state.completedIds]);
+    if (!state.workStartTime || state.items.length === 0) return;
+    const interval = setInterval(() => {
+      const { items, completedIds, autoAnnounce, viewMode: vm } = periodicStateRef.current;
+      if (!autoAnnounce || vm !== 'work') return;
+      const remaining = items.filter((it) => !completedIds.has(it.id));
+      if (remaining.length === 0) return;
+      const cts: Record<string, number> = {};
+      for (const it of remaining) cts[it.type] = (cts[it.type] || 0) + 1;
+      const parts: string[] = [];
+      for (const [t, c] of Object.entries(cts)) parts.push(`${t}が${c}種類`);
+      speak(`定期コール。残り${remaining.length}品。${parts.join('、')}。`);
+    }, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [state.workStartTime, state.items.length, speak]);
+
+  // 読込完了→100%表示1秒→フェードアウト
+  const closeLoading = useCallback(() => {
+    setLoadingProgress(100);
+    setTimeout(() => {
+      setLoadingClosing(true);
+      setTimeout(() => {
+        setLoadingMsg(null);
+        setLoadingProgress(0);
+        setLoadingClosing(false);
+      }, 500); // フェードアウト0.5秒
+    }, 1000); // 100%表示1秒
+  }, []);
 
   const handleFileLoaded = useCallback(
     async (file: File) => {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('Excelファイルを読み込み中...');
+      setLoadingProgress(10);
       try {
         // 1. 作業ファイルをパース
         const result = await parseExcelFile(file);
         if (result.containers.length === 0) return;
+        setLoadingProgress(25);
 
-        // 2. GitHubから最新マスタを確実に取得
+        // 2. GitHubから最新マスタを確実に取得（Meas.等の最新データ反映）
         setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+        setLoadingProgress(35);
         const masterItems = await fetchMasterData();
         if (masterItems.length > 0) {
           loadMaster(masterItems);
         }
+        setLoadingProgress(60);
 
         // 3. マスタと紐付（気高コード＋新建高コード両方で検索）
         setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
+        setLoadingProgress(70);
         const allItems = result.containers.flatMap(c => c.items);
         const { linkedItems, linked, total } = linkItemsWithMaster(allItems, masterItems);
 
@@ -196,11 +382,12 @@ export default function Home() {
         }
 
         setLoadingMsg(`紐付完了: ${linked}/${total}件  データを表示中...`);
+        setLoadingProgress(90);
 
         // 5. データをロード（紐付済みの状態で表示）
         loadData(result.containers);
         const totalItems = result.containers.reduce((sum, c) => sum + c.items.length, 0);
-        saveRecentFile(file, result.containers.length, totalItems);
+        saveRecentFile(file, result.containers.length, totalItems, 'container');
 
         // 紐付済みなのでuseEffectの再紐付をスキップさせる
         const container = result.containers[0];
@@ -211,10 +398,10 @@ export default function Home() {
         // 表示完了まで少し待機
         await new Promise((r) => setTimeout(r, 200));
       } finally {
-        setLoadingMsg(null);
+        closeLoading();
       }
     },
-    [loadData, loadMaster]
+    [loadData, loadMaster, closeLoading]
   );
 
   const handleAqssLoaded = useCallback(
@@ -235,17 +422,155 @@ export default function Home() {
         setLoadingMsg(`AQSS読込完了: ${totalUpdated}件更新`);
         await new Promise((r) => setTimeout(r, 1000));
       } finally {
-        setLoadingMsg(null);
+        closeLoading();
       }
     },
-    [state.items, updateItem]
+    [state.items, updateItem, closeLoading]
+  );
+
+  // AQSSファイルのみでコンテナを新規作成
+  const handleAqssContainerLoaded = useCallback(
+    async (invoiceFile: File, packingFile?: File) => {
+      loadedContainerRef.current = null;
+      linkedRef.current = null;
+      setLoadingMsg('AQSSファイルからコンテナを作成中...');
+      try {
+        const container = await parseAqssToContainer(invoiceFile, packingFile);
+        if (!container || container.items.length === 0) {
+          setLoadingMsg('AQSSファイルから品目を抽出できませんでした');
+          await new Promise((r) => setTimeout(r, 2000));
+          return;
+        }
+
+        // マスタと紐付
+        setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+        const masterItems = await fetchMasterData();
+        if (masterItems.length > 0) {
+          loadMaster(masterItems);
+        }
+
+        setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
+        const { linkedItems, linked, total } = linkItemsWithMaster(container.items, masterItems);
+        container.items = linkedItems;
+
+        setLoadingMsg(`紐付完了: ${linked}/${total}件 (${container.items.length}品目)`);
+        loadData([container]);
+        saveRecentFile(invoiceFile, 1, container.items.length, 'aqss');
+
+        // 紐付済みなのでuseEffectの再紐付をスキップ
+        linkedRef.current = `${container.containerNo}-0`;
+
+        await new Promise((r) => setTimeout(r, 500));
+      } finally {
+        closeLoading();
+      }
+    },
+    [loadData, loadMaster, closeLoading]
+  );
+
+  // マスターデータ（CNS品目一覧）をファイルから読込
+  const handleMasterLoaded = useCallback(
+    async (file: File) => {
+      setLoadingMsg('マスターデータを読み込み中...');
+      try {
+        const buffer = await file.arrayBuffer();
+        const masterItems = parseMasterExcel(buffer);
+        if (masterItems.length === 0) {
+          setLoadingMsg('マスターデータの解析に失敗しました');
+          await new Promise((r) => setTimeout(r, 2000));
+          return;
+        }
+
+        // マスタデータを更新
+        loadMaster(masterItems);
+        masterLoadedRef.current = true;
+
+        // 既存コンテナ品目があれば再紐付
+        if (state.items.length > 0) {
+          setLoadingMsg(`マスタ${masterItems.length}件で紐付中...`);
+          const { linkedItems, linked, total } = linkItemsWithMaster(state.items, masterItems);
+          linkedItems.forEach((updatedItem, idx) => {
+            const orig = state.items[idx];
+            if (!orig) return;
+            const updates: Partial<typeof orig> = {};
+            for (const k of Object.keys(updatedItem) as (keyof typeof updatedItem)[]) {
+              if (updatedItem[k] !== orig[k]) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (updates as any)[k] = updatedItem[k];
+              }
+            }
+            if (Object.keys(updates).length > 0) updateItem(idx, updates);
+          });
+          linkedRef.current = null;
+          setLoadingMsg(`マスタ読込完了: ${masterItems.length}件, 紐付${linked}/${total}件`);
+        } else {
+          setLoadingMsg(`マスタ読込完了: ${masterItems.length}件`);
+        }
+
+        saveRecentFile(file, 1, masterItems.length, 'master');
+        await new Promise((r) => setTimeout(r, 1500));
+      } finally {
+        closeLoading();
+      }
+    },
+    [loadMaster, state.items, updateItem, closeLoading]
+  );
+
+  // 写真（コンテナ日程の画像）を OCR で読込
+  const handlePhotoLoaded = useCallback(
+    async (file: File) => {
+      loadedContainerRef.current = null;
+      linkedRef.current = null;
+      setLoadingMsg('写真を解析中...');
+      setLoadingProgress(5);
+      try {
+        const { container, errors } = await parsePhotoFile(file, (p, msg) => {
+          setLoadingProgress(p);
+          setLoadingMsg(msg);
+        });
+        if (!container || container.items.length === 0) {
+          setLoadingMsg(errors[0] || '写真から品目を検出できませんでした');
+          await new Promise((r) => setTimeout(r, 2500));
+          return;
+        }
+
+        // マスタと紐付
+        setLoadingMsg('GitHubから最新の品目一覧を取得中...');
+        const masterItems = await fetchMasterData();
+        if (masterItems.length > 0) {
+          loadMaster(masterItems);
+        }
+
+        setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
+        const { linkedItems, linked, total } = linkItemsWithMaster(container.items, masterItems);
+        container.items = linkedItems;
+
+        setLoadingMsg(`紐付完了: ${linked}/${total}件 (${container.items.length}品目)`);
+        loadData([container]);
+        saveRecentFile(file, 1, container.items.length, 'container');
+
+        linkedRef.current = `${container.containerNo}-0`;
+        await new Promise((r) => setTimeout(r, 500));
+      } catch (e) {
+        console.error('Photo parse error:', e);
+        setLoadingMsg(`写真読込エラー: ${e instanceof Error ? e.message : String(e)}`);
+        await new Promise((r) => setTimeout(r, 3000));
+      } finally {
+        closeLoading();
+      }
+    },
+    [loadData, loadMaster, closeLoading],
   );
 
   const handleJkpLoaded = useCallback(
     async (file: File) => {
+      jkpUserLoadedRef.current = true;  // ユーザー操作による読込
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('JKPファイルを読み込み中...');
+      setLoadingProgress(5);
+      // UIの更新を待つ
+      await new Promise(r => setTimeout(r, 50));
       try {
         const buffer = await file.arrayBuffer();
         const wb = XLSX.read(buffer, { type: 'array' });
@@ -254,24 +579,24 @@ export default function Home() {
         const sheet1Items = parseJkpSheet1(wb);
         // 体積Ｍ３: CBM・箱寸
         const volumeMap = parseJkpVolume(wb);
-        // updata: 出荷スケジュール（N列="納入指示"の行のみ）
-        const shipments = parseJkpUpdata(wb);
+        // updata: 出荷スケジュール（納入指示行の数量がある列のRow10日付を納入日として読込、当日〜7日）
+        const { shipments, activeDates } = parseJkpUpdata(wb);
         setJkpShipments(shipments);
 
-        // 今日〜2週間先の日付範囲でデータがある日を特定
+        // パーサーが既に当日〜7日に絞り込み済み
         const today = new Date().toISOString().slice(0, 10);
-        const twoWeeksLater = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
-        const scheduleDates = getScheduleDatesInRange(shipments, today, twoWeeksLater);
+        const oneWeekLater = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+        const scheduleDates = getScheduleDatesInRange(shipments, today, oneWeekLater);
 
         if (scheduleDates.length === 0) {
-          setLoadingMsg(`${today}〜${twoWeeksLater}の出荷データがありません (updata:${shipments.length}件)`);
+          setLoadingMsg(`${today}〜${oneWeekLater}の出荷データがありません (updata:${shipments.length}件, 納入日:${activeDates.length}件)`);
           await new Promise((r) => setTimeout(r, 3000));
           return;
         }
 
-        setLoadingMsg(`${scheduleDates.length}日分のデータ検出。変換中...`);
+        setLoadingMsg(`${scheduleDates.length}日分のデータ検出（納入指示基準）。変換中...`);
 
-        // 日付ごとにContainerを作成: "タイガー鍋(3/25)" 形式
+        // 日付ごとにContainerを作成: "鍋(04/23)" 形式
         const containers = [];
         let totalItems = 0;
         for (const date of scheduleDates) {
@@ -280,7 +605,7 @@ export default function Home() {
           const dateLabel = date.slice(5).replace('-', '/');
           containers.push({
             date,
-            containerNo: `タイガー鍋(${dateLabel})`,
+            containerNo: `鍋(${dateLabel})`,
             items,
           });
           totalItems += items.length;
@@ -310,6 +635,7 @@ export default function Home() {
 
         setLoadingMsg(`紐付完了: ${linkedTotal}/${totalItems}件  作業シートを表示中...`);
         loadData(containers);
+        saveRecentFile(file, containers.length, totalItems, 'jkp');
 
         // 紐付済みなのでuseEffectの再紐付をスキップ
         linkedRef.current = `${containers[0].containerNo}-0`;
@@ -320,10 +646,10 @@ export default function Home() {
         setLoadingMsg(`JKP読込エラー: ${e instanceof Error ? e.message : String(e)}`);
         await new Promise((r) => setTimeout(r, 3000));
       } finally {
-        setLoadingMsg(null);
+        closeLoading();
       }
     },
-    [loadData, loadMaster]
+    [loadData, loadMaster, closeLoading]
   );
 
   const handleAnnounce = useCallback(() => {
@@ -338,53 +664,56 @@ export default function Home() {
   }, [state.containers, state.selectedContainerIdx, state.items, state.completedIds, workRawSeconds, announceContainerSummary]);
 
   const handleProgress = useCallback(() => {
-    announceProgress(state.items, state.completedIds);
-  }, [state.items, state.completedIds, announceProgress]);
+    // 進捗コールは種類数のみ（進捗率は廃止）
+    const rem = state.items.filter(it => !state.completedIds.has(it.id));
+    const cts: Record<string, number> = {};
+    for (const it of rem) cts[it.type] = (cts[it.type] || 0) + 1;
+    const pts: string[] = [];
+    for (const [t, c] of Object.entries(cts)) pts.push(`${t}が${c}種類`);
+    speak(pts.length > 0 ? pts.join('、') + '。' : '全品目完了です。');
+  }, [state.items, state.completedIds, speak]);
 
-  /** OKコマンド: パレット1つ消費、なくなったら自動完了 */
+  // OKコマンドの5秒クールダウン
+  const okCooldownRef = useRef(0);
+
+  /** OKコマンド: パレット1つ減らす。パレット0で端数のみ→完了。 */
   const handleConfirmOk = useCallback(() => {
-    if (!currentItem) return;
-    if (currentItem.palletCount <= 0 && currentItem.fraction <= 0) return;
+    const item = currentItemRef.current;
+    if (!item) return;
+    // 7秒クールダウン
+    if (Date.now() - okCooldownRef.current < 7000) return;
+    okCooldownRef.current = Date.now();
 
-    // 消費時間を記録
-    if (state.itemStartTime) {
-      const elapsed = Math.floor((Date.now() - state.itemStartTime) / 1000);
-      setItemTimeLogs(prev => [...prev, {
-        itemName: currentItem.itemName,
-        elapsed,
-        timestamp: Date.now(),
-      }]);
-    }
+    const pl = item.palletCount;
+    const rawFrac = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
+    const isNabeType = item.type === '鍋';
+    const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
 
-    // パレットがあればパレット1つ減らす
-    if (currentItem.palletCount > 0) {
+    if (pl > 0) {
       decreaseQty();
-      const newPallet = currentItem.palletCount - 1;
-      if (newPallet <= 0 && currentItem.fraction <= 0) {
-        // パレットもケースもなくなった→自動完了
-        setTimeout(() => {
-          const name = currentItem.itemName;
-          const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
-          completeItem(currentItem.id);
-          announceOk(name, 0);
-          if (remaining <= 0) {
-            setTimeout(() => announceAllComplete(), 1500);
-          }
-        }, 100);
+      const newPl = pl - 1;
+      if (newPl <= 0 && frac <= 0) {
+        speak('完了。');
+        suppressAnnounceRef.current = true;
+        setTimeout(() => completeItem(item.id), 300);
+      } else if (newPl > 0 && frac > 0) {
+        speak(`残り${newPl}パレットと${frac}ケース。`);
+      } else if (newPl > 0) {
+        speak(`残り${newPl}パレット。`);
       } else {
-        announceOk(currentItem.itemName, newPallet);
+        speak(`残り${frac}ケース。`);
       }
     } else {
-      // パレット0でケースのみの場合は完了
-      const name = currentItem.itemName;
-      const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
-      completeItem(currentItem.id);
-      announceOk(name, 0);
-      if (remaining <= 0) {
-        setTimeout(() => announceAllComplete(), 1500);
-      }
+      speak('完了。');
+      suppressAnnounceRef.current = true;
+      setTimeout(() => completeItem(item.id), 300);
     }
-  }, [currentItem, decreaseQty, completeItem, state.items, state.completedIds, state.itemStartTime, announceOk, announceAllComplete]);
+
+    if (state.itemStartTime) {
+      const elapsed = Math.floor((Date.now() - state.itemStartTime) / 1000);
+      setItemTimeLogs(prev => [...prev, { itemName: item.itemName, elapsed, timestamp: Date.now() }]);
+    }
+  }, [decreaseQty, completeItem, speak, state.itemStartTime]);
 
   const handleIncrease = useCallback(() => {
     increaseQty();
@@ -398,64 +727,45 @@ export default function Home() {
   }, [increaseQty, announcePalletChange]);
 
   const handleDecrease = useCallback(() => {
-    if (!currentItem) return;
+    const item = currentItemRef.current;
+    if (!item) return;
 
-    // Auto-complete if pallet is already 0
-    if (currentItem.palletCount === 0) {
-      const name = currentItem.itemName;
-      const remaining = state.items.filter((it) => !state.completedIds.has(it.id)).length - 1;
-      completeItem(currentItem.id);
-      announceComplete(name);
-      if (remaining <= 0) {
-        setTimeout(() => announceAllComplete(), 1500);
-      }
+    if (item.palletCount === 0) {
+      suppressAnnounceRef.current = true;
+      completeItem(item.id);
+      speak('完了。');
       return;
     }
 
     decreaseQty();
-    // 消費時間を記録（パレット減少）
-    if (state.itemStartTime) {
-      const elapsed = Math.floor((Date.now() - state.itemStartTime) / 1000);
-      setItemTimeLogs(prev => [...prev, {
-        itemName: currentItem.itemName,
-        elapsed,
-        timestamp: Date.now(),
-      }]);
+    const newPl = item.palletCount - 1;
+    const rawFrac = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
+    const isNabeType = item.type === '鍋';
+    const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
+
+    if (newPl > 0 && frac > 0) {
+      speak(`残り${newPl}パレットと${frac}ケース。`);
+    } else if (newPl > 0) {
+      speak(`残り${newPl}パレット。`);
+    } else if (frac > 0) {
+      speak(`残り${frac}ケース。`);
+    } else {
+      speak('完了。');
+      suppressAnnounceRef.current = true;
+      setTimeout(() => completeItem(item.id), 300);
     }
-    setTimeout(() => {
-      const el = document.querySelector('[data-pallet-count]');
-      if (el) {
-        const p = Number(el.getAttribute('data-pallet-count'));
-        const fraction = currentItem.fraction;
-        const fractionCeil = fraction % 1 !== 0 ? Math.ceil(fraction) : fraction;
-        let qtyText = '';
-        if (p > 0 && fractionCeil > 0) {
-          qtyText = `残り${p}パレットと${fractionCeil}ケース`;
-        } else if (p > 0) {
-          qtyText = `残り${p}パレット`;
-        } else if (fractionCeil > 0) {
-          qtyText = `残り${fractionCeil}ケース`;
-        } else {
-          qtyText = '残りなし';
-        }
-        speak(qtyText);
-      }
-    }, 50);
-  }, [currentItem, decreaseQty, speak, state.itemStartTime, state.items, state.completedIds, completeItem, announceComplete, announceAllComplete]);
+  }, [decreaseQty, speak, completeItem]);
 
   const handleComplete = useCallback(() => {
     if (!currentItem) return;
     const name = currentItem.itemName;
     const remaining = state.items.length - 1;
-    if (!window.confirm(`「${name}」を完了しますか？`)) return;
     deleteCurrent();
     announceComplete(name);
     if (remaining === 0) {
       setTimeout(() => announceAllComplete(), 1500);
-    } else {
-      setTimeout(() => announceRemaining(remaining), 1500);
     }
-  }, [currentItem, state.items.length, deleteCurrent, announceComplete, announceAllComplete, announceRemaining]);
+  }, [currentItem, state.items.length, deleteCurrent, announceComplete, announceAllComplete]);
 
   const handleSelectItem = useCallback(
     (idx: number) => {
@@ -508,8 +818,15 @@ export default function Home() {
             speak(`${itemNameForSpeech(currentItem.itemName)}、${qText}。`);
           }
           break;
-        case 'QUERY_REMAINING':
-          speak(`残り${state.items.length}品目です。`); break;
+        case 'QUERY_REMAINING': {
+          const rem = state.items.filter(it => !state.completedIds.has(it.id));
+          const typeCts: Record<string, number> = {};
+          for (const it of rem) typeCts[it.type] = (typeCts[it.type] || 0) + 1;
+          const pts: string[] = [];
+          for (const [t, c] of Object.entries(typeCts)) pts.push(`${t}が${c}種類`);
+          speak(pts.join('、') + '。');
+          break;
+        }
         case 'QUERY_PALLET':
           if (currentItem) speak(`パレット${currentItem.palletCount}枚です。`);
           break;
@@ -525,68 +842,263 @@ export default function Home() {
         case 'QUERY_PROGRESS':
           handleProgress();
           break;
+        case 'UNDO_DECREASE':
+          handleIncrease();
+          speak('パレットを1つ戻しました。');
+          break;
+        case 'QUERY_TYPE_COUNT': {
+          const counts: Record<string, number> = {};
+          const remaining = state.items.filter(it => !state.completedIds.has(it.id));
+          for (const it of remaining) counts[it.type] = (counts[it.type] || 0) + 1;
+          const parts: string[] = [];
+          for (const [t, c] of Object.entries(counts)) parts.push(`${t}が${c}種類`);
+          speak(parts.join('、') + '。');
+          break;
+        }
+        case 'MASA_CHEER': {
+          speak('がんばれ、まさ！');
+          break;
+        }
+        case 'WEATHER': {
+          speak('天気を取得中...');
+          fetchWeather().then(w => {
+            if (w) speak(weatherToSpeech(w));
+            else speak('天気情報を取得できませんでした。');
+          });
+          break;
+        }
+        case 'TEMPERATURE': {
+          speak('気温を取得中...');
+          fetchWeather().then(w => {
+            if (w) speak(temperatureToSpeech(w));
+            else speak('気温情報を取得できませんでした。');
+          });
+          break;
+        }
+        case 'TOTTORI_NEWS': {
+          speak('ニュースを取得中...');
+          fetchTottoriNews().then(text => speak(text));
+          break;
+        }
+        case 'FINANCE_NEWS': {
+          speak('金融ニュースを取得中...');
+          fetchFinanceNews().then(text => speak(text));
+          break;
+        }
+        case 'STOP_SPEECH': {
+          cancelSpeech();
+          break;
+        }
       }
     },
-    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items.length, speak, handleConfirmOk, handleContainerSummary, handleProgress]
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, handleConfirmOk, handleContainerSummary, handleProgress]
   );
 
-  const { isListening, isSupported, lastTranscript, toggleListening } =
+  const { isListening, isSpeaking, isPreparingSpeech, speakingText, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
-  if (state.containers.length === 0 && jkpShipments.length === 0) {
+  // 音声種類選択メニュー（マイクボタン長押しで開く）
+  const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
+  const [currentVoice, setCurrentVoice] = useState<string>('Kore');
+  const [geminiTtsOn, setGeminiTtsOn] = useState<boolean>(false);
+  const [hasGeminiKey, setHasGeminiKey] = useState<boolean>(false);
+  const [ttsModelName, setTtsModelName] = useState<string>(DEFAULT_GEMINI_TTS_MODEL);
+  const [ttsError, setTtsError] = useState<string | null>(null);
+  useEffect(() => {
+    setCurrentVoice(getSelectedVoice());
+    setGeminiTtsOn(isGeminiTtsEnabled());
+    setHasGeminiKey(!!getGeminiKey());
+    setTtsModelName(getGeminiTtsModel());
+    setTtsError(getLastTtsError());
+    return subscribeTtsError(setTtsError);
+  }, []);
+
+  const toggleGeminiTts = useCallback((enabled: boolean) => {
+    setGeminiTtsEnabled(enabled);
+    setGeminiTtsOn(enabled);
+  }, []);
+
+  const handleModelNameChange = useCallback((name: string) => {
+    setTtsModelName(name);
+    setGeminiTtsModel(name);
+  }, []);
+
+  // 各音声のサンプル試聴
+  const [sampleLoadingId, setSampleLoadingId] = useState<string | null>(null);
+  const [samplePlayingId, setSamplePlayingId] = useState<string | null>(null);
+  const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
+  const sampleUrlRef = useRef<string | null>(null);
+
+  const stopSample = useCallback(() => {
+    if (sampleAudioRef.current) {
+      try { sampleAudioRef.current.pause(); } catch { /* ignore */ }
+      sampleAudioRef.current = null;
+    }
+    if (sampleUrlRef.current) {
+      try { URL.revokeObjectURL(sampleUrlRef.current); } catch { /* ignore */ }
+      sampleUrlRef.current = null;
+    }
+    setSampleLoadingId(null);
+    setSamplePlayingId(null);
+  }, []);
+
+  const playSample = useCallback(async (voiceId: string) => {
+    stopSample();
+    setSampleLoadingId(voiceId);
+    try {
+      const blob = await geminiGenerateSpeech('こんにちは、サンプル音声です。', { voice: voiceId });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      sampleAudioRef.current = audio;
+      sampleUrlRef.current = url;
+      audio.onplay = () => {
+        setSampleLoadingId(null);
+        setSamplePlayingId(voiceId);
+      };
+      const cleanup = () => {
+        if (sampleUrlRef.current === url) {
+          URL.revokeObjectURL(url);
+          sampleUrlRef.current = null;
+        }
+        if (sampleAudioRef.current === audio) sampleAudioRef.current = null;
+        setSamplePlayingId((cur) => (cur === voiceId ? null : cur));
+      };
+      audio.onended = cleanup;
+      audio.onerror = cleanup;
+      await audio.play();
+    } catch (err) {
+      console.error('サンプル再生失敗:', err);
+      setSampleLoadingId(null);
+      setSamplePlayingId(null);
+    }
+  }, [stopSample]);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
+
+  const handleMicPressStart = useCallback(() => {
+    longPressFiredRef.current = false;
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true;
+      setCurrentVoice(getSelectedVoice());
+      setGeminiTtsOn(isGeminiTtsEnabled());
+      setHasGeminiKey(!!getGeminiKey());
+      setTtsModelName(getGeminiTtsModel());
+      setTtsError(getLastTtsError());
+      setVoiceMenuOpen(true);
+    }, 500);
+  }, []);
+
+  const handleMicPressEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return; // 長押しの場合は通常クリックを発火しない
+    }
+    if (isSpeaking) {
+      cancelSpeech();
+      return;
+    }
+    toggleListening();
+  }, [isSpeaking, toggleListening]);
+
+  const handleMicPressCancel = useCallback(() => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressFiredRef.current = false;
+  }, []);
+
+  const handleSelectVoice = useCallback((voiceId: string) => {
+    setSelectedVoice(voiceId);
+    setCurrentVoice(voiceId);
+  }, []);
+
+  // 初期ロード中はスプラッシュ画面
+  if (!appReady) {
     return (
-      <>
-        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onJkpLoaded={handleJkpLoaded} />
-        {loadingMsg && (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 300,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-          }}>
+      <div style={{
+        position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: theme === 'light'
+          ? '#f5f5f0'
+          : 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)',
+        zIndex: 999,
+      }}>
+        <style>{`
+          @keyframes neonPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+          @keyframes dotFlow { 0%,20% { opacity: 0.15; } 40% { opacity: 1; } 60%,100% { opacity: 0.15; } }
+        `}</style>
+        {/* キューブアイコン（2D・アニメーションなし） */}
+        <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28 }}>
+          {theme === 'dark' && (
             <div style={{
-              background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: 20, padding: '32px 40px', textAlign: 'center',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-            }}>
-              <div style={{
-                width: 40, height: 40, margin: '0 auto 16px',
-                border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6',
-                borderRadius: '50%', animation: 'spin 1s linear infinite',
+              position: 'absolute', inset: -16,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, transparent 70%)',
+              animation: 'neonPulse 2.5s ease-in-out infinite',
+            }} />
+          )}
+          <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
+            style={{ position: 'relative', animation: theme === 'dark' ? 'neonPulse 2.5s ease-in-out infinite' : undefined }}>
+            <g transform="translate(32,32)" stroke={theme === 'light' ? '#555' : '#fff'} strokeWidth="3" strokeLinejoin="round" fill="none">
+              <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
+              <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
+              <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
+            </g>
+          </svg>
+        </div>
+        {/* Loading文字 + ドット（下に配置） */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            fontSize: 16, fontWeight: 600,
+            color: theme === 'light' ? '#555' : '#fff',
+            fontFamily: 'Inter, sans-serif',
+            letterSpacing: 3,
+            textShadow: theme === 'light' ? 'none' : '0 0 10px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.35), 0 0 40px rgba(255,255,255,0.15)',
+          }}>Loading</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {[0, 1, 2, 3, 4].map(i => (
+              <span key={i} style={{
+                display: 'inline-block', width: 5, height: 5, borderRadius: '50%',
+                background: theme === 'light' ? '#999' : '#fff',
+                boxShadow: theme === 'light' ? 'none' : '0 0 6px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.3)',
+                animation: `dotFlow 2s ease-in-out ${i * 0.3}s infinite`,
               }} />
-              <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>
-                {loadingMsg}
-              </p>
-              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>
-                しばらくお待ちください
-              </p>
-            </div>
+            ))}
           </div>
-        )}
-      </>
+        </div>
+      </div>
     );
   }
 
-  // JKPデータのみ（コンテナなし）の場合: JKPスケジュールページ表示
-  if (state.containers.length === 0 && jkpShipments.length > 0) {
+  if (state.containers.length === 0) {
     return (
-      <div className="app-layout" style={{ background: 'var(--bg-primary)' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
-          background: '#1a1d2e', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0,
-        }}>
-          <button onClick={() => { setJkpShipments([]); setViewMode('work'); }}
-            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 4 }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
+      <>
+        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} onPhotoLoaded={handlePhotoLoaded} />
+        {/* テーマ切替ボタン（読込画面右下） */}
+        <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 100 }}>
+          <button onClick={toggleTheme} style={{
+            width: 44, height: 44, borderRadius: '50%',
+            background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+            border: `1.5px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+            transition: 'all 0.3s ease',
+          }}>
+            {theme === 'dark' ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            )}
           </button>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>JKP出荷スケジュール</span>
         </div>
-        <div style={{ flex: 1, minHeight: 0 }}>
-          <JkpSchedulePage shipments={jkpShipments} />
-        </div>
-      </div>
+        {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
+      </>
     );
   }
 
@@ -620,32 +1132,28 @@ export default function Home() {
     <>
       {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
-      {loadingMsg && (
+      {/* 音声コール中のテキスト表示（マイクボタンの上） */}
+      {isSpeaking && speakingText && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 300,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          position: 'fixed', bottom: 84, left: 8, right: 8,
+          zIndex: 101, pointerEvents: 'none',
+          textAlign: 'center',
+          animation: 'fadeIn 0.2s ease both',
         }}>
           <div style={{
-            background: 'linear-gradient(160deg, #1e2235 0%, #252a40 100%)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 20, padding: '32px 40px', textAlign: 'center',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            padding: '10px 16px', borderRadius: 16,
+            background: 'rgba(20,10,40,0.92)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(167,139,250,0.35)',
+            color: '#fff', fontSize: 15, fontWeight: 600,
+            lineHeight: 1.5,
+            boxShadow: '0 4px 24px rgba(139,92,246,0.25)',
           }}>
-            <div style={{
-              width: 40, height: 40, margin: '0 auto 16px',
-              border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6',
-              borderRadius: '50%', animation: 'spin 1s linear infinite',
-            }} />
-            <p style={{ color: '#fff', fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>
-              {loadingMsg}
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: 0 }}>
-              しばらくお待ちください
-            </p>
+            {speakingText}
           </div>
         </div>
       )}
+      {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 
       {/* メニューオーバーレイ */}
       {menuOpen && (
@@ -657,13 +1165,7 @@ export default function Home() {
               </svg>
               作業
             </button>
-            <button className={`menu-item ${viewMode === 'list' ? 'active' : ''}`} onClick={() => switchView('list')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-                <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-              </svg>
-              一覧
-            </button>
+            {/* 一覧ページ削除 */}
             <button className={`menu-item ${viewMode === 'edit' ? 'active' : ''}`} onClick={() => switchView('edit')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
@@ -692,7 +1194,7 @@ export default function Home() {
             </button>
             <div className="menu-divider" />
             <div className="menu-version">
-              CNS Ver 1.6
+              CNS Ver 1.7
             </div>
           </div>
         </div>
@@ -713,6 +1215,8 @@ export default function Home() {
           completionLog={state.completionLog}
           onContainerAnnounce={handleContainerSummary}
           hasItems={state.items.length > 0}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
 
         {/* メインエリア */}
@@ -730,14 +1234,20 @@ export default function Home() {
                     allItems={state.items}
                     completedIds={state.completedIds}
                     onSelectItem={handleSelectItem}
-                    onCompleteItem={completeItem}
+                    onCompleteItem={(id: string) => {
+                      const item = state.items.find(it => it.id === id);
+                      completeItem(id);
+                      if (item) {
+                        announceComplete(item.itemName);
+                      }
+                    }}
                     onUncompleteItem={uncompleteItem}
                     onDecrementPallet={handleDecrease}
                   />
                 )}
               </div>
               <div className="list-panel-side">
-                <ItemListPanel items={state.items} currentIdx={state.currentItemIdx} onSelect={handleSelectItem} />
+                <ItemListPanel items={state.items} currentIdx={state.currentItemIdx} onSelect={handleSelectItem} onComplete={completeItem} />
               </div>
             </>
           )}
@@ -804,6 +1314,7 @@ export default function Home() {
                   setLoadingMsg('GitHubから最新の品目一覧を取得中...');
                   try {
                     masterLoadedRef.current = false;
+                    // 1. マスタデータを取得・紐付
                     const { masterItems: newMaster, linkedItems, linked: linkedCount, total } =
                       await fetchAndLinkMaster(state.items);
                     if (newMaster.length > 0) {
@@ -822,13 +1333,31 @@ export default function Home() {
                         if (Object.keys(updates).length > 0) updateItem(idx, updates);
                       });
                       linkedRef.current = null;
-                      setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件`);
+
+                      // 2. JKPデータもGitHubから最新を取得
+                      setLoadingMsg(`マスタ${newMaster.length}件取得完了。JKPデータを取得中...`);
+                      try {
+                        const jkpWb = await fetchJkpFromGitHub();
+                        if (jkpWb) {
+                          const { shipments } = parseJkpUpdata(jkpWb);
+                          if (shipments.length > 0) {
+                            setJkpShipments(shipments);
+                            setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件, JKP${shipments.length}品目`);
+                          } else {
+                            setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件 (JKPデータなし)`);
+                          }
+                        } else {
+                          setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件`);
+                        }
+                      } catch {
+                        setLoadingMsg(`再読込完了: マスタ${newMaster.length}件, 紐付${linkedCount}/${total}件`);
+                      }
                     } else {
                       setLoadingMsg('マスタデータの取得に失敗しました');
                     }
                     await new Promise((r) => setTimeout(r, 1500));
                   } finally {
-                    setLoadingMsg(null);
+                    closeLoading();
                   }
                 }}
               />
@@ -836,18 +1365,348 @@ export default function Home() {
           )}
         </div>
 
-        {/* 操作バー (作業モード時のみ) */}
-        {viewMode === 'work' && (
-          <ActionBar
-            onIncrease={handleIncrease}
-            onDecrease={handleDecrease}
-            onAnnounce={handleAnnounce}
-            hasItems={state.items.length > 0}
-            isListening={isListening}
-            isVoiceSupported={isSupported}
-            onToggleVoice={toggleListening}
-          />
+        {/* フローティングマイクボタン（右下固定） */}
+        {viewMode === 'work' && isSupported && (
+          <>
+            {(isSpeaking || isPreparingSpeech) && (
+              <style>{`
+                @keyframes speakBar1 { 0%,100% { height: 20%; } 50% { height: 80%; } }
+                @keyframes speakBar2 { 0%,100% { height: 40%; } 40% { height: 95%; } }
+                @keyframes speakBar3 { 0%,100% { height: 60%; } 30% { height: 100%; } 70% { height: 35%; } }
+                @keyframes speakBar4 { 0%,100% { height: 50%; } 60% { height: 90%; } }
+                @keyframes speakBar5 { 0%,100% { height: 30%; } 45% { height: 75%; } }
+                @keyframes speakBar6 { 0%,100% { height: 15%; } 55% { height: 65%; } }
+                @keyframes speakBar7 { 0%,100% { height: 25%; } 35% { height: 70%; } }
+                @keyframes ttsLoadSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                @keyframes ttsLoadDot { 0%,80%,100% { opacity: 0.2; } 40% { opacity: 1; } }
+              `}</style>
+            )}
+            <button
+              onPointerDown={handleMicPressStart}
+              onPointerUp={handleMicPressEnd}
+              onPointerLeave={handleMicPressCancel}
+              onPointerCancel={handleMicPressCancel}
+              onContextMenu={(e) => e.preventDefault()}
+              className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
+              style={{
+                position: 'fixed', bottom: 20, zIndex: 100,
+                width: 56, height: 56, borderRadius: '50%',
+                background: isSpeaking
+                  ? 'radial-gradient(circle at 35% 35%, #b48eff, #8b5cf6 50%, #6d28d9 80%, #4c1d95)'
+                  : isListening
+                    ? 'radial-gradient(circle at 35% 35%, #ff6b6b, #dc2626 60%, #991b1b)'
+                    : 'radial-gradient(circle at 35% 35%, #7c9bff, #4a6ef7 50%, #3b52d4 80%, #2a3aaa)',
+                border: isSpeaking ? '2px solid rgba(167,139,250,0.6)'
+                  : isListening ? '2px solid rgba(255,100,100,0.6)' : '2px solid rgba(255,255,255,0.15)',
+                cursor: 'pointer',
+                boxShadow: isSpeaking
+                  ? '0 0 24px rgba(139,92,246,0.5), 0 0 48px rgba(139,92,246,0.2), inset 0 1px 2px rgba(255,255,255,0.15)'
+                  : isListening
+                    ? '0 0 24px rgba(239,68,68,0.5), 0 0 48px rgba(239,68,68,0.2), inset 0 1px 2px rgba(255,255,255,0.2)'
+                    : '0 4px 20px rgba(74,110,247,0.35), 0 0 40px rgba(107,82,212,0.15), inset 0 1px 2px rgba(255,255,255,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'all 0.3s ease',
+                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+              }}>
+              {isPreparingSpeech ? (
+                /* Gemini TTS 取得中: 回転スピナー */
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                  style={{ animation: 'ttsLoadSpin 0.9s linear infinite' }}>
+                  <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5" fill="none" />
+                  <path d="M12 3 a9 9 0 0 1 9 9" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+                </svg>
+              ) : isSpeaking ? (
+                /* 音声コール中: 音声波形アイコン（7本の棒が不規則に伸縮） */
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 24 }}>
+                  {[
+                    { dur: '0.8s', delay: '0s', anim: 'speakBar1' },
+                    { dur: '0.6s', delay: '0.1s', anim: 'speakBar2' },
+                    { dur: '0.7s', delay: '0.05s', anim: 'speakBar3' },
+                    { dur: '0.5s', delay: '0.15s', anim: 'speakBar4' },
+                    { dur: '0.65s', delay: '0.08s', anim: 'speakBar5' },
+                    { dur: '0.75s', delay: '0.12s', anim: 'speakBar6' },
+                    { dur: '0.55s', delay: '0.03s', anim: 'speakBar7' },
+                  ].map((b, i) => (
+                    <div key={i} style={{
+                      width: 3, borderRadius: 2,
+                      background: '#fff',
+                      boxShadow: '0 0 4px rgba(255,255,255,0.5)',
+                      animation: `${b.anim} ${b.dur} ease-in-out ${b.delay} infinite`,
+                    }} />
+                  ))}
+                </div>
+              ) : (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.4))' }}>
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  {!isListening && <><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></>}
+                </svg>
+              )}
+              {isListening && !isSpeaking && (
+                <span style={{
+                  position: 'absolute', inset: -4, borderRadius: '50%',
+                  border: '2px solid rgba(239,68,68,0.5)',
+                  animation: 'mic-ring-pulse 1.5s ease-out infinite',
+                }} />
+              )}
+              {isSpeaking && (
+                <span style={{
+                  position: 'absolute', inset: -4, borderRadius: '50%',
+                  border: '2px solid rgba(167,139,250,0.5)',
+                  animation: 'mic-ring-pulse 1.5s ease-out infinite',
+                }} />
+              )}
+            </button>
+
+            {/* 音声種類選択メニュー（マイクボタン長押しで表示） */}
+            {voiceMenuOpen && (
+              <div
+                onClick={() => { stopSample(); setVoiceMenuOpen(false); }}
+                style={{
+                  position: 'fixed', inset: 0, zIndex: 150,
+                  background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+                  display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+                  paddingBottom: 96, animation: 'fadeIn 0.18s ease both',
+                }}
+              >
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
+                    border: '1.5px solid rgba(255,255,255,0.15)',
+                    borderRadius: 20, padding: 16,
+                    boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+                    width: '92%', maxWidth: 360,
+                    maxHeight: '70vh', overflowY: 'auto',
+                  }}
+                >
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    marginBottom: 12, paddingBottom: 8,
+                    borderBottom: '1px solid rgba(255,255,255,0.1)',
+                  }}>
+                    <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>声の種類</div>
+                    <div style={{ color: geminiTtsOn ? '#a78bfa' : '#facc15', fontSize: 11 }}>
+                      {!hasGeminiKey
+                        ? 'Gemini キー未設定'
+                        : geminiTtsOn ? 'Gemini 3.1 Flash TTS' : 'Web Speech API'}
+                    </div>
+                  </div>
+
+                  {/* 音声エンジン切り替えトグル */}
+                  {hasGeminiKey && (
+                    <div style={{
+                      display: 'flex', gap: 6, marginBottom: 12,
+                      padding: 4, borderRadius: 10,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}>
+                      <button
+                        onClick={() => toggleGeminiTts(true)}
+                        style={{
+                          flex: 1, padding: '8px 10px', borderRadius: 7,
+                          background: geminiTtsOn
+                            ? 'linear-gradient(135deg, rgba(139,92,246,0.4), rgba(74,110,247,0.3))'
+                            : 'transparent',
+                          border: geminiTtsOn ? '1px solid rgba(167,139,250,0.5)' : '1px solid transparent',
+                          color: geminiTtsOn ? '#fff' : '#888', fontSize: 12, fontWeight: 600,
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                        }}
+                      >
+                        Gemini 3.1 Flash
+                      </button>
+                      <button
+                        onClick={() => toggleGeminiTts(false)}
+                        style={{
+                          flex: 1, padding: '8px 10px', borderRadius: 7,
+                          background: !geminiTtsOn
+                            ? 'linear-gradient(135deg, rgba(74,110,247,0.35), rgba(99,102,241,0.25))'
+                            : 'transparent',
+                          border: !geminiTtsOn ? '1px solid rgba(74,110,247,0.5)' : '1px solid transparent',
+                          color: !geminiTtsOn ? '#fff' : '#888', fontSize: 12, fontWeight: 600,
+                          cursor: 'pointer', transition: 'all 0.15s ease',
+                        }}
+                      >
+                        Web Speech
+                      </button>
+                    </div>
+                  )}
+
+                  {!hasGeminiKey && (
+                    <div style={{
+                      color: '#facc15', fontSize: 11, lineHeight: 1.5,
+                      padding: '8px 10px', marginBottom: 10,
+                      background: 'rgba(250,204,21,0.08)',
+                      border: '1px solid rgba(250,204,21,0.2)',
+                      borderRadius: 8,
+                    }}>
+                      Gemini API キーを設定すると高品質な音声(声の種類選択)が使えます。
+                    </div>
+                  )}
+                  {hasGeminiKey && !geminiTtsOn && (
+                    <div style={{
+                      color: '#94a3b8', fontSize: 11, lineHeight: 1.5,
+                      padding: '8px 10px', marginBottom: 10,
+                      background: 'rgba(148,163,184,0.06)',
+                      border: '1px solid rgba(148,163,184,0.15)',
+                      borderRadius: 8,
+                    }}>
+                      Web Speech API 使用中。声の種類選択は Gemini に切り替え後に反映されます。
+                    </div>
+                  )}
+
+                  {/* Gemini TTS のエラー表示 */}
+                  {hasGeminiKey && geminiTtsOn && ttsError && (
+                    <div style={{
+                      color: '#fca5a5', fontSize: 11, lineHeight: 1.5,
+                      padding: '8px 10px', marginBottom: 10,
+                      background: 'rgba(239,68,68,0.08)',
+                      border: '1px solid rgba(239,68,68,0.25)',
+                      borderRadius: 8,
+                      wordBreak: 'break-all',
+                    }}>
+                      <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ Gemini TTS エラー</div>
+                      <div>{ttsError}</div>
+                      <div style={{ marginTop: 4, color: '#fca5a5', opacity: 0.8 }}>
+                        モデル名を変更するか「Web Speech」に切り替えてください。
+                      </div>
+                    </div>
+                  )}
+
+                  {/* モデル名入力（Gemini 使用時のみ） */}
+                  {hasGeminiKey && geminiTtsOn && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>
+                        モデル名（他システムで動く名前があればここに）
+                      </div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <input
+                          type="text"
+                          value={ttsModelName}
+                          onChange={(e) => handleModelNameChange(e.target.value)}
+                          placeholder={DEFAULT_GEMINI_TTS_MODEL}
+                          style={{
+                            flex: 1, padding: '8px 10px', borderRadius: 7,
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            color: '#fff', fontSize: 12,
+                            fontFamily: 'monospace',
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          onClick={() => handleModelNameChange(DEFAULT_GEMINI_TTS_MODEL)}
+                          style={{
+                            padding: '8px 10px', borderRadius: 7,
+                            background: 'rgba(255,255,255,0.04)',
+                            border: '1px solid rgba(255,255,255,0.12)',
+                            color: '#aaa', fontSize: 11, cursor: 'pointer',
+                          }}
+                        >
+                          初期値
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {GEMINI_VOICES.map((v) => {
+                      const selected = v.id === currentVoice;
+                      const sampleLoading = sampleLoadingId === v.id;
+                      const samplePlaying = samplePlayingId === v.id;
+                      const canSample = hasGeminiKey && geminiTtsOn;
+                      return (
+                        <div
+                          key={v.id}
+                          onClick={() => handleSelectVoice(v.id)}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            gap: 8, padding: '10px 12px', borderRadius: 10,
+                            background: selected
+                              ? 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(74,110,247,0.25))'
+                              : 'rgba(255,255,255,0.04)',
+                            border: selected
+                              ? '1.5px solid rgba(167,139,250,0.6)'
+                              : '1px solid rgba(255,255,255,0.08)',
+                            color: '#fff', cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600 }}>{v.label}</div>
+                            <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{v.desc}</div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {/* サンプル試聴ボタン */}
+                            {canSample && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (samplePlaying || sampleLoading) {
+                                    stopSample();
+                                  } else {
+                                    void playSample(v.id);
+                                  }
+                                }}
+                                title="サンプル試聴"
+                                style={{
+                                  width: 32, height: 32, borderRadius: '50%',
+                                  background: samplePlaying
+                                    ? 'rgba(167,139,250,0.3)'
+                                    : 'rgba(255,255,255,0.08)',
+                                  border: '1px solid rgba(255,255,255,0.15)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  cursor: 'pointer', flexShrink: 0,
+                                  color: '#fff',
+                                }}
+                              >
+                                {sampleLoading ? (
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                    style={{ animation: 'ttsLoadSpin 0.9s linear infinite' }}>
+                                    <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.25)" strokeWidth="3" fill="none" />
+                                    <path d="M12 3 a9 9 0 0 1 9 9" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" />
+                                  </svg>
+                                ) : samplePlaying ? (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
+                                    <rect x="6" y="5" width="4" height="14" rx="1" />
+                                    <rect x="14" y="5" width="4" height="14" rx="1" />
+                                  </svg>
+                                ) : (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
+                                    <path d="M8 5v14l11-7z" />
+                                  </svg>
+                                )}
+                              </button>
+                            )}
+                            {selected && (
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => { stopSample(); setVoiceMenuOpen(false); }}
+                    style={{
+                      marginTop: 12, width: '100%', padding: '10px',
+                      borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'rgba(255,255,255,0.04)', color: '#ccc',
+                      fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    閉じる
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
+        <UpdateNotification />
       </div>
     </>
   );

@@ -29,10 +29,9 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <head>
-        <link rel="apple-touch-icon" sizes="180x180" href="/Container/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/svg+xml" href="/Container/icons/favicon.svg" />
         <link rel="icon" type="image/png" sizes="32x32" href="/Container/icons/favicon-32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/Container/icons/favicon-16.png" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/Container/icons/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/Container/icons/apple-touch-icon.png" />
       </head>
       <body className="font-sans antialiased">{children}</body>
     </html>
