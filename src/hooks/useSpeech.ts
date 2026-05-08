@@ -164,10 +164,19 @@ export function useSpeech() {
     let text = `${spokenName}。${qtyText}。`;
 
     // ポリカバーは検査で1ケース抜く（端数から1引く）。鍋は検査なし。
+    // 端数=0でパレットぴったりの場合は1パレットを崩して検査分を抜く。
     if (isPolycover) {
-      const afterInspection = fractionCeil - 1;
-      if (afterInspection >= 0) {
+      if (fractionCeil > 0) {
+        const afterInspection = fractionCeil - 1;
         text += `検査を抜いて${afterInspection}ケース。`;
+      } else if (item.palletCount > 0 && item.qtyPerPallet > 0) {
+        const remainingCases = item.qtyPerPallet - 1;
+        const remainingPallets = item.palletCount - 1;
+        if (remainingPallets > 0) {
+          text += `検査を抜いて${remainingPallets}パレットと${remainingCases}ケース。`;
+        } else {
+          text += `検査を抜いて${remainingCases}ケース。`;
+        }
       }
     }
 
