@@ -399,8 +399,17 @@ export function linkItemsWithMaster(
       updated.type = master.type;
     }
     // 品名をマスタから補完（AQSS等で中国語名の場合にマスタの品名で上書き）
+    // - 元データが中国語名の場合（AQSSで掃除しきれず残った等）はマスタ品名で上書き
+    // - 部品でマスタ品名が中国語、かつ itemNameContainer が日本語の場合は itemNameContainer を優先
+    //   （例: 蒸气孔胶圈 JRI-A100 → JRIAｽﾁ-ﾑﾎ-ﾙPK1、完成阀 SR-HX184 → ｶﾝｾｲﾍﾞﾝ(ken)）
+    const masterNameIsCJK = master.itemName ? /[\u4e00-\u9fff]/.test(master.itemName) : false;
+    const containerNameIsJa = master.itemNameContainer ? !/[\u4e00-\u9fff]/.test(master.itemNameContainer) : false;
     if (master.itemName && /[\u4e00-\u9fff]/.test(updated.itemName) && !/ポリカバー|ジャーポット/.test(updated.itemName)) {
-      updated.itemName = master.itemName;
+      updated.itemName = (masterNameIsCJK && containerNameIsJa && master.itemNameContainer)
+        ? master.itemNameContainer
+        : master.itemName;
+    } else if (updated.type === '部品' && masterNameIsCJK && containerNameIsJa && master.itemNameContainer) {
+      updated.itemName = master.itemNameContainer;
     }
     // 代表機種をマスタから補完
     if (master.representModel && !updated.representModel) {
