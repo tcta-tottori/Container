@@ -316,6 +316,35 @@ export default function Home() {
 
   // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
 
+  // 10分ごとの定期コール（作業中のみ）
+  const lastIntervalCallRef = useRef(0);
+  useEffect(() => {
+    if (!state.workStartTime) return;
+    if (workRawSeconds <= 0) return;
+    if (workRawSeconds % 600 !== 0) return;
+    if (lastIntervalCallRef.current === workRawSeconds) return;
+    lastIntervalCallRef.current = workRawSeconds;
+    if (state.items.length === 0) return;
+
+    const minutes = Math.floor(workRawSeconds / 60);
+    const completed = state.items.filter(it => state.completedIds.has(it.id)).length;
+    const remaining = state.items.filter(it => !state.completedIds.has(it.id));
+    const total = state.items.length;
+
+    // 残り種類別カウント
+    const cts: Record<string, number> = {};
+    for (const it of remaining) cts[it.type] = (cts[it.type] || 0) + 1;
+    const parts: string[] = [];
+    for (const [t, c] of Object.entries(cts)) parts.push(`${t}が${c}種類`);
+
+    if (remaining.length === 0) {
+      speak(`作業開始から${minutes}分経過。全${total}品目完了です。お疲れ様でした。`);
+    } else {
+      const summary = parts.length > 0 ? parts.join('、') : `${remaining.length}種類`;
+      speak(`作業開始から${minutes}分経過。完了${completed}、残り${summary}です。引き続きよろしくお願いします。`);
+    }
+  }, [workRawSeconds, state.workStartTime, state.items, state.completedIds, speak]);
+
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
     setLoadingProgress(100);
@@ -1188,7 +1217,7 @@ export default function Home() {
             </button>
             <div className="menu-divider" />
             <div className="menu-version">
-              CNS Ver 1.7
+              CNS Ver 1.8
             </div>
           </div>
         </div>
