@@ -65,9 +65,13 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '3.0';
+const APP_VERSION = '3.1';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '3.1', date: '2026-05-08', changes: [
+    { icon: '📄', text: 'メニューに「元ファイル閲覧」ボタンを追加（AQSS等の元Excelをスマホ向けに表示）' },
+    { icon: '⏰', text: '作業中、10分ごとに進捗を音声でコール（経過時間・完了数・残り種類別）' },
+  ]},
   { ver: '2.0', date: '2026-03-26', changes: [
     { icon: '🎙️', text: '操作バー廃止→マイクボタン固定化（音声メイン操作）' },
     { icon: '🗣️', text: '音声コマンド拡充（お願いします/戻して/何種類?）' },
