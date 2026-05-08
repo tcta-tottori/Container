@@ -27,6 +27,7 @@ import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
+import SourceFilesViewer from '@/components/SourceFilesViewer';
 import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
 import * as XLSX from 'xlsx';
 
@@ -190,6 +191,7 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('work');
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [sourceViewerOpen, setSourceViewerOpen] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingClosing, setLoadingClosing] = useState(false);
@@ -313,6 +315,35 @@ export default function Home() {
   }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
 
   // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
+
+  // 10分ごとの定期コール（作業中のみ）
+  const lastIntervalCallRef = useRef(0);
+  useEffect(() => {
+    if (!state.workStartTime) return;
+    if (workRawSeconds <= 0) return;
+    if (workRawSeconds % 600 !== 0) return;
+    if (lastIntervalCallRef.current === workRawSeconds) return;
+    lastIntervalCallRef.current = workRawSeconds;
+    if (state.items.length === 0) return;
+
+    const minutes = Math.floor(workRawSeconds / 60);
+    const completed = state.items.filter(it => state.completedIds.has(it.id)).length;
+    const remaining = state.items.filter(it => !state.completedIds.has(it.id));
+    const total = state.items.length;
+
+    // 残り種類別カウント
+    const cts: Record<string, number> = {};
+    for (const it of remaining) cts[it.type] = (cts[it.type] || 0) + 1;
+    const parts: string[] = [];
+    for (const [t, c] of Object.entries(cts)) parts.push(`${t}が${c}種類`);
+
+    if (remaining.length === 0) {
+      speak(`作業開始から${minutes}分経過。全${total}品目完了です。お疲れ様でした。`);
+    } else {
+      const summary = parts.length > 0 ? parts.join('、') : `${remaining.length}種類`;
+      speak(`作業開始から${minutes}分経過。完了${completed}、残り${summary}です。引き続きよろしくお願いします。`);
+    }
+  }, [workRawSeconds, state.workStartTime, state.items, state.completedIds, speak]);
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
@@ -1112,6 +1143,7 @@ export default function Home() {
   return (
     <>
       {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
+      <SourceFilesViewer open={sourceViewerOpen} onClose={() => setSourceViewerOpen(false)} />
       <VoiceFeedback transcript={lastTranscript} isListening={isListening} />
       {/* 音声コール中のテキスト表示（マイクボタンの上） */}
       {isSpeaking && speakingText && (
@@ -1167,6 +1199,16 @@ export default function Home() {
               履歴
             </button>
             <div className="menu-divider" />
+            <button className="menu-item" onClick={() => { setSourceViewerOpen(true); setMenuOpen(false); }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="8" y1="13" x2="16" y2="13"/>
+                <line x1="8" y1="17" x2="16" y2="17"/>
+                <line x1="8" y1="9" x2="10" y2="9"/>
+              </svg>
+              元ファイル閲覧
+            </button>
             <button className="menu-item" onClick={() => { setManualOpen(true); setMenuOpen(false); }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -1175,7 +1217,7 @@ export default function Home() {
             </button>
             <div className="menu-divider" />
             <div className="menu-version">
-              CNS Ver 1.7
+              CNS Ver 1.8
             </div>
           </div>
         </div>
