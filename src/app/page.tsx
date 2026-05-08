@@ -1217,6 +1217,7 @@ export default function Home() {
           hasItems={state.items.length > 0}
           theme={theme}
           onToggleTheme={toggleTheme}
+          onMasaCheer={() => speak('がんばれ、まさ！')}
         />
 
         {/* メインエリア */}
