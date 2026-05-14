@@ -18,6 +18,7 @@ import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews } from '@/lib/weatherNews';
+import { getRandomCheer } from '@/lib/cheerPhrases';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
@@ -315,6 +316,7 @@ export default function Home() {
   // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
 
   // 10分ごとの定期進捗コール（作業中のみ）
+  // 「10分経過しました」+ ランダム応援フレーズ。毎回応援フレーズが変わる。
   const periodicStateRef = useRef({ items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode });
   periodicStateRef.current = { items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode };
   useEffect(() => {
@@ -324,11 +326,7 @@ export default function Home() {
       if (!autoAnnounce || vm !== 'work') return;
       const remaining = items.filter((it) => !completedIds.has(it.id));
       if (remaining.length === 0) return;
-      const cts: Record<string, number> = {};
-      for (const it of remaining) cts[it.type] = (cts[it.type] || 0) + 1;
-      const parts: string[] = [];
-      for (const [t, c] of Object.entries(cts)) parts.push(`${t}が${c}種類`);
-      speak(`定期コール。残り${remaining.length}品。${parts.join('、')}。`);
+      speak(`10分経過しました。${getRandomCheer()}`);
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
   }, [state.workStartTime, state.items.length, speak]);
@@ -856,7 +854,7 @@ export default function Home() {
           break;
         }
         case 'MASA_CHEER': {
-          speak('がんばれ、まさ！');
+          speak(getRandomCheer());
           break;
         }
         case 'WEATHER': {
@@ -1217,6 +1215,7 @@ export default function Home() {
           hasItems={state.items.length > 0}
           theme={theme}
           onToggleTheme={toggleTheme}
+          onCheer={viewMode === 'work' ? () => speak(getRandomCheer()) : undefined}
         />
 
         {/* メインエリア */}
