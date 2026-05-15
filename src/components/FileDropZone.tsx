@@ -66,9 +66,14 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '3.1';
+const APP_VERSION = '3.2';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '3.2', date: '2026-05-15', changes: [
+    { icon: '📣', text: '作業ページにランダム応援コールボタンを追加（テーマ切替の隣）' },
+    { icon: '🎲', text: '10分定期コールを「10分経過しました」+ランダム応援に変更' },
+    { icon: '🗣️', text: '応援フレーズ集を追加（がんばれ、まさ！/じっちゃん 等）' },
+  ]},
   { ver: '3.1', date: '2026-05-01', changes: [
     { icon: '⏰', text: '10分ごとの定期進捗コール（残り品数・種類別内訳）' },
     { icon: '🔍', text: '1パレットぴったり時の検査分抜きを修正（パレットを崩して1ケース抜く）' },
