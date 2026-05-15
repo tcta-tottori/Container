@@ -163,7 +163,7 @@ function normalizeJapaneseForTts(text: string): string {
  */
 export async function geminiGenerateSpeech(
   text: string,
-  options?: { voice?: string; model?: string; signal?: AbortSignal },
+  options?: { voice?: string; model?: string; signal?: AbortSignal; stylePrefix?: string },
 ): Promise<Blob> {
   const apiKey = getGeminiKey();
   if (!apiKey) throw new Error('Gemini API キーが設定されていません');
@@ -175,7 +175,8 @@ export async function geminiGenerateSpeech(
 
   // スタイル指示は最小限にして生成時間を短縮（句読点のスペース挿入で間は十分確保）
   const normalized = normalizeJapaneseForTts(text);
-  const styled = `はっきりと読む: ${normalized}`;
+  const stylePrefix = options?.stylePrefix || 'はっきりと読む';
+  const styled = `${stylePrefix}: ${normalized}`;
 
   const body = {
     contents: [{ parts: [{ text: styled }] }],

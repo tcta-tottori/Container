@@ -70,13 +70,13 @@ function speakWebSpeech(text: string): void {
   window.speechSynthesis.speak(u);
 }
 
-async function speakGemini(text: string): Promise<void> {
+async function speakGemini(text: string, stylePrefix?: string): Promise<void> {
   const abort = new AbortController();
   _currentAbort = abort;
   // 生成前にコール開始を通知（録音をすぐ止めてフィードバック防止）
   _onSpeakStart?.(text);
   try {
-    const blob = await geminiGenerateSpeech(text, { signal: abort.signal });
+    const blob = await geminiGenerateSpeech(text, { signal: abort.signal, stylePrefix });
     if (abort.signal.aborted) return;
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
@@ -108,6 +108,25 @@ async function speakGemini(text: string): Promise<void> {
     _onSpeakEnd?.();
   } finally {
     if (_currentAbort === abort) _currentAbort = null;
+  }
+}
+
+/** 応援コール専用：Gemini が使える場合は元気よく読み上げる。
+ *  使えない場合は Web Speech にフォールバック（応援が無音にならないように）。*/
+function speakCheer(text: string): void {
+  if (typeof window === 'undefined') return;
+  if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
+  if (_currentAudio) {
+    try { _currentAudio.onended = null; _currentAudio.onerror = null; _currentAudio.pause(); } catch { /* ignore */ }
+    _currentAudio = null;
+  }
+  if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+  if (isGeminiTtsEnabled()) {
+    void speakGemini(text, '元気よく、応援するように大きな声で');
+  } else {
+    speakWebSpeech(text);
   }
 }
 
@@ -410,6 +429,7 @@ export function useSpeech() {
 
   return {
     speak,
+    speakCheer,
     announceItem,
     announcePalletChange,
     announceComplete,
