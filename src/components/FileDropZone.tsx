@@ -10,6 +10,7 @@ import {
   getGeminiModel, setGeminiModel, GEMINI_MODELS, verifyGeminiKey,
 } from '@/lib/geminiApi';
 import { useSpeech } from '@/hooks/useSpeech';
+import { getRandomCheer } from '@/lib/cheerPhrases';
 
 /** 判別されたファイルの役割 */
 export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'photo' | 'unknown';
@@ -66,9 +67,13 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '3.2';
+const APP_VERSION = '3.3';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '3.3', date: '2026-05-16', changes: [
+    { icon: '🎤', text: '応援コールを Gemini TTS で「元気よく」読み上げるよう修正' },
+    { icon: '🔁', text: 'Gemini 未設定時のみ Web Speech にフォールバック' },
+  ]},
   { ver: '3.2', date: '2026-05-15', changes: [
     { icon: '📣', text: '作業ページにランダム応援コールボタンを追加（テーマ切替の隣）' },
     { icon: '🎲', text: '10分定期コールを「10分経過しました」+ランダム応援に変更' },
@@ -195,7 +200,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [masterLastUpdate, setMasterLastUpdate] = useState<{ date: string; message: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { speak } = useSpeech();
+  const { speakCheer } = useSpeech();
 
   useEffect(() => {
     setRecentFiles(getRecentFiles());
@@ -704,7 +709,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
 
           {/* がんばれ、まさ ボタン */}
           <button
-            onClick={() => speak('がんばれ、まさ！')}
+            onClick={() => speakCheer(getRandomCheer())}
             className="cns-action-btn"
             title="まさを応援"
             style={{

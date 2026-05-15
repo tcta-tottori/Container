@@ -176,7 +176,7 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
+  const { speak, speakCheer, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
     useSpeech();
   const { theme, toggleTheme } = useTheme();
 
@@ -326,10 +326,10 @@ export default function Home() {
       if (!autoAnnounce || vm !== 'work') return;
       const remaining = items.filter((it) => !completedIds.has(it.id));
       if (remaining.length === 0) return;
-      speak(`10分経過しました。${getRandomCheer()}`);
+      speakCheer(`10分経過しました。${getRandomCheer()}`);
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [state.workStartTime, state.items.length, speak]);
+  }, [state.workStartTime, state.items.length, speakCheer]);
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
@@ -854,7 +854,7 @@ export default function Home() {
           break;
         }
         case 'MASA_CHEER': {
-          speak(getRandomCheer());
+          speakCheer(getRandomCheer());
           break;
         }
         case 'WEATHER': {
@@ -889,7 +889,7 @@ export default function Home() {
         }
       }
     },
-    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, handleConfirmOk, handleContainerSummary, handleProgress]
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, speakCheer, handleConfirmOk, handleContainerSummary, handleProgress]
   );
 
   const { isListening, isSpeaking, isPreparingSpeech, speakingText, isSupported, lastTranscript, toggleListening } =
@@ -1215,7 +1215,7 @@ export default function Home() {
           hasItems={state.items.length > 0}
           theme={theme}
           onToggleTheme={toggleTheme}
-          onCheer={viewMode === 'work' ? () => speak(getRandomCheer()) : undefined}
+          onCheer={viewMode === 'work' ? () => speakCheer(getRandomCheer()) : undefined}
         />
 
         {/* メインエリア */}
