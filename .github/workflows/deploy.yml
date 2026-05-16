@@ -3,7 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main
+      # main は github-pages 環境の Allowed branches 設定で deploy がブロックされており、
+      # 同時 push 時に concurrency で deploy branch のジョブを cancel してしまうため、
+      # トリガーから外す。env 設定で main を許可した後に戻して良い。
       - master
       - claude/init-container-app-0RJFr
       - claude/timer-ui-updates-DBaNV
