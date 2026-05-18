@@ -4,6 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
+import { buildJapanesePartName } from '@/lib/partTranslations';
 import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
 import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
@@ -435,7 +436,10 @@ export default function ItemDetailPanel({
     ? [...activeItems.sort(nabeSort), ...doneItems.sort(nabeSort)]
     : [...activeItems, ...doneItems];
 
-  const displayItemName = item.itemName.replace(/ポリカバー/g, '').replace(/^[\s\-]+|[\s\-]+$/g, '') || item.itemName;
+  const japanesePartName = buildJapanesePartName(item);
+  const displayItemName = japanesePartName
+    || item.itemName.replace(/ポリカバー/g, '').replace(/^[\s\-]+|[\s\-]+$/g, '')
+    || item.itemName;
 
   // コンテナ内全アイテムの最大寸法を計算（箱イメージのスケーリング基準）
   const maxContainerDim = (() => {
@@ -859,7 +863,8 @@ export default function ItemDetailPanel({
             const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
             const isActive = it.id === item.id;
             const isDone = completedIds.has(it.id);
-            const displayName = shortenName(it.itemName);
+            const jpName = buildJapanesePartName(it);
+            const displayName = jpName || shortenName(it.itemName);
             const origIdx = allItems.findIndex((a) => a.id === it.id);
             // 鍋は機種別カラーを使用
             const itNabeColor = getNabeModelColor(it.itemName, it.type);
