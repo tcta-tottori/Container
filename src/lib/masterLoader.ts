@@ -77,21 +77,54 @@ export function parseMasterExcel(buffer: ArrayBuffer): ContainerItem[] {
 export function parseAqssExcel(buffer: ArrayBuffer): Map<string, Partial<ContainerItem>> {
   const wb = XLSX.read(buffer, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
+
+  // !ref が不正確な場合があるため、実際のセル範囲を再計算
+  const cellKeys = Object.keys(ws).filter(k => !k.startsWith('!'));
+  if (cellKeys.length > 0) {
+    let maxR = 0, maxC = 0;
+    for (const k of cellKeys) {
+      const decoded = XLSX.utils.decode_cell(k);
+      if (decoded.r > maxR) maxR = decoded.r;
+      if (decoded.c > maxC) maxC = decoded.c;
+    }
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR, c: maxC } });
+  }
+
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
 
   const map = new Map<string, Partial<ContainerItem>>();
 
-  // ヘッダー行から品番列とAQSS列を検出
-  const header = rows[0] as string[] | undefined;
+  // ヘッダー行を検出 — AQSS04L (Invoice) は行17付近、フラット形式は行0
+  // "DESCRIPTION" を含むセルがある行をヘッダーとする
+  let headerRow = -1;
+  const scanLimit = Math.min(rows.length, 25);
+  for (let i = 0; i < scanLimit; i++) {
+    const r = rows[i];
+    if (!r || !Array.isArray(r)) continue;
+    for (let c = 0; c < r.length; c++) {
+      const cell = String(r[c] || '').toUpperCase();
+      if (cell.includes('DESCRIPTION') || cell === 'DESC') {
+        headerRow = i;
+        break;
+      }
+    }
+    if (headerRow >= 0) break;
+  }
+  if (headerRow < 0) headerRow = 0;
+
+  const header = rows[headerRow] as string[] | undefined;
   if (!header) return map;
 
   let partCol = -1;
-  let descCol = -1, modelCol = -1, gwCol = -1, cbmCol = -1, measCol = -1;
+  let descCol = -1, modelCol = -1, gwCol = -1, cbmCol = -1, measCol = -1, itemCol = -1;
 
   for (let c = 0; c < header.length; c++) {
     const h = String(header[c] || '').replace(/\n/g, '').trim().toUpperCase();
-    if (h.includes('品番') || h.includes('PART') || h.includes('気高') || h.includes('コード')) partCol = c;
-    if (h.includes('DESCRIPTION') || h.includes('DESC')) descCol = c;
+    // PARTS NO. を品番として優先（AQSS04L H列）
+    if (h.includes('PARTS NO') || h.includes('品番') || h.includes('気高') || h.includes('コード')) partCol = c;
+    else if (partCol < 0 && h.includes('PART')) partCol = c;
+    if (h.includes('DESCRIPTION') || h === 'DESC') descCol = c;
+    if (h === 'ITEM' || h.includes('ITEM ')) itemCol = c;
     if (h.includes('MODEL')) modelCol = c;
     if (h.includes('G.W') || h.includes('GROSS') || h.includes('WEIGHT')) gwCol = c;
     if (h.includes('CBM') || h.includes('容積')) cbmCol = c;
@@ -101,7 +134,7 @@ export function parseAqssExcel(buffer: ArrayBuffer): Map<string, Partial<Contain
   // 品番列が見つからない場合はB列(1)を試す
   if (partCol < 0) partCol = 1;
 
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = headerRow + 1; i < rows.length; i++) {
     const r = rows[i];
     if (!r || !Array.isArray(r)) continue;
     const partNumber = String(r[partCol] || '').trim();
@@ -112,13 +145,20 @@ export function parseAqssExcel(buffer: ArrayBuffer): Map<string, Partial<Contain
     const n = (col: number) => { if (col < 0) return undefined; const x = Number(r[col]); return isNaN(x) ? undefined : x; };
 
     if (v(descCol)) updates.description = v(descCol);
+    if (v(itemCol)) updates.rawItemName = v(itemCol);
     if (v(modelCol)) updates.modelNo = v(modelCol);
     if (n(gwCol) !== undefined) updates.grossWeight = n(gwCol);
     if (n(cbmCol) !== undefined) updates.cbm = n(cbmCol);
     if (v(measCol)) updates.measurements = v(measCol);
 
     if (Object.keys(updates).length > 0) {
-      map.set(partNumber, updates);
+      // 同一品番の複数行があれば description/rawItemName を上書きしない
+      const existing = map.get(partNumber);
+      if (existing) {
+        map.set(partNumber, { ...existing, ...updates });
+      } else {
+        map.set(partNumber, updates);
+      }
     }
   }
   return map;
@@ -388,7 +428,8 @@ export function linkItemsWithMaster(
     if (master.representModelContainer) updated.representModelContainer = master.representModelContainer;
     if (master.packingQtyContainer !== undefined) updated.packingQtyContainer = master.packingQtyContainer;
     if (master.qtyPerPalletContainer !== undefined) updated.qtyPerPalletContainer = master.qtyPerPalletContainer;
-    if (master.description) updated.description = master.description;
+    // description は AQSS04L 由来を優先 (空のときのみマスタで補完)
+    if (master.description && !updated.description) updated.description = master.description;
     if (master.modelNo) updated.modelNo = master.modelNo;
     if (master.grossWeight !== undefined) updated.grossWeight = master.grossWeight;
     if (master.cbm !== undefined) updated.cbm = master.cbm;
