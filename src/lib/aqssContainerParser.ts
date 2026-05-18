@@ -16,6 +16,7 @@ interface InvoiceRow {
   partNumber: string;   // 新建高コード (PARTS NO)
   description: string;  // ITEM DESCRIPTION
   itemName: string;     // ITEM (モデル名)
+  rawItemName: string;  // ITEM 列の生の内容 (中国語含む)
   quantity: number;     // QUANTITY
 }
 
@@ -94,9 +95,9 @@ function parseInvoice(wb: XLSX.WorkBook): {
     if (!partNumber) continue;
 
     // ITEM列から品名を抽出
-    let rawItem = String(r[4] || '').trim();
+    const rawItemOriginal = String(r[4] || '').trim();
     // 中国語文字を除去し、残った英数字・記号部分を品名とする
-    let cleaned = rawItem
+    let cleaned = rawItemOriginal
       .replace(/[\u4e00-\u9fff\u3400-\u4dbf]+/g, ' ')  // CJK漢字を空白に
       .replace(/\(\s*\)/g, '')             // 空の括弧を除去
       .replace(/\s+/g, ' ')
@@ -107,12 +108,13 @@ function parseInvoice(wb: XLSX.WorkBook): {
     cleaned = cleaned.replace(/\s+\d+V$/g, '').trim();
     // 先頭の記号・空白を除去
     cleaned = cleaned.replace(/^[\s\-\/]+/, '').trim();
-    rawItem = cleaned || rawItem;
+    const rawItem = cleaned || rawItemOriginal;
 
     rows.push({
       partNumber,
       description: String(r[1] || '').trim(),
       itemName: rawItem,
+      rawItemName: rawItemOriginal,
       quantity: toNum(r[10]),
     });
   }
@@ -206,6 +208,7 @@ export async function parseAqssToContainer(
     partNumber: string;
     description: string;
     itemName: string;
+    rawItemName: string;
     totalQty: number;
     rows: InvoiceRow[];
   }>();
@@ -220,6 +223,7 @@ export async function parseAqssToContainer(
         partNumber: row.partNumber,
         description: row.description,
         itemName: row.itemName,
+        rawItemName: row.rawItemName,
         totalQty: row.quantity,
         rows: [row],
       });
@@ -305,6 +309,7 @@ export async function parseAqssToContainer(
       fraction: caseCount,
       qtyPerPallet: 0,
       description: group.description || undefined,
+      rawItemName: group.rawItemName || undefined,
       grossWeight: gwPerUnit || undefined,
       cbm: cbmPerPc || undefined,
       measurements,
