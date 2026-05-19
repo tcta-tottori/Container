@@ -316,18 +316,24 @@ export default function Home() {
   // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
 
   // 10分ごとの定期進捗コール（作業中のみ）
-  // 「10分経過しました」+ ランダム応援フレーズ。毎回応援フレーズが変わる。
+  // 「10分経過しました」「20分経過しました」…と実際の経過時間+ランダム応援フレーズ。
   const periodicStateRef = useRef({ items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode });
   periodicStateRef.current = { items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode };
   useEffect(() => {
     if (!state.workStartTime || state.items.length === 0) return;
+    const startTime = state.workStartTime;
+    let lastAnnouncedMinutes = 0;
     const interval = setInterval(() => {
       const { items, completedIds, autoAnnounce, viewMode: vm } = periodicStateRef.current;
       if (!autoAnnounce || vm !== 'work') return;
       const remaining = items.filter((it) => !completedIds.has(it.id));
       if (remaining.length === 0) return;
-      speakCheer(`10分経過しました。${getRandomCheer()}`);
-    }, 10 * 60 * 1000);
+      const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
+      const milestone = Math.floor(elapsedMinutes / 10) * 10;
+      if (milestone < 10 || milestone === lastAnnouncedMinutes) return;
+      lastAnnouncedMinutes = milestone;
+      speakCheer(`${milestone}分経過しました。${getRandomCheer()}`);
+    }, 60 * 1000);
     return () => clearInterval(interval);
   }, [state.workStartTime, state.items.length, speakCheer]);
 
