@@ -23,7 +23,6 @@ import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
 import VoiceFeedback from '@/components/VoiceFeedback';
-import { useTheme } from '@/hooks/useTheme';
 import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
@@ -178,7 +177,6 @@ export default function Home() {
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
   const { speak, speakCheer, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
     useSpeech();
-  const { theme, toggleTheme } = useTheme();
 
   const prevItemRef = useRef<string | null>(null);
   const currentItemRef = useRef(currentItem);
@@ -319,8 +317,10 @@ export default function Home() {
   // 「10分経過しました」+ ランダム応援フレーズ。毎回応援フレーズが変わる。
   const periodicStateRef = useRef({ items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode });
   periodicStateRef.current = { items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode };
+  // deps は workStartTime のみ。items.length を入れると品目完了のたびに
+  // インターバルが張り直されて 10 分カウントがリセットされ、コールが永久に発火しない。
   useEffect(() => {
-    if (!state.workStartTime || state.items.length === 0) return;
+    if (!state.workStartTime) return;
     const interval = setInterval(() => {
       const { items, completedIds, autoAnnounce, viewMode: vm } = periodicStateRef.current;
       if (!autoAnnounce || vm !== 'work') return;
@@ -329,7 +329,7 @@ export default function Home() {
       speakCheer(`10分経過しました。${getRandomCheer()}`);
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [state.workStartTime, state.items.length, speakCheer]);
+  }, [state.workStartTime, speakCheer]);
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
@@ -660,6 +660,14 @@ export default function Home() {
       announceContainerSummary(state.items, container.containerNo, state.completedIds, workRawSeconds);
     }
   }, [state.containers, state.selectedContainerIdx, state.items, state.completedIds, workRawSeconds, announceContainerSummary]);
+
+  const handleWeatherCall = useCallback(() => {
+    speak('天気を取得中...');
+    fetchWeather().then(w => {
+      if (w) speak(weatherToSpeech(w));
+      else speak('天気情報を取得できませんでした。');
+    });
+  }, [speak]);
 
   const handleProgress = useCallback(() => {
     // 進捗コールは種類数のみ（進捗率は廃止）
@@ -1022,9 +1030,7 @@ export default function Home() {
       <div style={{
         position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        background: theme === 'light'
-          ? '#f5f5f0'
-          : 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)',
+        background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)',
         zIndex: 999,
       }}>
         <style>{`
@@ -1033,17 +1039,15 @@ export default function Home() {
         `}</style>
         {/* キューブアイコン（2D・アニメーションなし） */}
         <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 28 }}>
-          {theme === 'dark' && (
-            <div style={{
-              position: 'absolute', inset: -16,
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, transparent 70%)',
-              animation: 'neonPulse 2.5s ease-in-out infinite',
-            }} />
-          )}
+          <div style={{
+            position: 'absolute', inset: -16,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, transparent 70%)',
+            animation: 'neonPulse 2.5s ease-in-out infinite',
+          }} />
           <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
-            style={{ position: 'relative', animation: theme === 'dark' ? 'neonPulse 2.5s ease-in-out infinite' : undefined }}>
-            <g transform="translate(32,32)" stroke={theme === 'light' ? '#555' : '#fff'} strokeWidth="3" strokeLinejoin="round" fill="none">
+            style={{ position: 'relative', animation: 'neonPulse 2.5s ease-in-out infinite' }}>
+            <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none">
               <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
               <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
               <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
@@ -1054,17 +1058,17 @@ export default function Home() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <span style={{
             fontSize: 16, fontWeight: 600,
-            color: theme === 'light' ? '#555' : '#fff',
+            color: '#fff',
             fontFamily: 'Inter, sans-serif',
             letterSpacing: 3,
-            textShadow: theme === 'light' ? 'none' : '0 0 10px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.35), 0 0 40px rgba(255,255,255,0.15)',
+            textShadow: '0 0 10px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.35), 0 0 40px rgba(255,255,255,0.15)',
           }}>Loading</span>
           <div style={{ display: 'flex', gap: 4 }}>
             {[0, 1, 2, 3, 4].map(i => (
               <span key={i} style={{
                 display: 'inline-block', width: 5, height: 5, borderRadius: '50%',
-                background: theme === 'light' ? '#999' : '#fff',
-                boxShadow: theme === 'light' ? 'none' : '0 0 6px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.3)',
+                background: '#fff',
+                boxShadow: '0 0 6px rgba(255,255,255,0.6), 0 0 12px rgba(255,255,255,0.3)',
                 animation: `dotFlow 2s ease-in-out ${i * 0.3}s infinite`,
               }} />
             ))}
@@ -1078,23 +1082,6 @@ export default function Home() {
     return (
       <>
         <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} onPhotoLoaded={handlePhotoLoaded} />
-        {/* テーマ切替ボタン（読込画面右下） */}
-        <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 100 }}>
-          <button onClick={toggleTheme} style={{
-            width: 44, height: 44, borderRadius: '50%',
-            background: theme === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
-            border: `1.5px solid ${theme === 'dark' ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
-            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: theme === 'dark' ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
-            transition: 'all 0.3s ease',
-          }}>
-            {theme === 'dark' ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-            )}
-          </button>
-        </div>
         {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
       </>
     );
@@ -1213,8 +1200,7 @@ export default function Home() {
           completionLog={state.completionLog}
           onContainerAnnounce={handleContainerSummary}
           hasItems={state.items.length > 0}
-          theme={theme}
-          onToggleTheme={toggleTheme}
+          onWeather={viewMode === 'work' ? handleWeatherCall : undefined}
           onCheer={viewMode === 'work' ? () => speakCheer(getRandomCheer()) : undefined}
         />
 

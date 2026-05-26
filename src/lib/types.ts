@@ -49,6 +49,8 @@ export interface ContainerItem {
   // -- AQSS --
   /** ITEM DESCRIPTION (R列) */
   description?: string;
+  /** AQSS04L 列E の生の品名 (中国語を含む) */
+  rawItemName?: string;
   /** MODEL NO. (S列) */
   modelNo?: string;
   /** G.W. per carton (T列) */

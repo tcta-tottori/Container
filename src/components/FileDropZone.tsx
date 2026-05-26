@@ -9,8 +9,6 @@ import {
   getGeminiKey, setGeminiKey, clearGeminiKey,
   getGeminiModel, setGeminiModel, GEMINI_MODELS, verifyGeminiKey,
 } from '@/lib/geminiApi';
-import { useSpeech } from '@/hooks/useSpeech';
-import { getRandomCheer } from '@/lib/cheerPhrases';
 
 /** 判別されたファイルの役割 */
 export type FileRole = 'container' | 'master' | 'ketaka' | 'container_schedule' | 'aqss04l' | 'aqss05l' | 'jkp' | 'photo' | 'unknown';
@@ -67,9 +65,13 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '3.3';
+const APP_VERSION = '3.4';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '3.4', date: '2026-05-26', changes: [
+    { icon: '🌤️', text: '作業ページに天気コールボタンを追加（ライトモード切替を廃止）' },
+    { icon: '⏰', text: '10分定期コールが品目完了でリセットされ発火しない不具合を修正' },
+  ]},
   { ver: '3.3', date: '2026-05-16', changes: [
     { icon: '🎤', text: '応援コールを Gemini TTS で「元気よく」読み上げるよう修正' },
     { icon: '🔁', text: 'Gemini 未設定時のみ Web Speech にフォールバック' },
@@ -200,7 +202,6 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [masterLastUpdate, setMasterLastUpdate] = useState<{ date: string; message: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { speakCheer } = useSpeech();
 
   useEffect(() => {
     setRecentFiles(getRecentFiles());
@@ -705,37 +706,6 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               <path d="M 20 12 C 14 10, 12 5, 12 2 L 12 12 Z" fill="url(#gem-btn-tr)"/>
             </svg>
             AI写真 {aiKeySaved ? 'ON' : 'OFF'}
-          </button>
-
-          {/* がんばれ、まさ ボタン */}
-          <button
-            onClick={() => speakCheer(getRandomCheer())}
-            className="cns-action-btn"
-            title="まさを応援"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7,
-              padding: '9px 20px', borderRadius: 50,
-              background: 'linear-gradient(135deg, rgba(248,113,113,0.2) 0%, rgba(251,191,36,0.18) 100%)',
-              border: '1.5px solid rgba(251,146,60,0.4)',
-              cursor: 'pointer', transition: 'all 0.3s ease',
-              color: '#fdba74', fontSize: 12, fontWeight: 700,
-              boxShadow: '0 0 16px rgba(251,146,60,0.15), 0 0 32px rgba(248,113,113,0.06)',
-              textShadow: '0 0 12px rgba(253,186,116,0.5)',
-              letterSpacing: 0.3,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(248,113,113,0.35) 0%, rgba(251,191,36,0.3) 100%)';
-              e.currentTarget.style.boxShadow = '0 0 24px rgba(251,146,60,0.3), 0 0 48px rgba(248,113,113,0.15)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(248,113,113,0.2) 0%, rgba(251,191,36,0.18) 100%)';
-              e.currentTarget.style.boxShadow = '0 0 16px rgba(251,146,60,0.15), 0 0 32px rgba(248,113,113,0.06)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <span style={{ fontSize: 14, lineHeight: 1 }}>📣</span>
-            がんばれ、まさ
           </button>
         </div>
 
