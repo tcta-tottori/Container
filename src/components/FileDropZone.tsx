@@ -65,9 +65,13 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '3.3';
+const APP_VERSION = '3.4';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '3.4', date: '2026-05-26', changes: [
+    { icon: '🌤️', text: '作業ページに天気コールボタンを追加（ライトモード切替を廃止）' },
+    { icon: '⏰', text: '10分定期コールが品目完了でリセットされ発火しない不具合を修正' },
+  ]},
   { ver: '3.3', date: '2026-05-16', changes: [
     { icon: '🎤', text: '応援コールを Gemini TTS で「元気よく」読み上げるよう修正' },
     { icon: '🔁', text: 'Gemini 未設定時のみ Web Speech にフォールバック' },
