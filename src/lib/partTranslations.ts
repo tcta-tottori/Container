@@ -118,16 +118,52 @@ function hasChinese(text: string): boolean {
 }
 
 /**
+ * 型式コードを抽出する。
+ * 種類名・中国語・電圧などのノイズのみ除去し、コード自体（+ - U (KZ) サイズ等）は整形せずそのまま残す。
+ */
+function extractModelCode(item: ContainerItem): string {
+  let m = (item.itemName || item.representModel || '').trim();
+  // 埋め込まれた種類名・ラベル（和文/半角カナ）を除去
+  m = m.replace(/段ボール箱|放熱板|彩盒|ジャーポット|半成?品出荷|ホウネツイタ|ﾎｳﾈﾂｲﾀ|タイプ|ﾀｲﾌﾟ/g, ' ');
+  // 残った中国語（CJK漢字）を除去
+  m = m.replace(/[一-鿿㐀-䶿]+/g, ' ');
+  // 電圧表記（110V/220V 等）を除去
+  m = m.replace(/\s*\d{2,3}V(?![A-Za-z0-9])/g, ' ');
+  // 空の括弧を除去
+  m = m.replace(/[（(]\s*[）)]/g, ' ');
+  // 余分な空白・前後の区切り記号を整理（コード内の + - は保持）
+  m = m.replace(/\s+/g, ' ').replace(/^[\s/]+|[\s/]+$/g, '').trim();
+  return m;
+}
+
+/**
  * ポリカバー以外の部品向けに、日本語表示用の品名を生成。
  *   英語 DESCRIPTION → 日本語訳
  *   中国語 ITEM (rawItemName) → 日本語訳
  * 両方ある場合は「日本語DESCRIPTION ／ 日本語ITEM」形式で結合。
  * 翻訳対象なし (ポリカバー or 情報なし) の場合は null を返す。
+ *
+ * 例外: ジャーポット・放熱板・段ボール箱は「型式 + ラベル」で表示する。
+ *   ジャーポット → 型式のみ（例: PDZ+A40U）
+ *   放熱板       → 型式 + 放熱板（例: JPW+G10S 放熱板）
+ *   段ボール箱   → 型式 + 箱（例: PDU-A40A 箱）
  */
 export function buildJapanesePartName(item: ContainerItem): string | null {
   if (item.type === 'ポリカバー') return null;
 
   const enDesc = item.description?.trim() || '';
+  const enUpper = enDesc.toUpperCase();
+
+  const isJarPot = item.type === 'ジャーポット' || enUpper.includes('JAR POT');
+  const isBox = item.type === '箱' || enUpper.includes('CARTON BOX');
+  const isRadiation = enUpper.includes('RADIATION PLATE');
+  if (isJarPot || isBox || isRadiation) {
+    const model = extractModelCode(item);
+    if (isJarPot) return model || null;
+    const label = isBox ? '箱' : '放熱板';
+    return model ? `${model} ${label}` : label;
+  }
+
   const raw = item.rawItemName?.trim() || '';
 
   const jpDesc = enDesc ? translateEnDescription(enDesc) : '';
