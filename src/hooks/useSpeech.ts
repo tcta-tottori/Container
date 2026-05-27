@@ -70,13 +70,13 @@ function speakWebSpeech(text: string): void {
   window.speechSynthesis.speak(u);
 }
 
-async function speakGemini(text: string, stylePrefix?: string): Promise<void> {
+async function speakGemini(text: string, stylePrefix?: string, voice?: string): Promise<void> {
   const abort = new AbortController();
   _currentAbort = abort;
   // 生成前にコール開始を通知（録音をすぐ止めてフィードバック防止）
   _onSpeakStart?.(text);
   try {
-    const blob = await geminiGenerateSpeech(text, { signal: abort.signal, stylePrefix });
+    const blob = await geminiGenerateSpeech(text, { signal: abort.signal, stylePrefix, voice });
     if (abort.signal.aborted) return;
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
@@ -125,6 +125,26 @@ function speakCheer(text: string): void {
 
   if (isGeminiTtsEnabled()) {
     void speakGemini(text, '元気よく、応援するように大きな声で');
+  } else {
+    speakWebSpeech(text);
+  }
+}
+
+/** 経過時間コール専用：男性・低め・少し枯れた声であおるように読み上げる。
+ *  ユーザー選択の音声に関わらず男性ボイス(Orus)で固定。
+ *  Gemini が使えない場合は Web Speech にフォールバック。*/
+function speakTaunt(text: string): void {
+  if (typeof window === 'undefined') return;
+  if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
+  if (_currentAudio) {
+    try { _currentAudio.onended = null; _currentAudio.onerror = null; _currentAudio.pause(); } catch { /* ignore */ }
+    _currentAudio = null;
+  }
+  if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+
+  if (isGeminiTtsEnabled()) {
+    void speakGemini(text, '低くて少し枯れた男性の声で、挑発するようにあおって', 'Orus');
   } else {
     speakWebSpeech(text);
   }
@@ -430,6 +450,7 @@ export function useSpeech() {
   return {
     speak,
     speakCheer,
+    speakTaunt,
     announceItem,
     announcePalletChange,
     announceComplete,

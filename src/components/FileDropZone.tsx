@@ -65,9 +65,14 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '3.4';
+const APP_VERSION = '3.5';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '3.5', date: '2026-05-27', changes: [
+    { icon: '⏱️', text: '定期コールを実際の経過時間でコール（10分／20分／30分…）' },
+    { icon: '🗣️', text: 'あおりコールを男性・低め・少し枯れた声で読み上げ（専用フレーズ9種）' },
+    { icon: '📦', text: 'ジャーポット・放熱板・段ボール箱を型式コード付きで表示' },
+  ]},
   { ver: '3.4', date: '2026-05-26', changes: [
     { icon: '🌤️', text: '作業ページに天気コールボタンを追加（ライトモード切替を廃止）' },
     { icon: '⏰', text: '10分定期コールが品目完了でリセットされ発火しない不具合を修正' },

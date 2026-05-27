@@ -17,3 +17,24 @@ export const CHEER_PHRASES: string[] = [
 export function getRandomCheer(): string {
   return CHEER_PHRASES[Math.floor(Math.random() * CHEER_PHRASES.length)];
 }
+
+/**
+ * 経過時間コール後のあおりフレーズ集。
+ * 男性・低め・少し枯れた声であおるような雰囲気で読み上げる用。
+ */
+export const TAUNT_PHRASES: string[] = [
+  'がんばれ、まさ',
+  'ファイト、まさ',
+  'おせおせ、まさ',
+  '部品きらすなよ、まさ',
+  'おそいぞ、まさ',
+  'まさ、しっかり',
+  'はしれよ、まさ',
+  'がんばれ、じっちゃん',
+  'きんちゃん、ファイト',
+];
+
+/** ランダムにあおりフレーズを1つ返す */
+export function getRandomTaunt(): string {
+  return TAUNT_PHRASES[Math.floor(Math.random() * TAUNT_PHRASES.length)];
+}

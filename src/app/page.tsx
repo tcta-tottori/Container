@@ -18,7 +18,7 @@ import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews } from '@/lib/weatherNews';
-import { getRandomCheer } from '@/lib/cheerPhrases';
+import { getRandomCheer, getRandomTaunt } from '@/lib/cheerPhrases';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
@@ -175,7 +175,7 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, speakCheer, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
+  const { speak, speakCheer, speakTaunt, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
@@ -321,15 +321,18 @@ export default function Home() {
   // インターバルが張り直されて 10 分カウントがリセットされ、コールが永久に発火しない。
   useEffect(() => {
     if (!state.workStartTime) return;
+    const startedAt = state.workStartTime;
     const interval = setInterval(() => {
       const { items, completedIds, autoAnnounce, viewMode: vm } = periodicStateRef.current;
       if (!autoAnnounce || vm !== 'work') return;
       const remaining = items.filter((it) => !completedIds.has(it.id));
       if (remaining.length === 0) return;
-      speakCheer(`10分経過しました。${getRandomCheer()}`);
+      // 実際の経過時間を 10 分単位でコール（10分、20分、30分…）
+      const minutes = Math.max(10, Math.round((Date.now() - startedAt) / 600000) * 10);
+      speakTaunt(`${minutes}分経過しました。${getRandomTaunt()}`);
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [state.workStartTime, speakCheer]);
+  }, [state.workStartTime, speakTaunt]);
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
