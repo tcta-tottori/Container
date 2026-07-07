@@ -130,8 +130,8 @@ function speakCheer(text: string): void {
   }
 }
 
-/** 経過時間コール専用：男性・低め・少し枯れた声であおるように読み上げる。
- *  ユーザー選択の音声に関わらず男性ボイス(Orus)で固定。
+/** 経過時間コール専用：明るく元気な女性の声であおるように読み上げる。
+ *  ユーザー選択の音声に関わらず女性ボイス(Zephyr)で固定。
  *  Gemini が使えない場合は Web Speech にフォールバック。*/
 function speakTaunt(text: string): void {
   if (typeof window === 'undefined') return;
@@ -144,7 +144,7 @@ function speakTaunt(text: string): void {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
   if (isGeminiTtsEnabled()) {
-    void speakGemini(text, '低くて少し枯れた男性の声で、挑発するようにあおって', 'Orus');
+    void speakGemini(text, '明るく元気な女性の声で、テンション高くあおって', 'Zephyr');
   } else {
     speakWebSpeech(text);
   }

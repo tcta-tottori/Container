@@ -20,7 +20,7 @@ export function getRandomCheer(): string {
 
 /**
  * 経過時間コール後のあおりフレーズ集。
- * 男性・低め・少し枯れた声であおるような雰囲気で読み上げる用。
+ * 明るく元気な女性の声で、テンション高くあおるような雰囲気で読み上げる用。
  */
 export const TAUNT_PHRASES: string[] = [
   'がんばれ、まさ',
