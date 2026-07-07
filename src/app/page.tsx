@@ -18,7 +18,7 @@ import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews } from '@/lib/weatherNews';
-import { getRandomCheer, getRandomTaunt } from '@/lib/cheerPhrases';
+import { getRandomCheer, getRandomTaunt, getAllVoices, subscribeCallSettings } from '@/lib/callSettings';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
@@ -27,10 +27,11 @@ import ManualPage from '@/components/ManualPage';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
+import SettingsPage from '@/components/SettingsPage';
 import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
 import * as XLSX from 'xlsx';
 
-type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
+type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history' | 'settings';
 
 /* ===== おしゃれな読込ポップアップ ===== */
 function LoadingOverlay({ message, progress, closing }: { message: string; progress: number; closing?: boolean }) {
@@ -913,13 +914,17 @@ export default function Home() {
   const [hasGeminiKey, setHasGeminiKey] = useState<boolean>(false);
   const [ttsModelName, setTtsModelName] = useState<string>(DEFAULT_GEMINI_TTS_MODEL);
   const [ttsError, setTtsError] = useState<string | null>(null);
+  const [allVoices, setAllVoices] = useState<typeof GEMINI_VOICES>(GEMINI_VOICES);
   useEffect(() => {
     setCurrentVoice(getSelectedVoice());
     setGeminiTtsOn(isGeminiTtsEnabled());
     setHasGeminiKey(!!getGeminiKey());
     setTtsModelName(getGeminiTtsModel());
     setTtsError(getLastTtsError());
-    return subscribeTtsError(setTtsError);
+    setAllVoices(getAllVoices());
+    const unsubErr = subscribeTtsError(setTtsError);
+    const unsubSettings = subscribeCallSettings(() => setAllVoices(getAllVoices()));
+    return () => { unsubErr(); unsubSettings(); };
   }, []);
 
   const toggleGeminiTts = useCallback((enabled: boolean) => {
@@ -994,6 +999,7 @@ export default function Home() {
       setHasGeminiKey(!!getGeminiKey());
       setTtsModelName(getGeminiTtsModel());
       setTtsError(getLastTtsError());
+      setAllVoices(getAllVoices());
       setVoiceMenuOpen(true);
     }, 500);
   }, []);
@@ -1174,6 +1180,12 @@ export default function Home() {
               履歴
             </button>
             <div className="menu-divider" />
+            <button className={`menu-item ${viewMode === 'settings' ? 'active' : ''}`} onClick={() => switchView('settings')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              設定
+            </button>
             <button className="menu-item" onClick={() => { setManualOpen(true); setMenuOpen(false); }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -1265,6 +1277,12 @@ export default function Home() {
           {viewMode === 'history' && (
             <div className="full-panel" style={{ padding: 16, overflowY: 'auto' }}>
               <HistoryPanel />
+            </div>
+          )}
+
+          {viewMode === 'settings' && (
+            <div className="full-panel">
+              <SettingsPage />
             </div>
           )}
 
@@ -1599,7 +1617,7 @@ export default function Home() {
                     </div>
                   )}
                   <div style={{ display: 'grid', gap: 6 }}>
-                    {GEMINI_VOICES.map((v) => {
+                    {allVoices.map((v) => {
                       const selected = v.id === currentVoice;
                       const sampleLoading = sampleLoadingId === v.id;
                       const samplePlaying = samplePlayingId === v.id;

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { itemNameForSpeech, areSimilarItems, getSimilarityReason, extractColor } from '@/lib/typeDetector';
 import { geminiGenerateSpeech, isGeminiTtsEnabled } from '@/lib/geminiTts';
+import { getCheerVoice, getTauntVoice } from '@/lib/callSettings';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
@@ -124,14 +125,15 @@ function speakCheer(text: string): void {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
   if (isGeminiTtsEnabled()) {
-    void speakGemini(text, '元気よく、応援するように大きな声で');
+    // 応援コール専用ボイスが設定されていればそれを使う（未設定ならユーザー選択の声）
+    void speakGemini(text, '元気よく、応援するように大きな声で', getCheerVoice() ?? undefined);
   } else {
     speakWebSpeech(text);
   }
 }
 
-/** 経過時間コール専用：明るく元気な女性の声であおるように読み上げる。
- *  ユーザー選択の音声に関わらず女性ボイス(Zephyr)で固定。
+/** 経過時間コール専用：明るく元気な声でテンション高くあおるように読み上げる。
+ *  ボイスは設定画面で変更可能（デフォルトは明るく元気な女性ボイス Zephyr）。
  *  Gemini が使えない場合は Web Speech にフォールバック。*/
 function speakTaunt(text: string): void {
   if (typeof window === 'undefined') return;
@@ -144,7 +146,7 @@ function speakTaunt(text: string): void {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 
   if (isGeminiTtsEnabled()) {
-    void speakGemini(text, '明るく元気な女性の声で、テンション高くあおって', 'Zephyr');
+    void speakGemini(text, 'テンション高く、元気よくあおって', getTauntVoice());
   } else {
     speakWebSpeech(text);
   }

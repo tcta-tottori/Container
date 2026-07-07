@@ -1,5 +1,14 @@
 /**
- * 応援コール（がんばれコール）のフレーズ集
+ * 応援コール・あおりコールの「デフォルト」フレーズ集
+ *
+ * 実際に読み上げられるフレーズはユーザーが設定画面で追加・変更でき、
+ * その値は callSettings.ts が localStorage で管理する。
+ * ここの配列は未設定時のフォールバック（初期値）として使われる。
+ * ランダム取得は callSettings.ts の getRandomCheer / getRandomTaunt を参照。
+ */
+
+/**
+ * 応援コール（がんばれコール）のデフォルトフレーズ集
  * 10分定期コール後の応援、およびヘッダーのコールボタンで使用
  */
 export const CHEER_PHRASES: string[] = [
@@ -13,13 +22,8 @@ export const CHEER_PHRASES: string[] = [
   'まさ、最高！',
 ];
 
-/** ランダムに応援フレーズを1つ返す */
-export function getRandomCheer(): string {
-  return CHEER_PHRASES[Math.floor(Math.random() * CHEER_PHRASES.length)];
-}
-
 /**
- * 経過時間コール後のあおりフレーズ集。
+ * 経過時間コール（10分コール）のデフォルトあおりフレーズ集。
  * 明るく元気な女性の声で、テンション高くあおるような雰囲気で読み上げる用。
  */
 export const TAUNT_PHRASES: string[] = [
@@ -33,8 +37,3 @@ export const TAUNT_PHRASES: string[] = [
   'がんばれ、じっちゃん',
   'きんちゃん、ファイト',
 ];
-
-/** ランダムにあおりフレーズを1つ返す */
-export function getRandomTaunt(): string {
-  return TAUNT_PHRASES[Math.floor(Math.random() * TAUNT_PHRASES.length)];
-}
