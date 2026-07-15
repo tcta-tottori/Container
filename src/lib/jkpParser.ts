@@ -187,7 +187,9 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   if (!ws) return { shipments: [], activeDates: [] };
 
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-  const maxCol = Math.min(range.e.c, 3800);
+  // Excelの最大列(XFD=16383)まで走査。ファイルは毎週日付列が右に追加されるため
+  // 固定上限で切ると当日データを読み逃す（旧: 3800固定で2026年分が欠落した不具合の修正）
+  const maxCol = Math.min(range.e.c, 16383);
   const getCell = cellReader(ws);
 
   // ── 日付行を自動検出（"M/D" パターンが3つ以上連続する行） ──
