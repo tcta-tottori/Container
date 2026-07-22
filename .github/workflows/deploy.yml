@@ -13,6 +13,7 @@ on:
       - claude/add-photo-schedule-reading-Wx3tS
       - claude/add-gemini-voice-system-7J6VK
       - claude/new-session-ve46d
+      - claude/needs-update-76b67n
 
 permissions:
   contents: read

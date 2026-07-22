@@ -65,9 +65,12 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '3.5';
+const APP_VERSION = '3.6';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '3.6', date: '2026-07-22', changes: [
+    { icon: '📅', text: 'JKP出荷データが6月中旬以降表示されない不具合を修正（列スキャン上限を撤廃）' },
+  ]},
   { ver: '3.5', date: '2026-05-27', changes: [
     { icon: '⏱️', text: '定期コールを実際の経過時間でコール（10分／20分／30分…）' },
     { icon: '🗣️', text: 'あおりコールを男性・低め・少し枯れた声で読み上げ（専用フレーズ9種）' },
