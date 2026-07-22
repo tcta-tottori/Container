@@ -60,13 +60,14 @@ export async function fetchWeather(): Promise<WeatherData | null> {
 }
 
 export function weatherToSpeech(w: WeatherData): string {
-  let text = `気高町の天気。気温${w.temperature}度、湿度${w.humidity}%、`;
+  // 「気高町」は「けたかちょう」と読ませるため、読み仮名で記述
+  let text = `けたかちょうの天気。気温${w.temperature}度、湿度${w.humidity}%、`;
   text += `降水確率${w.precipitationProb}%、風速${w.windSpeed}メートル。`;
   return text;
 }
 
 export function temperatureToSpeech(w: WeatherData): string {
-  return `宝木の気温。現在${w.temperature}度、体感${w.feelsLike}度。最高${w.maxTemp}度、最低${w.minTemp}度。`;
+  return `けたかちょうの気温。現在${w.temperature}度、体感${w.feelsLike}度。最高${w.maxTemp}度、最低${w.minTemp}度。`;
 }
 
 // ニュース取得（Google News RSS経由）

@@ -18,12 +18,13 @@ import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews } from '@/lib/weatherNews';
-import { getRandomCheer, getRandomTaunt } from '@/lib/cheerPhrases';
+import { getRandomCallPhrase } from '@/lib/callPhrases';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
 import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
+import CallPhraseSettings from '@/components/CallPhraseSettings';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
@@ -175,7 +176,7 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, speakCheer, speakTaunt, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
+  const { speak, speakCheer, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
@@ -189,6 +190,9 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('work');
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [callSettingsOpen, setCallSettingsOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingClosing, setLoadingClosing] = useState(false);
@@ -329,10 +333,11 @@ export default function Home() {
       if (remaining.length === 0) return;
       // 実際の経過時間を 10 分単位でコール（10分、20分、30分…）
       const minutes = Math.max(10, Math.round((Date.now() - startedAt) / 600000) * 10);
-      speakTaunt(`${minutes}分経過しました。${getRandomTaunt()}`);
+      // 他の音声と同様に選択中の（女性）ボイスでコールする
+      speakCheer(`${minutes}分経過しました。${getRandomCallPhrase()}`);
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [state.workStartTime, speakTaunt]);
+  }, [state.workStartTime, speakCheer]);
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
@@ -664,13 +669,21 @@ export default function Home() {
     }
   }, [state.containers, state.selectedContainerIdx, state.items, state.completedIds, workRawSeconds, announceContainerSummary]);
 
+  // 一時的なテキスト通知（音声なし）
+  const showToast = useCallback((msg: string, ms = 2500) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), ms);
+  }, []);
+
   const handleWeatherCall = useCallback(() => {
-    speak('天気を取得中...');
+    // 「天気を取得中」は音声ではなく文字表示のみ。結果の天気は音声でコールする。
+    showToast('天気を取得中...');
     fetchWeather().then(w => {
       if (w) speak(weatherToSpeech(w));
       else speak('天気情報を取得できませんでした。');
     });
-  }, [speak]);
+  }, [speak, showToast]);
 
   const handleProgress = useCallback(() => {
     // 進捗コールは種類数のみ（進捗率は廃止）
@@ -865,11 +878,12 @@ export default function Home() {
           break;
         }
         case 'MASA_CHEER': {
-          speakCheer(getRandomCheer());
+          speakCheer(getRandomCallPhrase());
           break;
         }
         case 'WEATHER': {
-          speak('天気を取得中...');
+          // 「取得中」は文字表示のみ（音声なし）
+          showToast('天気を取得中...');
           fetchWeather().then(w => {
             if (w) speak(weatherToSpeech(w));
             else speak('天気情報を取得できませんでした。');
@@ -877,7 +891,8 @@ export default function Home() {
           break;
         }
         case 'TEMPERATURE': {
-          speak('気温を取得中...');
+          // 「取得中」は文字表示のみ（音声なし）
+          showToast('気温を取得中...');
           fetchWeather().then(w => {
             if (w) speak(temperatureToSpeech(w));
             else speak('気温情報を取得できませんでした。');
@@ -900,7 +915,7 @@ export default function Home() {
         }
       }
     },
-    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, speakCheer, handleConfirmOk, handleContainerSummary, handleProgress]
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, speakCheer, showToast, handleConfirmOk, handleContainerSummary, handleProgress]
   );
 
   const { isListening, isSpeaking, isPreparingSpeech, speakingText, isSupported, lastTranscript, toggleListening } =
@@ -1141,6 +1156,34 @@ export default function Home() {
           </div>
         </div>
       )}
+      {/* 一時テキスト通知（天気取得中など・音声なし） */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 84, left: 8, right: 8,
+          zIndex: 101, pointerEvents: 'none',
+          textAlign: 'center',
+          animation: 'fadeIn 0.2s ease both',
+        }}>
+          <div style={{
+            display: 'inline-block',
+            padding: '10px 16px', borderRadius: 16,
+            background: 'rgba(20,10,40,0.92)',
+            backdropFilter: 'blur(12px)',
+            border: '1px solid rgba(148,163,184,0.35)',
+            color: '#fff', fontSize: 15, fontWeight: 600,
+            lineHeight: 1.5,
+            boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
+          }}>
+            {toast}
+          </div>
+        </div>
+      )}
+      {callSettingsOpen && (
+        <CallPhraseSettings
+          onClose={() => setCallSettingsOpen(false)}
+          onTest={(p) => speakCheer(p)}
+        />
+      )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 
       {/* メニューオーバーレイ */}
@@ -1180,6 +1223,12 @@ export default function Home() {
               </svg>
               マニュアル
             </button>
+            <button className="menu-item" onClick={() => { setCallSettingsOpen(true); setMenuOpen(false); }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
+              </svg>
+              コール設定
+            </button>
             <div className="menu-divider" />
             <div className="menu-version">
               CNS Ver 3.6
@@ -1204,7 +1253,7 @@ export default function Home() {
           onContainerAnnounce={handleContainerSummary}
           hasItems={state.items.length > 0}
           onWeather={viewMode === 'work' ? handleWeatherCall : undefined}
-          onCheer={viewMode === 'work' ? () => speakCheer(getRandomCheer()) : undefined}
+          onCheer={viewMode === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
         />
 
         {/* メインエリア */}
