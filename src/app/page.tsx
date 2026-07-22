@@ -17,7 +17,7 @@ import { saveRecentFile } from '@/lib/recentFiles';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
-import { fetchWeather, weatherToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews } from '@/lib/weatherNews';
+import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
 import { getRandomCallPhrase } from '@/lib/callPhrases';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
@@ -25,6 +25,7 @@ import ItemEditPage from '@/components/ItemEditPage';
 import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
 import CallPhraseSettings from '@/components/CallPhraseSettings';
+import WeatherPopup from '@/components/WeatherPopup';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
@@ -191,6 +192,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [callSettingsOpen, setCallSettingsOpen] = useState(false);
+  const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
@@ -333,8 +335,12 @@ export default function Home() {
       if (remaining.length === 0) return;
       // 実際の経過時間を 10 分単位でコール（10分、20分、30分…）
       const minutes = Math.max(10, Math.round((Date.now() - startedAt) / 600000) * 10);
-      // 他の音声と同様に選択中の（女性）ボイスでコールする
-      speakCheer(`${minutes}分経過しました。${getRandomCallPhrase()}`);
+      // 現在気温を先頭に付け、選択中の（女性）ボイスで応援コール＋温湿度ポップアップ表示
+      fetchWeather().then(w => {
+        const tempPart = w ? currentTempToSpeech(w) : '';
+        speakCheer(`${minutes}分経過しました。${tempPart}${getRandomCallPhrase()}`);
+        if (w) setWeatherPopup(w);
+      });
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
   }, [state.workStartTime, speakCheer]);
@@ -677,10 +683,10 @@ export default function Home() {
   }, []);
 
   const handleWeatherCall = useCallback(() => {
-    // 「天気を取得中」は音声ではなく文字表示のみ。結果の天気は音声でコールする。
+    // 「天気を取得中」は音声ではなく文字表示のみ。結果は音声コール＋ポップアップ表示。
     showToast('天気を取得中...');
     fetchWeather().then(w => {
-      if (w) speak(weatherToSpeech(w));
+      if (w) { speak(weatherToSpeech(w)); setWeatherPopup(w); }
       else speak('天気情報を取得できませんでした。');
     });
   }, [speak, showToast]);
@@ -882,10 +888,10 @@ export default function Home() {
           break;
         }
         case 'WEATHER': {
-          // 「取得中」は文字表示のみ（音声なし）
+          // 「取得中」は文字表示のみ（音声なし）。結果は音声コール＋ポップアップ表示。
           showToast('天気を取得中...');
           fetchWeather().then(w => {
-            if (w) speak(weatherToSpeech(w));
+            if (w) { speak(weatherToSpeech(w)); setWeatherPopup(w); }
             else speak('天気情報を取得できませんでした。');
           });
           break;
@@ -1183,6 +1189,9 @@ export default function Home() {
           onClose={() => setCallSettingsOpen(false)}
           onTest={(p) => speakCheer(p)}
         />
+      )}
+      {weatherPopup && (
+        <WeatherPopup weather={weatherPopup} onClose={() => setWeatherPopup(null)} />
       )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 

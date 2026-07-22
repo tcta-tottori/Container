@@ -23,6 +23,14 @@ const WMO_WEATHER: Record<number, string> = {
   95: '雷雨', 96: '雷雨（ひょう）', 99: '激しい雷雨',
 };
 
+/** 1時間ごとの気温・湿度データ（推移グラフ用） */
+export interface WeatherHourPoint {
+  hour: number;        // 8..12
+  label: string;       // "8時"
+  temperature: number;
+  humidity: number;
+}
+
 export interface WeatherData {
   temperature: number;
   feelsLike: number;
@@ -33,16 +41,37 @@ export interface WeatherData {
   maxTemp: number;
   minTemp: number;
   precipitationProb: number;
+  /** 当日 8時〜12時の推移（取得できない場合は空配列） */
+  hourly: WeatherHourPoint[];
 }
 
 export async function fetchWeather(): Promise<WeatherData | null> {
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${HOUKI_LAT}&longitude=${HOUKI_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia/Tokyo&forecast_days=1`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${HOUKI_LAT}&longitude=${HOUKI_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&hourly=temperature_2m,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia/Tokyo&forecast_days=1`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
     const current = data.current;
     const daily = data.daily;
+
+    // 当日 8〜12時の推移を抽出
+    const hourly: WeatherHourPoint[] = [];
+    const h = data.hourly;
+    if (h && Array.isArray(h.time)) {
+      for (let i = 0; i < h.time.length; i++) {
+        const t: string = h.time[i]; // 例: "2026-07-23T08:00"
+        const hour = parseInt(t.slice(11, 13), 10);
+        if (hour >= 8 && hour <= 12) {
+          hourly.push({
+            hour,
+            label: `${hour}時`,
+            temperature: Math.round(h.temperature_2m[i] * 10) / 10,
+            humidity: Math.round(h.relative_humidity_2m[i]),
+          });
+        }
+      }
+    }
+
     return {
       temperature: Math.round(current.temperature_2m * 10) / 10,
       feelsLike: Math.round(current.apparent_temperature * 10) / 10,
@@ -53,17 +82,21 @@ export async function fetchWeather(): Promise<WeatherData | null> {
       maxTemp: Math.round(daily.temperature_2m_max[0] * 10) / 10,
       minTemp: Math.round(daily.temperature_2m_min[0] * 10) / 10,
       precipitationProb: daily.precipitation_probability_max[0] || 0,
+      hourly,
     };
   } catch {
     return null;
   }
 }
 
+/** 天気ボタン用コール：現在の気温・湿度のみ */
 export function weatherToSpeech(w: WeatherData): string {
-  // 「気高町」は「けたかちょう」と読ませるため、読み仮名で記述
-  let text = `けたかちょうの天気。気温${w.temperature}度、湿度${w.humidity}%、`;
-  text += `降水確率${w.precipitationProb}%、風速${w.windSpeed}メートル。`;
-  return text;
+  return `現在の気温${w.temperature}度、湿度${w.humidity}%です。`;
+}
+
+/** 定期コール等の先頭に付ける現在気温フレーズ */
+export function currentTempToSpeech(w: WeatherData): string {
+  return `現在の気温${w.temperature}度。`;
 }
 
 export function temperatureToSpeech(w: WeatherData): string {
