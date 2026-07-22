@@ -187,7 +187,9 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   if (!ws) return { shipments: [], activeDates: [] };
 
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-  const maxCol = Math.min(range.e.c, 3800);
+  // updataシートは1日1列ずつ増えるため、固定上限だと当該週の列が範囲外に落ちる。
+  // Excelの列上限(16384列=XFD)までスキャンして取りこぼしを防ぐ（!ref異常時のガードは維持）。
+  const maxCol = Math.min(range.e.c, 16383);
   const getCell = cellReader(ws);
 
   // ── 日付行を自動検出（"M/D" パターンが3つ以上連続する行） ──
