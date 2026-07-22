@@ -65,6 +65,28 @@ const initialState: ContainerState = {
   autoAnnounce: true,
 };
 
+/** 今日の日付に該当するコンテナのインデックスを返す（該当なしは0） */
+function findTodayContainerIdx(containers: Container[]): number {
+  if (containers.length === 0) return 0;
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const todayMd = `${mm}-${dd}`;
+  for (let i = 0; i < containers.length; i++) {
+    const c = containers[i];
+    // date フィールド（YYYY-MM-DD）で照合
+    if (c.date && c.date.length >= 10 && c.date.slice(5) === todayMd) return i;
+    // containerNo 末尾の (MM/DD) で照合
+    const m = c.containerNo.match(/\((\d{1,2})\/(\d{1,2})\)\s*$/);
+    if (m) {
+      const cmm = m[1].padStart(2, '0');
+      const cdd = m[2].padStart(2, '0');
+      if (`${cmm}-${cdd}` === todayMd) return i;
+    }
+  }
+  return 0;
+}
+
 function buildOriginalValues(items: ContainerItem[]): Map<string, OriginalValues> {
   const map = new Map<string, OriginalValues>();
   for (const item of items) {
@@ -82,11 +104,12 @@ function reducer(state: ContainerState, action: Action): ContainerState {
     case 'LOAD_DATA': {
       const containers = action.containers;
       if (containers.length === 0) return { ...state, containers };
-      const items = [...containers[0].items];
+      const idx = findTodayContainerIdx(containers);
+      const items = [...containers[idx].items];
       return {
         ...state,
         containers,
-        selectedContainerIdx: 0,
+        selectedContainerIdx: idx,
         items,
         currentItemIdx: 0,
         originalValues: buildOriginalValues(items),

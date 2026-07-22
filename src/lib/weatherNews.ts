@@ -60,13 +60,8 @@ export async function fetchWeather(): Promise<WeatherData | null> {
 }
 
 export function weatherToSpeech(w: WeatherData): string {
-  let text = `宝木の天気。現在${w.weatherDesc}、気温${w.temperature}度、`;
-  text += `体感${w.feelsLike}度。`;
-  text += `最高${w.maxTemp}度、最低${w.minTemp}度。`;
-  if (w.precipitationProb > 0) {
-    text += `降水確率${w.precipitationProb}%。`;
-  }
-  text += `湿度${w.humidity}%、風速${w.windSpeed}メートル。`;
+  let text = `気高町の天気。気温${w.temperature}度、湿度${w.humidity}%、`;
+  text += `降水確率${w.precipitationProb}%、風速${w.windSpeed}メートル。`;
   return text;
 }
 
