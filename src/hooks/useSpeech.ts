@@ -51,9 +51,10 @@ export function cancelSpeech(): void {
   _onSpeakEnd?.();
 }
 
-function speakWebSpeech(text: string): void {
+function speakWebSpeech(text: string, onDone?: () => void): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     _onSpeakEnd?.();
+    onDone?.();
     return;
   }
   window.speechSynthesis.cancel();
@@ -64,17 +65,21 @@ function speakWebSpeech(text: string): void {
   const voices = window.speechSynthesis.getVoices();
   const jaVoice = voices.find((v) => v.lang.startsWith('ja'));
   if (jaVoice) u.voice = jaVoice;
+  let done = false;
+  const finish = () => { if (done) return; done = true; _onSpeakEnd?.(); onDone?.(); };
   u.onstart = () => { _onSpeakStart?.(text); _onSpeakPlay?.(); };
-  u.onend = () => { _onSpeakEnd?.(); };
-  u.onerror = () => { _onSpeakEnd?.(); };
+  u.onend = finish;
+  u.onerror = finish;
   window.speechSynthesis.speak(u);
 }
 
-async function speakGemini(text: string, stylePrefix?: string, voice?: string): Promise<void> {
+async function speakGemini(text: string, stylePrefix?: string, voice?: string, onDone?: () => void): Promise<void> {
   const abort = new AbortController();
   _currentAbort = abort;
   // 生成前にコール開始を通知（録音をすぐ止めてフィードバック防止）
   _onSpeakStart?.(text);
+  let finished = false;
+  const finish = () => { if (finished) return; finished = true; _onSpeakEnd?.(); onDone?.(); };
   try {
     const blob = await geminiGenerateSpeech(text, { signal: abort.signal, stylePrefix, voice });
     if (abort.signal.aborted) return;
@@ -82,22 +87,12 @@ async function speakGemini(text: string, stylePrefix?: string, voice?: string): 
     const audio = new Audio(url);
     _currentAudio = audio;
     _currentAudioUrl = url;
-    audio.onended = () => {
-      if (_currentAudioUrl === url) {
-        URL.revokeObjectURL(url);
-        _currentAudioUrl = null;
-      }
+    const releaseUrl = () => {
+      if (_currentAudioUrl === url) { URL.revokeObjectURL(url); _currentAudioUrl = null; }
       if (_currentAudio === audio) _currentAudio = null;
-      _onSpeakEnd?.();
     };
-    audio.onerror = () => {
-      if (_currentAudioUrl === url) {
-        URL.revokeObjectURL(url);
-        _currentAudioUrl = null;
-      }
-      if (_currentAudio === audio) _currentAudio = null;
-      _onSpeakEnd?.();
-    };
+    audio.onended = () => { releaseUrl(); finish(); };
+    audio.onerror = () => { releaseUrl(); finish(); };
     audio.onplay = () => { _onSpeakPlay?.(); };
     await audio.play();
   } catch (err) {
@@ -105,9 +100,35 @@ async function speakGemini(text: string, stylePrefix?: string, voice?: string): 
     console.error('Gemini TTS 失敗:', err);
     // ユーザーが Gemini を明示選択しているため自動フォールバックしない。
     // 録音再開のため _onSpeakEnd を呼んで状態を解放する。
-    _onSpeakEnd?.();
+    finish();
   } finally {
     if (_currentAbort === abort) _currentAbort = null;
+  }
+}
+
+/** 進行中のコールを停止（onEnd は呼ばない。新しい発話側で管理する） */
+function stopCurrentPlayback(): void {
+  if (typeof window === 'undefined') return;
+  if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
+  if (_currentAudio) {
+    try { _currentAudio.onended = null; _currentAudio.onerror = null; _currentAudio.pause(); } catch { /* ignore */ }
+    _currentAudio = null;
+  }
+  if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+}
+
+/** 事前アナウンスを読み上げた後、応援コールを「そのまま」別発話で読み上げる（定期コール用）。
+ *  応援を独立した発話にすることで、長文結合による語尾の乱れを防ぐ。 */
+function speakThenCheer(pre: string, cheer: string): void {
+  if (typeof window === 'undefined') return;
+  stopCurrentPlayback();
+  const startCheer = () => speakCheer(cheer);
+  if (!pre.trim()) { startCheer(); return; }
+  if (isGeminiTtsEnabled()) {
+    void speakGemini(pre, undefined, undefined, startCheer);
+  } else {
+    speakWebSpeech(pre, startCheer);
   }
 }
 
@@ -450,6 +471,7 @@ export function useSpeech() {
   return {
     speak,
     speakCheer,
+    speakThenCheer,
     speakTaunt,
     announceItem,
     announcePalletChange,

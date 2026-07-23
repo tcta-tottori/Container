@@ -177,7 +177,7 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, speakCheer, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
+  const { speak, speakCheer, speakThenCheer, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
@@ -335,15 +335,16 @@ export default function Home() {
       if (remaining.length === 0) return;
       // 実際の経過時間を 10 分単位でコール（10分、20分、30分…）
       const minutes = Math.max(10, Math.round((Date.now() - startedAt) / 600000) * 10);
-      // 現在気温を先頭に付け、選択中の（女性）ボイスで応援コール＋温湿度ポップアップ表示
+      // 経過アナウンス＋現在気温を先に読み上げ、応援コールは応援リストから取得して
+      // そのまま（別発話で）コールする。温湿度ポップアップも表示。
       fetchWeather().then(w => {
-        const tempPart = w ? currentTempToSpeech(w) : '';
-        speakCheer(`${minutes}分経過しました。${tempPart}${getRandomCallPhrase()}`);
+        const pre = `${minutes}分経過しました。${w ? currentTempToSpeech(w) : ''}`;
+        speakThenCheer(pre, getRandomCallPhrase());
         if (w) setWeatherPopup(w);
       });
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [state.workStartTime, speakCheer]);
+  }, [state.workStartTime, speakThenCheer]);
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
