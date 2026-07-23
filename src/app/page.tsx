@@ -18,7 +18,7 @@ import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
-import { getRandomCallPhrase } from '@/lib/callPhrases';
+import { getRandomCallPhrase, isTenMinCheerEnabled } from '@/lib/callPhrases';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
@@ -335,16 +335,20 @@ export default function Home() {
       if (remaining.length === 0) return;
       // 実際の経過時間を 10 分単位でコール（10分、20分、30分…）
       const minutes = Math.max(10, Math.round((Date.now() - startedAt) / 600000) * 10);
-      // 経過アナウンス＋現在気温を先に読み上げ、応援コールは応援リストから取得して
-      // そのまま（別発話で）コールする。温湿度ポップアップも表示。
+      // 経過アナウンス＋現在気温を先に読み上げ。応援コールは設定がオンの時のみ
+      // 応援リストから取得してそのまま（別発話で）コールする。温湿度ポップアップも表示。
       fetchWeather().then(w => {
         const pre = `${minutes}分経過しました。${w ? currentTempToSpeech(w) : ''}`;
-        speakThenCheer(pre, getRandomCallPhrase());
+        if (isTenMinCheerEnabled()) {
+          speakThenCheer(pre, getRandomCallPhrase());
+        } else {
+          speak(pre);
+        }
         if (w) setWeatherPopup(w);
       });
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [state.workStartTime, speakThenCheer]);
+  }, [state.workStartTime, speakThenCheer, speak]);
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {

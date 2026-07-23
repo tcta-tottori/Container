@@ -7,6 +7,19 @@
  */
 
 const STORAGE_KEY = 'cns_call_phrases';
+const TENMIN_CHEER_KEY = 'cns_call_10min_cheer';
+
+/** 10分ごとのコールで応援コールを読み上げるか（デフォルト: オフ） */
+export function isTenMinCheerEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(TENMIN_CHEER_KEY) === '1';
+}
+
+/** 10分ごとのコールの応援読み上げ ON/OFF を保存 */
+export function setTenMinCheerEnabled(on: boolean): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TENMIN_CHEER_KEY, on ? '1' : '0');
+}
 
 /** デフォルトのコールフレーズ（以前指定した固有名入りのコール） */
 export const DEFAULT_CALL_PHRASES: string[] = [

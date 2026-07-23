@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { loadCallPhrases, saveCallPhrases, DEFAULT_CALL_PHRASES } from '@/lib/callPhrases';
+import { loadCallPhrases, saveCallPhrases, DEFAULT_CALL_PHRASES, isTenMinCheerEnabled, setTenMinCheerEnabled } from '@/lib/callPhrases';
 
 interface CallPhraseSettingsProps {
   onClose: () => void;
@@ -12,6 +12,13 @@ interface CallPhraseSettingsProps {
 export default function CallPhraseSettings({ onClose, onTest }: CallPhraseSettingsProps) {
   const [phrases, setPhrases] = useState<string[]>(() => loadCallPhrases());
   const [newPhrase, setNewPhrase] = useState('');
+  const [tenMinCheer, setTenMinCheer] = useState<boolean>(() => isTenMinCheerEnabled());
+
+  const toggleTenMinCheer = () => {
+    const next = !tenMinCheer;
+    setTenMinCheer(next);
+    setTenMinCheerEnabled(next);
+  };
 
   const persist = (next: string[]) => {
     setPhrases(next);
@@ -86,6 +93,36 @@ export default function CallPhraseSettings({ onClose, onTest }: CallPhraseSettin
         </div>
         <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.5, marginBottom: 12 }}>
           応援コールボタンと10分ごとの定期コールで読み上げる内容です。追加・変更・削除できます。
+        </div>
+
+        {/* 10分ごとのコールの応援 ON/OFF */}
+        <div
+          onClick={toggleTenMinCheer}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+            padding: '10px 12px', marginBottom: 14, borderRadius: 10,
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>10分ごとのコールで応援する</div>
+            <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>
+              オフの場合は経過時間・気温のみをコールします
+            </div>
+          </div>
+          {/* トグルスイッチ */}
+          <div style={{
+            width: 44, height: 26, borderRadius: 999, flexShrink: 0,
+            background: tenMinCheer ? 'linear-gradient(135deg, #8b5cf6, #4a6ef7)' : 'rgba(255,255,255,0.15)',
+            border: '1px solid rgba(255,255,255,0.15)', position: 'relative',
+            transition: 'background 0.15s ease',
+          }}>
+            <div style={{
+              position: 'absolute', top: 2, left: tenMinCheer ? 20 : 2,
+              width: 20, height: 20, borderRadius: '50%', background: '#fff',
+              transition: 'left 0.15s ease',
+            }} />
+          </div>
         </div>
 
         {/* フレーズ一覧 */}
