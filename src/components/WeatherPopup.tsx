@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { WeatherData, WeatherHourPoint } from '@/lib/weatherNews';
+import { WeatherData, WeatherHourPoint, wbgtLevel } from '@/lib/weatherNews';
 
 interface WeatherPopupProps {
   weather: WeatherData;
@@ -12,6 +12,7 @@ interface WeatherPopupProps {
 
 const TEMP_COLOR = '#fb923c'; // 気温（オレンジ）
 const HUM_COLOR = '#38bdf8';  // 湿度（水色）
+const WBGT_COLOR = '#c084fc'; // 暑さ指数（紫）
 
 /** 気温・湿度と 8時〜12時の推移グラフを温湿度アプリ風に表示するポップアップ */
 export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPopupProps) {
@@ -44,8 +45,11 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
 
   const temps = pts.map((p) => p.temperature);
   const hums = pts.map((p) => p.humidity);
-  const tLo = temps.length ? Math.floor(Math.min(...temps) - 1) : 0;
-  const tHi = temps.length ? Math.ceil(Math.max(...temps) + 1) : 40;
+  const wbgts = pts.map((p) => p.wbgt);
+  // 左軸(℃)は気温・暑さ指数の両方が収まる範囲にする
+  const leftVals = [...temps, ...wbgts];
+  const tLo = leftVals.length ? Math.floor(Math.min(...leftVals) - 1) : 0;
+  const tHi = leftVals.length ? Math.ceil(Math.max(...leftVals) + 1) : 40;
   const hLo = hums.length ? Math.max(0, Math.floor(Math.min(...hums) - 5)) : 0;
   const hHi = hums.length ? Math.min(100, Math.ceil(Math.max(...hums) + 5)) : 100;
 
@@ -55,6 +59,9 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
 
   const tempLine = pts.map((p) => `${xOf(p.hour)},${yTemp(p.temperature)}`).join(' ');
   const humLine = pts.map((p) => `${xOf(p.hour)},${yHum(p.humidity)}`).join(' ');
+  const wbgtLine = pts.map((p) => `${xOf(p.hour)},${yTemp(p.wbgt)}`).join(' ');
+
+  const lv = wbgtLevel(weather.wbgt);
 
   const curX = xOf(clamped);
 
@@ -81,7 +88,7 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
   };
 
   // 選択ツールチップの配置
-  const boxW = 96, boxH = 34;
+  const boxW = 150, boxH = 34;
   const selX = selected ? xOf(selected.hour) : 0;
   const boxX = selected ? Math.max(padL, Math.min(W - padR - boxW, selX - boxW / 2)) : 0;
 
@@ -147,6 +154,33 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
           </div>
         </div>
 
+        {/* 暑さ指数 WBGT バナー */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
+          borderRadius: 16, padding: '12px 16px',
+          background: `${lv.color}22`, border: `1px solid ${lv.color}66`,
+        }}>
+          <div>
+            <div style={{ color: WBGT_COLOR, fontSize: 11, fontWeight: 600, marginBottom: 2 }}>暑さ指数(WBGT)</div>
+            <div style={{ color: '#fff', fontSize: 26, fontWeight: 800, lineHeight: 1, fontFamily: 'var(--font-mono)' }}>
+              {weather.wbgt}<span style={{ fontSize: 13, fontWeight: 600 }}>℃</span>
+            </div>
+          </div>
+          <div style={{
+            marginLeft: 'auto', textAlign: 'right',
+          }}>
+            <div style={{
+              display: 'inline-block', padding: '4px 12px', borderRadius: 999,
+              background: lv.color, color: '#fff', fontSize: 15, fontWeight: 800,
+            }}>
+              {lv.label}
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 9, marginTop: 4 }}>
+              ※気温・湿度からの推定値
+            </div>
+          </div>
+        </div>
+
         {/* 推移グラフ 8時〜12時 */}
         <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
           本日 8時〜12時の推移（グラフをタップで詳細）
@@ -170,7 +204,7 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
             {tempTicks.map((t, i) => (
               <g key={`t${i}`}>
                 <line x1={padL - 3} x2={padL} y1={yTemp(t)} y2={yTemp(t)} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
-                <text x={padL - 6} y={yTemp(t) + 3} fill={TEMP_COLOR} fontSize={9} textAnchor="end">{t}°</text>
+                <text x={padL - 6} y={yTemp(t) + 3} fill="rgba(255,255,255,0.55)" fontSize={9} textAnchor="end">{t}°</text>
               </g>
             ))}
             {/* 右軸目盛り（湿度） */}
@@ -192,9 +226,11 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
               </g>
             ))}
 
-            {/* 温度・湿度ライン */}
+            {/* 湿度・暑さ指数・気温ライン */}
             <polyline points={humLine} fill="none" stroke={HUM_COLOR} strokeWidth={2.5}
               strokeLinejoin="round" strokeLinecap="round" opacity={0.9} />
+            <polyline points={wbgtLine} fill="none" stroke={WBGT_COLOR} strokeWidth={2.5}
+              strokeLinejoin="round" strokeLinecap="round" strokeDasharray="5 3" />
             <polyline points={tempLine} fill="none" stroke={TEMP_COLOR} strokeWidth={2.5}
               strokeLinejoin="round" strokeLinecap="round" />
 
@@ -202,6 +238,7 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
             {pts.map((p, i) => (
               <g key={i}>
                 <circle cx={xOf(p.hour)} cy={yHum(p.humidity)} r={2.5} fill={HUM_COLOR} />
+                <circle cx={xOf(p.hour)} cy={yTemp(p.wbgt)} r={2.5} fill={WBGT_COLOR} />
                 <circle cx={xOf(p.hour)} cy={yTemp(p.temperature)} r={2.5} fill={TEMP_COLOR} />
               </g>
             ))}
@@ -212,6 +249,7 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
                 <line x1={curX} x2={curX} y1={padT} y2={padT + innerH}
                   stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" opacity={0.7} />
                 <circle cx={curX} cy={yTemp(weather.temperature)} r={4.5} fill={TEMP_COLOR} stroke="#fff" strokeWidth={1.5} />
+                <circle cx={curX} cy={yTemp(weather.wbgt)} r={4.5} fill={WBGT_COLOR} stroke="#fff" strokeWidth={1.5} />
                 <circle cx={curX} cy={yHum(weather.humidity)} r={4.5} fill={HUM_COLOR} stroke="#fff" strokeWidth={1.5} />
                 <text x={Math.min(curX, W - padR - 10)} y={padT + 9} fill="#fff" fontSize={9} textAnchor="middle" fontWeight="700">
                   現在
@@ -225,6 +263,7 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
                 <line x1={selX} x2={selX} y1={padT} y2={padT + innerH}
                   stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" opacity={0.8} />
                 <circle cx={selX} cy={yTemp(selected.temperature)} r={5} fill={TEMP_COLOR} stroke="#fff" strokeWidth={1.5} />
+                <circle cx={selX} cy={yTemp(selected.wbgt)} r={5} fill={WBGT_COLOR} stroke="#fff" strokeWidth={1.5} />
                 <circle cx={selX} cy={yHum(selected.humidity)} r={5} fill={HUM_COLOR} stroke="#fff" strokeWidth={1.5} />
                 <rect x={boxX} y={padT + 2} width={boxW} height={boxH} rx={6}
                   fill="rgba(3,10,20,0.92)" stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
@@ -233,8 +272,10 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
                 </text>
                 <text x={boxX + boxW / 2} y={padT + 27} fontSize={10} textAnchor="middle">
                   <tspan fill={TEMP_COLOR}>{selected.temperature}°</tspan>
-                  <tspan fill="rgba(255,255,255,0.5)"> / </tspan>
+                  <tspan fill="rgba(255,255,255,0.4)"> / </tspan>
                   <tspan fill={HUM_COLOR}>{selected.humidity}%</tspan>
+                  <tspan fill="rgba(255,255,255,0.4)"> / </tspan>
+                  <tspan fill={WBGT_COLOR}>暑さ{selected.wbgt}</tspan>
                 </text>
               </g>
             )}
@@ -249,12 +290,15 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
         )}
 
         {/* 凡例 + 補足 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 8, flexWrap: 'wrap' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
             <span style={{ width: 14, height: 3, borderRadius: 2, background: TEMP_COLOR }} />気温
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
             <span style={{ width: 14, height: 3, borderRadius: 2, background: HUM_COLOR }} />湿度
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+            <span style={{ width: 14, height: 3, borderRadius: 2, background: WBGT_COLOR }} />暑さ指数
           </span>
           <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
             降水{weather.precipitationProb}% / 風速{weather.windSpeed}m

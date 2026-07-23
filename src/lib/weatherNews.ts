@@ -29,6 +29,7 @@ export interface WeatherHourPoint {
   label: string;       // "8時"
   temperature: number;
   humidity: number;
+  wbgt: number;        // 暑さ指数（推定）
 }
 
 export interface WeatherData {
@@ -41,8 +42,30 @@ export interface WeatherData {
   maxTemp: number;
   minTemp: number;
   precipitationProb: number;
+  /** 暑さ指数 WBGT（気温・湿度からの推定値, ℃） */
+  wbgt: number;
   /** 当日 8時〜12時の推移（取得できない場合は空配列） */
   hourly: WeatherHourPoint[];
+}
+
+/**
+ * 気温(℃)と相対湿度(%)から暑さ指数 WBGT を近似算出する。
+ * 日本で広く使われる簡易推定式（小野・登内 2014, 屋内・日陰想定）。
+ *   WBGT = 0.567×Ta + 0.393×e + 3.94   （e: 水蒸気圧 hPa）
+ */
+export function computeWBGT(tempC: number, humidity: number): number {
+  const e = (humidity / 100) * 6.105 * Math.exp((17.27 * tempC) / (237.7 + tempC));
+  const wbgt = 0.567 * tempC + 0.393 * e + 3.94;
+  return Math.round(wbgt * 10) / 10;
+}
+
+/** WBGT の警戒レベル（環境省 熱中症予防指針に準拠） */
+export function wbgtLevel(wbgt: number): { label: string; color: string } {
+  if (wbgt >= 31) return { label: '危険', color: '#dc2626' };
+  if (wbgt >= 28) return { label: '厳重警戒', color: '#f97316' };
+  if (wbgt >= 25) return { label: '警戒', color: '#f59e0b' };
+  if (wbgt >= 21) return { label: '注意', color: '#eab308' };
+  return { label: 'ほぼ安全', color: '#22c55e' };
 }
 
 export async function fetchWeather(): Promise<WeatherData | null> {
@@ -62,11 +85,14 @@ export async function fetchWeather(): Promise<WeatherData | null> {
         const t: string = h.time[i]; // 例: "2026-07-23T08:00"
         const hour = parseInt(t.slice(11, 13), 10);
         if (hour >= 8 && hour <= 12) {
+          const tt = Math.round(h.temperature_2m[i] * 10) / 10;
+          const hh = Math.round(h.relative_humidity_2m[i]);
           hourly.push({
             hour,
             label: `${hour}時`,
-            temperature: Math.round(h.temperature_2m[i] * 10) / 10,
-            humidity: Math.round(h.relative_humidity_2m[i]),
+            temperature: tt,
+            humidity: hh,
+            wbgt: computeWBGT(tt, hh),
           });
         }
       }
@@ -82,6 +108,7 @@ export async function fetchWeather(): Promise<WeatherData | null> {
       maxTemp: Math.round(daily.temperature_2m_max[0] * 10) / 10,
       minTemp: Math.round(daily.temperature_2m_min[0] * 10) / 10,
       precipitationProb: daily.precipitation_probability_max[0] || 0,
+      wbgt: computeWBGT(Math.round(current.temperature_2m * 10) / 10, current.relative_humidity_2m),
       hourly,
     };
   } catch {
@@ -89,14 +116,15 @@ export async function fetchWeather(): Promise<WeatherData | null> {
   }
 }
 
-/** 天気ボタン用コール：現在の気温・湿度のみ */
+/** 天気ボタン用コール：現在の気温・湿度・暑さ指数 */
 export function weatherToSpeech(w: WeatherData): string {
-  return `現在の気温${w.temperature}度、湿度${w.humidity}%です。`;
+  const lv = wbgtLevel(w.wbgt).label;
+  return `現在の気温${w.temperature}度、湿度${w.humidity}%、暑さ指数${w.wbgt}、${lv}です。`;
 }
 
-/** 定期コール等の先頭に付ける現在気温フレーズ */
+/** 定期コール等の先頭に付ける現在気温・暑さ指数フレーズ */
 export function currentTempToSpeech(w: WeatherData): string {
-  return `現在の気温${w.temperature}度。`;
+  return `現在の気温${w.temperature}度、暑さ指数${w.wbgt}。`;
 }
 
 export function temperatureToSpeech(w: WeatherData): string {
