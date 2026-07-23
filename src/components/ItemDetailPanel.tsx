@@ -536,12 +536,12 @@ export default function ItemDetailPanel({
   // カウントアップアニメーション（フェードアウト中は値をフリーズ）
   const isTransitioning = animKey !== item.id;
   const rawFraction = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-  // 鍋は検査を抜かない、それ以外は1ケース抜く。
+  // 鍋・ジャーポットは検査を抜かない、それ以外は1ケース抜く。
   // 端数=0でパレットぴったりの場合は1パレットを崩して検査分を抜く。
-  const isNabeItem = item.type === '鍋';
-  const breakPalletForInspection = !isNabeItem && rawFraction === 0 && item.palletCount > 0 && item.qtyPerPallet > 0;
+  const noInspection = item.type === '鍋' || item.type === 'ジャーポット';
+  const breakPalletForInspection = !noInspection && rawFraction === 0 && item.palletCount > 0 && item.qtyPerPallet > 0;
   const displayPallets = breakPalletForInspection ? item.palletCount - 1 : item.palletCount;
-  const inspectionDeducted = isNabeItem
+  const inspectionDeducted = noInspection
     ? rawFraction
     : breakPalletForInspection
       ? item.qtyPerPallet - 1

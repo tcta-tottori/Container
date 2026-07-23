@@ -113,12 +113,13 @@ export function extractColor(itemName: string): string | null {
   // (KB), (K), (KM), (KV), (KKB) etc. → 黒系
   // (W), (WS), (WM), (WG), (WY), (WP) etc. → 白系
   // (T), (TD) → その他の色
+  // 色コードに K が含まれれば黒、W が含まれれば白（例: KY, KB, BK, WS, W）
   const parenMatch = itemName.match(/\(([^)]+)\)/);
   if (parenMatch) {
     const code = parenMatch[1];
-    if (code.startsWith('K') || code.includes('KK')) return '黒';
-    if (code.startsWith('W')) return '白';
-    if (code.startsWith('T')) return '他色';
+    if (code.includes('K')) return '黒';
+    if (code.includes('W')) return '白';
+    if (code.includes('T')) return '他色';
     return null;
   }
 
@@ -130,9 +131,9 @@ export function extractColor(itemName: string): string | null {
     const suffixMatch = name.match(/(KKB|KB|KM|KV|K|WS|WM|WG|WY|WP|W|TD|T)$/);
     if (suffixMatch) {
       const code = suffixMatch[1];
-      if (code.startsWith('K') || code.includes('KK')) return '黒';
-      if (code.startsWith('W')) return '白';
-      if (code.startsWith('T')) return '他色';
+      if (code.includes('K')) return '黒';
+      if (code.includes('W')) return '白';
+      if (code.includes('T')) return '他色';
     }
   }
 
@@ -152,14 +153,14 @@ export function itemNameForSpeech(itemName: string): string {
     .replace(/ﾎﾟﾘｶﾊﾞｰ/g, '')
     .trim();
 
-  // 括弧内の色コードを変換
+  // 括弧内の色コードを変換（K を含めば黒、W を含めば白）
   const parenMatch = name.match(/\(([^)]+)\)/);
   if (parenMatch) {
     const code = parenMatch[1];
     let colorName = '';
-    if (code.startsWith('K') || code.includes('KK')) colorName = '黒';
-    else if (code.startsWith('W')) colorName = '白';
-    else if (code.startsWith('T')) colorName = '他色';
+    if (code.includes('K')) colorName = '黒';
+    else if (code.includes('W')) colorName = '白';
+    else if (code.includes('T')) colorName = '他色';
 
     if (colorName) {
       name = name.replace(/\([^)]+\)/, colorName);
