@@ -682,6 +682,8 @@ export default function Home() {
     toastTimerRef.current = setTimeout(() => setToast(null), ms);
   }, []);
 
+  const closeWeatherPopup = useCallback(() => setWeatherPopup(null), []);
+
   const handleWeatherCall = useCallback(() => {
     // 「天気を取得中」は音声ではなく文字表示のみ。結果は音声コール＋ポップアップ表示。
     showToast('天気を取得中...');
@@ -1191,7 +1193,7 @@ export default function Home() {
         />
       )}
       {weatherPopup && (
-        <WeatherPopup weather={weatherPopup} onClose={() => setWeatherPopup(null)} />
+        <WeatherPopup weather={weatherPopup} onClose={closeWeatherPopup} isSpeaking={isSpeaking} />
       )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 

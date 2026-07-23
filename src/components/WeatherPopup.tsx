@@ -1,18 +1,31 @@
 'use client';
 
-import { WeatherData } from '@/lib/weatherNews';
+import { useEffect, useRef, useState } from 'react';
+import { WeatherData, WeatherHourPoint } from '@/lib/weatherNews';
 
 interface WeatherPopupProps {
   weather: WeatherData;
   onClose: () => void;
+  /** 音声コール中フラグ。コール終了から10秒後に自動で閉じる */
+  isSpeaking?: boolean;
 }
 
 const TEMP_COLOR = '#fb923c'; // 気温（オレンジ）
 const HUM_COLOR = '#38bdf8';  // 湿度（水色）
 
 /** 気温・湿度と 8時〜12時の推移グラフを温湿度アプリ風に表示するポップアップ */
-export default function WeatherPopup({ weather, onClose }: WeatherPopupProps) {
+export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPopupProps) {
   const pts = weather.hourly;
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [selected, setSelected] = useState<WeatherHourPoint | null>(null);
+  const [activity, setActivity] = useState(0);
+
+  // コール終了から10秒後に自動クローズ（コール中・タップ操作中はリセット）
+  useEffect(() => {
+    if (isSpeaking) return;
+    const t = setTimeout(onClose, 10000);
+    return () => clearTimeout(t);
+  }, [isSpeaking, activity, onClose]);
 
   // 現在時刻の位置（8〜12時にクランプ）
   const now = new Date();
@@ -22,8 +35,8 @@ export default function WeatherPopup({ weather, onClose }: WeatherPopupProps) {
   const inRange = nowH >= H0 && nowH <= H1;
 
   // チャート寸法
-  const W = 320, Hgt = 180;
-  const padL = 32, padR = 34, padT = 16, padB = 26;
+  const W = 340, Hgt = 194;
+  const padL = 36, padR = 42, padT = 18, padB = 26;
   const innerW = W - padL - padR;
   const innerH = Hgt - padT - padB;
 
@@ -44,6 +57,33 @@ export default function WeatherPopup({ weather, onClose }: WeatherPopupProps) {
   const humLine = pts.map((p) => `${xOf(p.hour)},${yHum(p.humidity)}`).join(' ');
 
   const curX = xOf(clamped);
+
+  // Y軸目盛り
+  const tMid = Math.round((tLo + tHi) / 2);
+  const hMid = Math.round((hLo + hHi) / 2);
+  const tempTicks = [tHi, tMid, tLo];
+  const humTicks = [hHi, hMid, hLo];
+
+  // グラフタップ → 最寄りの時間の点を選択
+  const handleChartClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    const svg = svgRef.current;
+    if (!svg || pts.length === 0) return;
+    const rect = svg.getBoundingClientRect();
+    const vx = ((e.clientX - rect.left) / rect.width) * W;
+    let nearest = pts[0];
+    let best = Infinity;
+    for (const p of pts) {
+      const d = Math.abs(xOf(p.hour) - vx);
+      if (d < best) { best = d; nearest = p; }
+    }
+    setSelected(nearest);
+    setActivity((a) => a + 1);
+  };
+
+  // 選択ツールチップの配置
+  const boxW = 96, boxH = 34;
+  const selX = selected ? xOf(selected.hour) : 0;
+  const boxX = selected ? Math.max(padL, Math.min(W - padR - boxW, selX - boxW / 2)) : 0;
 
   return (
     <div
@@ -109,18 +149,38 @@ export default function WeatherPopup({ weather, onClose }: WeatherPopupProps) {
 
         {/* 推移グラフ 8時〜12時 */}
         <div style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11, marginBottom: 6, fontWeight: 600 }}>
-          本日 8時〜12時の推移
+          本日 8時〜12時の推移（グラフをタップで詳細）
         </div>
         {pts.length > 0 ? (
-          <svg viewBox={`0 0 ${W} ${Hgt}`} width="100%" style={{ display: 'block' }}>
-            {/* グリッド（横） */}
-            {[0, 0.25, 0.5, 0.75, 1].map((f, i) => (
+          <svg ref={svgRef} viewBox={`0 0 ${W} ${Hgt}`} width="100%" style={{ display: 'block', cursor: 'pointer' }} onClick={handleChartClick}>
+            {/* 横グリッド */}
+            {[0, 0.5, 1].map((f, i) => (
               <line key={i}
                 x1={padL} x2={W - padR}
                 y1={padT + f * innerH} y2={padT + f * innerH}
                 stroke="rgba(255,255,255,0.08)" strokeWidth={1}
               />
             ))}
+
+            {/* 縦軸（左：気温 / 右：湿度） */}
+            <line x1={padL} x2={padL} y1={padT} y2={padT + innerH} stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
+            <line x1={W - padR} x2={W - padR} y1={padT} y2={padT + innerH} stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
+
+            {/* 左軸目盛り（気温） */}
+            {tempTicks.map((t, i) => (
+              <g key={`t${i}`}>
+                <line x1={padL - 3} x2={padL} y1={yTemp(t)} y2={yTemp(t)} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+                <text x={padL - 6} y={yTemp(t) + 3} fill={TEMP_COLOR} fontSize={9} textAnchor="end">{t}°</text>
+              </g>
+            ))}
+            {/* 右軸目盛り（湿度） */}
+            {humTicks.map((h, i) => (
+              <g key={`h${i}`}>
+                <line x1={W - padR} x2={W - padR + 3} y1={yHum(h)} y2={yHum(h)} stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+                <text x={W - padR + 6} y={yHum(h) + 3} fill={HUM_COLOR} fontSize={9} textAnchor="start">{h}%</text>
+              </g>
+            ))}
+
             {/* X軸ラベル + 縦グリッド */}
             {[8, 9, 10, 11, 12].map((hh) => (
               <g key={hh}>
@@ -147,7 +207,7 @@ export default function WeatherPopup({ weather, onClose }: WeatherPopupProps) {
             ))}
 
             {/* 現在位置マーカー */}
-            {inRange && (
+            {inRange && !selected && (
               <g>
                 <line x1={curX} x2={curX} y1={padT} y2={padT + innerH}
                   stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" opacity={0.7} />
@@ -155,6 +215,26 @@ export default function WeatherPopup({ weather, onClose }: WeatherPopupProps) {
                 <circle cx={curX} cy={yHum(weather.humidity)} r={4.5} fill={HUM_COLOR} stroke="#fff" strokeWidth={1.5} />
                 <text x={Math.min(curX, W - padR - 10)} y={padT + 9} fill="#fff" fontSize={9} textAnchor="middle" fontWeight="700">
                   現在
+                </text>
+              </g>
+            )}
+
+            {/* タップで選択した時間の詳細 */}
+            {selected && (
+              <g>
+                <line x1={selX} x2={selX} y1={padT} y2={padT + innerH}
+                  stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" opacity={0.8} />
+                <circle cx={selX} cy={yTemp(selected.temperature)} r={5} fill={TEMP_COLOR} stroke="#fff" strokeWidth={1.5} />
+                <circle cx={selX} cy={yHum(selected.humidity)} r={5} fill={HUM_COLOR} stroke="#fff" strokeWidth={1.5} />
+                <rect x={boxX} y={padT + 2} width={boxW} height={boxH} rx={6}
+                  fill="rgba(3,10,20,0.92)" stroke="rgba(255,255,255,0.25)" strokeWidth={1} />
+                <text x={boxX + boxW / 2} y={padT + 14} fill="#fff" fontSize={10} fontWeight={700} textAnchor="middle">
+                  {selected.label}
+                </text>
+                <text x={boxX + boxW / 2} y={padT + 27} fontSize={10} textAnchor="middle">
+                  <tspan fill={TEMP_COLOR}>{selected.temperature}°</tspan>
+                  <tspan fill="rgba(255,255,255,0.5)"> / </tspan>
+                  <tspan fill={HUM_COLOR}>{selected.humidity}%</tspan>
                 </text>
               </g>
             )}
