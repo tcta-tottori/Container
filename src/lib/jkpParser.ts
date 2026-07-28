@@ -187,8 +187,8 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   if (!ws) return { shipments: [], activeDates: [] };
 
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-  // updataシートは1日1列ずつ増えるため、固定上限だと当該週の列が範囲外に落ちる。
-  // Excelの列上限(16384列=XFD)までスキャンして取りこぼしを防ぐ（!ref異常時のガードは維持）。
+  // Excelの最大列(XFD=16383)まで走査。ファイルは毎週日付列が右に追加されるため
+  // 固定上限で切ると当日データを読み逃す（旧: 3800固定で2026年分が欠落した不具合の修正）
   const maxCol = Math.min(range.e.c, 16383);
   const getCell = cellReader(ws);
 
