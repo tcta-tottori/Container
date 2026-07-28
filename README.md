@@ -17,6 +17,14 @@ Excelファイルから品目データを読み込み、リアルタイムの作
 - 音声コマンド: 次/前/完了/読み上げ/増減/数量確認/残数確認
 - 品目切り替え時の自動読み上げ（ON/OFF切替可能）
 
+### 温湿度バー（ヘッダー下）
+作業ページのヘッダー直下に、気温・湿度・暑さ指数（WBGT）を表示するバー。
+- **気象庁データ**: Open-Meteo から現在地（気高町宝木）の気温・湿度を取得し、WBGT を推定表示。10分ごとに自動更新。
+- **SwitchBot 温湿度計（Bluetooth）**: 「接続」ボタンで SwitchBot 温湿度計の BLE アドバタイズをスキャンし、実測の気温・湿度・WBGT を表示。気象庁データとの差分（SwitchBot − 気象庁）もチップで表示する。
+  - 仕組み: Web Bluetooth の `navigator.bluetooth.requestLEScan`（ペアリング不要・受信のたびに最新値へ更新）。
+  - 対応: Android Chrome で `chrome://flags/#enable-experimental-web-platform-features` を有効にすると利用可能。非対応環境ではバーに「非対応」と表示される。
+  - 実装: `src/lib/switchbot.ts`（SwitchBot Meter サービスデータ解析）、`src/components/ClimateBar.tsx`（表示バー）。
+
 ### 品目マスタ管理（CNS品目一覧）
 CNS品目一覧はコード紐付・入数・1P数・重量・寸法情報を保管するマスタデータ。
 パレット枚数・端数は「内容」シート（コンテナデータ）から取得する。

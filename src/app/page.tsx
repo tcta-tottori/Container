@@ -26,6 +26,8 @@ import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
 import CallPhraseSettings from '@/components/CallPhraseSettings';
 import WeatherPopup from '@/components/WeatherPopup';
+import ClimateBar, { SwitchBotStatus } from '@/components/ClimateBar';
+import { SwitchBotReading, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
@@ -193,6 +195,12 @@ export default function Home() {
   const [manualOpen, setManualOpen] = useState(false);
   const [callSettingsOpen, setCallSettingsOpen] = useState(false);
   const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
+  // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
+  const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
+  const [switchbot, setSwitchbot] = useState<SwitchBotReading | null>(null);
+  const [sbStatus, setSbStatus] = useState<SwitchBotStatus>('idle');
+  const [sbError, setSbError] = useState<string | null>(null);
+  const sbStopRef = useRef<null | (() => void)>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
@@ -344,11 +352,53 @@ export default function Home() {
         } else {
           speak(pre);
         }
-        if (w) setWeatherPopup(w);
+        if (w) { setWeatherPopup(w); setBarWeather(w); }
       });
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
   }, [state.workStartTime, speakThenCheer, speak]);
+
+  // 温湿度バー: 気象庁データを起動時＋10分ごとに取得
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => fetchWeather().then((w) => { if (!cancelled && w) setBarWeather(w); });
+    load();
+    const iv = setInterval(load, 10 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, []);
+
+  // SwitchBot スキャン対応判定
+  useEffect(() => {
+    setSbStatus(isSwitchBotScanSupported() ? 'idle' : 'unsupported');
+  }, []);
+
+  // アンマウント時にスキャンを停止
+  useEffect(() => () => { sbStopRef.current?.(); }, []);
+
+  // SwitchBot スキャンの開始/停止トグル
+  const toggleSwitchBot = useCallback(async () => {
+    // 既にスキャン中なら停止
+    if (sbStopRef.current) {
+      sbStopRef.current();
+      sbStopRef.current = null;
+      setSbStatus('idle');
+      return;
+    }
+    setSbError(null);
+    try {
+      const stop = await startSwitchBotScan(
+        (r) => setSwitchbot(r),
+        (s, err) => {
+          if (s === 'error') { setSbStatus('error'); setSbError(err || null); }
+        },
+      );
+      sbStopRef.current = stop;
+      setSbStatus('scanning');
+    } catch (e) {
+      setSbStatus('error');
+      setSbError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
@@ -1271,6 +1321,17 @@ export default function Home() {
           onWeather={viewMode === 'work' ? handleWeatherCall : undefined}
           onCheer={viewMode === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
         />
+
+        {/* 温湿度バー（ヘッダー下・作業ページのみ） */}
+        {viewMode === 'work' && (
+          <ClimateBar
+            weather={barWeather}
+            switchbot={switchbot}
+            sbStatus={sbStatus}
+            sbError={sbError}
+            onToggleSwitchBot={toggleSwitchBot}
+          />
+        )}
 
         {/* メインエリア */}
         <div className="main-area">

@@ -100,6 +100,53 @@ body {
   50% { color: rgba(245,158,11,0.3); }
 }
 
+/* ===== Climate bar (温湿度バー: ヘッダー下) ===== */
+.climate-bar {
+  display: flex; align-items: center; gap: 10px;
+  height: 44px; padding: 0 8px;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  transition: background 0.3s ease;
+}
+.climate-bar::-webkit-scrollbar { display: none; }
+.climate-seg {
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+}
+.climate-seg-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.climate-divider {
+  width: 1px; height: 26px; flex-shrink: 0;
+  background: rgba(255,255,255,0.12);
+}
+.climate-btn {
+  display: flex; align-items: center; justify-content: center;
+  height: 26px; padding: 0 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.75);
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  flex-shrink: 0; white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.climate-btn:hover { background: rgba(255,255,255,0.08); }
+.climate-scan-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #4ade80; flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(74,222,128,0.7);
+  animation: climate-scan-pulse 1.2s ease-in-out infinite;
+}
+@keyframes climate-scan-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
 /* Mic button: always centered */
 .mic-float-btn { left: 50% !important; right: auto !important; transform: translateX(-50%); }
 
