@@ -96,10 +96,12 @@ export default function ClimateBar({
         color: '#4ade80',
         lines: [
           `気温 ${switchbot.temperature}°C / 湿度 ${switchbot.humidity}% / 暑さ指数 ${switchbot.wbgt}`,
+          `判定機種: ${switchbot.model === 'outdoor' ? '防水/屋外モデル' : '室内モデル'}`,
           switchbot.battery != null ? `電池 ${switchbot.battery}%` : '',
           switchbot.rssi != null ? `電波強度 ${switchbot.rssi}dBm` : '',
           switchbot.deviceName ? `デバイス ${switchbot.deviceName}` : '',
           `最終受信 ${age}秒前`,
+          `生データ: ${switchbot.raw}`,
         ].filter(Boolean),
       };
     }
@@ -301,14 +303,19 @@ export default function ClimateBar({
               >×</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {sbInfo.lines.map((line, i) => (
-                <div key={i} style={{
-                  fontSize: 11, lineHeight: 1.5, color: 'rgba(255,255,255,0.8)',
-                  wordBreak: 'break-word',
-                }}>
-                  {line}
-                </div>
-              ))}
+              {sbInfo.lines.map((line, i) => {
+                const isRaw = line.startsWith('生データ:');
+                return (
+                  <div key={i} style={{
+                    fontSize: isRaw ? 9 : 11, lineHeight: 1.5,
+                    color: isRaw ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.8)',
+                    fontFamily: isRaw ? 'var(--font-mono, monospace)' : undefined,
+                    wordBreak: 'break-all',
+                  }}>
+                    {line}
+                  </div>
+                );
+              })}
             </div>
             {/* 接続/停止アクション */}
             <button
