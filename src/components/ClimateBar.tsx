@@ -22,6 +22,8 @@ interface ClimateBarProps {
   onToggleSwitchBot: () => void;
   /** 気象庁データ部タップ（気温・湿度・グラフの詳細を表示） */
   onOpenWeather?: () => void;
+  /** SwitchBotデータ部タップ（数値・グラフ・気象庁との差を表示） */
+  onOpenSwitchBot?: () => void;
 }
 
 /** 小さな数値スタット（ラベル + 値 + 単位） */
@@ -47,29 +49,6 @@ function Stat({
   );
 }
 
-/** SwitchBot − 気象庁 の差分チップ */
-function DiffChip({ diff, unit }: { diff: number; unit: string }) {
-  const rounded = Math.round(diff * 10) / 10;
-  const sign = rounded > 0 ? '+' : '';
-  // 高いほど暖色、低いほど寒色（±0 は中立グレー）
-  const color = rounded > 0 ? '#f87171' : rounded < 0 ? '#60a5fa' : 'rgba(255,255,255,0.45)';
-  return (
-    <span
-      style={{
-        fontSize: 9,
-        fontWeight: 700,
-        color,
-        fontFamily: 'var(--font-mono)',
-        marginTop: 1,
-      }}
-    >
-      {sign}
-      {rounded}
-      {unit}
-    </span>
-  );
-}
-
 /**
  * ヘッダー下に表示する温湿度バー。
  * 左：気象庁（Open-Meteo）データ、右：SwitchBot データ（接続後、気象庁との差異も表示）。
@@ -81,6 +60,7 @@ export default function ClimateBar({
   sbError,
   onToggleSwitchBot,
   onOpenWeather,
+  onOpenSwitchBot,
 }: ClimateBarProps) {
   const wLv = weather ? wbgtLevel(weather.wbgt) : null;
   const sbLv = switchbot ? wbgtLevel(switchbot.wbgt) : null;
@@ -149,121 +129,119 @@ export default function ClimateBar({
 
   return (
     <div className="climate-bar">
-      {/* ===== 気象庁（Open-Meteo）===== タップで気温・湿度・グラフの詳細 ===== */}
-      <div
-        className={`climate-seg${weather && onOpenWeather ? ' climate-seg-tap' : ''}`}
-        onClick={weather && onOpenWeather ? onOpenWeather : undefined}
-        role={weather && onOpenWeather ? 'button' : undefined}
-        title={weather && onOpenWeather ? 'タップで気温・湿度・推移グラフを表示' : undefined}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.05 }}>
-          <span className="climate-seg-label" style={{ color: 'rgba(255,255,255,0.55)' }}>
-            🏢 気象庁
-          </span>
-          {weather?.time ? (
-            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
-              {weather.time} 時点
-            </span>
-          ) : null}
-        </div>
-        {weather ? (
-          <>
-            <Stat label="気温" value={`${weather.temperature}`} unit="°C" color={TEMP_COLOR} />
-            <Stat label="湿度" value={`${weather.humidity}`} unit="%" color={HUM_COLOR} />
-            <Stat
-              label="暑さ指数"
-              value={`${weather.wbgt}`}
-              unit=""
-              color={wLv?.color || '#c084fc'}
-            />
-            {onOpenWeather && (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                style={{ flexShrink: 0 }}>
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            )}
-          </>
-        ) : (
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>取得中…</span>
-        )}
-      </div>
-
-      <div className="climate-divider" />
-
-      {/* ===== SwitchBot ===== */}
-      <div className="climate-seg">
-        <span
-          className="climate-seg-label climate-seg-tap"
-          style={{ color: '#4ade80', display: 'inline-flex', alignItems: 'center', gap: 3 }}
-          onClick={() => setInfoOpen((v) => !v)}
+      {switchbot ? (
+        /* ===== SwitchBot 有効時: SwitchBot のみ表示（タップで詳細ポップアップ） ===== */
+        <div
+          className="climate-seg climate-seg-tap"
+          onClick={onOpenSwitchBot}
           role="button"
-          title="タップで状態・対処法を表示"
+          title="タップで数値・グラフ・気象庁との差を表示"
+          style={{ flex: 1, minWidth: 0 }}
         >
-          📡 SwitchBot
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: 13, height: 13, borderRadius: '50%',
-            border: '1px solid rgba(74,222,128,0.6)', fontSize: 9, lineHeight: 1,
-          }}>i</span>
-        </span>
-
-        {switchbot ? (
-          <>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <Stat label="気温" value={`${switchbot.temperature}`} unit="°C" color={TEMP_COLOR} />
-              {weather && <DiffChip diff={switchbot.temperature - weather.temperature} unit="°" />}
+          <span className="climate-seg-label" style={{ color: '#4ade80' }}>📡 SwitchBot</span>
+          <Stat label="気温" value={`${switchbot.temperature}`} unit="°C" color={TEMP_COLOR} />
+          <Stat label="湿度" value={`${switchbot.humidity}`} unit="%" color={HUM_COLOR} />
+          <Stat label="暑さ指数" value={`${switchbot.wbgt}`} unit="" color={sbLv?.color || '#c084fc'} />
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            style={{ flexShrink: 0 }}>
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={(e) => { e.stopPropagation(); onToggleSwitchBot(); }}
+            className="climate-btn"
+            title="SwitchBot スキャンを停止"
+            style={{ color: '#f87171', borderColor: 'rgba(248,113,113,0.4)' }}
+          >
+            停止
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* ===== 気象庁（Open-Meteo）===== タップで気温・湿度・グラフの詳細 ===== */}
+          <div
+            className={`climate-seg${weather && onOpenWeather ? ' climate-seg-tap' : ''}`}
+            onClick={weather && onOpenWeather ? onOpenWeather : undefined}
+            role={weather && onOpenWeather ? 'button' : undefined}
+            title={weather && onOpenWeather ? 'タップで気温・湿度・推移グラフを表示' : undefined}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.05 }}>
+              <span className="climate-seg-label" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                🏢 気象庁
+              </span>
+              {weather?.time ? (
+                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                  {weather.time} 時点
+                </span>
+              ) : null}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <Stat label="湿度" value={`${switchbot.humidity}`} unit="%" color={HUM_COLOR} />
-              {weather && <DiffChip diff={switchbot.humidity - weather.humidity} unit="%" />}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <Stat
-                label="暑さ指数"
-                value={`${switchbot.wbgt}`}
-                unit=""
-                color={sbLv?.color || '#c084fc'}
-              />
-              {weather && <DiffChip diff={switchbot.wbgt - weather.wbgt} unit="" />}
-            </div>
-            {/* 電池 + 停止ボタン */}
-            <button
-              onClick={onToggleSwitchBot}
-              className="climate-btn"
-              title="SwitchBot スキャンを停止"
-              style={{ color: '#4ade80', borderColor: 'rgba(74,222,128,0.4)' }}
-            >
-              {switchbot.battery != null ? `🔋${switchbot.battery}%` : '停止'}
-            </button>
-          </>
-        ) : sbStatus === 'scanning' ? (
-          <>
-            <span className="climate-scan-dot" />
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>受信待ち…</span>
-            <button onClick={onToggleSwitchBot} className="climate-btn" title="停止">
-              停止
-            </button>
-          </>
-        ) : sbStatus === 'unsupported' ? (
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }} title="Chrome の実験的機能（Web Bluetooth スキャン）が必要です">
-            非対応
-          </span>
-        ) : (
-          <>
-            <button
-              onClick={onToggleSwitchBot}
-              className="climate-btn"
-              style={{ color: '#4ade80', borderColor: 'rgba(74,222,128,0.4)' }}
-            >
-              接続
-            </button>
-            {sbStatus === 'error' && (
-              <span style={{ fontSize: 10, color: '#f87171', flexShrink: 0 }}>エラー（詳細→ⓘ）</span>
+            {weather ? (
+              <>
+                <Stat label="気温" value={`${weather.temperature}`} unit="°C" color={TEMP_COLOR} />
+                <Stat label="湿度" value={`${weather.humidity}`} unit="%" color={HUM_COLOR} />
+                <Stat label="暑さ指数" value={`${weather.wbgt}`} unit="" color={wLv?.color || '#c084fc'} />
+                {onOpenWeather && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                    stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    style={{ flexShrink: 0 }}>
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                )}
+              </>
+            ) : (
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>取得中…</span>
             )}
-          </>
-        )}
-      </div>
+          </div>
+
+          <div className="climate-divider" />
+
+          {/* ===== SwitchBot（未接続/スキャン/エラー） ===== */}
+          <div className="climate-seg">
+            <span
+              className="climate-seg-label climate-seg-tap"
+              style={{ color: '#4ade80', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+              onClick={() => setInfoOpen((v) => !v)}
+              role="button"
+              title="タップで状態・対処法を表示"
+            >
+              📡 SwitchBot
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 13, height: 13, borderRadius: '50%',
+                border: '1px solid rgba(74,222,128,0.6)', fontSize: 9, lineHeight: 1,
+              }}>i</span>
+            </span>
+
+            {sbStatus === 'scanning' ? (
+              <>
+                <span className="climate-scan-dot" />
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>受信待ち…</span>
+                <button onClick={onToggleSwitchBot} className="climate-btn" title="停止">
+                  停止
+                </button>
+              </>
+            ) : sbStatus === 'unsupported' ? (
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }} title="Chrome の実験的機能（Web Bluetooth スキャン）が必要です">
+                非対応
+              </span>
+            ) : (
+              <>
+                <button
+                  onClick={onToggleSwitchBot}
+                  className="climate-btn"
+                  style={{ color: '#4ade80', borderColor: 'rgba(74,222,128,0.4)' }}
+                >
+                  接続
+                </button>
+                {sbStatus === 'error' && (
+                  <span style={{ fontSize: 10, color: '#f87171', flexShrink: 0 }}>エラー（詳細→ⓘ）</span>
+                )}
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       {/* SwitchBot 詳細ポップアップ（状態・エラー全文・対処法） */}
       {infoOpen && (

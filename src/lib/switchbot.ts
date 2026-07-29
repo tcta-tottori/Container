@@ -40,6 +40,15 @@ export interface SwitchBotReading {
 
 export type SwitchBotScanState = 'scanning' | 'stopped' | 'error';
 
+/** SwitchBot 推移グラフ用の時系列ポイント */
+export interface SwitchBotHistoryPoint {
+  /** 時刻 (epoch ms) */
+  t: number;
+  temperature: number;
+  humidity: number;
+  wbgt: number;
+}
+
 // SwitchBot がサービスデータを載せる UUID（Web Bluetooth が返す 128bit 正規形）
 const SB_SERVICE_UUIDS = [
   '0000fd3d-0000-1000-8000-00805f9b34fb', // 現行 SwitchBot カンパニーサービス

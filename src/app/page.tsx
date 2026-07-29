@@ -27,7 +27,8 @@ import ManualPage from '@/components/ManualPage';
 import CallPhraseSettings from '@/components/CallPhraseSettings';
 import WeatherPopup from '@/components/WeatherPopup';
 import ClimateBar, { SwitchBotStatus } from '@/components/ClimateBar';
-import { SwitchBotReading, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
+import SwitchBotPopup from '@/components/SwitchBotPopup';
+import { SwitchBotReading, SwitchBotHistoryPoint, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import HistoryPanel from '@/components/HistoryPanel';
@@ -201,6 +202,10 @@ export default function Home() {
   const [sbStatus, setSbStatus] = useState<SwitchBotStatus>('idle');
   const [sbError, setSbError] = useState<string | null>(null);
   const sbStopRef = useRef<null | (() => void)>(null);
+  const [sbHistory, setSbHistory] = useState<SwitchBotHistoryPoint[]>([]);
+  const sbHistoryRef = useRef<SwitchBotHistoryPoint[]>([]);
+  const sbLastRef = useRef<SwitchBotReading | null>(null);
+  const [sbPopupOpen, setSbPopupOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loadingMsg, setLoadingMsg] = useState<string | null>(null);
@@ -367,27 +372,67 @@ export default function Home() {
     return () => { cancelled = true; clearInterval(iv); };
   }, []);
 
-  // SwitchBot スキャン対応判定
+  // SwitchBot スキャン対応判定 + 前回値/履歴の復元（押したら即表示できるように）
   useEffect(() => {
     setSbStatus(isSwitchBotScanSupported() ? 'idle' : 'unsupported');
+    try {
+      const rawLast = localStorage.getItem('sb_last');
+      if (rawLast) sbLastRef.current = JSON.parse(rawLast) as SwitchBotReading;
+      const rawHist = localStorage.getItem('sb_history');
+      if (rawHist) {
+        const hist = JSON.parse(rawHist) as SwitchBotHistoryPoint[];
+        if (Array.isArray(hist)) { sbHistoryRef.current = hist; setSbHistory(hist); }
+      }
+    } catch { /* ignore */ }
   }, []);
 
   // アンマウント時にスキャンを停止
   useEffect(() => () => { sbStopRef.current?.(); }, []);
 
+  // 受信値を履歴に追加（20秒間隔でサンプリング、最大180点、localStorageへ保存）
+  const pushSbHistory = useCallback((r: SwitchBotReading) => {
+    const pt: SwitchBotHistoryPoint = { t: r.updatedAt, temperature: r.temperature, humidity: r.humidity, wbgt: r.wbgt };
+    const hist = sbHistoryRef.current;
+    const last = hist[hist.length - 1];
+    const isNewPoint = !last || pt.t - last.t >= 20000;
+    let next: SwitchBotHistoryPoint[];
+    if (isNewPoint) {
+      next = [...hist, pt];
+    } else {
+      next = [...hist.slice(0, -1), pt]; // 直近点を更新
+    }
+    if (next.length > 180) next = next.slice(next.length - 180);
+    sbHistoryRef.current = next;
+    setSbHistory(next);
+    if (isNewPoint) {
+      try { localStorage.setItem('sb_history', JSON.stringify(next)); } catch { /* ignore */ }
+    }
+  }, []);
+
+  // 受信ハンドラ: 表示更新 + 前回値保存 + 履歴追加
+  const handleSbReading = useCallback((r: SwitchBotReading) => {
+    setSwitchbot(r);
+    sbLastRef.current = r;
+    try { localStorage.setItem('sb_last', JSON.stringify(r)); } catch { /* ignore */ }
+    pushSbHistory(r);
+  }, [pushSbHistory]);
+
   // SwitchBot スキャンの開始/停止トグル
   const toggleSwitchBot = useCallback(async () => {
-    // 既にスキャン中なら停止
+    // 既にスキャン中なら停止（表示も気象庁に戻す）
     if (sbStopRef.current) {
       sbStopRef.current();
       sbStopRef.current = null;
       setSbStatus('idle');
+      setSwitchbot(null);
       return;
     }
     setSbError(null);
+    // 前回値があれば即表示（スキャン確立を待たずに表示）
+    if (sbLastRef.current) setSwitchbot(sbLastRef.current);
     try {
       const stop = await startSwitchBotScan(
-        (r) => setSwitchbot(r),
+        handleSbReading,
         (s, err) => {
           if (s === 'error') { setSbStatus('error'); setSbError(err || null); }
         },
@@ -397,8 +442,9 @@ export default function Home() {
     } catch (e) {
       setSbStatus('error');
       setSbError(e instanceof Error ? e.message : String(e));
+      setSwitchbot(null);
     }
-  }, []);
+  }, [handleSbReading]);
 
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
@@ -1331,6 +1377,15 @@ export default function Home() {
             sbError={sbError}
             onToggleSwitchBot={toggleSwitchBot}
             onOpenWeather={() => { if (barWeather) setWeatherPopup(barWeather); }}
+            onOpenSwitchBot={() => setSbPopupOpen(true)}
+          />
+        )}
+        {sbPopupOpen && switchbot && (
+          <SwitchBotPopup
+            reading={switchbot}
+            weather={barWeather}
+            history={sbHistory}
+            onClose={() => setSbPopupOpen(false)}
           />
         )}
 
