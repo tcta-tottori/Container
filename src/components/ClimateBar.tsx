@@ -19,6 +19,8 @@ interface ClimateBarProps {
   sbError?: string | null;
   /** 接続ボタン押下（開始/停止トグル） */
   onToggleSwitchBot: () => void;
+  /** 気象庁データ部タップ（気温・湿度・グラフの詳細を表示） */
+  onOpenWeather?: () => void;
 }
 
 /** 小さな数値スタット（ラベル + 値 + 単位） */
@@ -77,17 +79,30 @@ export default function ClimateBar({
   sbStatus,
   sbError,
   onToggleSwitchBot,
+  onOpenWeather,
 }: ClimateBarProps) {
   const wLv = weather ? wbgtLevel(weather.wbgt) : null;
   const sbLv = switchbot ? wbgtLevel(switchbot.wbgt) : null;
 
   return (
     <div className="climate-bar">
-      {/* ===== 気象庁（Open-Meteo）===== */}
-      <div className="climate-seg">
-        <span className="climate-seg-label" style={{ color: 'rgba(255,255,255,0.55)' }}>
-          🏢 気象庁
-        </span>
+      {/* ===== 気象庁（Open-Meteo）===== タップで気温・湿度・グラフの詳細 ===== */}
+      <div
+        className={`climate-seg${weather && onOpenWeather ? ' climate-seg-tap' : ''}`}
+        onClick={weather && onOpenWeather ? onOpenWeather : undefined}
+        role={weather && onOpenWeather ? 'button' : undefined}
+        title={weather && onOpenWeather ? 'タップで気温・湿度・推移グラフを表示' : undefined}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.05 }}>
+          <span className="climate-seg-label" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            🏢 気象庁
+          </span>
+          {weather?.time ? (
+            <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+              {weather.time} 時点
+            </span>
+          ) : null}
+        </div>
         {weather ? (
           <>
             <Stat label="気温" value={`${weather.temperature}`} unit="°C" color={TEMP_COLOR} />
@@ -98,6 +113,13 @@ export default function ClimateBar({
               unit=""
               color={wLv?.color || '#c084fc'}
             />
+            {onOpenWeather && (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="rgba(255,255,255,0.35)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                style={{ flexShrink: 0 }}>
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            )}
           </>
         ) : (
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>取得中…</span>

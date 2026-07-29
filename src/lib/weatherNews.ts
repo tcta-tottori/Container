@@ -36,6 +36,8 @@ export interface WeatherData {
   temperature: number;
   feelsLike: number;
   humidity: number;
+  /** データの観測時刻（"HH:MM"）。取得できない場合は空文字 */
+  time: string;
   weatherCode: number;
   weatherDesc: string;
   windSpeed: number;
@@ -98,10 +100,16 @@ export async function fetchWeather(): Promise<WeatherData | null> {
       }
     }
 
+    // 観測時刻（current.time は "2026-07-29T09:30" 形式・JST）
+    const obsTime = typeof current.time === 'string' && current.time.length >= 16
+      ? current.time.slice(11, 16)
+      : '';
+
     return {
       temperature: Math.round(current.temperature_2m * 10) / 10,
       feelsLike: Math.round(current.apparent_temperature * 10) / 10,
       humidity: current.relative_humidity_2m,
+      time: obsTime,
       weatherCode: current.weather_code,
       weatherDesc: WMO_WEATHER[current.weather_code] || '不明',
       windSpeed: Math.round(current.wind_speed_10m * 10) / 10,

@@ -1330,6 +1330,7 @@ export default function Home() {
             sbStatus={sbStatus}
             sbError={sbError}
             onToggleSwitchBot={toggleSwitchBot}
+            onOpenWeather={() => { if (barWeather) setWeatherPopup(barWeather); }}
           />
         )}
 
