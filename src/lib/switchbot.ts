@@ -85,22 +85,21 @@ function parseIndoor(svc: number[]): TempHum | null {
 }
 
 /**
- * 防水/屋外モデル（防水温湿度計, WoIOSensorTH）:
- * 温湿度はメーカーデータ側に格納。
- * Web Bluetooth のメーカーデータは先頭のカンパニーID(2byte)を含まない
- * （＝node-switchbot のオフセット9,10,11 がここでは 7,8,9 に対応）。
- *   byte7: 下位4bit = 気温の小数第1位
- *   byte8: bit7 = 符号(1で正), 下位7bit = 気温整数部
- *   byte9: 下位7bit = 湿度(%)
- * 先頭6byteは MAC アドレス。
+ * 防水/屋外モデル（防水温湿度計 5D, WoIOSensorTH）:
+ * 温湿度はメーカーデータ側に格納。実機の生データで検証したバイト位置。
+ * メーカーデータ = [0-5: MAC][6-7: フラグ/状態][8: 気温小数][9: 気温整数+符号][10: 湿度][11: ...]
+ *   byte8: 下位4bit = 気温の小数第1位
+ *   byte9: bit7 = 符号(1で正), 下位7bit = 気温整数部
+ *   byte10: 下位7bit = 湿度(%)
+ * 例) mfr=eb6b0106665d bd0e 01 9c bc 00 → 気温28.1℃/湿度60%（SwitchBotアプリと一致）
  */
 function parseOutdoor(mfr: number[]): TempHum | null {
-  if (mfr.length < 10) return null;
-  const tempFrac = (mfr[7] & 0x0f) / 10;
-  const tempInt = mfr[8] & 0x7f;
+  if (mfr.length < 11) return null;
+  const tempFrac = (mfr[8] & 0x0f) / 10;
+  const tempInt = mfr[9] & 0x7f;
   let temperature = tempInt + tempFrac;
-  if ((mfr[8] & 0x80) === 0) temperature = -temperature;
-  const humidity = mfr[9] & 0x7f;
+  if ((mfr[9] & 0x80) === 0) temperature = -temperature;
+  const humidity = mfr[10] & 0x7f;
   return { temperature: Math.round(temperature * 10) / 10, humidity };
 }
 
