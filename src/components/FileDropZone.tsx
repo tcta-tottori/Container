@@ -203,7 +203,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
   const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
   const [showAiSettings, setShowAiSettings] = useState(false);
   const [aiKeyDraft, setAiKeyDraft] = useState('');
-  const [aiModelDraft, setAiModelDraft] = useState('gemini-2.0-flash');
+  const [aiModelDraft, setAiModelDraft] = useState('gemini-3.6-flash');
   const [aiKeySaved, setAiKeySaved] = useState(false);
   const [aiTestState, setAiTestState] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
   const [aiTestMsg, setAiTestMsg] = useState('');

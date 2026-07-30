@@ -2,21 +2,36 @@
  * Google Gemini API (Vision) クライアント
  *
  * 画像から構造化データ（コンテナ日程の品目リスト）を抽出する。
- * API キーは localStorage に保存。無料枠（gemini-2.0-flash: 15 req/min, 1500 req/day）あり。
+ * API キーは localStorage に保存。無料枠（gemini-3.6-flash など）あり。
+ *
+ * ※ 旧モデル（gemini-2.0-flash / gemini-2.5-flash / gemini-2.5-pro）は
+ *   Google 側で提供終了・新規ユーザー利用不可となったため、Gemini 3 系へ移行。
  */
 
 const API_KEY_STORAGE = 'cns_gemini_api_key';
 const MODEL_STORAGE = 'cns_gemini_model';
 
-/** デフォルトモデル（無料枠で十分な精度） */
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.0-flash';
+/** デフォルトモデル（最新の高速・高精度モデル。無料枠あり） */
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.6-flash';
 
 /** 選択可能なモデル一覧 */
 export const GEMINI_MODELS: { id: string; label: string; note: string }[] = [
-  { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', note: '無料枠・高速' },
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', note: '高精度・やや遅い' },
-  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', note: '最高精度・有料' },
+  { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', note: '最新・高速・高精度（推奨）' },
+  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', note: '無料枠・軽量・低コスト' },
+  { id: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro', note: '最高精度・有料' },
 ];
+
+/**
+ * 提供終了した旧モデル ID → 現行モデル ID への移行マップ。
+ * localStorage に古いモデルが保存されている端末を自動的に救済する。
+ */
+const DEPRECATED_MODEL_MIGRATION: Record<string, string> = {
+  'gemini-2.0-flash': 'gemini-3.6-flash',
+  'gemini-2.5-flash': 'gemini-3.6-flash',
+  'gemini-2.5-pro': 'gemini-3.1-pro',
+  'gemini-1.5-flash': 'gemini-3.6-flash',
+  'gemini-1.5-pro': 'gemini-3.1-pro',
+};
 
 export function getGeminiKey(): string {
   if (typeof window === 'undefined') return '';
@@ -35,7 +50,15 @@ export function clearGeminiKey(): void {
 
 export function getGeminiModel(): string {
   if (typeof window === 'undefined') return DEFAULT_GEMINI_MODEL;
-  return localStorage.getItem(MODEL_STORAGE) || DEFAULT_GEMINI_MODEL;
+  const stored = localStorage.getItem(MODEL_STORAGE);
+  if (!stored) return DEFAULT_GEMINI_MODEL;
+  // 提供終了した旧モデルが保存されていれば現行モデルへ移行して保存し直す
+  const migrated = DEPRECATED_MODEL_MIGRATION[stored];
+  if (migrated) {
+    localStorage.setItem(MODEL_STORAGE, migrated);
+    return migrated;
+  }
+  return stored;
 }
 
 export function setGeminiModel(model: string): void {
