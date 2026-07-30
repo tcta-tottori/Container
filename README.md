@@ -46,7 +46,7 @@ CNS品目一覧はコード紐付・入数・1P数・重量・寸法情報を保
 - ヘッダー左上の「4月15日 26K0308」形式から日付・コンテナ番号を抽出
 
 #### 抽出エンジン
-1. **Gemini API (推奨)** — 「AI写真」ボタンから Google AI Studio で取得した API キーを設定すると、Gemini 2.0 Flash / 2.5 Flash / 2.5 Pro を用いて高精度な構造化抽出を行う。光沢・影・日本語英数混在もLLMの文脈理解で高精度に処理。Flash モデルは無料枠あり。
+1. **Gemini API (推奨)** — 「AI写真」ボタンから Google AI Studio で取得した API キーを設定すると、Gemini 3.6 Flash / 3.5 Flash-Lite / 3.1 Pro を用いて高精度な構造化抽出を行う。光沢・影・日本語英数混在もLLMの文脈理解で高精度に処理。Flash 系モデルは無料枠あり。
 2. **Tesseract.js (フォールバック)** — API キー未設定時は tesseract.js のローカル OCR を使用。精度は低いが完全オフライン動作。
 
 API キーは端末の localStorage にのみ保存され、外部には送信されない。
