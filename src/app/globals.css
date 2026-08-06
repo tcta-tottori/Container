@@ -190,6 +190,8 @@ body {
 }
 .menu-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
 .menu-item.active { background: rgba(59,130,246,0.15); color: #60a5fa; font-weight: 600; }
+.menu-item:disabled { opacity: 0.35; cursor: default; }
+.menu-item:disabled:hover { background: transparent; color: rgba(255,255,255,0.7); }
 .menu-divider { height: 1px; margin: 4px 10px; background: rgba(255,255,255,0.06); }
 .menu-version { padding: 8px 14px; font-size: 10px; color: rgba(255,255,255,0.35); font-family: var(--font-mono); letter-spacing: 0.3px; }
 
