@@ -17,9 +17,15 @@ on:
   # 手動デプロイ用。GitHub App / API 経由のマージでは push イベントが発火せず
   # 自動デプロイが走らないため、Actions 画面から任意のブランチで実行できるようにする。
   workflow_dispatch:
+  # 取りこぼし防止。GitHub App 経由のマージ・push ではイベントが発火しないため、
+  # 15分ごとに既定ブランチの先頭コミットを確認し、未デプロイならデプロイする。
+  # （定期実行は GitHub のスケジューラが起動するのでイベント発火の制約を受けない）
+  schedule:
+    - cron: "7,22,37,52 * * * *"
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -28,7 +34,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # 定期実行のとき、最後に成功したデプロイと同じコミットならビルドを丸ごと省略する
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.decide.outputs.should_deploy }}
+    steps:
+      - name: 未デプロイのコミットがあるか判定
+        id: decide
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName !== 'schedule') {
+              core.info(`event=${context.eventName} のため無条件にデプロイします`);
+              core.setOutput('should_deploy', 'true');
+              return;
+            }
+            const res = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'deploy.yml',
+              branch: context.ref.replace('refs/heads/', ''),
+              status: 'success',
+              per_page: 1,
+            });
+            const last = res.data.workflow_runs[0];
+            const deployed = last ? last.head_sha : '';
+            const should = deployed !== context.sha;
+            core.info(`current=${context.sha} last_success=${deployed || '(なし)'} deploy=${should}`);
+            core.setOutput('should_deploy', should ? 'true' : 'false');
+
   build:
+    needs: check
+    if: needs.check.outputs.should_deploy == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
