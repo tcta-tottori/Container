@@ -65,9 +65,14 @@ interface FileDropZoneProps {
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
 }
 
-const APP_VERSION = '3.6';
+const APP_VERSION = '3.7';
 const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';
 const CHANGELOG = [
+  { ver: '3.7', date: '2026-08-06', changes: [
+    { icon: '📂', text: 'A列=コンテナ番号／B列=日付のコンテナ日程を読み込めず作業ページへ進めない不具合を修正' },
+    { icon: '⚠️', text: '品目が1件も読めなかった場合に理由を表示（無言で読込画面に戻らない）' },
+    { icon: '📦', text: '残りが端数パレットになったら積み方を全画面表示（7秒・ズームで出現/終了、タップで即閉じ）' },
+  ]},
   { ver: '3.6', date: '2026-07-22', changes: [
     { icon: '📅', text: 'JKP出荷データが6月中旬以降表示されない不具合を修正（列スキャン上限を撤廃）' },
   ]},

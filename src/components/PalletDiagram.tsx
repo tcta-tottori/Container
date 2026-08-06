@@ -622,7 +622,7 @@ export default function PalletDiagram({
       )}
       {/* 出現アニメーション用ラッパー（opacityのみ。3D変換なし） */}
       <div style={{ animation: 'palletFadeUp 1.5s ease 0.5s both' }}>
-        <div style={{
+        <div data-pallet-body style={{
           width: pw, height: totalHeight,
           position: 'relative',
           transformStyle: 'preserve-3d',
