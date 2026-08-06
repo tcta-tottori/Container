@@ -124,19 +124,47 @@ export async function fetchWeather(): Promise<WeatherData | null> {
   }
 }
 
-/** 天気ボタン用コール：現在の気温・湿度・暑さ指数 */
-export function weatherToSpeech(w: WeatherData): string {
-  const lv = wbgtLevel(w.wbgt).label;
-  return `現在の気温${w.temperature}度、湿度${w.humidity}%、暑さ指数${w.wbgt}、${lv}です。`;
+/** 気温・湿度・暑さ指数の観測値（気象庁データ / SwitchBot 実測 共通） */
+export interface ClimateReading {
+  temperature: number;
+  humidity: number;
+  wbgt: number;
 }
 
-/** 定期コール等の先頭に付ける現在気温・暑さ指数フレーズ */
-export function currentTempToSpeech(w: WeatherData): string {
-  return `現在の気温${w.temperature}度、暑さ指数${w.wbgt}。`;
+/** 暑さ指数に応じた注意喚起（警戒以上のみ読み上げる） */
+export function wbgtAdviceToSpeech(wbgt: number): string {
+  if (wbgt >= 31) return '作業を中断して休憩してください。';
+  if (wbgt >= 28) return 'こまめに休憩と水分補給をしてください。';
+  if (wbgt >= 25) return '水分補給をしてください。';
+  return '';
 }
 
-export function temperatureToSpeech(w: WeatherData): string {
-  return `けたかちょうの気温。現在${w.temperature}度、体感${w.feelsLike}度。最高${w.maxTemp}度、最低${w.minTemp}度。`;
+/**
+ * 気温・湿度・暑さ指数＋警戒レベル（危険/厳重警戒/警戒/注意）のコール文。
+ * @param fromSwitchBot SwitchBot の実測値の場合は true（読み上げで実測と区別する）
+ */
+export function climateToSpeech(r: ClimateReading, fromSwitchBot = false): string {
+  const lv = wbgtLevel(r.wbgt).label;
+  const head = fromSwitchBot ? '実測の気温' : '現在の気温';
+  return `${head}${r.temperature}度、湿度${Math.round(r.humidity)}%、暑さ指数${r.wbgt}、${lv}です。${wbgtAdviceToSpeech(r.wbgt)}`;
+}
+
+/** 天気ボタン用コール：現在の気温・湿度・暑さ指数（SwitchBot 接続中は実測値） */
+export function weatherToSpeech(w: WeatherData, sb?: ClimateReading | null): string {
+  return climateToSpeech(sb || w, !!sb);
+}
+
+/** 定期コール等の先頭に付ける気温・湿度・暑さ指数フレーズ（SwitchBot 接続中は実測値） */
+export function currentTempToSpeech(w: WeatherData | null, sb?: ClimateReading | null): string {
+  const r = sb || w;
+  if (!r) return '';
+  return climateToSpeech(r, !!sb);
+}
+
+/** 気温コール：現地の気温・湿度・暑さ指数＋警戒レベルと予報（SwitchBot 接続中は実測値） */
+export function temperatureToSpeech(w: WeatherData, sb?: ClimateReading | null): string {
+  const head = sb ? '' : 'けたかちょうの、';
+  return `${head}${climateToSpeech(sb || w, !!sb)}体感${w.feelsLike}度。最高${w.maxTemp}度、最低${w.minTemp}度。`;
 }
 
 // ニュース取得（Google News RSS経由）
