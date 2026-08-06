@@ -1,22 +1,21 @@
 'use client';
 
-import { AMBIENT_TRACKS } from '@/lib/ambientSound';
-import { useAmbientSound } from '@/hooks/useAmbientSound';
+import { useWaterSound } from '@/hooks/useWaterSound';
 
-interface AmbientSoundPanelProps {
+interface WaterSoundPanelProps {
   onClose: () => void;
 }
 
-/** 再生中トラックに表示する波形インジケーター */
-function PlayingBars({ color }: { color: string }) {
+/** 再生中に表示する波形インジケーター */
+function PlayingBars() {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 12 }}>
-      {[0, 1, 2].map((i) => (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 14 }}>
+      {[0, 1, 2, 3].map((i) => (
         <span
           key={i}
           style={{
-            width: 2.5, borderRadius: 2, background: color, height: 4,
-            animation: `ambient-bar 1.1s ease-in-out ${i * 0.18}s infinite`,
+            width: 3, borderRadius: 2, background: '#67e8f9', height: 4,
+            animation: `water-bar 1.2s ease-in-out ${i * 0.15}s infinite`,
           }}
         />
       ))}
@@ -24,12 +23,12 @@ function PlayingBars({ color }: { color: string }) {
   );
 }
 
-/** 作業用BGM（水音・涼感サウンド）の再生パネル */
-export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
+/** 作業用BGM「水の流れる音」の操作パネル */
+export default function WaterSoundPanel({ onClose }: WaterSoundPanelProps) {
   const {
-    activeIds, isPlaying, volume, fadeSeconds, autoStart, isSupported,
-    toggle, stopAll, setVolume, setFadeSeconds, setAutoStart,
-  } = useAmbientSound();
+    playing, loading, error, volume, fadeSeconds, autoStart, isSupported,
+    toggle, setVolume, setFadeSeconds, setAutoStart,
+  } = useWaterSound();
 
   return (
     <div
@@ -42,23 +41,23 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
       }}
     >
       <style>{`
-        @keyframes ambient-bar {
-          0%, 100% { height: 3px; opacity: 0.55; }
-          50% { height: 12px; opacity: 1; }
+        @keyframes water-bar {
+          0%, 100% { height: 4px; opacity: 0.55; }
+          50% { height: 14px; opacity: 1; }
         }
-        .ambient-range {
+        .water-range {
           -webkit-appearance: none; appearance: none;
           width: 100%; height: 4px; border-radius: 999px;
           background: rgba(255,255,255,0.15); outline: none;
         }
-        .ambient-range::-webkit-slider-thumb {
+        .water-range::-webkit-slider-thumb {
           -webkit-appearance: none; appearance: none;
-          width: 18px; height: 18px; border-radius: 50%;
+          width: 20px; height: 20px; border-radius: 50%;
           background: linear-gradient(135deg, #67e8f9, #38bdf8);
           border: 1px solid rgba(255,255,255,0.5); cursor: pointer;
         }
-        .ambient-range::-moz-range-thumb {
-          width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.5);
+        .water-range::-moz-range-thumb {
+          width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.5);
           background: linear-gradient(135deg, #67e8f9, #38bdf8); cursor: pointer;
         }
       `}</style>
@@ -70,8 +69,8 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
           border: '1.5px solid rgba(255,255,255,0.15)',
           borderRadius: 20, padding: 18,
           boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
-          width: '100%', maxWidth: 440,
-          maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+          width: '100%', maxWidth: 400,
+          display: 'flex', flexDirection: 'column',
         }}
       >
         {/* ヘッダー */}
@@ -81,8 +80,8 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
           borderBottom: '1px solid rgba(255,255,255,0.1)',
         }}>
           <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            🌊 環境音BGM
-            {isPlaying && <PlayingBars color="#67e8f9" />}
+            🌊 水の音
+            {playing && <PlayingBars />}
           </div>
           <button
             onClick={onClose}
@@ -95,8 +94,8 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
             ×
           </button>
         </div>
-        <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.5, marginBottom: 12 }}>
-          作業中に流す水音・涼しげな音です。タップで再生／停止（フェードイン・アウトします）。複数を重ねられます。
+        <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.5, marginBottom: 14 }}>
+          作業中に流す水の流れる音です。フェードイン・フェードアウトで自然に出入りします。
         </div>
 
         {!isSupported && (
@@ -105,52 +104,43 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
             padding: '8px 10px', borderRadius: 8,
             background: 'rgba(250,204,21,0.08)', border: '1px solid rgba(250,204,21,0.25)',
           }}>
-            この端末のブラウザは音声合成（Web Audio）に対応していないため再生できません。
+            この端末のブラウザは音声再生（Web Audio）に対応していないため再生できません。
+          </div>
+        )}
+        {error && (
+          <div style={{
+            color: '#f87171', fontSize: 12, lineHeight: 1.5, marginBottom: 12,
+            padding: '8px 10px', borderRadius: 8,
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+          }}>
+            {error}
           </div>
         )}
 
-        {/* 音の一覧 */}
-        <div style={{
-          flex: 1, overflowY: 'auto', minHeight: 0,
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8,
-        }}>
-          {AMBIENT_TRACKS.map((t) => {
-            const on = activeIds.includes(t.id);
-            return (
-              <button
-                key={t.id}
-                onClick={() => toggle(t.id)}
-                disabled={!isSupported}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
-                  padding: '10px 12px', borderRadius: 12, cursor: isSupported ? 'pointer' : 'not-allowed',
-                  background: on ? `linear-gradient(135deg, ${t.color}26, rgba(255,255,255,0.03))` : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${on ? `${t.color}80` : 'rgba(255,255,255,0.1)'}`,
-                  boxShadow: on ? `0 0 16px ${t.color}33` : 'none',
-                  transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
-                  opacity: isSupported ? 1 : 0.5,
-                }}
-              >
-                <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{t.emoji}</span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{
-                    display: 'block', color: on ? '#fff' : 'rgba(255,255,255,0.85)',
-                    fontSize: 13, fontWeight: 600,
-                  }}>
-                    {t.name}
-                  </span>
-                  <span style={{ display: 'block', color: '#94a3b8', fontSize: 10, marginTop: 2, lineHeight: 1.4 }}>
-                    {t.desc}
-                  </span>
-                </span>
-                {on && <PlayingBars color={t.color} />}
-              </button>
-            );
-          })}
-        </div>
+        {/* 再生／停止 */}
+        <button
+          onClick={toggle}
+          disabled={!isSupported}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            padding: '16px 12px', borderRadius: 14, marginBottom: 16,
+            cursor: isSupported ? 'pointer' : 'not-allowed',
+            background: playing
+              ? 'linear-gradient(135deg, rgba(34,211,238,0.22), rgba(56,189,248,0.12))'
+              : 'rgba(255,255,255,0.05)',
+            border: `1px solid ${playing ? 'rgba(103,232,249,0.5)' : 'rgba(255,255,255,0.12)'}`,
+            boxShadow: playing ? '0 0 20px rgba(103,232,249,0.18)' : 'none',
+            color: '#fff', fontSize: 15, fontWeight: 700,
+            transition: 'background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+            opacity: isSupported ? 1 : 0.5,
+          }}
+        >
+          <span style={{ fontSize: 20, lineHeight: 1 }}>{playing ? '⏸' : '▶'}</span>
+          {loading ? '読み込み中...' : playing ? '停止（フェードアウト）' : '再生（フェードイン）'}
+        </button>
 
         {/* 音量 */}
-        <div style={{ marginTop: 14 }}>
+        <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 600 }}>音量</span>
             <span style={{ color: '#67e8f9', fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
@@ -158,7 +148,7 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
             </span>
           </div>
           <input
-            className="ambient-range"
+            className="water-range"
             type="range" min={0} max={100} step={1}
             value={Math.round(volume * 100)}
             onChange={(e) => setVolume(Number(e.target.value) / 100)}
@@ -166,7 +156,7 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
         </div>
 
         {/* フェード時間 */}
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 600 }}>フェード時間</span>
             <span style={{ color: '#67e8f9', fontSize: 12, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
@@ -174,7 +164,7 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
             </span>
           </div>
           <input
-            className="ambient-range"
+            className="water-range"
             type="range" min={5} max={120} step={5}
             value={Math.round(fadeSeconds * 10)}
             onChange={(e) => setFadeSeconds(Number(e.target.value) / 10)}
@@ -189,14 +179,14 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
           onClick={() => setAutoStart(!autoStart)}
           style={{
             display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-            padding: '10px 12px', marginTop: 14, borderRadius: 10,
+            padding: '10px 12px', marginTop: 16, borderRadius: 10,
             background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
           }}
         >
           <div style={{ flex: 1 }}>
-            <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>次回起動時も同じBGMを流す</div>
+            <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>次回起動時も自動で流す</div>
             <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 2 }}>
-              アプリを開いて最初の操作をしたタイミングで自動再生します
+              アプリを開いて最初の操作をしたタイミングで再生します
             </div>
           </div>
           <div style={{
@@ -213,23 +203,9 @@ export default function AmbientSoundPanel({ onClose }: AmbientSoundPanelProps) {
           </div>
         </div>
 
-        {/* 全停止 */}
-        <button
-          onClick={stopAll}
-          disabled={!isPlaying}
-          style={{
-            marginTop: 10, padding: '10px 12px', borderRadius: 10,
-            background: isPlaying ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.04)',
-            border: `1px solid ${isPlaying ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.1)'}`,
-            color: isPlaying ? '#f87171' : '#64748b',
-            fontSize: 12, fontWeight: 600, cursor: isPlaying ? 'pointer' : 'default',
-          }}
-        >
-          フェードアウトして全て停止
-        </button>
-
-        <div style={{ color: '#64748b', fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
-          音声コール中は自動で音量を下げます。iPhoneはマナーモードだと鳴りません。
+        <div style={{ color: '#64748b', fontSize: 10, marginTop: 10, lineHeight: 1.5 }}>
+          ヘッダーの🌊ボタンでも再生・停止できます。音声コール中は自動で音量を下げます。
+          iPhoneはマナーモードだと鳴りません。
         </div>
       </div>
     </div>
