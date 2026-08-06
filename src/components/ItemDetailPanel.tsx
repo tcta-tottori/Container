@@ -9,6 +9,15 @@ import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
 import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
+/* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） ===== */
+type AutoFsPhase = 'idle' | 'in' | 'show' | 'out';
+/** ズームイン時間 */
+const AUTO_FS_IN_MS = 700;
+/** ズームアウト時間 */
+const AUTO_FS_OUT_MS = 600;
+/** 表示開始から自動で閉じるまで（7秒） */
+const AUTO_FS_HOLD_MS = 7000;
+
 /**
  * カウントアニメーション（アップ/ダウン対応）
  * - key変更: 0.4秒待機→1秒で0→targetまでカウントアップ
@@ -367,6 +376,11 @@ export default function ItemDetailPanel({
   const [fzManual, setFzManual] = useState(false);
   const fzTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
   const fzAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 端数パレットのみになった時の全画面表示
+  const [autoFs, setAutoFs] = useState<AutoFsPhase>('idle');
+  const autoFsPhaseRef = useRef<AutoFsPhase>('idle');
+  const autoFsSeqRef = useRef(0);
+  const autoFsHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [animKey, setAnimKey] = useState(item.id);
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
@@ -586,18 +600,83 @@ export default function ItemDetailPanel({
     }
   }, [fractionZoom, openFractionZoom, closeFractionZoom]);
 
-  // 品目切替時: 端数のみになった場合に自動ズーム（その品名で1度のみ）
+  // ===== 残りが端数パレットになったら積み方を全画面で一時表示（7秒） =====
+  const setAutoFsPhase = useCallback((phase: AutoFsPhase) => {
+    autoFsPhaseRef.current = phase;
+    setAutoFs(phase);
+  }, []);
+
+  const closeAutoFullscreen = useCallback(() => {
+    if (autoFsPhaseRef.current === 'idle' || autoFsPhaseRef.current === 'out') return;
+    if (autoFsHoldRef.current) { clearTimeout(autoFsHoldRef.current); autoFsHoldRef.current = null; }
+    const seq = ++autoFsSeqRef.current;
+    setAutoFsPhase('out');
+    setTimeout(() => {
+      if (autoFsSeqRef.current === seq) setAutoFsPhase('idle');
+    }, AUTO_FS_OUT_MS);
+  }, [setAutoFsPhase]);
+
+  const openAutoFullscreen = useCallback(() => {
+    const seq = ++autoFsSeqRef.current;
+    setAutoFsPhase('in');
+    setTimeout(() => {
+      if (autoFsSeqRef.current === seq) setAutoFsPhase('show');
+    }, AUTO_FS_IN_MS);
+    if (autoFsHoldRef.current) clearTimeout(autoFsHoldRef.current);
+    autoFsHoldRef.current = setTimeout(closeAutoFullscreen, AUTO_FS_HOLD_MS);
+  }, [setAutoFsPhase, closeAutoFullscreen]);
+
+  // アンマウント時にタイマーを掃除
+  useEffect(() => () => {
+    if (autoFsHoldRef.current) clearTimeout(autoFsHoldRef.current);
+    autoFsSeqRef.current++;
+  }, []);
+
+  // 端数のみになった瞬間（パレット消化・品目切替）に1品目1度だけ全画面表示
   const autoZoomDoneRef = useRef<Set<string>>(new Set());
   const isFractionOnly = displayPallets === 0 && inspectionDeducted > 0;
+  const prevFractionStateRef = useRef<{ id: string; fractionOnly: boolean } | null>(null);
   useEffect(() => {
-    if (!isFractionOnly || isTransitioning) return;
+    if (isTransitioning) return;
+    const prev = prevFractionStateRef.current;
+    prevFractionStateRef.current = { id: item.id, fractionOnly: isFractionOnly };
+    // 作業シート初回表示はスキップ（「端数になった」瞬間のみ表示）
+    if (prev === null) return;
+    if (!isFractionOnly) return;
+    // 端数のみに変化した or 端数のみの品目に切り替わった時だけ
+    if (prev.fractionOnly && prev.id === item.id) return;
     if (autoZoomDoneRef.current.has(item.id)) return;
-    // 作業シート初回表示はスキップ（切替アニメーション後のみ）
-    if (animKey === item.id && prevItemIdRef.current === item.id) return;
     autoZoomDoneRef.current.add(item.id);
-    const t = setTimeout(() => openFractionZoom(true), 500);
+    const t = setTimeout(openAutoFullscreen, 400);
     return () => clearTimeout(t);
-  }, [animKey, item.id, isFractionOnly, isTransitioning, openFractionZoom]);
+  }, [item.id, isFractionOnly, isTransitioning, openAutoFullscreen]);
+
+  // 品目が切り替わったら表示中の全画面は閉じる
+  useEffect(() => {
+    closeAutoFullscreen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.id]);
+
+  // パレット図は固定pxで描画されるため、全画面枠いっぱいになる倍率を実測して合わせる
+  const autoFsBoxRef = useRef<HTMLDivElement | null>(null);
+  const [autoFsScale, setAutoFsScale] = useState(1);
+  useEffect(() => {
+    if (autoFs === 'idle') return;
+    const host = autoFsBoxRef.current;
+    if (!host) return;
+    const fit = () => {
+      const body = host.querySelector('[data-pallet-body]') as HTMLElement | null;
+      if (!body) return;
+      const w = body.offsetWidth;
+      const h = body.offsetHeight;
+      if (!w || !h) return;
+      // 回転(rotateX/rotateY)で見かけの幅・高さが増えるぶんの余裕を持たせる
+      const scale = Math.min(host.clientWidth / (w * 1.45), host.clientHeight / (h * 1.2));
+      setAutoFsScale(Math.max(1, Math.min(scale, 8)));
+    };
+    const raf = requestAnimationFrame(fit);
+    return () => cancelAnimationFrame(raf);
+  }, [autoFs, item.id, inspectionDeducted]);
 
   return (
     <div className="detail-root" style={{ background: '#1a1d2e' }}>
@@ -992,6 +1071,74 @@ export default function ItemDetailPanel({
                 overrideRotateY={fractionZoom === 'show' && fzManual ? fzRotateY : undefined}
                 wireframe={false}
               />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* 端数パレットのみになった時の全画面「積み方」表示（7秒で自動クローズ） */}
+      {autoFs !== 'idle' && inspectionDeducted > 0 && (
+        <>
+          <style>{`
+            @keyframes afsBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes afsBackdropOut { from { opacity: 1; } to { opacity: 0; } }
+            @keyframes afsZoomIn {
+              0% { transform: scale(0.28); opacity: 0; }
+              60% { opacity: 1; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+            @keyframes afsZoomOut {
+              0% { transform: scale(1); opacity: 1; }
+              100% { transform: scale(0.28); opacity: 0; }
+            }
+          `}</style>
+          <div
+            onClick={closeAutoFullscreen}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 300,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(6,8,18,0.82)', backdropFilter: 'blur(14px)',
+              animation: autoFs === 'out'
+                ? `afsBackdropOut ${AUTO_FS_OUT_MS}ms ease both`
+                : `afsBackdropIn ${AUTO_FS_IN_MS}ms ease both`,
+              cursor: 'pointer', touchAction: 'none',
+            }}
+          >
+            <div ref={autoFsBoxRef} style={{
+              width: '92vw', height: '62vh',
+              pointerEvents: 'none',
+              transformOrigin: 'center center',
+              animation: autoFs === 'out'
+                ? `afsZoomOut ${AUTO_FS_OUT_MS}ms cubic-bezier(0.4,0,0.7,0.2) both`
+                : `afsZoomIn ${AUTO_FS_IN_MS}ms cubic-bezier(0.16,1,0.3,1) both`,
+            }}>
+              <div style={{
+                width: '100%', height: '100%',
+                transform: `scale(${autoFsScale})`, transformOrigin: 'center center',
+                transition: 'transform 0.3s ease',
+              }}>
+                <PalletDiagram
+                  palletCount={0} fraction={inspectionDeducted}
+                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+                  measurements={item.measurements} wireframe={false}
+                />
+              </div>
+            </div>
+            <div style={{
+              marginTop: 8, textAlign: 'center', pointerEvents: 'none',
+              animation: autoFs === 'out'
+                ? `afsBackdropOut ${AUTO_FS_OUT_MS}ms ease both`
+                : `afsBackdropIn ${AUTO_FS_IN_MS}ms ease both`,
+            }}>
+              <p style={{
+                margin: 0, color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
+                textShadow: `0 0 18px ${accentColor}88`,
+              }}>
+                のこり 端数パレット {inspectionDeducted} CT
+              </p>
+              <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
+                この積み方で仕上げ
+              </p>
             </div>
           </div>
         </>
