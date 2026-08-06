@@ -142,7 +142,7 @@ export default function HeaderBar({
           className={`header-btn ${waterPlaying ? 'header-btn-water-on' : ''}`}
           title="水の音（長押しで設定）"
         >
-          <span style={{ fontSize: 14, lineHeight: 1 }}>🌊</span>
+          <span style={{ fontSize: 14, lineHeight: 1 }}>💧</span>
         </button>
       )}
 

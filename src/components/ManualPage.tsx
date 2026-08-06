@@ -289,7 +289,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    ヘッダーの<strong style={{ color: '#67e8f9' }}>🌊ボタン</strong>をタップすると、水の流れる音が<strong style={{ color: '#22d3ee' }}>フェードイン</strong>で流れます。もう一度タップでフェードアウトして停止します。
+                    ヘッダーの<strong style={{ color: '#67e8f9' }}>💧ボタン</strong>をタップすると、水の流れる音が<strong style={{ color: '#22d3ee' }}>フェードイン</strong>で流れます。もう一度タップでフェードアウトして停止します。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#67e8f9' }}>長押し</strong>（またはメニュー →「水の音」）で設定パネルが開き、音量・フェード時間・次回起動時の自動再生を変更できます。
