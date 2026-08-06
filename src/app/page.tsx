@@ -17,7 +17,7 @@ import { saveRecentFile } from '@/lib/recentFiles';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
-import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
+import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, climateToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
 import { getRandomCallPhrase, isTenMinCheerEnabled } from '@/lib/callPhrases';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
@@ -25,6 +25,9 @@ import ItemEditPage from '@/components/ItemEditPage';
 import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
 import CallPhraseSettings from '@/components/CallPhraseSettings';
+import AmbientSoundPanel from '@/components/AmbientSoundPanel';
+import { getAmbientEngine, setupAmbientAutoResume } from '@/lib/ambientSound';
+import { useAmbientSound } from '@/hooks/useAmbientSound';
 import WeatherPopup from '@/components/WeatherPopup';
 import ClimateBar, { SwitchBotStatus } from '@/components/ClimateBar';
 import SwitchBotPopup from '@/components/SwitchBotPopup';
@@ -195,6 +198,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [callSettingsOpen, setCallSettingsOpen] = useState(false);
+  const [ambientOpen, setAmbientOpen] = useState(false);
   const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
   const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
@@ -332,6 +336,21 @@ export default function Home() {
 
   // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
 
+  // 音声コールで使う SwitchBot 実測値。コール時点の状態を参照するため ref に保持する。
+  const sbLiveRef = useRef<{ reading: SwitchBotReading | null; status: SwitchBotStatus }>({ reading: null, status: 'idle' });
+  sbLiveRef.current = { reading: switchbot, status: sbStatus };
+
+  /**
+   * コールに使う SwitchBot の実測値を返す。
+   * 接続（スキャン）中かつ受信から10分以内のときだけ有効。それ以外は気象庁データを使う。
+   */
+  const getSbClimate = useCallback((): SwitchBotReading | null => {
+    const { reading, status } = sbLiveRef.current;
+    if (status !== 'scanning' || !reading) return null;
+    if (Date.now() - reading.updatedAt > 10 * 60 * 1000) return null;
+    return reading;
+  }, []);
+
   // 10分ごとの定期進捗コール（作業中のみ）
   // 「10分経過しました」+ ランダム応援フレーズ。毎回応援フレーズが変わる。
   const periodicStateRef = useRef({ items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode });
@@ -350,8 +369,10 @@ export default function Home() {
       const minutes = Math.max(10, Math.round((Date.now() - startedAt) / 600000) * 10);
       // 経過アナウンス＋現在気温を先に読み上げ。応援コールは設定がオンの時のみ
       // 応援リストから取得してそのまま（別発話で）コールする。温湿度ポップアップも表示。
+      // SwitchBot 接続中は実測の気温・湿度・暑さ指数（＋危険/注意などの警戒レベル）をコールする
+      const sb = getSbClimate();
       fetchWeather().then(w => {
-        const pre = `${minutes}分経過しました。${w ? currentTempToSpeech(w) : ''}`;
+        const pre = `${minutes}分経過しました。${currentTempToSpeech(w, sb)}`;
         if (isTenMinCheerEnabled()) {
           speakThenCheer(pre, getRandomCallPhrase());
         } else {
@@ -361,7 +382,7 @@ export default function Home() {
       });
     }, 10 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [state.workStartTime, speakThenCheer, speak]);
+  }, [state.workStartTime, speakThenCheer, speak, getSbClimate]);
 
   // 温湿度バー: 気象庁データを起動時＋10分ごとに取得
   useEffect(() => {
@@ -793,11 +814,13 @@ export default function Home() {
   const handleWeatherCall = useCallback(() => {
     // 「天気を取得中」は音声ではなく文字表示のみ。結果は音声コール＋ポップアップ表示。
     showToast('天気を取得中...');
+    const sb = getSbClimate();
     fetchWeather().then(w => {
-      if (w) { speak(weatherToSpeech(w)); setWeatherPopup(w); }
+      if (w) { speak(weatherToSpeech(w, sb)); setWeatherPopup(w); }
+      else if (sb) speak(climateToSpeech(sb, true));
       else speak('天気情報を取得できませんでした。');
     });
-  }, [speak, showToast]);
+  }, [speak, showToast, getSbClimate]);
 
   const handleProgress = useCallback(() => {
     // 進捗コールは種類数のみ（進捗率は廃止）
@@ -998,8 +1021,10 @@ export default function Home() {
         case 'WEATHER': {
           // 「取得中」は文字表示のみ（音声なし）。結果は音声コール＋ポップアップ表示。
           showToast('天気を取得中...');
+          const sb = getSbClimate();
           fetchWeather().then(w => {
-            if (w) { speak(weatherToSpeech(w)); setWeatherPopup(w); }
+            if (w) { speak(weatherToSpeech(w, sb)); setWeatherPopup(w); }
+            else if (sb) speak(climateToSpeech(sb, true));
             else speak('天気情報を取得できませんでした。');
           });
           break;
@@ -1007,8 +1032,11 @@ export default function Home() {
         case 'TEMPERATURE': {
           // 「取得中」は文字表示のみ（音声なし）
           showToast('気温を取得中...');
+          // SwitchBot 接続中は実測値でコール（湿度・暑さ指数・警戒レベル付き）
+          const sb = getSbClimate();
           fetchWeather().then(w => {
-            if (w) speak(temperatureToSpeech(w));
+            if (w) speak(temperatureToSpeech(w, sb));
+            else if (sb) speak(climateToSpeech(sb, true));
             else speak('気温情報を取得できませんでした。');
           });
           break;
@@ -1029,11 +1057,22 @@ export default function Home() {
         }
       }
     },
-    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, speakCheer, showToast, handleConfirmOk, handleContainerSummary, handleProgress]
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, speakCheer, showToast, handleConfirmOk, handleContainerSummary, handleProgress, getSbClimate]
   );
 
   const { isListening, isSpeaking, isPreparingSpeech, speakingText, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
+
+  // 環境音BGM（水音・涼感サウンド）
+  const { isPlaying: ambientPlaying } = useAmbientSound();
+
+  // 前回のBGMを自動再開（ブラウザ制限のため最初の操作を待って再生）
+  useEffect(() => setupAmbientAutoResume(), []);
+
+  // 音声コール中はBGMを下げる（ダッキング）。音声認識は常時ONのため対象外。
+  useEffect(() => {
+    getAmbientEngine().setDucked(isSpeaking || isPreparingSpeech);
+  }, [isSpeaking, isPreparingSpeech]);
 
   // 音声種類選択メニュー（マイクボタン長押しで開く）
   const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
@@ -1301,6 +1340,7 @@ export default function Home() {
       {weatherPopup && (
         <WeatherPopup weather={weatherPopup} onClose={closeWeatherPopup} isSpeaking={isSpeaking} />
       )}
+      {ambientOpen && <AmbientSoundPanel onClose={() => setAmbientOpen(false)} />}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 
       {/* メニューオーバーレイ */}
@@ -1346,6 +1386,14 @@ export default function Home() {
               </svg>
               コール設定
             </button>
+            <button className="menu-item" onClick={() => { setAmbientOpen(true); setMenuOpen(false); }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>
+                <path d="M2 14c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>
+                <path d="M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>
+              </svg>
+              環境音BGM
+            </button>
             <div className="menu-divider" />
             <div className="menu-version">
               CNS Ver 3.6
@@ -1371,6 +1419,8 @@ export default function Home() {
           hasItems={state.items.length > 0}
           onWeather={viewMode === 'work' ? handleWeatherCall : undefined}
           onCheer={viewMode === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
+          onAmbient={() => setAmbientOpen(true)}
+          ambientPlaying={ambientPlaying}
         />
 
         {/* 温湿度バー（ヘッダー下・作業ページのみ） */}

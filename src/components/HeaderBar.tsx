@@ -25,6 +25,8 @@ interface HeaderBarProps {
   hasItems?: boolean;
   onWeather?: () => void;
   onCheer?: () => void;
+  onAmbient?: () => void;
+  ambientPlaying?: boolean;
 }
 
 export default function HeaderBar({
@@ -39,6 +41,8 @@ export default function HeaderBar({
   completionLog,
   onWeather,
   onCheer,
+  onAmbient,
+  ambientPlaying,
 }: HeaderBarProps) {
   const [popupOpen, setPopupOpen] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
@@ -107,6 +111,17 @@ export default function HeaderBar({
       {onCheer && (
         <button onClick={onCheer} className="header-btn" title="応援コール（ランダム）">
           <span style={{ fontSize: 14, lineHeight: 1 }}>📣</span>
+        </button>
+      )}
+
+      {/* 環境音BGM（水音）ボタン */}
+      {onAmbient && (
+        <button
+          onClick={onAmbient}
+          className={`header-btn ${ambientPlaying ? 'header-btn-ambient-on' : ''}`}
+          title="環境音BGM"
+        >
+          <span style={{ fontSize: 14, lineHeight: 1 }}>🌊</span>
         </button>
       )}
 

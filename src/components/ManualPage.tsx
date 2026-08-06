@@ -275,8 +275,27 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#22c55e' }}>コンテナ読み込み時</strong>: 種類別品目数、類似品の有無をアナウンス。鍋は100/180サイズ別にコール。
                   </div>
-                  <div>
+                  <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#ef4444' }}>OKコマンド後</strong>: 「残り○パレットと○ケース。」のみコール（次の品目コールはなし）。
+                  </div>
+                  <div>
+                    <strong style={{ color: '#f59e0b' }}>10分ごとのコール</strong>: 経過時間＋気温・湿度・暑さ指数と警戒レベル（危険／厳重警戒／警戒／注意）をコール。SwitchBot 接続中は実測値を使います。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
+            <Section title="環境音BGM（水音）" color="#22d3ee">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    ヘッダーの<strong style={{ color: '#67e8f9' }}>🌊ボタン</strong>（またはメニュー →「環境音BGM」）から、作業中に流す水音・涼しげな音を選べます。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    小川のせせらぎ／滝／雨／波打ち際／洞窟の水滴／風鈴／木陰の風の<strong style={{ color: '#22d3ee' }}>7種類</strong>。タップで再生・停止し、<strong style={{ color: '#22d3ee' }}>フェードイン・フェードアウト</strong>で自然に出入りします（フェード時間は設定可能）。
+                  </div>
+                  <div>
+                    複数を重ねて再生でき、<strong style={{ color: '#8b5cf6' }}>音声コール中は自動で音量を下げます</strong>。音はアプリ内で合成しているため通信は不要です。
                   </div>
                 </div>
               </InfoCard>
