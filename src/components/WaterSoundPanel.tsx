@@ -80,7 +80,7 @@ export default function WaterSoundPanel({ onClose }: WaterSoundPanelProps) {
           borderBottom: '1px solid rgba(255,255,255,0.1)',
         }}>
           <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            🌊 水の音
+            💧 水の音
             {playing && <PlayingBars />}
           </div>
           <button
@@ -204,7 +204,7 @@ export default function WaterSoundPanel({ onClose }: WaterSoundPanelProps) {
         </div>
 
         <div style={{ color: '#64748b', fontSize: 10, marginTop: 10, lineHeight: 1.5 }}>
-          ヘッダーの🌊ボタンでも再生・停止できます。音声コール中は自動で音量を下げます。
+          ヘッダーの💧ボタンでも再生・停止できます。音声コール中は自動で音量を下げます。
           iPhoneはマナーモードだと鳴りません。
         </div>
       </div>
