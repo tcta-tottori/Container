@@ -63,6 +63,8 @@ interface FileDropZoneProps {
   onMasterLoaded?: (file: File) => void;
   onPhotoLoaded?: (file: File) => void;
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
+  /** 作業画面のレイアウト内に埋め込んで表示する（ヘッダー・メニューを残す） */
+  embedded?: boolean;
 }
 
 const APP_VERSION = '3.7';
@@ -197,7 +199,7 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   );
 }
 
-export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded }: FileDropZoneProps) {
+export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded, embedded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -354,7 +356,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
   const gradientStyle = 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)';
 
   return (
-    <div className="filedrop-root flex items-center justify-center h-screen w-screen"
+    <div className={`filedrop-root flex items-center justify-center ${embedded ? 'w-full h-full' : 'h-screen w-screen'}`}
       style={{ background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)', overflow: 'auto' }}>
       <div className="drop-zone-root" style={{ width: '100%', maxWidth: 800, padding: '0 20px' }}>
 

@@ -38,7 +38,7 @@ import HistoryPanel from '@/components/HistoryPanel';
 import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
 import * as XLSX from 'xlsx';
 
-type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
+type ViewMode = 'load' | 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
 
 /* ===== おしゃれな読込ポップアップ ===== */
 function LoadingOverlay({ message, progress, closing }: { message: string; progress: number; closing?: boolean }) {
@@ -947,6 +947,10 @@ export default function Home() {
     setMenuOpen(false);
   }, []);
 
+  // コンテナ未読込のときは常に読込画面。読み込み済みならメニューで行き来できる。
+  const hasData = state.containers.length > 0;
+  const view: ViewMode = hasData ? viewMode : 'load';
+
   const handleVoiceCommand = useCallback(
     (action: VoiceAction) => {
       switch (action) {
@@ -1249,41 +1253,6 @@ export default function Home() {
     );
   }
 
-  if (state.containers.length === 0) {
-    return (
-      <>
-        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} onPhotoLoaded={handlePhotoLoaded} />
-        {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
-      </>
-    );
-  }
-
-  if (state.items.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-screen w-screen" style={{ background: 'var(--bg-primary)' }}>
-        <div className="text-center">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(34,197,94,0.1)', border: '2px solid rgba(34,197,94,0.2)' }}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-          </div>
-          <p className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>全品目完了</p>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>お疲れ様でした</p>
-          <button onClick={() => {
-            const input = document.createElement('input');
-            input.type = 'file'; input.accept = '.xlsx,.xls';
-            input.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) handleFileLoaded(f); };
-            input.click();
-          }} className="action-btn px-5 py-2.5 text-sm"
-            style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa' }}>
-            新しいファイルを読み込む
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
@@ -1347,27 +1316,33 @@ export default function Home() {
       {menuOpen && (
         <div className="menu-overlay" onClick={() => setMenuOpen(false)}>
           <div className="menu-panel" onClick={(e) => e.stopPropagation()}>
-            <button className={`menu-item ${viewMode === 'work' ? 'active' : ''}`} onClick={() => switchView('work')}>
+            <button className={`menu-item ${view === 'load' ? 'active' : ''}`} onClick={() => switchView('load')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              読込
+            </button>
+            <button className={`menu-item ${view === 'work' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('work')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/>
               </svg>
               作業
             </button>
             {/* 一覧ページ削除 */}
-            <button className={`menu-item ${viewMode === 'edit' ? 'active' : ''}`} onClick={() => switchView('edit')}>
+            <button className={`menu-item ${view === 'edit' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('edit')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
               </svg>
               管理
             </button>
             <div className="menu-divider" />
-            <button className={`menu-item ${viewMode === 'analytics' ? 'active' : ''}`} onClick={() => switchView('analytics')}>
+            <button className={`menu-item ${view === 'analytics' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('analytics')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
               </svg>
               分析
             </button>
-            <button className={`menu-item ${viewMode === 'history' ? 'active' : ''}`} onClick={() => switchView('history')}>
+            <button className={`menu-item ${view === 'history' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('history')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
@@ -1417,15 +1392,15 @@ export default function Home() {
           completionLog={state.completionLog}
           onContainerAnnounce={handleContainerSummary}
           hasItems={state.items.length > 0}
-          onWeather={viewMode === 'work' ? handleWeatherCall : undefined}
-          onCheer={viewMode === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
+          onWeather={view === 'work' ? handleWeatherCall : undefined}
+          onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
           onWater={toggleWater}
           onWaterSettings={() => setWaterOpen(true)}
           waterPlaying={waterPlaying}
         />
 
         {/* 温湿度バー（ヘッダー下・作業ページのみ） */}
-        {viewMode === 'work' && (
+        {view === 'work' && (
           <ClimateBar
             weather={barWeather}
             switchbot={switchbot}
@@ -1447,7 +1422,40 @@ export default function Home() {
 
         {/* メインエリア */}
         <div className="main-area">
-          {viewMode === 'work' && (
+          {view === 'load' && (
+            <div className="full-panel">
+              <FileDropZone
+                embedded
+                onFileLoaded={handleFileLoaded}
+                onAqssLoaded={handleAqssLoaded}
+                onAqssContainerLoaded={handleAqssContainerLoaded}
+                onJkpLoaded={handleJkpLoaded}
+                onMasterLoaded={handleMasterLoaded}
+                onPhotoLoaded={handlePhotoLoaded}
+              />
+            </div>
+          )}
+
+          {view === 'work' && state.items.length === 0 && (
+            <div className="full-panel flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(34,197,94,0.1)', border: '2px solid rgba(34,197,94,0.2)' }}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </div>
+                <p className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>全品目完了</p>
+                <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>お疲れ様でした</p>
+                <button onClick={() => switchView('load')} className="action-btn px-5 py-2.5 text-sm"
+                  style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa' }}>
+                  新しいファイルを読み込む
+                </button>
+              </div>
+            </div>
+          )}
+
+          {view === 'work' && state.items.length > 0 && (
             <>
               {/* 横: 左60%詳細+右40%一覧, 縦: 詳細のみフル */}
               <div className="detail-panel"
@@ -1478,13 +1486,13 @@ export default function Home() {
             </>
           )}
 
-          {viewMode === 'list' && (
+          {view === 'list' && (
             <div className="full-panel">
               <ItemListPanel items={state.items} currentIdx={state.currentItemIdx} onSelect={handleSelectItem} />
             </div>
           )}
 
-          {viewMode === 'analytics' && (
+          {view === 'analytics' && (
             <div className="full-panel">
               <ContainerAnalyticsPage
                 items={state.items}
@@ -1494,19 +1502,19 @@ export default function Home() {
             </div>
           )}
 
-          {viewMode === 'jkp' && (
+          {view === 'jkp' && (
             <div className="full-panel">
               <JkpSchedulePage shipments={jkpShipments} />
             </div>
           )}
 
-          {viewMode === 'history' && (
+          {view === 'history' && (
             <div className="full-panel" style={{ padding: 16, overflowY: 'auto' }}>
               <HistoryPanel />
             </div>
           )}
 
-          {viewMode === 'edit' && (
+          {view === 'edit' && (
             <div className="full-panel">
               <ItemEditPage
                 items={(() => {
@@ -1592,7 +1600,7 @@ export default function Home() {
         </div>
 
         {/* フローティングマイクボタン（右下固定） */}
-        {viewMode === 'work' && isSupported && (
+        {view === 'work' && isSupported && (
           <>
             {(isSpeaking || isPreparingSpeech) && (
               <style>{`

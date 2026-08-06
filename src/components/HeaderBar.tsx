@@ -91,7 +91,8 @@ export default function HeaderBar({
         </svg>
       </button>
 
-      {/* コンテナ選択 */}
+      {/* コンテナ選択（未読込のときは出さない） */}
+      {containers.length > 0 && (
       <select value={selectedIdx} onChange={(e) => onSelectContainer(Number(e.target.value))} className="header-select">
         {containers.map((c, i) => {
           // containerNo が既に (MM/DD) 形式の日付を含む場合は末尾の (MM/DD) を追記しない
@@ -103,6 +104,7 @@ export default function HeaderBar({
           );
         })}
       </select>
+      )}
 
       {/* 天気コールボタン */}
       {onWeather && (
