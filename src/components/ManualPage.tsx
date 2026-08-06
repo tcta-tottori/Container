@@ -285,17 +285,17 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               </InfoCard>
             </Section>
 
-            <Section title="環境音BGM（水音）" color="#22d3ee">
+            <Section title="作業用BGM（水の音）" color="#22d3ee">
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    ヘッダーの<strong style={{ color: '#67e8f9' }}>🌊ボタン</strong>（またはメニュー →「環境音BGM」）から、作業中に流す水音・涼しげな音を選べます。
+                    ヘッダーの<strong style={{ color: '#67e8f9' }}>🌊ボタン</strong>をタップすると、水の流れる音が<strong style={{ color: '#22d3ee' }}>フェードイン</strong>で流れます。もう一度タップでフェードアウトして停止します。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    小川のせせらぎ／滝／雨／波打ち際／洞窟の水滴／風鈴／木陰の風の<strong style={{ color: '#22d3ee' }}>7種類</strong>。タップで再生・停止し、<strong style={{ color: '#22d3ee' }}>フェードイン・フェードアウト</strong>で自然に出入りします（フェード時間は設定可能）。
+                    <strong style={{ color: '#67e8f9' }}>長押し</strong>（またはメニュー →「水の音」）で設定パネルが開き、音量・フェード時間・次回起動時の自動再生を変更できます。
                   </div>
                   <div>
-                    複数を重ねて再生でき、<strong style={{ color: '#8b5cf6' }}>音声コール中は自動で音量を下げます</strong>。音はアプリ内で合成しているため通信は不要です。
+                    音声コール中は<strong style={{ color: '#8b5cf6' }}>自動で音量が下がり</strong>、コールが終わると元に戻ります。iPhoneはマナーモードだと鳴りません。
                   </div>
                 </div>
               </InfoCard>

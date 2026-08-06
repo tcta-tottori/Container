@@ -27,17 +27,18 @@ Excelファイルから品目データを読み込み、リアルタイムの作
   厳重警戒（28以上）で「こまめに休憩と水分補給をしてください」、危険（31以上）で「作業を中断して休憩してください」を付加。
 - 実装: `src/lib/weatherNews.ts` の `climateToSpeech` / `wbgtAdviceToSpeech`。
 
-### 環境音BGM（水音・涼感サウンド）
-作業中に流す BGM。ヘッダーの 🌊 ボタン、またはメニュー →「環境音BGM」から操作する。
+### 作業用BGM（水の流れる音）
+作業中に流す水音。ヘッダーの 🌊 ボタンをタップで再生／停止、長押し（右クリック）またはメニュー →「水の音」で設定パネルを開く。
 
-- **7種類**: 小川のせせらぎ / 滝 / 雨 / 波打ち際 / 洞窟の水滴 / 風鈴 / 木陰の風
+- **音源**: 実録音の水の流れる音。30秒のシームレスループ素材（`public/sounds/water-loop.mp3` / MP3 128kbps モノラル・約470KB）。
+  末尾2秒を先頭へ等パワークロスフェードして作成しているため、継ぎ目でクリックノイズが出ない。
 - **フェードイン・アウト**: 再生開始と停止はS字カーブ（ease-in-out）でなめらかに出入りする。フェード時間は 0.5〜12秒で調整可能。
-- **重ねがけ**: 複数トラックを同時再生できる（例: 雨 + 風鈴）
 - **自動ダッキング**: 音声コール中は BGM の音量を自動で下げ、コール終了後に戻す
-- **自動再開**: 「次回起動時も同じBGMを流す」をオンにすると、次回起動後の最初の操作で前回のトラックを復元して再生する（ブラウザの自動再生制限に対応）
-- **音源ファイル不要**: Web Audio API でノイズ・オシレーターからリアルタイム合成しているため、オフライン（PWA）でも動作し、ループの継ぎ目や同じ音の繰り返しがない
-- 実装: `src/lib/ambientSound.ts`（合成エンジン）、`src/hooks/useAmbientSound.ts`、`src/components/AmbientSoundPanel.tsx`（設定パネル）
-- 設定は localStorage に保存（`cns_ambient_volume` / `cns_ambient_tracks` / `cns_ambient_fade` / `cns_ambient_autostart`）
+- **自動再開**: 「次回起動時も自動で流す」をオンにすると、次回起動後の最初の操作で再生を再開する（ブラウザの自動再生制限に対応）
+- **ループ位置**: 再生のたびにループ区間内のランダムな位置から鳴らすため、毎回同じ出だしにならない
+- 実装: `src/lib/waterSound.ts`（再生エンジン）、`src/hooks/useWaterSound.ts`、`src/components/WaterSoundPanel.tsx`（設定パネル）
+- 設定は localStorage に保存（`cns_water_volume` / `cns_water_fade` / `cns_water_playing` / `cns_water_autostart`）
+- 停止後は AudioContext を休止してバッテリーを節約する
 - 注意: iPhone はマナーモードでは音が鳴らない
 
 ### 温湿度バー（ヘッダー下）

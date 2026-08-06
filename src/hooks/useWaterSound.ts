@@ -2,17 +2,18 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  AmbientTrackId,
-  getAmbientEngine,
-  isAmbientAutoStartEnabled,
-  setAmbientAutoStartEnabled,
-} from '@/lib/ambientSound';
+  getWaterSoundEngine,
+  isWaterAutoStartEnabled,
+  setWaterAutoStartEnabled,
+} from '@/lib/waterSound';
 
-/** 環境音BGMエンジンの状態をReactに橋渡しするフック */
-export function useAmbientSound() {
-  const engine = getAmbientEngine();
-  const [activeIds, setActiveIds] = useState<AmbientTrackId[]>([]);
-  const [volume, setVolumeState] = useState(0.35);
+/** 水の音BGMの状態をReactに橋渡しするフック */
+export function useWaterSound() {
+  const engine = getWaterSoundEngine();
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [volume, setVolumeState] = useState(0.4);
   const [fadeSeconds, setFadeState] = useState(3);
   const [autoStart, setAutoStartState] = useState(false);
   // SSR とクライアントで初期描画をそろえるため、対応判定はマウント後に行う
@@ -21,33 +22,36 @@ export function useAmbientSound() {
   useEffect(() => {
     setIsSupported(engine.isSupported());
     const sync = () => {
-      setActiveIds(engine.getActiveIds());
+      setPlaying(engine.isPlaying());
+      setLoading(engine.isLoading());
+      setError(engine.getError());
       setVolumeState(engine.getVolume());
       setFadeState(engine.getFadeSeconds());
     };
     sync();
-    setAutoStartState(isAmbientAutoStartEnabled());
+    setAutoStartState(isWaterAutoStartEnabled());
     return engine.subscribe(sync);
   }, [engine]);
 
-  const toggle = useCallback((id: AmbientTrackId) => { engine.toggle(id); }, [engine]);
-  const stopAll = useCallback(() => { engine.stopAll(); }, [engine]);
+  const toggle = useCallback(() => { engine.toggle(); }, [engine]);
+  const stop = useCallback(() => { engine.stop(); }, [engine]);
   const setVolume = useCallback((v: number) => { engine.setVolume(v); }, [engine]);
   const setFadeSeconds = useCallback((s: number) => { engine.setFadeSeconds(s); }, [engine]);
   const setAutoStart = useCallback((on: boolean) => {
-    setAmbientAutoStartEnabled(on);
+    setWaterAutoStartEnabled(on);
     setAutoStartState(on);
   }, []);
 
   return {
-    activeIds,
-    isPlaying: activeIds.length > 0,
+    playing,
+    loading,
+    error,
     volume,
     fadeSeconds,
     autoStart,
     isSupported,
     toggle,
-    stopAll,
+    stop,
     setVolume,
     setFadeSeconds,
     setAutoStart,

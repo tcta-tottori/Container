@@ -25,8 +25,11 @@ interface HeaderBarProps {
   hasItems?: boolean;
   onWeather?: () => void;
   onCheer?: () => void;
-  onAmbient?: () => void;
-  ambientPlaying?: boolean;
+  /** 水の音の再生/停止 */
+  onWater?: () => void;
+  /** 水の音の設定パネルを開く（長押し） */
+  onWaterSettings?: () => void;
+  waterPlaying?: boolean;
 }
 
 export default function HeaderBar({
@@ -41,10 +44,14 @@ export default function HeaderBar({
   completionLog,
   onWeather,
   onCheer,
-  onAmbient,
-  ambientPlaying,
+  onWater,
+  onWaterSettings,
+  waterPlaying,
 }: HeaderBarProps) {
   const [popupOpen, setPopupOpen] = useState(false);
+  // 水の音ボタンの長押し判定
+  const waterHoldRef = useRef<number | null>(null);
+  const waterHeldRef = useRef(false);
   const [isFlashing, setIsFlashing] = useState(false);
   const lastFlashedAt = useRef(0);
   const [currentTime, setCurrentTime] = useState('');
@@ -114,12 +121,26 @@ export default function HeaderBar({
         </button>
       )}
 
-      {/* 環境音BGM（水音）ボタン */}
-      {onAmbient && (
+      {/* 水の音ボタン（タップで再生/停止・長押しで設定） */}
+      {onWater && (
         <button
-          onClick={onAmbient}
-          className={`header-btn ${ambientPlaying ? 'header-btn-ambient-on' : ''}`}
-          title="環境音BGM"
+          onClick={onWater}
+          onContextMenu={(e) => { e.preventDefault(); onWaterSettings?.(); }}
+          onPointerDown={() => {
+            if (!onWaterSettings) return;
+            waterHoldRef.current = window.setTimeout(() => {
+              waterHeldRef.current = true;
+              onWaterSettings();
+            }, 500);
+          }}
+          onPointerUp={() => { if (waterHoldRef.current) { clearTimeout(waterHoldRef.current); waterHoldRef.current = null; } }}
+          onPointerLeave={() => { if (waterHoldRef.current) { clearTimeout(waterHoldRef.current); waterHoldRef.current = null; } }}
+          onClickCapture={(e) => {
+            // 長押しで設定を開いたときは再生/停止させない
+            if (waterHeldRef.current) { e.preventDefault(); e.stopPropagation(); waterHeldRef.current = false; }
+          }}
+          className={`header-btn ${waterPlaying ? 'header-btn-water-on' : ''}`}
+          title="水の音（長押しで設定）"
         >
           <span style={{ fontSize: 14, lineHeight: 1 }}>🌊</span>
         </button>

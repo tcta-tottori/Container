@@ -25,9 +25,9 @@ import ItemEditPage from '@/components/ItemEditPage';
 import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
 import CallPhraseSettings from '@/components/CallPhraseSettings';
-import AmbientSoundPanel from '@/components/AmbientSoundPanel';
-import { getAmbientEngine, setupAmbientAutoResume } from '@/lib/ambientSound';
-import { useAmbientSound } from '@/hooks/useAmbientSound';
+import WaterSoundPanel from '@/components/WaterSoundPanel';
+import { getWaterSoundEngine, setupWaterAutoResume } from '@/lib/waterSound';
+import { useWaterSound } from '@/hooks/useWaterSound';
 import WeatherPopup from '@/components/WeatherPopup';
 import ClimateBar, { SwitchBotStatus } from '@/components/ClimateBar';
 import SwitchBotPopup from '@/components/SwitchBotPopup';
@@ -198,7 +198,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [callSettingsOpen, setCallSettingsOpen] = useState(false);
-  const [ambientOpen, setAmbientOpen] = useState(false);
+  const [waterOpen, setWaterOpen] = useState(false);
   const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
   const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
@@ -1063,15 +1063,15 @@ export default function Home() {
   const { isListening, isSpeaking, isPreparingSpeech, speakingText, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
-  // 環境音BGM（水音・涼感サウンド）
-  const { isPlaying: ambientPlaying } = useAmbientSound();
+  // 作業用BGM（水の流れる音）
+  const { playing: waterPlaying, toggle: toggleWater } = useWaterSound();
 
-  // 前回のBGMを自動再開（ブラウザ制限のため最初の操作を待って再生）
-  useEffect(() => setupAmbientAutoResume(), []);
+  // 前回の再生状態を自動再開（ブラウザ制限のため最初の操作を待って再生）
+  useEffect(() => setupWaterAutoResume(), []);
 
   // 音声コール中はBGMを下げる（ダッキング）。音声認識は常時ONのため対象外。
   useEffect(() => {
-    getAmbientEngine().setDucked(isSpeaking || isPreparingSpeech);
+    getWaterSoundEngine().setDucked(isSpeaking || isPreparingSpeech);
   }, [isSpeaking, isPreparingSpeech]);
 
   // 音声種類選択メニュー（マイクボタン長押しで開く）
@@ -1340,7 +1340,7 @@ export default function Home() {
       {weatherPopup && (
         <WeatherPopup weather={weatherPopup} onClose={closeWeatherPopup} isSpeaking={isSpeaking} />
       )}
-      {ambientOpen && <AmbientSoundPanel onClose={() => setAmbientOpen(false)} />}
+      {waterOpen && <WaterSoundPanel onClose={() => setWaterOpen(false)} />}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 
       {/* メニューオーバーレイ */}
@@ -1386,13 +1386,13 @@ export default function Home() {
               </svg>
               コール設定
             </button>
-            <button className="menu-item" onClick={() => { setAmbientOpen(true); setMenuOpen(false); }}>
+            <button className="menu-item" onClick={() => { setWaterOpen(true); setMenuOpen(false); }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>
                 <path d="M2 14c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>
                 <path d="M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>
               </svg>
-              環境音BGM
+              水の音
             </button>
             <div className="menu-divider" />
             <div className="menu-version">
@@ -1419,8 +1419,9 @@ export default function Home() {
           hasItems={state.items.length > 0}
           onWeather={viewMode === 'work' ? handleWeatherCall : undefined}
           onCheer={viewMode === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
-          onAmbient={() => setAmbientOpen(true)}
-          ambientPlaying={ambientPlaying}
+          onWater={toggleWater}
+          onWaterSettings={() => setWaterOpen(true)}
+          waterPlaying={waterPlaying}
         />
 
         {/* 温湿度バー（ヘッダー下・作業ページのみ） */}

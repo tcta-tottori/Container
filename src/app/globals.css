@@ -100,15 +100,15 @@ body {
   50% { color: rgba(245,158,11,0.3); }
 }
 
-/* 環境音BGM 再生中のヘッダーボタン */
-.header-btn-ambient-on {
+/* 水の音 再生中のヘッダーボタン */
+.header-btn-water-on {
   color: #67e8f9;
   border-color: rgba(103,232,249,0.45);
   background: rgba(103,232,249,0.1);
-  animation: ambient-glow 3.2s ease-in-out infinite;
+  animation: water-glow 3.2s ease-in-out infinite;
 }
-.header-btn-ambient-on:hover { background: rgba(103,232,249,0.18); color: #a5f3fc; }
-@keyframes ambient-glow {
+.header-btn-water-on:hover { background: rgba(103,232,249,0.18); color: #a5f3fc; }
+@keyframes water-glow {
   0%, 100% { box-shadow: 0 0 0 rgba(103,232,249,0); }
   50% { box-shadow: 0 0 10px rgba(103,232,249,0.45); }
 }
