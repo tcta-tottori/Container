@@ -26,6 +26,69 @@ function formatDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * セルの値を入荷日 (YYYY-MM-DD) として解釈する
+ * - Excelシリアル値（数値）
+ * - Date オブジェクト（cellDates 有効時）
+ * - 文字列の日付 (2026/07/05, 2026-07-05 等)
+ * 日付として解釈できなければ null
+ */
+function parseDateCell(val: unknown): string | null {
+  if (val == null || val === '') return null;
+
+  if (typeof val === 'number') {
+    // 1970-01-01(25569) 〜 2100年頃(73000) の範囲のみ日付とみなす
+    if (val > 25569 && val < 73000) return formatDate(excelSerialToDate(val));
+    return null;
+  }
+
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return formatDate(val);
+  }
+
+  if (typeof val === 'string') {
+    const m = val.trim().match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (m) {
+      return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+    }
+  }
+
+  return null;
+}
+
+/** コンテナ番号らしい値か判定（例: 26K0705） */
+function isContainerNoCell(val: unknown): boolean {
+  if (typeof val !== 'string') return false;
+  return /^\d{2}[A-Za-z]\d{3,5}$/.test(val.trim());
+}
+
+/**
+ * A列・B列から「入荷日」と「コンテナ番号」を取り出す
+ * ファイルによって A=日付/B=コンテナ番号 と A=コンテナ番号/B=日付 の
+ * どちらのレイアウトもあるため、日付として解釈できた側を日付とする
+ */
+function readContainerHeader(
+  aVal: unknown,
+  bVal: unknown
+): { date: string; containerNo: string } | null {
+  const dateA = parseDateCell(aVal);
+  if (dateA !== null) {
+    return { date: dateA, containerNo: String(bVal ?? '').trim() };
+  }
+  const dateB = parseDateCell(bVal);
+  if (dateB !== null) {
+    return { date: dateB, containerNo: String(aVal ?? '').trim() };
+  }
+  // 日付が無くコンテナ番号だけある行にも対応
+  if (isContainerNoCell(aVal)) {
+    return { date: '', containerNo: String(aVal).trim() };
+  }
+  if (isContainerNoCell(bVal)) {
+    return { date: '', containerNo: String(bVal).trim() };
+  }
+  return null;
+}
+
 /** 値を数値に変換（空文字・undefined → 0） */
 function toNumber(val: unknown): number {
   if (val === null || val === undefined || val === '') return 0;
@@ -110,25 +173,27 @@ export async function parseExcelFile(file: File): Promise<ParseResult> {
     const row = rows[i];
     if (!row || !Array.isArray(row)) continue;
 
-    const aVal = row[0]; // A列: 日付（シリアル値 or Date）
-    const bVal = row[1]; // B列: コンテナ番号
+    const aVal = row[0]; // A列: 日付 or コンテナ番号（ファイルによって入れ替わる）
+    const bVal = row[1]; // B列: コンテナ番号 or 日付
+    const cVal = row[2]; // C列: 品番
     const dVal = row[3]; // D列: 品名
 
-    // A列に数値があればコンテナ先頭行
-    if (aVal != null && typeof aVal === 'number' && aVal > 40000) {
-      if (current) containers.push(current);
-      const date = excelSerialToDate(aVal);
+    // A列・B列に日付／コンテナ番号があればコンテナ先頭行
+    const header = readContainerHeader(aVal, bVal);
+    if (header && (header.date !== '' || header.containerNo !== '')) {
+      if (current && current.items.length > 0) containers.push(current);
       current = {
-        date: formatDate(date),
-        containerNo: String(bVal || ''),
+        date: header.date,
+        containerNo: header.containerNo,
         items: [],
       };
     }
 
-    // D列に品名があればアイテム行（ヘッダー行を除外）
+    // ヘッダー行（品番／品名の見出し）はスキップ
+    if (cVal === '品番' || dVal === '品名') continue;
+
+    // D列に品名があればアイテム行
     if (dVal && typeof dVal === 'string' && dVal.trim() !== '' && current) {
-      // ヘッダー行 (i === 0) はスキップ
-      if (i === 0) continue;
       const item = createContainerItem(
         row,
         current.containerNo,

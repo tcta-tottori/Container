@@ -468,7 +468,12 @@ export default function Home() {
       try {
         // 1. 作業ファイルをパース
         const result = await parseExcelFile(file);
-        if (result.containers.length === 0) return;
+        if (result.containers.length === 0) {
+          // 何も読めなかった理由を表示（無言で読込画面に戻らない）
+          setLoadingMsg(result.errors[0] || 'コンテナデータが見つかりませんでした');
+          await new Promise((r) => setTimeout(r, 2500));
+          return;
+        }
         setLoadingProgress(25);
 
         // 2. GitHubから最新マスタを確実に取得（Meas.等の最新データ反映）
