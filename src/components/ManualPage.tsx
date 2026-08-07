@@ -157,7 +157,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
           <>
             <Section title="作業の流れ" color="#60a5fa">
               <Step num={1} title="ファイルを読み込む" icon="📁"
-                desc="読込画面でExcelファイルをドラッグ＆ドロップ、Googleドライブから選択、またはGitHubリポジトリから読込。コンテナ日程・AQSS04L両方に対応。" />
+                desc="読込画面でExcelファイルをドラッグ＆ドロップ、または「Googleドライブ」ボタンから選択。コンテナ日程・AQSS04L両方に対応。" />
               <Step num={2} title="概要アナウンスを確認" icon="🔊"
                 desc="読込完了後、コンテナの概要（種類別品目数・類似品の有無）が自動でアナウンスされます。鍋コンテナは100/180サイズ別に読み上げ。" />
               <Step num={3} title="音声で「OK」と言う" icon="🗣️"
@@ -289,10 +289,10 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    ヘッダーの<strong style={{ color: '#67e8f9' }}>💧ボタン</strong>をタップすると、水の流れる音が<strong style={{ color: '#22d3ee' }}>フェードイン</strong>で流れます。もう一度タップでフェードアウトして停止します。
+                    ヘッダーの<strong style={{ color: '#67e8f9' }}>水滴ボタン</strong>をタップすると、水の流れる音が<strong style={{ color: '#22d3ee' }}>フェードイン</strong>で流れます。もう一度タップでフェードアウトして停止します。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#67e8f9' }}>長押し</strong>（またはメニュー →「水の音」）で設定パネルが開き、音量・フェード時間・次回起動時の自動再生を変更できます。
+                    <strong style={{ color: '#67e8f9' }}>長押し</strong>（またはメニュー →「設定」→「水の音」）で設定が開き、音量・フェード時間・次回起動時の自動再生を変更できます。
                   </div>
                   <div>
                     音声コール中は<strong style={{ color: '#8b5cf6' }}>自動で音量が下がり</strong>、コールが終わると元に戻ります。iPhoneはマナーモードだと鳴りません。
@@ -334,10 +334,8 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                 desc="読込画面のドロップゾーンにExcelファイルをドラッグ＆ドロップ。複数ファイル同時対応。" />
               <Step num={2} title="Googleドライブ" icon="☁️"
                 desc="「Googleドライブ」ボタンでCNSフォルダ内のファイルを選択。OAuth認証で安全にアクセス。" />
-              <Step num={3} title="GitHubリポジトリ" icon="🐙"
-                desc="「GitHub」ボタンでリポジトリ内のExcelファイルを直接読込。" />
-              <Step num={4} title="最近のファイル" icon="🕐"
-                desc="「履歴」ボタンで過去に読み込んだファイルをワンタップで再読込。" />
+              <Step num={3} title="最近のファイル" icon="🕐"
+                desc="メニュー →「履歴」→「最近のファイル」で、過去に読み込んだファイルをワンタップで再読込。" />
             </Section>
 
             <Section title="マスタデータ紐付" color="#8b5cf6">

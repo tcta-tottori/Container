@@ -13,7 +13,7 @@ import { getGeminiKey } from '@/lib/geminiApi';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForSpeech } from '@/lib/typeDetector';
-import { saveRecentFile } from '@/lib/recentFiles';
+import { saveRecentFile, FileType } from '@/lib/recentFiles';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
@@ -24,8 +24,11 @@ import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
 import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
-import CallPhraseSettings from '@/components/CallPhraseSettings';
-import WaterSoundPanel from '@/components/WaterSoundPanel';
+import SettingsPage, { SettingsTab } from '@/components/SettingsPage';
+import HistoryModal from '@/components/HistoryModal';
+import ChangelogPopup from '@/components/ChangelogPopup';
+import { APP_VERSION } from '@/lib/appVersion';
+import { MenuIcon, UploadIcon, WorkIcon, EditIcon, ChartIcon, ClockIcon, HelpIcon, SettingsIcon } from '@/components/AppIcons';
 import { getWaterSoundEngine, setupWaterAutoResume } from '@/lib/waterSound';
 import { useWaterSound } from '@/hooks/useWaterSound';
 import WeatherPopup from '@/components/WeatherPopup';
@@ -34,11 +37,10 @@ import SwitchBotPopup from '@/components/SwitchBotPopup';
 import { SwitchBotReading, SwitchBotHistoryPoint, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
-import HistoryPanel from '@/components/HistoryPanel';
 import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
 import * as XLSX from 'xlsx';
 
-type ViewMode = 'load' | 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
+type ViewMode = 'load' | 'work' | 'list' | 'edit' | 'analytics' | 'jkp';
 
 /* ===== おしゃれな読込ポップアップ ===== */
 function LoadingOverlay({ message, progress, closing }: { message: string; progress: number; closing?: boolean }) {
@@ -197,8 +199,10 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('work');
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
-  const [callSettingsOpen, setCallSettingsOpen] = useState(false);
-  const [waterOpen, setWaterOpen] = useState(false);
+  // 設定ページ（コール・水の音・AI写真を集約）。null のときは閉じている
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
   const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
   const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
@@ -791,6 +795,20 @@ export default function Home() {
     [loadData, loadMaster, closeLoading]
   );
 
+  /** 履歴（最近のファイル）から選ばれたファイルを種類ごとに読み込む */
+  const handleRecentFileSelected = useCallback(
+    (file: File, fileType: FileType) => {
+      if (fileType === 'jkp') {
+        handleJkpLoaded(file);
+      } else if (fileType === 'aqss') {
+        handleAqssContainerLoaded(file);
+      } else {
+        handleFileLoaded(file);
+      }
+    },
+    [handleFileLoaded, handleJkpLoaded, handleAqssContainerLoaded]
+  );
+
   const handleAnnounce = useCallback(() => {
     if (currentItem) announceItem(currentItem, state.items);
   }, [currentItem, announceItem, state.items]);
@@ -1299,79 +1317,74 @@ export default function Home() {
           </div>
         </div>
       )}
-      {callSettingsOpen && (
-        <CallPhraseSettings
-          onClose={() => setCallSettingsOpen(false)}
-          onTest={(p) => speakCheer(p)}
+      {settingsTab && (
+        <SettingsPage
+          initialTab={settingsTab}
+          onClose={() => setSettingsTab(null)}
+          onTestCall={(p) => speakCheer(p)}
         />
       )}
       {weatherPopup && (
         <WeatherPopup weather={weatherPopup} onClose={closeWeatherPopup} isSpeaking={isSpeaking} />
       )}
-      {waterOpen && <WaterSoundPanel onClose={() => setWaterOpen(false)} />}
+      {historyOpen && (
+        <HistoryModal
+          onClose={() => setHistoryOpen(false)}
+          onSelectRecent={handleRecentFileSelected}
+        />
+      )}
+      {changelogOpen && <ChangelogPopup onClose={() => setChangelogOpen(false)} />}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 
       {/* メニューオーバーレイ */}
       {menuOpen && (
         <div className="menu-overlay" onClick={() => setMenuOpen(false)}>
           <div className="menu-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="menu-title">
+              <MenuIcon size={20} strokeWidth={2} />
+              <span>
+                メニュー
+                <small>Container Navigation System</small>
+              </span>
+            </div>
             <button className={`menu-item ${view === 'load' ? 'active' : ''}`} onClick={() => switchView('load')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
+              <UploadIcon size={20} />
               読込
             </button>
             <button className={`menu-item ${view === 'work' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('work')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/>
-              </svg>
+              <WorkIcon size={20} />
               作業
             </button>
             {/* 一覧ページ削除 */}
             <button className={`menu-item ${view === 'edit' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('edit')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-              </svg>
+              <EditIcon size={20} />
               管理
             </button>
             <div className="menu-divider" />
             <button className={`menu-item ${view === 'analytics' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('analytics')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-              </svg>
+              <ChartIcon size={20} />
               分析
             </button>
-            <button className={`menu-item ${view === 'history' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('history')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
+            <button className="menu-item" onClick={() => { setHistoryOpen(true); setMenuOpen(false); }}>
+              <ClockIcon size={20} />
               履歴
             </button>
             <div className="menu-divider" />
             <button className="menu-item" onClick={() => { setManualOpen(true); setMenuOpen(false); }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
+              <HelpIcon size={20} />
               マニュアル
             </button>
-            <button className="menu-item" onClick={() => { setCallSettingsOpen(true); setMenuOpen(false); }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
-              </svg>
-              コール設定
+            <button className="menu-item" onClick={() => { setSettingsTab('call'); setMenuOpen(false); }}>
+              <SettingsIcon size={20} />
+              設定
             </button>
-            <button className="menu-item" onClick={() => { setWaterOpen(true); setMenuOpen(false); }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 8c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>
-                <path d="M2 14c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>
-                <path d="M2 20c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0"/>
-              </svg>
-              水の音
+
+            {/* バージョン情報（読込画面から移動） */}
+            <div className="menu-spacer" />
+            <button className="menu-version" onClick={() => { setChangelogOpen(true); setMenuOpen(false); }}>
+              <span>CNS Ver {APP_VERSION}</span>
+              <span className="menu-version-sub">更新内容 ›</span>
             </button>
-            <div className="menu-divider" />
-            <div className="menu-version">
-              CNS Ver 3.6
-            </div>
           </div>
         </div>
       )}
@@ -1394,7 +1407,7 @@ export default function Home() {
           onWeather={view === 'work' ? handleWeatherCall : undefined}
           onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
           onWater={toggleWater}
-          onWaterSettings={() => setWaterOpen(true)}
+          onWaterSettings={() => setSettingsTab('water')}
           waterPlaying={waterPlaying}
         />
 
@@ -1501,12 +1514,6 @@ export default function Home() {
           {view === 'jkp' && (
             <div className="full-panel">
               <JkpSchedulePage shipments={jkpShipments} />
-            </div>
-          )}
-
-          {view === 'history' && (
-            <div className="full-panel" style={{ padding: 16, overflowY: 'auto' }}>
-              <HistoryPanel />
             </div>
           )}
 

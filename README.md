@@ -43,7 +43,7 @@ Excelファイルから品目データを読み込み、リアルタイムの作
 - 実装: `src/lib/weatherNews.ts` の `climateToSpeech` / `wbgtAdviceToSpeech`。
 
 ### 作業用BGM（水の流れる音）
-作業中に流す水音。ヘッダーの 💧 ボタンをタップで再生／停止、長押し（右クリック）またはメニュー →「水の音」で設定パネルを開く。
+作業中に流す水音。ヘッダーの水滴ボタンをタップで再生／停止、長押し（右クリック）またはメニュー →「設定」→「水の音」で設定を開く。
 
 - **音源**: 実録音の水の流れる音。30秒のシームレスループ素材（`public/sounds/water-loop.mp3` / MP3 128kbps モノラル・約470KB）。
   末尾2秒を先頭へ等パワークロスフェードして作成しているため、継ぎ目でクリックノイズが出ない。
@@ -51,7 +51,7 @@ Excelファイルから品目データを読み込み、リアルタイムの作
 - **自動ダッキング**: 音声コール中は BGM の音量を自動で下げ、コール終了後に戻す
 - **自動再開**: 「次回起動時も自動で流す」をオンにすると、次回起動後の最初の操作で再生を再開する（ブラウザの自動再生制限に対応）
 - **ループ位置**: 再生のたびにループ区間内のランダムな位置から鳴らすため、毎回同じ出だしにならない
-- 実装: `src/lib/waterSound.ts`（再生エンジン）、`src/hooks/useWaterSound.ts`、`src/components/WaterSoundPanel.tsx`（設定パネル）
+- 実装: `src/lib/waterSound.ts`（再生エンジン）、`src/hooks/useWaterSound.ts`、`src/components/WaterSoundPanel.tsx`（設定ページの「水の音」タブ）
 - 設定は localStorage に保存（`cns_water_volume` / `cns_water_fade` / `cns_water_playing` / `cns_water_autostart`）
 - 停止後は AudioContext を休止してバッテリーを節約する
 - 注意: iPhone はマナーモードでは音が鳴らない
@@ -63,6 +63,20 @@ Excelファイルから品目データを読み込み、リアルタイムの作
   - 仕組み: Web Bluetooth の `navigator.bluetooth.requestLEScan`（ペアリング不要・受信のたびに最新値へ更新）。
   - 対応: Android Chrome で `chrome://flags/#enable-experimental-web-platform-features` を有効にすると利用可能。非対応環境ではバーに「非対応」と表示される。
   - 実装: `src/lib/switchbot.ts`（SwitchBot Meter サービスデータ解析）、`src/components/ClimateBar.tsx`（表示バー）。
+
+### ヘッダー・メニュー・読込画面（UI）
+- **ヘッダーは 1.5 倍サイズ**: 高さ 72px（`calc(72px + var(--safe-top))`）、ボタン 48px 角、経過時間・時計は 21px。
+  温湿度バーも 1.5 倍（高さ 66px・気温などの数値 21px）にして、離れた位置からでも読めるようにしている。
+- **アイコンは白線に統一**: 絵文字（📣 / 💧 / 📡 など）をやめ、`src/components/AppIcons.tsx` の
+  `currentColor` ストロークアイコンに統一。ボタンの状態色（水の音 ON の水色など）はそのまま効く。
+- **メニューは画面左側全域**: 上端から下端まで（幅 `min(320px, 82vw)`）を占め、
+  オーバーレイのフェードイン + パネルの微小スライドで展開する（`globals.css` の `menu-overlay-in` / `menu-panel-in`）。
+  下部にバージョン（`CNS Ver x.y`）を置き、タップで更新内容（`ChangelogPopup`）を開く。
+- **読込画面はドロップゾーンと Google ドライブのみ**: GitHub・履歴・AI写真・バージョンのボタンは廃止。
+  Google ドライブはドロップゾーンと同じ横幅の大ボタン。ファイル種別のバッジ表示も廃止した。
+- **設定ページ**: メニュー →「設定」で `SettingsPage` を開き、「コール」「水の音」「AI写真」をタブで切り替える。
+- **履歴**: メニュー →「履歴」で `HistoryModal` を開き、「最近のファイル」（再読込）と「更新履歴」をタブで切り替える。
+  コンテナ未読込でも開けるので、読込画面からでも過去のファイルを呼び出せる。
 
 ### 品目マスタ管理（CNS品目一覧）
 CNS品目一覧はコード紐付・入数・1P数・重量・寸法情報を保管するマスタデータ。
@@ -85,7 +99,7 @@ CNS品目一覧はコード紐付・入数・1P数・重量・寸法情報を保
 - ヘッダー左上の「4月15日 26K0308」形式から日付・コンテナ番号を抽出
 
 #### 抽出エンジン
-1. **Gemini API (推奨)** — 「AI写真」ボタンから Google AI Studio で取得した API キーを設定すると、Gemini 3.6 Flash / 3.5 Flash-Lite / 3.1 Pro を用いて高精度な構造化抽出を行う。光沢・影・日本語英数混在もLLMの文脈理解で高精度に処理。Flash 系モデルは無料枠あり。
+1. **Gemini API (推奨)** — メニュー →「設定」→「AI写真」から Google AI Studio で取得した API キーを設定すると、Gemini 3.6 Flash / 3.5 Flash-Lite / 3.1 Pro を用いて高精度な構造化抽出を行う。光沢・影・日本語英数混在もLLMの文脈理解で高精度に処理。Flash 系モデルは無料枠あり。
 2. **Tesseract.js (フォールバック)** — API キー未設定時は tesseract.js のローカル OCR を使用。精度は低いが完全オフライン動作。
 
 API キーは端末の localStorage にのみ保存され、外部には送信されない。
@@ -147,7 +161,11 @@ src/
 │   └── globals.css         # グローバルスタイル・CSS変数
 ├── components/
 │   ├── ActionBar.tsx        # 下部操作バー（前後移動・増減・音声・完了）
-│   ├── FileDropZone.tsx     # ファイルアップロード画面（D&D・最近のファイル）
+│   ├── AppIcons.tsx         # 共通の白線アイコン（絵文字を使わない）
+│   ├── FileDropZone.tsx     # ファイル読込画面（D&D + Googleドライブ大ボタン）
+│   ├── SettingsPage.tsx     # 設定ページ（コール / 水の音 / AI写真）
+│   ├── HistoryModal.tsx     # 履歴（最近のファイル / 更新履歴）
+│   ├── ChangelogPopup.tsx   # バージョン情報・更新内容（メニュー下部から）
 │   ├── HeaderBar.tsx        # ヘッダー（コンテナ選択・時計・経過時間）
 │   ├── ItemDetailPanel.tsx  # 作業ビュー（ヒーロー表示・パレット図・品目リスト）
 │   ├── ItemEditPage.tsx     # 品目マスタ管理（登録・編集・削除・Import/Export）
@@ -182,7 +200,8 @@ src/
 | **一覧** (list) | 全品目のリスト表示 |
 | **管理** (edit) | 品目マスタの登録・編集・削除・Import/Export |
 | **分析** (analytics) | コンテナの内容分析 |
-| **履歴** (history) | 作業履歴 |
+
+メニューからは他に、ページではなくポップアップとして「マニュアル」「設定」「履歴」「バージョン情報」を開ける。
 
 ## データフロー
 
@@ -232,7 +251,8 @@ npm run build && npm start
   `manifest.json` の `theme_color` / `background_color` と `layout.tsx` の `viewport.themeColor` を同じ値にそろえること。
 - **セーフエリア**: iOS はステータスバーが黒半透明（`statusBarStyle: black-translucent`）でコンテンツに重なるため、
   ヘッダーに `env(safe-area-inset-top)`（CSS変数 `--safe-top`）分の余白を持たせ、その領域もヘッダー色で塗る。
-  ヘッダー高さとメニューパネルの表示位置は `calc(48px + var(--safe-top))` で連動させている。
+  ヘッダー高さは `calc(72px + var(--safe-top))`、メニューパネルは画面左側全域（`top: 0` / `bottom: 0`）を占め、
+  内側の上余白を `calc(var(--safe-top) + 12px)` にしてステータスバーを避ける。
 
 ## レスポンシブ対応
 

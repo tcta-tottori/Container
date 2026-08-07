@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { Container } from '@/lib/types';
 import { CompletionLogEntry } from '@/hooks/useContainerData';
+import { MenuIcon, WeatherIcon, MegaphoneIcon, DropletIcon } from '@/components/AppIcons';
 
 export interface ItemTimeLog {
   itemName: string;
@@ -83,12 +84,8 @@ export default function HeaderBar({
   return (
     <div className="app-header">
       {/* ハンバーガーメニュー */}
-      <button onClick={onMenuToggle} className="header-btn" title="メニュー">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="3" y1="6" x2="21" y2="6"/>
-          <line x1="3" y1="12" x2="21" y2="12"/>
-          <line x1="3" y1="18" x2="21" y2="18"/>
-        </svg>
+      <button onClick={onMenuToggle} className="header-btn" title="メニュー" aria-label="メニュー">
+        <MenuIcon size={24} strokeWidth={2} />
       </button>
 
       {/* コンテナ選択（未読込のときは出さない） */}
@@ -108,18 +105,15 @@ export default function HeaderBar({
 
       {/* 天気コールボタン */}
       {onWeather && (
-        <button onClick={onWeather} className="header-btn" title="天気コール">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M16 13a4 4 0 1 0-5-5"/>
-            <path d="M7 18a4 4 0 0 1 .5-7.97A5 5 0 0 1 17 12.5a3.5 3.5 0 0 1-.5 6.95H7z"/>
-          </svg>
+        <button onClick={onWeather} className="header-btn" title="天気コール" aria-label="天気コール">
+          <WeatherIcon size={24} strokeWidth={1.9} />
         </button>
       )}
 
       {/* 応援コール（ランダム）ボタン */}
       {onCheer && (
-        <button onClick={onCheer} className="header-btn" title="応援コール（ランダム）">
-          <span style={{ fontSize: 14, lineHeight: 1 }}>📣</span>
+        <button onClick={onCheer} className="header-btn" title="応援コール（ランダム）" aria-label="応援コール">
+          <MegaphoneIcon size={24} strokeWidth={1.9} />
         </button>
       )}
 
@@ -143,8 +137,9 @@ export default function HeaderBar({
           }}
           className={`header-btn ${waterPlaying ? 'header-btn-water-on' : ''}`}
           title="水の音（長押しで設定）"
+          aria-label="水の音"
         >
-          <span style={{ fontSize: 14, lineHeight: 1 }}>💧</span>
+          <DropletIcon size={24} strokeWidth={1.9} />
         </button>
       )}
 
@@ -152,19 +147,19 @@ export default function HeaderBar({
 
       {/* 日付（横画面のみ）+ 経過時間（黄色）+ リアルタイム時計 */}
       <span className="header-date-landscape" style={{
-        fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
-        color: 'rgba(255,255,255,0.4)', flexShrink: 0, marginRight: 8,
+        fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 500,
+        color: 'rgba(255,255,255,0.4)', flexShrink: 0, marginRight: 10,
       }}>
         {currentDate}
       </span>
       <span
         className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
-        style={{ color: '#f59e0b', marginRight: 6, flexShrink: 0 }}
+        style={{ color: '#f59e0b', marginRight: 9, flexShrink: 0 }}
       >
         {workElapsed}
       </span>
       <span className="header-clock" style={{
-        fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 700,
+        fontFamily: 'var(--font-mono)', fontSize: 21, fontWeight: 700,
         color: 'rgba(255,255,255,0.85)', fontVariantNumeric: 'tabular-nums',
         letterSpacing: 0.5, flexShrink: 0, marginRight: 16,
       }}>
