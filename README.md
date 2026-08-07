@@ -208,6 +208,15 @@ npm run build && npm start
 
 `http://localhost:3000` でアクセス。
 
+## PWA / 画面表示
+
+- **表示モード**: `standalone`（`public/manifest.json`）。`fullscreen` だとスマートフォンのステータスバー（時計・電池）が隠れてしまうため使わない。
+- **テーマカラー**: ステータスバーの色をヘッダー（`--header-bg` = `#1a1d2e`）と同色にして一体感を出す。
+  `manifest.json` の `theme_color` / `background_color` と `layout.tsx` の `viewport.themeColor` を同じ値にそろえること。
+- **セーフエリア**: iOS はステータスバーが黒半透明（`statusBarStyle: black-translucent`）でコンテンツに重なるため、
+  ヘッダーに `env(safe-area-inset-top)`（CSS変数 `--safe-top`）分の余白を持たせ、その領域もヘッダー色で塗る。
+  ヘッダー高さとメニューパネルの表示位置は `calc(48px + var(--safe-top))` で連動させている。
+
 ## レスポンシブ対応
 
 - **縦画面 (Portrait)**: 詳細パネルのフルスクリーン表示 + 下部操作バー
