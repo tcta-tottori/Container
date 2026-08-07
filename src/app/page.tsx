@@ -917,7 +917,6 @@ export default function Home() {
 
   const handleComplete = useCallback(() => {
     if (!currentItem) return;
-    const name = currentItem.itemName;
     const remaining = state.items.length - 1;
     deleteCurrent();
     // 品目ごとの完了コールは行わない（作業テンポを優先）。全品目完了時のみコールする。
