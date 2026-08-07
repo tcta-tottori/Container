@@ -102,6 +102,11 @@ export function ThermometerIcon(p: IconProps) {
   return <Svg {...p}><path d="M14 14.8V4.5a2 2 0 1 0-4 0v10.3a4 4 0 1 0 4 0z" /></Svg>;
 }
 
+/** 湿度（しずく + 目盛り） */
+export function HumidityIcon(p: IconProps) {
+  return <Svg {...p}><path d="M12 3.5 7.4 9.2a5.9 5.9 0 1 0 9.2 0L12 3.5z" /></Svg>;
+}
+
 /** センサー（電波） */
 export function SensorIcon(p: IconProps) {
   return <Svg {...p}><circle cx="12" cy="12" r="2" /><path d="M8.5 15.5a5 5 0 0 1 0-7" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M5.8 18.2a9 9 0 0 1 0-12.4" /><path d="M18.2 5.8a9 9 0 0 1 0 12.4" /></Svg>;

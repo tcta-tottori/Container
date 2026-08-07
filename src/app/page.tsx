@@ -1486,8 +1486,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* フローティングマイクボタン（右下固定） */}
-        {view === 'work' && isSupported && (
+        {/* フローティングマイクボタン（メニュー展開中は隠す） */}
+        {view === 'work' && isSupported && !menuOpen && (
           <>
             {(isSpeaking || isPreparingSpeech) && (
               <style>{`
