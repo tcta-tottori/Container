@@ -27,14 +27,14 @@ interface QuickActionsProps {
   hidden?: boolean;
 }
 
-/** メニューを開くボタンのアイコン（四角い山） */
+/** メニューを開くボタンのアイコン（角丸四角 + 上向きの山）。開くと180度回って下向きになる */
 export function QuickMenuIcon({ size = 26 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round"
+      stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" strokeLinecap="round"
       aria-hidden="true" style={{ flexShrink: 0 }}>
-      <rect x="3" y="3" width="18" height="18" rx="4" />
-      <path d="M6 16.5 10 11l2.6 3.4L15 11.6l3 4.9z" />
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <polyline points="7.5 14.5 12 9.5 16.5 14.5" />
     </svg>
   );
 }
@@ -134,7 +134,9 @@ export default function QuickActions({
         aria-label="メニューを開く"
         title="メニュー"
       >
-        {open ? <CloseIcon size={24} /> : <QuickMenuIcon size={26} />}
+        <span className={`quick-fab-icon${open ? ' open' : ''}`}>
+          <QuickMenuIcon size={28} />
+        </span>
       </button>
 
       {open && (

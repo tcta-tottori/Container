@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react';
 import { CompletionLogEntry } from '@/hooks/useContainerData';
 import { WeatherData, wbgtLevel } from '@/lib/weatherNews';
 import { SwitchBotReading } from '@/lib/switchbot';
-import { MenuIcon } from '@/components/AppIcons';
+import { MenuIcon, ThermometerIcon, HumidityIcon } from '@/components/AppIcons';
 
 export interface ItemTimeLog {
   itemName: string;
@@ -45,11 +45,17 @@ function HeaderClimate({
     <button className="header-climate" onClick={onOpen} title="タップで詳細を表示">
       {switchbot && <span className="header-climate-src">S</span>}
       <span className="header-climate-val">
-        <span className="header-climate-num" style={{ color: TEMP_COLOR }}>
-          {r.temperature}<span className="header-climate-unit">°C</span>
+        <span className="header-climate-row" style={{ color: TEMP_COLOR }}>
+          <ThermometerIcon size={15} strokeWidth={2} />
+          <span className="header-climate-num">
+            {r.temperature}<span className="header-climate-unit">°C</span>
+          </span>
         </span>
-        <span className="header-climate-num" style={{ color: HUM_COLOR, fontSize: 15 }}>
-          {Math.round(r.humidity)}<span className="header-climate-unit" style={{ fontSize: 11 }}>%</span>
+        <span className="header-climate-row" style={{ color: HUM_COLOR }}>
+          <HumidityIcon size={14} strokeWidth={2} />
+          <span className="header-climate-num" style={{ fontSize: 16 }}>
+            {Math.round(r.humidity)}<span className="header-climate-unit" style={{ fontSize: 11 }}>%</span>
+          </span>
         </span>
       </span>
       <span

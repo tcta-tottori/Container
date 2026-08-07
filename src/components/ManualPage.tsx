@@ -234,8 +234,9 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     右が気温・湿度と暑さ指数の色バッジ（緑→黄→オレンジ→赤で危険度）。バッジをタップすると詳細と推移グラフが開きます。
                   </div>
                   <div>
-                    <strong style={{ color: '#60a5fa' }}>右下のボタン</strong>を押すと下からメニューが開き、
+                    <strong style={{ color: '#60a5fa' }}>右下のボタン</strong>（四角の中の山マーク）を押すと下からメニューが開き、
                     コンテナの選択・応援コール・天気コール・水の音・SwitchBot 接続をまとめて操作できます。
+                    開いている間はマークが下向きになります。
                   </div>
                 </div>
               </InfoCard>
