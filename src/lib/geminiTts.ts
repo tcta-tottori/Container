@@ -1,84 +1,12 @@
 /**
  * Google Gemini TTS (Text-to-Speech) クライアント
  *
- * Gemini Flash TTS モデルで高品質な音声合成を行う。
- * API キーは geminiApi.ts と共有（localStorage）。
- * 複数の音声キャラクターを選択可能（声の種類）。
+ * Gemini TTS モデルで音声合成を行う。API キーは geminiApi.ts と共有（localStorage）。
+ * 話者・トーン・速さなどの設定は voiceSettings.ts が持つ。
  */
 
 import { getGeminiKey } from './geminiApi';
-
-const VOICE_STORAGE = 'cns_gemini_voice';
-const TTS_ENABLED_STORAGE = 'cns_gemini_tts_enabled';
-const TTS_MODEL_STORAGE = 'cns_gemini_tts_model';
-
-/** デフォルト TTS モデル（Flash 系） */
-export const DEFAULT_GEMINI_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
-
-/** 選択可能な音声 */
-export interface GeminiVoice {
-  id: string;
-  label: string;
-  desc: string;
-}
-
-export const GEMINI_VOICES: GeminiVoice[] = [
-  { id: 'Kore',       label: 'コレ',       desc: '落ち着いた女性' },
-  { id: 'Aoede',      label: 'アオイデ',   desc: '爽やかな女性' },
-  { id: 'Leda',       label: 'レダ',       desc: '若々しい女性' },
-  { id: 'Zephyr',     label: 'ゼファー',   desc: '明るい女性' },
-  { id: 'Puck',       label: 'パック',     desc: '元気な男性' },
-  { id: 'Charon',     label: 'カロン',     desc: '情報的な男性' },
-  { id: 'Fenrir',     label: 'フェンリル', desc: '活発な男性' },
-  { id: 'Orus',       label: 'オルス',     desc: '力強い男性' },
-  { id: 'Enceladus',  label: 'エンケラ',   desc: '囁くような男性' },
-  { id: 'Achird',     label: 'アキルド',   desc: '親しみやすい男性' },
-];
-
-export const DEFAULT_VOICE = 'Kore';
-
-export function getSelectedVoice(): string {
-  if (typeof window === 'undefined') return DEFAULT_VOICE;
-  return localStorage.getItem(VOICE_STORAGE) || DEFAULT_VOICE;
-}
-
-export function setSelectedVoice(voiceId: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(VOICE_STORAGE, voiceId);
-}
-
-/** 過去の誤ったモデル名を自動的に正しいデフォルトに置換する */
-const LEGACY_WRONG_MODELS = new Set([
-  'gemini-3.1-flash-preview-tts',
-  'gemini-3.0-flash-preview-tts',
-]);
-
-export function getGeminiTtsModel(): string {
-  if (typeof window === 'undefined') return DEFAULT_GEMINI_TTS_MODEL;
-  const stored = localStorage.getItem(TTS_MODEL_STORAGE);
-  if (stored && LEGACY_WRONG_MODELS.has(stored)) {
-    localStorage.removeItem(TTS_MODEL_STORAGE);
-    return DEFAULT_GEMINI_TTS_MODEL;
-  }
-  return stored || DEFAULT_GEMINI_TTS_MODEL;
-}
-
-export function setGeminiTtsModel(model: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(TTS_MODEL_STORAGE, model);
-}
-
-/** Gemini TTS が利用可能か（API キーがあり、かつ明示的に無効化されていない） */
-export function isGeminiTtsEnabled(): boolean {
-  if (typeof window === 'undefined') return false;
-  if (!getGeminiKey()) return false;
-  return localStorage.getItem(TTS_ENABLED_STORAGE) !== '0';
-}
-
-export function setGeminiTtsEnabled(enabled: boolean): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(TTS_ENABLED_STORAGE, enabled ? '1' : '0');
-}
+import { getVoiceSettings, styleInstruction } from './voiceSettings';
 
 /** 直近の TTS エラーメッセージ（UI 表示用） */
 let _lastTtsError: string | null = null;
@@ -159,7 +87,8 @@ function normalizeJapaneseForTts(text: string): string {
 }
 
 /**
- * Gemini TTS で音声を生成する（Gemini 3.1 Flash TTS 固定）
+ * Gemini TTS で音声を生成する。
+ * 話者・トーン・モデルは設定ページの内容（voiceSettings）を既定値として使う。
  */
 export async function geminiGenerateSpeech(
   text: string,
@@ -168,14 +97,15 @@ export async function geminiGenerateSpeech(
   const apiKey = getGeminiKey();
   if (!apiKey) throw new Error('Gemini API キーが設定されていません');
 
-  const voice = options?.voice || getSelectedVoice();
-  const model = options?.model || getGeminiTtsModel();
+  const settings = getVoiceSettings();
+  const voice = options?.voice || settings.main.voice;
+  const model = options?.model || settings.model;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   // スタイル指示は最小限にして生成時間を短縮（句読点のスペース挿入で間は十分確保）
   const normalized = normalizeJapaneseForTts(text);
-  const stylePrefix = options?.stylePrefix || 'はっきりと読む';
+  const stylePrefix = options?.stylePrefix || styleInstruction(settings.main);
   const styled = `${stylePrefix}: ${normalized}`;
 
   const body = {

@@ -55,19 +55,17 @@ export default function HeaderBar({
   const waterHeldRef = useRef(false);
   const [isFlashing, setIsFlashing] = useState(false);
   const lastFlashedAt = useRef(0);
-  const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
 
-  // リアルタイム時計+日付
+  // 日付（現在時刻は端末のステータスバーに出るためヘッダーには表示しない）
   useEffect(() => {
     const days = ['日', '月', '火', '水', '木', '金', '土'];
     const update = () => {
       const now = new Date();
-      setCurrentTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
       setCurrentDate(`${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}(${days[now.getDay()]})`);
     };
     update();
-    const iv = setInterval(update, 1000);
+    const iv = setInterval(update, 30000);
     return () => clearInterval(iv);
   }, []);
 
@@ -145,7 +143,7 @@ export default function HeaderBar({
 
       <div className="flex-1" />
 
-      {/* 日付（横画面のみ）+ 経過時間（黄色）+ リアルタイム時計 */}
+      {/* 日付（横画面のみ）+ 経過時間（黄色） */}
       <span className="header-date-landscape" style={{
         fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 500,
         color: 'rgba(255,255,255,0.4)', flexShrink: 0, marginRight: 10,
@@ -154,12 +152,9 @@ export default function HeaderBar({
       </span>
       <span
         className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
-        style={{ color: '#f59e0b', marginRight: 9, flexShrink: 0 }}
+        style={{ color: '#f59e0b', marginRight: 12, flexShrink: 0 }}
       >
         {workElapsed}
-      </span>
-      <span className="header-clock" style={{ marginRight: 16 }}>
-        {currentTime}
       </span>
 
       {/* 経過時間ポップアップ */}

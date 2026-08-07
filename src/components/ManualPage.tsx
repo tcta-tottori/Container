@@ -270,7 +270,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#60a5fa' }}>品目切替時</strong>: 品名・パレット数・ケース数を読み上げ。ポリカバーは検査分も計算。類似品がある場合は警告。
+                    <strong style={{ color: '#60a5fa' }}>品目切替時</strong>: 品名・パレット数・ケース数を読み上げ。ポリカバーは検査分も計算。類似品がある場合は「類似品があります」とだけコール（品名・数量は読み上げません）。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#22c55e' }}>コンテナ読み込み時</strong>: 種類別品目数、類似品の有無をアナウンス。鍋は100/180サイズ別にコール。
@@ -278,8 +278,11 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#ef4444' }}>OKコマンド後</strong>: 「残り○パレットと○ケース。」のみコール（次の品目コールはなし）。
                   </div>
-                  <div>
+                  <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#f59e0b' }}>10分ごとのコール</strong>: 経過時間＋気温・湿度・暑さ指数と警戒レベル（危険／厳重警戒／警戒／注意）をコール。SwitchBot 接続中は実測値を使います。
+                  </div>
+                  <div>
+                    <strong style={{ color: '#a78bfa' }}>声・トーンの設定</strong>: メニュー →「設定」→「音声」で、使う音声API・話す人・トーン・速さ・音量を変更できます（通常コールと応援コールで別々に設定）。
                   </div>
                 </div>
               </InfoCard>

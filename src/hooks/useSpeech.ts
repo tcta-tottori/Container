@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
-import { itemNameForSpeech, areSimilarItems, getSimilarityReason, extractColor } from '@/lib/typeDetector';
-import { geminiGenerateSpeech, isGeminiTtsEnabled } from '@/lib/geminiTts';
+import { itemNameForSpeech, areSimilarItems } from '@/lib/typeDetector';
+import { geminiGenerateSpeech } from '@/lib/geminiTts';
+import { getGeminiKey } from '@/lib/geminiApi';
+import { getVoiceSettings, styleInstruction, VoiceProfile } from '@/lib/voiceSettings';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
@@ -51,17 +53,20 @@ export function cancelSpeech(): void {
   _onSpeakEnd?.();
 }
 
-function speakWebSpeech(text: string, onDone?: () => void): void {
+function speakWebSpeech(text: string, onDone?: () => void, profile?: VoiceProfile): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
     _onSpeakEnd?.();
     onDone?.();
     return;
   }
+  const settings = getVoiceSettings();
+  const p = profile || settings.main;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'ja-JP';
-  u.rate = 1.1;
-  u.volume = 1.0;
+  u.rate = Math.min(2, Math.max(0.5, p.rate * 1.1));
+  u.pitch = Math.min(2, Math.max(0, p.pitch));
+  u.volume = settings.volume;
   const voices = window.speechSynthesis.getVoices();
   const jaVoice = voices.find((v) => v.lang.startsWith('ja'));
   if (jaVoice) u.voice = jaVoice;
@@ -85,6 +90,7 @@ async function speakGemini(text: string, stylePrefix?: string, voice?: string, o
     if (abort.signal.aborted) return;
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    audio.volume = getVoiceSettings().volume;
     _currentAudio = audio;
     _currentAudioUrl = url;
     const releaseUrl = () => {
@@ -118,6 +124,21 @@ function stopCurrentPlayback(): void {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
 
+/** Gemini TTS を使うか（設定が gemini で、かつ API キーがある） */
+function isGeminiEngineReady(): boolean {
+  return getVoiceSettings().engine === 'gemini' && !!getGeminiKey();
+}
+
+/** 指定プロファイルで読み上げる（エンジンの切り替えとフォールバックをまとめる） */
+function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): void {
+  if (typeof window === 'undefined') return;
+  if (isGeminiEngineReady()) {
+    void speakGemini(text, styleInstruction(profile), profile.voice, onDone);
+  } else {
+    speakWebSpeech(text, onDone, profile);
+  }
+}
+
 /** 事前アナウンスを読み上げた後、応援コールを「そのまま」別発話で読み上げる（定期コール用）。
  *  応援を独立した発話にすることで、長文結合による語尾の乱れを防ぐ。 */
 function speakThenCheer(pre: string, cheer: string): void {
@@ -125,69 +146,25 @@ function speakThenCheer(pre: string, cheer: string): void {
   stopCurrentPlayback();
   const startCheer = () => speakCheer(cheer);
   if (!pre.trim()) { startCheer(); return; }
-  if (isGeminiTtsEnabled()) {
-    void speakGemini(pre, undefined, undefined, startCheer);
-  } else {
-    speakWebSpeech(pre, startCheer);
-  }
+  speakWith(pre, getVoiceSettings().main, startCheer);
 }
 
-/** 応援コール専用：元気な女性の声(Zephyr)で明るく応援するように読み上げる。
- *  ユーザー選択の音声に関わらず女性ボイスで固定。
- *  Gemini が使えない場合は Web Speech にフォールバック（応援が無音にならないように）。*/
+/** 応援コール・あおりコール専用。設定ページの「応援コール」プロファイルで読み上げる。 */
 function speakCheer(text: string): void {
-  if (typeof window === 'undefined') return;
-  if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
-  if (_currentAudio) {
-    try { _currentAudio.onended = null; _currentAudio.onerror = null; _currentAudio.pause(); } catch { /* ignore */ }
-    _currentAudio = null;
-  }
-  if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-
-  if (isGeminiTtsEnabled()) {
-    void speakGemini(text, '元気な女性の声で、明るく応援するように大きな声で', 'Zephyr');
-  } else {
-    speakWebSpeech(text);
-  }
+  stopCurrentPlayback();
+  speakWith(text, getVoiceSettings().cheer);
 }
 
-/** 経過時間コール専用：明るく元気な女性の声であおるように読み上げる。
- *  ユーザー選択の音声に関わらず女性ボイス(Zephyr)で固定。
- *  Gemini が使えない場合は Web Speech にフォールバック。*/
+/** 経過時間のあおりコール。応援コールと同じプロファイルを使う。 */
 function speakTaunt(text: string): void {
-  if (typeof window === 'undefined') return;
-  if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
-  if (_currentAudio) {
-    try { _currentAudio.onended = null; _currentAudio.onerror = null; _currentAudio.pause(); } catch { /* ignore */ }
-    _currentAudio = null;
-  }
-  if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-
-  if (isGeminiTtsEnabled()) {
-    void speakGemini(text, '明るく元気な女性の声で、テンション高くあおって', 'Zephyr');
-  } else {
-    speakWebSpeech(text);
-  }
+  stopCurrentPlayback();
+  speakWith(text, getVoiceSettings().cheer);
 }
 
+/** 通常のコール。設定ページの「通常コール」プロファイルで読み上げる。 */
 function speak(text: string): void {
-  if (typeof window === 'undefined') return;
-  // 前回のコールを必ず止める（開始/終了コールバックは新しい speak 側で発火）
-  if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
-  if (_currentAudio) {
-    try { _currentAudio.onended = null; _currentAudio.onerror = null; _currentAudio.pause(); } catch { /* ignore */ }
-    _currentAudio = null;
-  }
-  if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-
-  if (isGeminiTtsEnabled()) {
-    void speakGemini(text);
-  } else {
-    speakWebSpeech(text);
-  }
+  stopCurrentPlayback();
+  speakWith(text, getVoiceSettings().main);
 }
 
 export function useSpeech() {
@@ -244,67 +221,17 @@ export function useSpeech() {
     // 鍋: 類似品・サイズ違いアナウンスは不要
     const isNabe = item.type === '鍋';
 
-    // 似た名前のアイテムがある場合に警告（鍋以外）
+    // 似た名前のアイテムがある場合に警告（鍋以外）。
+    // 具体的な類似品の内容はコールせず「類似品があります」とだけ伝える。
     if (!isNabe && allItems && allItems.length > 0) {
-      const similarItems = allItems.filter(
+      const hasSimilar = allItems.some(
         (other) => other.id !== item.id && areSimilarItems(item.itemName, other.itemName)
       );
-      if (similarItems.length > 0) {
-        const colorItems = similarItems.filter(s => getSimilarityReason(item.itemName, s.itemName) === 'color');
-        const nameItems = similarItems.filter(s => getSimilarityReason(item.itemName, s.itemName) === 'name');
-
-        if (colorItems.length > 0) {
-          // 色違い: 「色違いの黒(白)が○パレット○ケースあります」形式
-          const descs = colorItems.map(s => {
-            const color = extractColor(s.itemName) || '他色';
-            const fractionCeil = s.fraction % 1 !== 0 ? Math.ceil(s.fraction) : s.fraction;
-            let qty = '';
-            if (s.palletCount > 0 && fractionCeil > 0) {
-              qty = `${s.palletCount}パレット${fractionCeil}ケース`;
-            } else if (s.palletCount > 0) {
-              qty = `${s.palletCount}パレット`;
-            } else if (fractionCeil > 0) {
-              qty = `${fractionCeil}ケース`;
-            }
-            return qty ? `色違いの${color}が${qty}あります` : `色違いの${color}があります`;
-          }).join('。');
-          text += `注意、${descs}。`;
-        }
-
-        if (nameItems.length > 0) {
-          // 異なる文字だけを抽出して読み上げ
-          const descs = nameItems.map(s => {
-            const base1 = item.itemName.replace(/\([^)]*\)/g, '').replace(/ポリカバー/g, '').trim();
-            const base2 = s.itemName.replace(/\([^)]*\)/g, '').replace(/ポリカバー/g, '').trim();
-            // 1文字違いの箇所を特定
-            let diffChar = '';
-            if (base1.length === base2.length) {
-              for (let i = 0; i < base1.length; i++) {
-                if (base1[i] !== base2[i]) { diffChar = base2[i]; break; }
-              }
-            } else {
-              const longer = base1.length > base2.length ? base2 : base1;
-              const shorter = base1.length > base2.length ? base1 : base2;
-              for (let i = 0; i < longer.length; i++) {
-                if (i >= shorter.length || longer[i] !== shorter[i]) { diffChar = longer[i]; break; }
-              }
-            }
-            const label = diffChar || itemNameForSpeech(s.itemName);
-            const fractionCeil = s.fraction % 1 !== 0 ? Math.ceil(s.fraction) : s.fraction;
-            let qty = '';
-            if (s.palletCount > 0 && fractionCeil > 0) {
-              qty = `${s.palletCount}パレット${fractionCeil}ケース`;
-            } else if (s.palletCount > 0) {
-              qty = `${s.palletCount}パレット`;
-            } else if (fractionCeil > 0) {
-              qty = `${fractionCeil}ケース`;
-            }
-            return qty ? `${label}が${qty}` : label;
-          }).join('、');
-          text += `注意、品名違いで${descs}あります。`;
-        }
+      if (hasSimilar) {
+        text += '注意、類似品があります。';
       }
     }
+
 
     speak(text);
   }, []);

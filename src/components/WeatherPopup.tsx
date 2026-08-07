@@ -117,8 +117,13 @@ export default function WeatherPopup({ weather, onClose, isSpeaking }: WeatherPo
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           marginBottom: 14,
         }}>
-          <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, letterSpacing: 0.5 }}>
-            けたか町 温湿度
+          <div>
+            <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, letterSpacing: 0.5 }}>
+              鳥取市 温湿度
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, marginTop: 3 }}>
+              気象庁データ{weather.time ? ` ・ ${weather.time} 時点` : ''}
+            </div>
           </div>
           <button
             onClick={onClose}

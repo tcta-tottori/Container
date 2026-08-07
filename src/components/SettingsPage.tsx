@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import CallPhraseSettings from '@/components/CallPhraseSettings';
 import WaterSoundPanel from '@/components/WaterSoundPanel';
-import { MegaphoneIcon, DropletIcon, CameraIcon, SettingsIcon, CloseIcon } from '@/components/AppIcons';
+import VoiceSettingsPanel from '@/components/VoiceSettingsPanel';
+import { ChatIcon, DropletIcon, CameraIcon, SettingsIcon, CloseIcon, SpeakerIcon } from '@/components/AppIcons';
 import {
   getGeminiKey, setGeminiKey, clearGeminiKey,
   getGeminiModel, setGeminiModel, GEMINI_MODELS, verifyGeminiKey,
 } from '@/lib/geminiApi';
 
-export type SettingsTab = 'call' | 'water' | 'ai';
+export type SettingsTab = 'voice' | 'call' | 'water' | 'ai';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -177,14 +178,15 @@ function AiPhotoSettings() {
   );
 }
 
-const TABS: { id: SettingsTab; label: string; Icon: typeof MegaphoneIcon }[] = [
-  { id: 'call', label: 'コール', Icon: MegaphoneIcon },
+const TABS: { id: SettingsTab; label: string; Icon: typeof ChatIcon }[] = [
+  { id: 'voice', label: '音声', Icon: SpeakerIcon },
+  { id: 'call', label: 'コール', Icon: ChatIcon },
   { id: 'water', label: '水の音', Icon: DropletIcon },
   { id: 'ai', label: 'AI写真', Icon: CameraIcon },
 ];
 
 /** コール・水の音・AI写真をまとめて設定するページ */
-export default function SettingsPage({ onClose, initialTab = 'call', onTestCall }: SettingsPageProps) {
+export default function SettingsPage({ onClose, initialTab = 'voice', onTestCall }: SettingsPageProps) {
   const [tab, setTab] = useState<SettingsTab>(initialTab);
 
   return (
@@ -240,15 +242,15 @@ export default function SettingsPage({ onClose, initialTab = 'call', onTestCall 
                 key={id}
                 onClick={() => setTab(id)}
                 style={{
-                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  padding: '11px 6px', borderRadius: 12, cursor: 'pointer',
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  padding: '11px 4px', borderRadius: 12, cursor: 'pointer',
                   background: active ? 'rgba(139,92,246,0.18)' : 'rgba(255,255,255,0.04)',
                   border: `1px solid ${active ? 'rgba(167,139,250,0.5)' : 'rgba(255,255,255,0.1)'}`,
                   color: active ? '#fff' : 'rgba(255,255,255,0.55)',
-                  fontSize: 13, fontWeight: 700, transition: 'all 0.15s ease',
+                  fontSize: 12, fontWeight: 700, transition: 'all 0.15s ease',
                 }}
               >
-                <Icon size={17} />
+                <Icon size={16} />
                 {label}
               </button>
             );
@@ -257,6 +259,7 @@ export default function SettingsPage({ onClose, initialTab = 'call', onTestCall 
 
         {/* 内容 */}
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          {tab === 'voice' && <VoiceSettingsPanel />}
           {tab === 'call' && <CallPhraseSettings onTest={onTestCall} />}
           {tab === 'water' && <WaterSoundPanel />}
           {tab === 'ai' && <AiPhotoSettings />}
