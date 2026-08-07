@@ -25,7 +25,7 @@ const AUTO_FS_HOLD_MS = 7000;
 /** 全画面になってから回り始めるまでの間 */
 const AUTO_FS_SPIN_DELAY_MS = 300;
 /** 自動回転の初速（度/秒）。勢いよく回り始める */
-const AUTO_FS_SPIN_DPS_START = 102;
+const AUTO_FS_SPIN_DPS_START = 260;
 /** 落ち着いたあとの速さ。作業画面の端数パレット（15秒で1回転）と同じにする */
 const AUTO_FS_SPIN_DPS_END = 360 / 15;
 /** 初速から終速へ近づく時定数（秒）。3倍の時間でほぼ終速になる */
@@ -414,8 +414,12 @@ export default function ItemDetailPanel({
   const autoFsSrcRectRef = useRef<DOMRect | null>(null);
   /** 元の位置へ戻すための移動量と縮小率 */
   const [autoFsFlip, setAutoFsFlip] = useState<{ dx: number; dy: number; s: number } | null>(null);
-  /** 全画面中の回転角（スワイプと自動回転で変わる） */
-  const [autoFsRotY, setAutoFsRotY] = useState(FS_ROT_Y0);
+  /**
+   * 全画面中の回転角。React の再描画を挟むと 20fps 程度になってカクつくため、
+   * 角度は ref で持ち、毎フレーム DOM の transform を直接書き換える。
+   */
+  const autoFsRotRef = useRef(FS_ROT_Y0);
+  const autoFsBodyElRef = useRef<HTMLElement | null>(null);
   const autoFsDragRef = useRef<{ x: number; y: number; rotY: number; moved: boolean } | null>(null);
   /** 最後に触った時刻。これを過ぎると自動回転を再開する */
   const autoFsLastActRef = useRef(0);
@@ -678,7 +682,8 @@ export default function ItemDetailPanel({
       pcsStatRef.current?.getBoundingClientRect() ?? null,
     );
     autoFsSeqRef.current++;
-    setAutoFsRotY(FS_ROT_Y0);
+    autoFsRotRef.current = FS_ROT_Y0;
+    autoFsBodyElRef.current = null;
     setAutoFsFlip(null);
     setAutoFsCapFlip(null);
     autoFsLastActRef.current = performance.now();
@@ -731,7 +736,20 @@ export default function ItemDetailPanel({
     }
   }, [autoFs, setAutoFsPhase, bumpAutoFsHold]);
 
-  // 触っていない間はゆっくり自動回転する（描画負荷を抑えるため約20fpsに間引く）
+  /** 回転角をパレットへ即座に反映する（再描画を挟まない） */
+  const applyAutoFsRot = useCallback((deg: number) => {
+    autoFsRotRef.current = deg;
+    let el = autoFsBodyElRef.current;
+    if (!el || !el.isConnected) {
+      el = (autoFsBoxRef.current?.querySelector('[data-pallet-body]') as HTMLElement | null) ?? null;
+      autoFsBodyElRef.current = el;
+      // 合成レイヤーに載せて、回転のたびに描き直さないようにする
+      if (el) el.style.willChange = 'transform';
+    }
+    if (el) el.style.transform = `rotateX(-25deg) rotateY(${deg}deg)`;
+  }, []);
+
+  // 触っていない間は自動回転する。毎フレーム DOM を直接更新するので滑らかに回る。
   useEffect(() => {
     if (autoFs !== 'show') return;
     let raf = 0;
@@ -745,25 +763,24 @@ export default function ItemDetailPanel({
       if (!last) { last = now; return; }
       if (!autoFsSpinT0Ref.current) autoFsSpinT0Ref.current = now;
       const dt = now - last;
-      if (dt < 45) return;
       last = now;
       // 初速から終速へ指数的に近づける（勢いよく回り始めて、作業画面と同じ速さに落ち着く）
       const elapsed = (now - autoFsSpinT0Ref.current) / 1000;
       const dps = AUTO_FS_SPIN_DPS_END
         + (AUTO_FS_SPIN_DPS_START - AUTO_FS_SPIN_DPS_END) * Math.exp(-elapsed / AUTO_FS_SPIN_EASE_SEC);
-      setAutoFsRotY((v) => v + (dps * dt) / 1000);
+      applyAutoFsRot(autoFsRotRef.current + (dps * dt) / 1000);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [autoFs]);
+  }, [autoFs, applyAutoFsRot]);
 
   // 横スワイプで回転（画面幅いっぱいで180度）
   const handleAutoFsPointerDown = useCallback((e: React.PointerEvent) => {
     if (autoFsPhaseRef.current === 'out') return;
-    autoFsDragRef.current = { x: e.clientX, y: e.clientY, rotY: autoFsRotY, moved: false };
+    autoFsDragRef.current = { x: e.clientX, y: e.clientY, rotY: autoFsRotRef.current, moved: false };
     autoFsLastActRef.current = performance.now();
     bumpAutoFsHold();
-  }, [autoFsRotY, bumpAutoFsHold]);
+  }, [bumpAutoFsHold]);
 
   const handleAutoFsPointerMove = useCallback((e: React.PointerEvent) => {
     const d = autoFsDragRef.current;
@@ -771,10 +788,10 @@ export default function ItemDetailPanel({
     const dx = e.clientX - d.x;
     if (Math.abs(dx) > 6 || Math.abs(e.clientY - d.y) > 6) d.moved = true;
     const degPerPx = AUTO_FS_SWIPE_DEG / Math.max(1, window.innerWidth);
-    setAutoFsRotY(d.rotY + dx * degPerPx);
+    applyAutoFsRot(d.rotY + dx * degPerPx);
     autoFsLastActRef.current = performance.now();
     bumpAutoFsHold();
-  }, [bumpAutoFsHold]);
+  }, [bumpAutoFsHold, applyAutoFsRot]);
 
   const handleAutoFsPointerUp = useCallback((e: React.PointerEvent) => {
     const d = autoFsDragRef.current;
@@ -1267,6 +1284,8 @@ export default function ItemDetailPanel({
             width: '92vw', height: '58vh',
             pointerEvents: 'none',
             transformOrigin: 'center center',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden',
             transform: (autoFs === 'in' || autoFs === 'show') || !autoFsFlip
               ? 'translate(0px, 0px) scale(1)'
               : `translate(${autoFsFlip.dx}px, ${autoFsFlip.dy}px) scale(${autoFsFlip.s})`,
@@ -1280,12 +1299,13 @@ export default function ItemDetailPanel({
             <div style={{
               width: '100%', height: '100%',
               transform: `scale(${autoFsScale})`, transformOrigin: 'center center',
+              willChange: 'transform',
             }}>
               <PalletDiagram
                 palletCount={0} fraction={inspectionDeducted}
                 qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                 measurements={item.measurements} wireframe={false}
-                overrideRotateY={autoFsRotY}
+                overrideRotateY={autoFsRotRef.current}
               />
             </div>
           </div>
@@ -1293,6 +1313,7 @@ export default function ItemDetailPanel({
             {/* 残りCT数は作業画面の CT 表示の位置・大きさから、図と一緒に下りてくる */}
             <div ref={autoFsCapRef} style={{
               transformOrigin: 'center center',
+              willChange: 'transform',
               transform: (autoFs === 'in' || autoFs === 'show') || !autoFsCapFlip
                 ? 'translate(0px, 0px) scale(1)'
                 : `translate(${autoFsCapFlip.dx}px, ${autoFsCapFlip.dy}px) scale(${autoFsCapFlip.s})`,
