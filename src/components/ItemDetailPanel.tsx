@@ -12,7 +12,8 @@ import SizeDiagram, { parseMeas } from './SizeDiagram';
 /* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） =====
  * measure: 実寸を測る（非表示）→ start: 元のパレット位置に縮小配置（アニメなし）
  * → in: 全画面へゆっくり移動 → show: 操作受付 → out: 元の位置へ戻る
- * 横スワイプで回転（画面幅いっぱいで180度）。触っていない間は自動で1周半まわる。
+ * 横スワイプで回転（画面幅いっぱいで180度）。触っていない間は勢いよく回り始め、
+ * 作業画面の端数パレットと同じ速さ（15秒で1回転）まで徐々に落ちる。
  * 表示は7秒で、触ると最後の操作から数え直す。図の外をタップするとすぐ元に戻る。 */
 type AutoFsPhase = 'idle' | 'measure' | 'start' | 'in' | 'show' | 'out';
 /** 元の位置から全画面へ移動する時間（ゆっくり見せる） */
@@ -23,8 +24,12 @@ const AUTO_FS_OUT_MS = 900;
 const AUTO_FS_HOLD_MS = 7000;
 /** 全画面になってから回り始めるまでの間 */
 const AUTO_FS_SPIN_DELAY_MS = 300;
-/** 自動回転の速さ（度/秒）。表示時間とは独立して指定する */
-const AUTO_FS_SPIN_DPS = 102;
+/** 自動回転の初速（度/秒）。勢いよく回り始める */
+const AUTO_FS_SPIN_DPS_START = 102;
+/** 落ち着いたあとの速さ。作業画面の端数パレット（15秒で1回転）と同じにする */
+const AUTO_FS_SPIN_DPS_END = 360 / 15;
+/** 初速から終速へ近づく時定数（秒）。3倍の時間でほぼ終速になる */
+const AUTO_FS_SPIN_EASE_SEC = 1.8;
 /** 画面幅いっぱいのスワイプで回る角度 */
 const AUTO_FS_SWIPE_DEG = 180;
 /** 既定の見る角度 */
@@ -414,6 +419,8 @@ export default function ItemDetailPanel({
   const autoFsDragRef = useRef<{ x: number; y: number; rotY: number; moved: boolean } | null>(null);
   /** 最後に触った時刻。これを過ぎると自動回転を再開する */
   const autoFsLastActRef = useRef(0);
+  /** 自動回転を始めた時刻。ここからの経過で回転速度を落としていく */
+  const autoFsSpinT0Ref = useRef(0);
 
   /** 全画面の文字が飛び出す元（作業画面の CT 表示） */
   const ctStatRef = useRef<HTMLDivElement | null>(null);
@@ -675,6 +682,7 @@ export default function ItemDetailPanel({
     setAutoFsFlip(null);
     setAutoFsCapFlip(null);
     autoFsLastActRef.current = performance.now();
+    autoFsSpinT0Ref.current = 0;
     setAutoFsPhase('measure');
   }, [setAutoFsPhase]);
 
@@ -735,10 +743,15 @@ export default function ItemDetailPanel({
         return;
       }
       if (!last) { last = now; return; }
+      if (!autoFsSpinT0Ref.current) autoFsSpinT0Ref.current = now;
       const dt = now - last;
       if (dt < 45) return;
       last = now;
-      setAutoFsRotY((v) => v + (AUTO_FS_SPIN_DPS * dt) / 1000);
+      // 初速から終速へ指数的に近づける（勢いよく回り始めて、作業画面と同じ速さに落ち着く）
+      const elapsed = (now - autoFsSpinT0Ref.current) / 1000;
+      const dps = AUTO_FS_SPIN_DPS_END
+        + (AUTO_FS_SPIN_DPS_START - AUTO_FS_SPIN_DPS_END) * Math.exp(-elapsed / AUTO_FS_SPIN_EASE_SEC);
+      setAutoFsRotY((v) => v + (dps * dt) / 1000);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
@@ -1230,7 +1243,7 @@ export default function ItemDetailPanel({
 
       {/* 端数パレットのみになった時の全画面「積み方」表示
           元のパレット位置からズームし、背景はガウスぼかし。
-          横スワイプで回転（画面幅で180度）。触っていない間は7秒の表示中に1周半まわる。
+          横スワイプで回転（画面幅で180度）。触っていない間は速い回転から始まり作業画面と同じ速さに落ち着く。
           図の外をタップするとすぐ元に戻る。 */}
       {autoFs !== 'idle' && inspectionDeducted > 0 && (
         <div
