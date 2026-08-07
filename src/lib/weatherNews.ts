@@ -6,7 +6,7 @@
  * - ニュース: 外部APIは制限があるためRSS/スクレイピングの代替としてWeb検索を使用
  */
 
-// 鳥取市気高町宝木の座標
+// 鳥取市気高町宝木の座標（表示・読み上げ上の地名は「鳥取市」に統一）
 const HOUKI_LAT = 35.4833;
 const HOUKI_LON = 134.1167;
 
@@ -149,9 +149,17 @@ export function climateToSpeech(r: ClimateReading, fromSwitchBot = false): strin
   return `${head}${r.temperature}度、湿度${Math.round(r.humidity)}%、暑さ指数${r.wbgt}、${lv}です。${wbgtAdviceToSpeech(r.wbgt)}`;
 }
 
-/** 天気ボタン用コール：現在の気温・湿度・暑さ指数（SwitchBot 接続中は実測値） */
+/** 本日の予報（最高気温・1日を通した降水確率）のコール文 */
+export function forecastToSpeech(w: WeatherData): string {
+  return `今日の最高気温は${w.maxTemp}度、降水確率は${w.precipitationProb}%です。`;
+}
+
+/**
+ * 天気ボタン用コール：現在の気温・湿度・暑さ指数（SwitchBot 接続中は実測値）に加え、
+ * その日の最高気温と1日を通した降水確率を読み上げる。
+ */
 export function weatherToSpeech(w: WeatherData, sb?: ClimateReading | null): string {
-  return climateToSpeech(sb || w, !!sb);
+  return `${climateToSpeech(sb || w, !!sb)}${forecastToSpeech(w)}`;
 }
 
 /** 定期コール等の先頭に付ける気温・湿度・暑さ指数フレーズ（SwitchBot 接続中は実測値） */
@@ -163,8 +171,8 @@ export function currentTempToSpeech(w: WeatherData | null, sb?: ClimateReading |
 
 /** 気温コール：現地の気温・湿度・暑さ指数＋警戒レベルと予報（SwitchBot 接続中は実測値） */
 export function temperatureToSpeech(w: WeatherData, sb?: ClimateReading | null): string {
-  const head = sb ? '' : 'けたかちょうの、';
-  return `${head}${climateToSpeech(sb || w, !!sb)}体感${w.feelsLike}度。最高${w.maxTemp}度、最低${w.minTemp}度。`;
+  const head = sb ? '' : '鳥取市の、';
+  return `${head}${climateToSpeech(sb || w, !!sb)}体感${w.feelsLike}度。今日の最高気温は${w.maxTemp}度、最低${w.minTemp}度、降水確率は${w.precipitationProb}%です。`;
 }
 
 // ニュース取得（Google News RSS経由）

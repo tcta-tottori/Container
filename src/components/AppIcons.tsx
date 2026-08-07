@@ -57,6 +57,16 @@ export function SettingsIcon(p: IconProps) {
   );
 }
 
+/** コール文言（吹き出し） */
+export function ChatIcon(p: IconProps) {
+  return <Svg {...p}><path d="M20 15.5a2.5 2.5 0 0 1-2.5 2.5H8l-4 3V6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5z" /><line x1="8" y1="9.5" x2="16" y2="9.5" /><line x1="8" y1="13" x2="13" y2="13" /></Svg>;
+}
+
+/** 音声（スピーカー） */
+export function SpeakerIcon(p: IconProps) {
+  return <Svg {...p}><path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" /><path d="M15.5 9.2a4 4 0 0 1 0 5.6" /><path d="M18.2 6.6a7.6 7.6 0 0 1 0 10.8" /></Svg>;
+}
+
 /** 履歴（時計） */
 export function ClockIcon(p: IconProps) {
   return <Svg {...p}><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></Svg>;

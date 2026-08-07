@@ -8,8 +8,6 @@ import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
 import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
-import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled, setGeminiTtsEnabled, getGeminiTtsModel, setGeminiTtsModel, getLastTtsError, subscribeTtsError, DEFAULT_GEMINI_TTS_MODEL, geminiGenerateSpeech } from '@/lib/geminiTts';
-import { getGeminiKey } from '@/lib/geminiApi';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForSpeech } from '@/lib/typeDetector';
@@ -1093,126 +1091,14 @@ export default function Home() {
     getWaterSoundEngine().setDucked(isSpeaking || isPreparingSpeech);
   }, [isSpeaking, isPreparingSpeech]);
 
-  // 音声種類選択メニュー（マイクボタン長押しで開く）
-  const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
-  const [currentVoice, setCurrentVoice] = useState<string>('Kore');
-  const [geminiTtsOn, setGeminiTtsOn] = useState<boolean>(false);
-  const [hasGeminiKey, setHasGeminiKey] = useState<boolean>(false);
-  const [ttsModelName, setTtsModelName] = useState<string>(DEFAULT_GEMINI_TTS_MODEL);
-  const [ttsError, setTtsError] = useState<string | null>(null);
-  useEffect(() => {
-    setCurrentVoice(getSelectedVoice());
-    setGeminiTtsOn(isGeminiTtsEnabled());
-    setHasGeminiKey(!!getGeminiKey());
-    setTtsModelName(getGeminiTtsModel());
-    setTtsError(getLastTtsError());
-    return subscribeTtsError(setTtsError);
-  }, []);
-
-  const toggleGeminiTts = useCallback((enabled: boolean) => {
-    setGeminiTtsEnabled(enabled);
-    setGeminiTtsOn(enabled);
-  }, []);
-
-  const handleModelNameChange = useCallback((name: string) => {
-    setTtsModelName(name);
-    setGeminiTtsModel(name);
-  }, []);
-
-  // 各音声のサンプル試聴
-  const [sampleLoadingId, setSampleLoadingId] = useState<string | null>(null);
-  const [samplePlayingId, setSamplePlayingId] = useState<string | null>(null);
-  const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
-  const sampleUrlRef = useRef<string | null>(null);
-
-  const stopSample = useCallback(() => {
-    if (sampleAudioRef.current) {
-      try { sampleAudioRef.current.pause(); } catch { /* ignore */ }
-      sampleAudioRef.current = null;
-    }
-    if (sampleUrlRef.current) {
-      try { URL.revokeObjectURL(sampleUrlRef.current); } catch { /* ignore */ }
-      sampleUrlRef.current = null;
-    }
-    setSampleLoadingId(null);
-    setSamplePlayingId(null);
-  }, []);
-
-  const playSample = useCallback(async (voiceId: string) => {
-    stopSample();
-    setSampleLoadingId(voiceId);
-    try {
-      const blob = await geminiGenerateSpeech('こんにちは、サンプル音声です。', { voice: voiceId });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      sampleAudioRef.current = audio;
-      sampleUrlRef.current = url;
-      audio.onplay = () => {
-        setSampleLoadingId(null);
-        setSamplePlayingId(voiceId);
-      };
-      const cleanup = () => {
-        if (sampleUrlRef.current === url) {
-          URL.revokeObjectURL(url);
-          sampleUrlRef.current = null;
-        }
-        if (sampleAudioRef.current === audio) sampleAudioRef.current = null;
-        setSamplePlayingId((cur) => (cur === voiceId ? null : cur));
-      };
-      audio.onended = cleanup;
-      audio.onerror = cleanup;
-      await audio.play();
-    } catch (err) {
-      console.error('サンプル再生失敗:', err);
-      setSampleLoadingId(null);
-      setSamplePlayingId(null);
-    }
-  }, [stopSample]);
-  const longPressTimerRef = useRef<number | null>(null);
-  const longPressFiredRef = useRef(false);
-
-  const handleMicPressStart = useCallback(() => {
-    longPressFiredRef.current = false;
-    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = window.setTimeout(() => {
-      longPressFiredRef.current = true;
-      setCurrentVoice(getSelectedVoice());
-      setGeminiTtsOn(isGeminiTtsEnabled());
-      setHasGeminiKey(!!getGeminiKey());
-      setTtsModelName(getGeminiTtsModel());
-      setTtsError(getLastTtsError());
-      setVoiceMenuOpen(true);
-    }, 500);
-  }, []);
-
-  const handleMicPressEnd = useCallback(() => {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    if (longPressFiredRef.current) {
-      longPressFiredRef.current = false;
-      return; // 長押しの場合は通常クリックを発火しない
-    }
+  /** マイクボタン: タップで録音の開始/停止（コール中はコール停止） */
+  const handleMicTap = useCallback(() => {
     if (isSpeaking) {
       cancelSpeech();
       return;
     }
     toggleListening();
   }, [isSpeaking, toggleListening]);
-
-  const handleMicPressCancel = useCallback(() => {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    longPressFiredRef.current = false;
-  }, []);
-
-  const handleSelectVoice = useCallback((voiceId: string) => {
-    setSelectedVoice(voiceId);
-    setCurrentVoice(voiceId);
-  }, []);
 
   // 初期ロード中はスプラッシュ画面
   if (!appReady) {
@@ -1371,7 +1257,7 @@ export default function Home() {
               <HelpIcon size={20} />
               マニュアル
             </button>
-            <button className="menu-item" onClick={() => { setSettingsTab('call'); setMenuOpen(false); }}>
+            <button className="menu-item" onClick={() => { setSettingsTab('voice'); setMenuOpen(false); }}>
               <SettingsIcon size={20} />
               設定
             </button>
@@ -1616,10 +1502,7 @@ export default function Home() {
               `}</style>
             )}
             <button
-              onPointerDown={handleMicPressStart}
-              onPointerUp={handleMicPressEnd}
-              onPointerLeave={handleMicPressCancel}
-              onPointerCancel={handleMicPressCancel}
+              onClick={handleMicTap}
               onContextMenu={(e) => e.preventDefault()}
               className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
               style={{
@@ -1694,250 +1577,6 @@ export default function Home() {
               )}
             </button>
 
-            {/* 音声種類選択メニュー（マイクボタン長押しで表示） */}
-            {voiceMenuOpen && (
-              <div
-                onClick={() => { stopSample(); setVoiceMenuOpen(false); }}
-                style={{
-                  position: 'fixed', inset: 0, zIndex: 150,
-                  background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-                  display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-                  paddingBottom: 96, animation: 'fadeIn 0.18s ease both',
-                }}
-              >
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
-                    border: '1.5px solid rgba(255,255,255,0.15)',
-                    borderRadius: 20, padding: 16,
-                    boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
-                    width: '92%', maxWidth: 360,
-                    maxHeight: '70vh', overflowY: 'auto',
-                  }}
-                >
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    marginBottom: 12, paddingBottom: 8,
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                  }}>
-                    <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>声の種類</div>
-                    <div style={{ color: geminiTtsOn ? '#a78bfa' : '#facc15', fontSize: 11 }}>
-                      {!hasGeminiKey
-                        ? 'Gemini キー未設定'
-                        : geminiTtsOn ? 'Gemini 3.1 Flash TTS' : 'Web Speech API'}
-                    </div>
-                  </div>
-
-                  {/* 音声エンジン切り替えトグル */}
-                  {hasGeminiKey && (
-                    <div style={{
-                      display: 'flex', gap: 6, marginBottom: 12,
-                      padding: 4, borderRadius: 10,
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                    }}>
-                      <button
-                        onClick={() => toggleGeminiTts(true)}
-                        style={{
-                          flex: 1, padding: '8px 10px', borderRadius: 7,
-                          background: geminiTtsOn
-                            ? 'linear-gradient(135deg, rgba(139,92,246,0.4), rgba(74,110,247,0.3))'
-                            : 'transparent',
-                          border: geminiTtsOn ? '1px solid rgba(167,139,250,0.5)' : '1px solid transparent',
-                          color: geminiTtsOn ? '#fff' : '#888', fontSize: 12, fontWeight: 600,
-                          cursor: 'pointer', transition: 'all 0.15s ease',
-                        }}
-                      >
-                        Gemini 3.1 Flash
-                      </button>
-                      <button
-                        onClick={() => toggleGeminiTts(false)}
-                        style={{
-                          flex: 1, padding: '8px 10px', borderRadius: 7,
-                          background: !geminiTtsOn
-                            ? 'linear-gradient(135deg, rgba(74,110,247,0.35), rgba(99,102,241,0.25))'
-                            : 'transparent',
-                          border: !geminiTtsOn ? '1px solid rgba(74,110,247,0.5)' : '1px solid transparent',
-                          color: !geminiTtsOn ? '#fff' : '#888', fontSize: 12, fontWeight: 600,
-                          cursor: 'pointer', transition: 'all 0.15s ease',
-                        }}
-                      >
-                        Web Speech
-                      </button>
-                    </div>
-                  )}
-
-                  {!hasGeminiKey && (
-                    <div style={{
-                      color: '#facc15', fontSize: 11, lineHeight: 1.5,
-                      padding: '8px 10px', marginBottom: 10,
-                      background: 'rgba(250,204,21,0.08)',
-                      border: '1px solid rgba(250,204,21,0.2)',
-                      borderRadius: 8,
-                    }}>
-                      Gemini API キーを設定すると高品質な音声(声の種類選択)が使えます。
-                    </div>
-                  )}
-                  {hasGeminiKey && !geminiTtsOn && (
-                    <div style={{
-                      color: '#94a3b8', fontSize: 11, lineHeight: 1.5,
-                      padding: '8px 10px', marginBottom: 10,
-                      background: 'rgba(148,163,184,0.06)',
-                      border: '1px solid rgba(148,163,184,0.15)',
-                      borderRadius: 8,
-                    }}>
-                      Web Speech API 使用中。声の種類選択は Gemini に切り替え後に反映されます。
-                    </div>
-                  )}
-
-                  {/* Gemini TTS のエラー表示 */}
-                  {hasGeminiKey && geminiTtsOn && ttsError && (
-                    <div style={{
-                      color: '#fca5a5', fontSize: 11, lineHeight: 1.5,
-                      padding: '8px 10px', marginBottom: 10,
-                      background: 'rgba(239,68,68,0.08)',
-                      border: '1px solid rgba(239,68,68,0.25)',
-                      borderRadius: 8,
-                      wordBreak: 'break-all',
-                    }}>
-                      <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ Gemini TTS エラー</div>
-                      <div>{ttsError}</div>
-                      <div style={{ marginTop: 4, color: '#fca5a5', opacity: 0.8 }}>
-                        モデル名を変更するか「Web Speech」に切り替えてください。
-                      </div>
-                    </div>
-                  )}
-
-                  {/* モデル名入力（Gemini 使用時のみ） */}
-                  {hasGeminiKey && geminiTtsOn && (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>
-                        モデル名（他システムで動く名前があればここに）
-                      </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <input
-                          type="text"
-                          value={ttsModelName}
-                          onChange={(e) => handleModelNameChange(e.target.value)}
-                          placeholder={DEFAULT_GEMINI_TTS_MODEL}
-                          style={{
-                            flex: 1, padding: '8px 10px', borderRadius: 7,
-                            background: 'rgba(0,0,0,0.3)',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            color: '#fff', fontSize: 12,
-                            fontFamily: 'monospace',
-                            outline: 'none',
-                          }}
-                        />
-                        <button
-                          onClick={() => handleModelNameChange(DEFAULT_GEMINI_TTS_MODEL)}
-                          style={{
-                            padding: '8px 10px', borderRadius: 7,
-                            background: 'rgba(255,255,255,0.04)',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            color: '#aaa', fontSize: 11, cursor: 'pointer',
-                          }}
-                        >
-                          初期値
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ display: 'grid', gap: 6 }}>
-                    {GEMINI_VOICES.map((v) => {
-                      const selected = v.id === currentVoice;
-                      const sampleLoading = sampleLoadingId === v.id;
-                      const samplePlaying = samplePlayingId === v.id;
-                      const canSample = hasGeminiKey && geminiTtsOn;
-                      return (
-                        <div
-                          key={v.id}
-                          onClick={() => handleSelectVoice(v.id)}
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            gap: 8, padding: '10px 12px', borderRadius: 10,
-                            background: selected
-                              ? 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(74,110,247,0.25))'
-                              : 'rgba(255,255,255,0.04)',
-                            border: selected
-                              ? '1.5px solid rgba(167,139,250,0.6)'
-                              : '1px solid rgba(255,255,255,0.08)',
-                            color: '#fff', cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600 }}>{v.label}</div>
-                            <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{v.desc}</div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {/* サンプル試聴ボタン */}
-                            {canSample && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (samplePlaying || sampleLoading) {
-                                    stopSample();
-                                  } else {
-                                    void playSample(v.id);
-                                  }
-                                }}
-                                title="サンプル試聴"
-                                style={{
-                                  width: 32, height: 32, borderRadius: '50%',
-                                  background: samplePlaying
-                                    ? 'rgba(167,139,250,0.3)'
-                                    : 'rgba(255,255,255,0.08)',
-                                  border: '1px solid rgba(255,255,255,0.15)',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  cursor: 'pointer', flexShrink: 0,
-                                  color: '#fff',
-                                }}
-                              >
-                                {sampleLoading ? (
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                    style={{ animation: 'ttsLoadSpin 0.9s linear infinite' }}>
-                                    <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.25)" strokeWidth="3" fill="none" />
-                                    <path d="M12 3 a9 9 0 0 1 9 9" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" />
-                                  </svg>
-                                ) : samplePlaying ? (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
-                                    <rect x="6" y="5" width="4" height="14" rx="1" />
-                                    <rect x="14" y="5" width="4" height="14" rx="1" />
-                                  </svg>
-                                ) : (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
-                                    <path d="M8 5v14l11-7z" />
-                                  </svg>
-                                )}
-                              </button>
-                            )}
-                            {selected && (
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button
-                    onClick={() => { stopSample(); setVoiceMenuOpen(false); }}
-                    style={{
-                      marginTop: 12, width: '100%', padding: '10px',
-                      borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.04)', color: '#ccc',
-                      fontSize: 13, cursor: 'pointer',
-                    }}
-                  >
-                    閉じる
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
         <UpdateNotification />
