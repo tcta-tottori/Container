@@ -399,11 +399,6 @@ export default function ItemDetailPanel({
   const [fullscreenPallet, setFullscreenPallet] = useState<'full' | 'fraction' | null>(null);
   const [fsRotateY, setFsRotateY] = useState(-35);
   const fsTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
-  const [fractionZoom, setFractionZoom] = useState<'idle' | 'zoomIn' | 'show' | 'zoomOut'>('idle');
-  const [fzRotateY, setFzRotateY] = useState(0);
-  const [fzManual, setFzManual] = useState(false);
-  const fzTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
-  const fzAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 端数パレットのみになった時の全画面表示
   const [autoFs, setAutoFs] = useState<AutoFsPhase>('idle');
   const autoFsPhaseRef = useRef<AutoFsPhase>('idle');
@@ -619,39 +614,6 @@ export default function ItemDetailPanel({
   const animCT = useCountUp(ctTarget ?? 0, animKey, isTransitioning);
   const animPCS = useCountUp(pcsTarget ?? 0, animKey, isTransitioning);
 
-  // 端数パレットズーム: タップで開く・再タップ or 5秒で閉じる
-  const closeFractionZoom = useCallback(() => {
-    if (fzAutoTimerRef.current) clearTimeout(fzAutoTimerRef.current);
-    fzAutoTimerRef.current = null;
-    setFractionZoom('zoomOut');
-    setTimeout(() => { setFractionZoom('idle'); setFzRotateY(0); setFzManual(false); }, 500);
-  }, []);
-
-  const openFractionZoom = useCallback((autoClose = false) => {
-    if (fractionZoom === 'show' || fractionZoom === 'zoomIn') {
-      closeFractionZoom();
-      return;
-    }
-    if (fractionZoom === 'zoomOut') return;
-    setFzRotateY(0);
-    setFzManual(false);
-    setFractionZoom('zoomIn');
-    setTimeout(() => setFractionZoom('show'), 500);
-    if (autoClose) {
-      if (fzAutoTimerRef.current) clearTimeout(fzAutoTimerRef.current);
-      fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000);
-    }
-  }, [fractionZoom, closeFractionZoom]);
-
-  // タップ時: 手動ズーム（何度でも可、5秒自動閉じ）
-  const handleFractionTap = useCallback(() => {
-    if (fractionZoom === 'show' || fractionZoom === 'zoomIn') {
-      closeFractionZoom();
-    } else {
-      openFractionZoom(true);
-    }
-  }, [fractionZoom, openFractionZoom, closeFractionZoom]);
-
   // ===== 残りが端数パレットになったら積み方を全画面表示（操作が5秒途切れたら戻る） =====
   const setAutoFsPhase = useCallback((phase: AutoFsPhase) => {
     autoFsPhaseRef.current = phase;
@@ -690,6 +652,12 @@ export default function ItemDetailPanel({
     autoFsSpinT0Ref.current = 0;
     setAutoFsPhase('measure');
   }, [setAutoFsPhase]);
+
+  /** 端数パレットのタップ: 自動表示と同じ全画面を開く（表示中なら閉じる） */
+  const handleFractionTap = useCallback(() => {
+    if (autoFsPhaseRef.current === 'idle') openAutoFullscreen();
+    else closeAutoFullscreen();
+  }, [openAutoFullscreen, closeAutoFullscreen]);
 
   // フェーズ進行: 実寸を測る → 元の位置に置く → 全画面へ移動
   useEffect(() => {
@@ -1193,71 +1161,6 @@ export default function ItemDetailPanel({
       </div>
 
       {/* パレット全画面表示モーダル */}
-      {/* 端数パレット上半分ズーム表示 */}
-      {fractionZoom !== 'idle' && inspectionDeducted > 0 && (
-        <>
-          <style>{`
-            @keyframes fzBlurIn { 0% { backdrop-filter: blur(0); opacity: 0; } 100% { backdrop-filter: blur(2px); opacity: 1; } }
-            @keyframes fzBlurOut { 0% { backdrop-filter: blur(2px); opacity: 1; } 100% { backdrop-filter: blur(0); opacity: 0; } }
-            @keyframes fzZoomIn { 0% { transform: scale(0) rotate(0deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
-            @keyframes fzZoomOut { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0); opacity: 0; } }
-          `}</style>
-          {/* 上半分ぼかし（暗くしない） */}
-          <div className="detail-upper" style={{
-            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
-            background: 'rgba(0,0,0,0.08)',
-            animation: fractionZoom === 'zoomOut' ? 'fzBlurOut 0.5s ease both' : 'fzBlurIn 0.3s ease both',
-            pointerEvents: fractionZoom === 'show' ? 'auto' : 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 0, gap: 0, touchAction: 'none', cursor: 'grab',
-          }}
-            onClick={(e) => { if (!fzTouchRef.current) { e.stopPropagation(); closeFractionZoom(); } }}
-            onTouchStart={(e) => { fzTouchRef.current = { startX: e.touches[0].clientX, startRotY: fzRotateY }; }}
-            onTouchMove={(e) => {
-              if (!fzTouchRef.current) return;
-              e.preventDefault();
-              setFzManual(true);
-              setFzRotateY(fzTouchRef.current.startRotY + (e.touches[0].clientX - fzTouchRef.current.startX) * 0.5);
-              if (fzAutoTimerRef.current) { clearTimeout(fzAutoTimerRef.current); fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000); }
-            }}
-            onTouchEnd={() => {
-              if (fzTouchRef.current) {
-                const dx = Math.abs(fzRotateY - fzTouchRef.current.startRotY);
-                fzTouchRef.current = null;
-                if (dx > 3) return; // スワイプ時はclickで閉じない
-              }
-            }}
-            onMouseDown={(e) => { fzTouchRef.current = { startX: e.clientX, startRotY: fzRotateY }; }}
-            onMouseMove={(e) => {
-              if (!fzTouchRef.current || !e.buttons) return;
-              setFzManual(true);
-              setFzRotateY(fzTouchRef.current.startRotY + (e.clientX - fzTouchRef.current.startX) * 0.5);
-              if (fzAutoTimerRef.current) { clearTimeout(fzAutoTimerRef.current); fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000); }
-            }}
-            onMouseUp={() => {
-              if (fzTouchRef.current) {
-                const dx = Math.abs(fzRotateY - fzTouchRef.current.startRotY);
-                fzTouchRef.current = null;
-                if (dx > 3) return;
-              }
-            }}
-          >
-            <div style={{
-              width: '90%', height: '90%', transform: fractionZoom === 'show' ? 'scale(1.8)' : undefined,
-              animation: fractionZoom === 'zoomIn' ? 'fzZoomIn 0.5s cubic-bezier(0.2,0.8,0.3,1) both'
-                : fractionZoom === 'zoomOut' ? 'fzZoomOut 0.5s ease both'
-                : undefined,
-            }}>
-              <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet}
-                type={item.type} itemName={item.itemName} measurements={item.measurements}
-                overrideRotateY={fractionZoom === 'show' && fzManual ? fzRotateY : undefined}
-                wireframe={false}
-              />
-            </div>
-          </div>
-        </>
-      )}
-
       {/* 端数パレットのみになった時の全画面「積み方」表示
           元のパレット位置からズームし、背景はガウスぼかし。
           横スワイプで回転（画面幅で180度）。触っていない間は速い回転から始まり作業画面と同じ速さに落ち着く。
