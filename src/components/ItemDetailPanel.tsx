@@ -12,19 +12,21 @@ import SizeDiagram, { parseMeas } from './SizeDiagram';
 /* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） =====
  * measure: 実寸を測る（非表示）→ start: 元のパレット位置に縮小配置（アニメなし）
  * → in: 全画面へゆっくり移動 → show: 操作受付 → out: 元の位置へ戻る
- * 横スワイプで回転（画面幅いっぱいで180度）。触っていない間はゆっくり自動回転する。
- * 図の外をタップすると元に戻る。 */
+ * 横スワイプで回転（画面幅いっぱいで180度）。触っていない間は自動で1周半まわる。
+ * 表示は7秒で、触ると最後の操作から数え直す。図の外をタップするとすぐ元に戻る。 */
 type AutoFsPhase = 'idle' | 'measure' | 'start' | 'in' | 'show' | 'out';
 /** 元の位置から全画面へ移動する時間（ゆっくり見せる） */
 const AUTO_FS_IN_MS = 1400;
 /** 元の位置へ戻る時間 */
 const AUTO_FS_OUT_MS = 900;
-/** 最後の操作から自動回転を再開するまで */
-const AUTO_FS_SPIN_DELAY_MS = 1200;
-/** 自動回転の速さ（度/秒） */
-const AUTO_FS_SPIN_DPS = 14;
-/** 自動回転がこの角度（1周半）に達したら元に戻る */
-const AUTO_FS_SPIN_END_DEG = 540;
+/** 全画面を表示しておく時間。触ると最後の操作から数え直す */
+const AUTO_FS_HOLD_MS = 7000;
+/** 全画面になってから回り始めるまでの間 */
+const AUTO_FS_SPIN_DELAY_MS = 300;
+/** 自動回転で回る角度（1周半） */
+const AUTO_FS_SPIN_DEG = 540;
+/** 自動回転の速さ。表示時間のうち回転に使える時間で1周半しきる速さにする */
+const AUTO_FS_SPIN_DPS = AUTO_FS_SPIN_DEG / ((AUTO_FS_HOLD_MS - AUTO_FS_IN_MS - AUTO_FS_SPIN_DELAY_MS) / 1000);
 /** 画面幅いっぱいのスワイプで回る角度 */
 const AUTO_FS_SWIPE_DEG = 180;
 /** 既定の見る角度 */
@@ -403,8 +405,7 @@ export default function ItemDetailPanel({
   const autoFsDragRef = useRef<{ x: number; y: number; rotY: number; moved: boolean } | null>(null);
   /** 最後に触った時刻。これを過ぎると自動回転を再開する */
   const autoFsLastActRef = useRef(0);
-  /** 自動回転で回った累計角度（1周半で自動的に戻る）。触ると 0 に戻す */
-  const autoFsSpunRef = useRef(0);
+
   /** 全画面の文字が飛び出す元（作業画面の CT 表示） */
   const ctStatRef = useRef<HTMLDivElement | null>(null);
   const autoFsCapRef = useRef<HTMLDivElement | null>(null);
@@ -646,6 +647,12 @@ export default function ItemDetailPanel({
     }, AUTO_FS_OUT_MS);
   }, [setAutoFsPhase]);
 
+  /** 表示時間を数え直す（触るたびに呼ぶ） */
+  const bumpAutoFsHold = useCallback(() => {
+    if (autoFsHoldRef.current) clearTimeout(autoFsHoldRef.current);
+    autoFsHoldRef.current = setTimeout(closeAutoFullscreen, AUTO_FS_HOLD_MS);
+  }, [closeAutoFullscreen]);
+
   const openAutoFullscreen = useCallback(() => {
     // 画面に出ている端数パレットの位置を記録し、そこからゆっくり移動させる
     autoFsSrcRectRef.current = fractionSrcRef.current?.getBoundingClientRect() ?? null;
@@ -654,7 +661,6 @@ export default function ItemDetailPanel({
     setAutoFsRotY(FS_ROT_Y0);
     setAutoFsFlip(null);
     setAutoFsCapFlip(null);
-    autoFsSpunRef.current = 0;
     autoFsLastActRef.current = performance.now();
     setAutoFsPhase('measure');
   }, [setAutoFsPhase]);
@@ -698,10 +704,11 @@ export default function ItemDetailPanel({
       return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
     }
     if (autoFs === 'in') {
+      bumpAutoFsHold();
       const t = setTimeout(() => setAutoFsPhase('show'), AUTO_FS_IN_MS);
       return () => clearTimeout(t);
     }
-  }, [autoFs, setAutoFsPhase]);
+  }, [autoFs, setAutoFsPhase, bumpAutoFsHold]);
 
   // 触っていない間はゆっくり自動回転する（描画負荷を抑えるため約20fpsに間引く）
   useEffect(() => {
@@ -718,23 +725,19 @@ export default function ItemDetailPanel({
       const dt = now - last;
       if (dt < 45) return;
       last = now;
-      const deg = (AUTO_FS_SPIN_DPS * dt) / 1000;
-      autoFsSpunRef.current += deg;
-      setAutoFsRotY((v) => v + deg);
-      // 1周半まわったら自動で元に戻す
-      if (autoFsSpunRef.current >= AUTO_FS_SPIN_END_DEG) closeAutoFullscreen();
+      setAutoFsRotY((v) => v + (AUTO_FS_SPIN_DPS * dt) / 1000);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [autoFs, closeAutoFullscreen]);
+  }, [autoFs]);
 
   // 横スワイプで回転（画面幅いっぱいで180度）
   const handleAutoFsPointerDown = useCallback((e: React.PointerEvent) => {
     if (autoFsPhaseRef.current === 'out') return;
     autoFsDragRef.current = { x: e.clientX, y: e.clientY, rotY: autoFsRotY, moved: false };
     autoFsLastActRef.current = performance.now();
-    autoFsSpunRef.current = 0;
-  }, [autoFsRotY]);
+    bumpAutoFsHold();
+  }, [autoFsRotY, bumpAutoFsHold]);
 
   const handleAutoFsPointerMove = useCallback((e: React.PointerEvent) => {
     const d = autoFsDragRef.current;
@@ -744,12 +747,14 @@ export default function ItemDetailPanel({
     const degPerPx = AUTO_FS_SWIPE_DEG / Math.max(1, window.innerWidth);
     setAutoFsRotY(d.rotY + dx * degPerPx);
     autoFsLastActRef.current = performance.now();
-  }, []);
+    bumpAutoFsHold();
+  }, [bumpAutoFsHold]);
 
   const handleAutoFsPointerUp = useCallback((e: React.PointerEvent) => {
     const d = autoFsDragRef.current;
     autoFsDragRef.current = null;
     autoFsLastActRef.current = performance.now();
+    bumpAutoFsHold();
     if (!d || d.moved) return;
     // 図の外をタップしたら元に戻す（図の上のタップは何もしない）
     const body = autoFsBoxRef.current?.querySelector('[data-pallet-body]') as HTMLElement | null;
@@ -758,7 +763,7 @@ export default function ItemDetailPanel({
       && e.clientX >= r.left - 16 && e.clientX <= r.right + 16
       && e.clientY >= r.top - 16 && e.clientY <= r.bottom + 16;
     if (!onFigure) closeAutoFullscreen();
-  }, [closeAutoFullscreen]);
+  }, [closeAutoFullscreen, bumpAutoFsHold]);
 
   // アンマウント時にタイマーを掃除
   useEffect(() => () => {
@@ -1212,8 +1217,8 @@ export default function ItemDetailPanel({
 
       {/* 端数パレットのみになった時の全画面「積み方」表示
           元のパレット位置からズームし、背景はガウスぼかし。
-          横スワイプで回転（画面幅で180度）。触っていない間はゆっくり自動回転。
-          図の外をタップすると元に戻る。 */}
+          横スワイプで回転（画面幅で180度）。触っていない間は7秒の表示中に1周半まわる。
+          図の外をタップするとすぐ元に戻る。 */}
       {autoFs !== 'idle' && inspectionDeducted > 0 && (
         <div
           onPointerDown={handleAutoFsPointerDown}
