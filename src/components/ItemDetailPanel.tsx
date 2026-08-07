@@ -23,10 +23,8 @@ const AUTO_FS_OUT_MS = 900;
 const AUTO_FS_HOLD_MS = 7000;
 /** 全画面になってから回り始めるまでの間 */
 const AUTO_FS_SPIN_DELAY_MS = 300;
-/** 自動回転で回る角度（1周半） */
-const AUTO_FS_SPIN_DEG = 540;
-/** 自動回転の速さ。表示時間のうち回転に使える時間で1周半しきる速さにする */
-const AUTO_FS_SPIN_DPS = AUTO_FS_SPIN_DEG / ((AUTO_FS_HOLD_MS - AUTO_FS_IN_MS - AUTO_FS_SPIN_DELAY_MS) / 1000);
+/** 自動回転の速さ（度/秒）。表示時間とは独立して指定する */
+const AUTO_FS_SPIN_DPS = 102;
 /** 画面幅いっぱいのスワイプで回る角度 */
 const AUTO_FS_SWIPE_DEG = 180;
 /** 既定の見る角度 */
@@ -1277,23 +1275,36 @@ export default function ItemDetailPanel({
                   : 'none',
               opacity: autoFs === 'measure' ? 0 : 1,
             }}>
-              <p style={{
-                margin: 0, color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
-                textShadow: `0 0 18px ${accentColor}88, 0 2px 10px rgba(0,0,0,0.9)`,
-                whiteSpace: 'nowrap',
-              }}>
-                のこり 端数パレット {fmtNum(animCT)} CT
-              </p>
+              {/* 作業画面の CT 表示と同じ内容を、大きいサイズで見せる */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 6 }}>
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 'clamp(56px, 20vw, 110px)',
+                  fontWeight: 900, fontVariantNumeric: 'tabular-nums', letterSpacing: -3,
+                  lineHeight: 0.78, color: '#fff',
+                  textShadow: `0 0 26px ${accentColor}77, 0 3px 14px rgba(0,0,0,0.9)`,
+                }}>
+                  {fmtNum(animCT)}
+                </span>
+                <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  {rawFraction > 0 && rawFraction !== inspectionDeducted && (
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 'clamp(16px, 5vw, 26px)', fontWeight: 700,
+                      lineHeight: 1, color: '#e8e8e8', textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+                    }}>({rawFraction})</span>
+                  )}
+                  <span style={{
+                    fontFamily: 'var(--font-body)', fontSize: 'clamp(18px, 6vw, 30px)', fontWeight: 700,
+                    lineHeight: 1, color: 'rgba(255,255,255,0.75)', textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+                  }}>CT</span>
+                </span>
+              </div>
             </div>
             {/* 補足の文字は移動後に浮かび上がらせる */}
             <div style={{
               opacity: autoFs === 'show' ? 1 : 0,
               transition: `opacity ${autoFs === 'out' ? AUTO_FS_OUT_MS / 2 : 400}ms ease`,
             }}>
-              <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.6)', fontSize: 12, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
-                この積み方で仕上げ
-              </p>
-              <p style={{ margin: '10px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 11, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
+              <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 11, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
                 スワイプで回転／図の外をタップで戻る
               </p>
             </div>
