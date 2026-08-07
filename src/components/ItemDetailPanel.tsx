@@ -11,18 +11,22 @@ import SizeDiagram, { parseMeas } from './SizeDiagram';
 
 /* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） =====
  * measure: 実寸を測る（非表示）→ start: 元のパレット位置に縮小配置（アニメなし）
- * → in: 全画面へズーム → show: 操作受付 → out: 元の位置へ戻る
- * ドラッグで自由回転、タップで45°回転。操作が5秒途切れたら自動で閉じる。 */
+ * → in: 全画面へゆっくり移動 → show: 操作受付 → out: 元の位置へ戻る
+ * 横スワイプで回転（画面幅いっぱいで180度）。触っていない間はゆっくり自動回転する。
+ * 図の外をタップすると元に戻る。 */
 type AutoFsPhase = 'idle' | 'measure' | 'start' | 'in' | 'show' | 'out';
-/** ズームイン時間 */
-const AUTO_FS_IN_MS = 700;
-/** ズームアウト時間 */
-const AUTO_FS_OUT_MS = 600;
-/** 最後の操作から自動で閉じるまで（5秒） */
-const AUTO_FS_IDLE_MS = 5000;
+/** 元の位置から全画面へ移動する時間（ゆっくり見せる） */
+const AUTO_FS_IN_MS = 1400;
+/** 元の位置へ戻る時間 */
+const AUTO_FS_OUT_MS = 900;
+/** 最後の操作から自動回転を再開するまで */
+const AUTO_FS_SPIN_DELAY_MS = 1200;
+/** 自動回転の速さ（度/秒） */
+const AUTO_FS_SPIN_DPS = 14;
+/** 画面幅いっぱいのスワイプで回る角度 */
+const AUTO_FS_SWIPE_DEG = 180;
 /** 既定の見る角度 */
 const FS_ROT_Y0 = -35;
-const FS_ROT_X0 = -25;
 
 /**
  * カウントアニメーション（アップ/ダウン対応）
@@ -392,10 +396,11 @@ export default function ItemDetailPanel({
   const autoFsSrcRectRef = useRef<DOMRect | null>(null);
   /** 元の位置へ戻すための移動量と縮小率 */
   const [autoFsFlip, setAutoFsFlip] = useState<{ dx: number; dy: number; s: number } | null>(null);
-  /** 全画面中の回転角（ドラッグ・タップで変わる） */
+  /** 全画面中の回転角（スワイプと自動回転で変わる） */
   const [autoFsRotY, setAutoFsRotY] = useState(FS_ROT_Y0);
-  const [autoFsRotX, setAutoFsRotX] = useState(FS_ROT_X0);
-  const autoFsDragRef = useRef<{ x: number; y: number; rotY: number; rotX: number; moved: boolean } | null>(null);
+  const autoFsDragRef = useRef<{ x: number; y: number; rotY: number; moved: boolean } | null>(null);
+  /** 最後に触った時刻。これを過ぎると自動回転を再開する */
+  const autoFsLastActRef = useRef(0);
   const [animKey, setAnimKey] = useState(item.id);
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
@@ -631,23 +636,17 @@ export default function ItemDetailPanel({
     }, AUTO_FS_OUT_MS);
   }, [setAutoFsPhase]);
 
-  /** 操作があるたびに自動クローズを先送りする */
-  const bumpAutoFsIdle = useCallback(() => {
-    if (autoFsHoldRef.current) clearTimeout(autoFsHoldRef.current);
-    autoFsHoldRef.current = setTimeout(closeAutoFullscreen, AUTO_FS_IDLE_MS);
-  }, [closeAutoFullscreen]);
-
   const openAutoFullscreen = useCallback(() => {
-    // 画面に出ている端数パレットの位置を記録し、そこからズームさせる
+    // 画面に出ている端数パレットの位置を記録し、そこからゆっくり移動させる
     autoFsSrcRectRef.current = fractionSrcRef.current?.getBoundingClientRect() ?? null;
     autoFsSeqRef.current++;
     setAutoFsRotY(FS_ROT_Y0);
-    setAutoFsRotX(FS_ROT_X0);
     setAutoFsFlip(null);
+    autoFsLastActRef.current = performance.now();
     setAutoFsPhase('measure');
   }, [setAutoFsPhase]);
 
-  // フェーズ進行: 実寸を測る → 元の位置に置く → 全画面へズーム
+  // フェーズ進行: 実寸を測る → 元の位置に置く → 全画面へ移動
   useEffect(() => {
     if (autoFs === 'measure') {
       const box = autoFsBoxRef.current;
@@ -667,44 +666,68 @@ export default function ItemDetailPanel({
       return;
     }
     if (autoFs === 'start') {
-      // 縮小状態を1フレーム描いてからズームを開始する（アニメーションの取りこぼし防止）
+      // 縮小状態を1フレーム描いてから移動を開始する（アニメーションの取りこぼし防止）
       let raf2 = 0;
       const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setAutoFsPhase('in')); });
       return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
     }
     if (autoFs === 'in') {
-      bumpAutoFsIdle();
       const t = setTimeout(() => setAutoFsPhase('show'), AUTO_FS_IN_MS);
       return () => clearTimeout(t);
     }
-  }, [autoFs, setAutoFsPhase, bumpAutoFsIdle]);
+  }, [autoFs, setAutoFsPhase]);
 
-  // ドラッグで自由回転・タップで45°回転。どちらも自動クローズを先送りする。
+  // 触っていない間はゆっくり自動回転する（描画負荷を抑えるため約20fpsに間引く）
+  useEffect(() => {
+    if (autoFs !== 'show') return;
+    let raf = 0;
+    let last = 0;
+    const step = (now: number) => {
+      raf = requestAnimationFrame(step);
+      if (autoFsDragRef.current || now - autoFsLastActRef.current < AUTO_FS_SPIN_DELAY_MS) {
+        last = now;
+        return;
+      }
+      if (!last) { last = now; return; }
+      const dt = now - last;
+      if (dt < 45) return;
+      last = now;
+      setAutoFsRotY((v) => v + (AUTO_FS_SPIN_DPS * dt) / 1000);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [autoFs]);
+
+  // 横スワイプで回転（画面幅いっぱいで180度）
   const handleAutoFsPointerDown = useCallback((e: React.PointerEvent) => {
     if (autoFsPhaseRef.current === 'out') return;
-    autoFsDragRef.current = { x: e.clientX, y: e.clientY, rotY: autoFsRotY, rotX: autoFsRotX, moved: false };
-    bumpAutoFsIdle();
-  }, [autoFsRotY, autoFsRotX, bumpAutoFsIdle]);
+    autoFsDragRef.current = { x: e.clientX, y: e.clientY, rotY: autoFsRotY, moved: false };
+    autoFsLastActRef.current = performance.now();
+  }, [autoFsRotY]);
 
   const handleAutoFsPointerMove = useCallback((e: React.PointerEvent) => {
     const d = autoFsDragRef.current;
     if (!d) return;
     const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) d.moved = true;
-    setAutoFsRotY(d.rotY + dx * 0.6);
-    // 上下は寝かせすぎ・裏返しを防ぐため制限する
-    setAutoFsRotX(Math.max(-85, Math.min(20, d.rotX - dy * 0.35)));
-    bumpAutoFsIdle();
-  }, [bumpAutoFsIdle]);
+    if (Math.abs(dx) > 6 || Math.abs(e.clientY - d.y) > 6) d.moved = true;
+    const degPerPx = AUTO_FS_SWIPE_DEG / Math.max(1, window.innerWidth);
+    setAutoFsRotY(d.rotY + dx * degPerPx);
+    autoFsLastActRef.current = performance.now();
+  }, []);
 
-  const handleAutoFsPointerUp = useCallback(() => {
+  const handleAutoFsPointerUp = useCallback((e: React.PointerEvent) => {
     const d = autoFsDragRef.current;
     autoFsDragRef.current = null;
-    // 動かさずに離した＝タップ: 45度回して次の面を見せる
-    if (d && !d.moved) setAutoFsRotY((v) => v + 45);
-    bumpAutoFsIdle();
-  }, [bumpAutoFsIdle]);
+    autoFsLastActRef.current = performance.now();
+    if (!d || d.moved) return;
+    // 図の外をタップしたら元に戻す（図の上のタップは何もしない）
+    const body = autoFsBoxRef.current?.querySelector('[data-pallet-body]') as HTMLElement | null;
+    const r = body?.getBoundingClientRect();
+    const onFigure = !!r
+      && e.clientX >= r.left - 16 && e.clientX <= r.right + 16
+      && e.clientY >= r.top - 16 && e.clientY <= r.bottom + 16;
+    if (!onFigure) closeAutoFullscreen();
+  }, [closeAutoFullscreen]);
 
   // アンマウント時にタイマーを掃除
   useEffect(() => () => {
@@ -1158,7 +1181,8 @@ export default function ItemDetailPanel({
 
       {/* 端数パレットのみになった時の全画面「積み方」表示
           元のパレット位置からズームし、背景はガウスぼかし。
-          ドラッグで自由回転・タップで45°回転。操作が5秒途切れたら元に戻る。 */}
+          横スワイプで回転（画面幅で180度）。触っていない間はゆっくり自動回転。
+          図の外をタップすると元に戻る。 */}
       {autoFs !== 'idle' && inspectionDeducted > 0 && (
         <div
           onPointerDown={handleAutoFsPointerDown}
@@ -1168,10 +1192,10 @@ export default function ItemDetailPanel({
           style={{
             position: 'fixed', inset: 0, zIndex: 300,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            // 背景は元の画面をガウスぼかしで透かす
-            background: 'rgba(8,10,22,0.5)',
-            backdropFilter: 'blur(20px) saturate(1.15)',
-            WebkitBackdropFilter: 'blur(20px) saturate(1.15)',
+            // 背景は明るさを変えず、ガウスぼかしだけを掛ける
+            background: 'transparent',
+            backdropFilter: 'blur(18px)',
+            WebkitBackdropFilter: 'blur(18px)',
             opacity: autoFs === 'measure' || autoFs === 'out' ? 0 : 1,
             transition: `opacity ${autoFs === 'out' ? AUTO_FS_OUT_MS : AUTO_FS_IN_MS}ms ease`,
             touchAction: 'none', userSelect: 'none', cursor: 'grab',
@@ -1185,9 +1209,9 @@ export default function ItemDetailPanel({
               ? 'translate(0px, 0px) scale(1)'
               : `translate(${autoFsFlip.dx}px, ${autoFsFlip.dy}px) scale(${autoFsFlip.s})`,
             transition: autoFs === 'in'
-              ? `transform ${AUTO_FS_IN_MS}ms cubic-bezier(0.16,1,0.3,1)`
+              ? `transform ${AUTO_FS_IN_MS}ms cubic-bezier(0.33,0.1,0.2,1)`
               : autoFs === 'out'
-                ? `transform ${AUTO_FS_OUT_MS}ms cubic-bezier(0.4,0,0.7,0.2)`
+                ? `transform ${AUTO_FS_OUT_MS}ms cubic-bezier(0.4,0,0.4,1)`
                 : 'none',
             opacity: autoFs === 'measure' ? 0 : 1,
           }}>
@@ -1199,7 +1223,7 @@ export default function ItemDetailPanel({
                 palletCount={0} fraction={inspectionDeducted}
                 qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                 measurements={item.measurements} wireframe={false}
-                overrideRotateY={autoFsRotY} overrideRotateX={autoFsRotX}
+                overrideRotateY={autoFsRotY}
               />
             </div>
           </div>
@@ -1210,15 +1234,15 @@ export default function ItemDetailPanel({
           }}>
             <p style={{
               margin: 0, color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
-              textShadow: `0 0 18px ${accentColor}88`,
+              textShadow: `0 0 18px ${accentColor}88, 0 2px 10px rgba(0,0,0,0.9)`,
             }}>
               のこり 端数パレット {inspectionDeducted} CT
             </p>
-            <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
+            <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.6)', fontSize: 12, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
               この積み方で仕上げ
             </p>
-            <p style={{ margin: '10px 0 0', color: 'rgba(255,255,255,0.32)', fontSize: 11 }}>
-              スワイプで回転・タップで45°回転／5秒操作しないと戻ります
+            <p style={{ margin: '10px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 11, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
+              スワイプで回転／図の外をタップで戻る
             </p>
           </div>
         </div>

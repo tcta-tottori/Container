@@ -12,8 +12,6 @@ interface PalletDiagramProps {
   itemName?: string;
   measurements?: string;
   overrideRotateY?: number;
-  /** 上下方向の傾き（度）。未指定は -25（既定の見下ろし角） */
-  overrideRotateX?: number;
   wireframe?: boolean;
 }
 
@@ -477,7 +475,7 @@ function isJPIType(itemName?: string): boolean {
 
 /* ===== Main Component ===== */
 export default function PalletDiagram({
-  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, overrideRotateX, wireframe,
+  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe,
 }: PalletDiagramProps) {
   const isFull = palletCount > 0;
   const isFraction = !isFull && fraction > 0;
@@ -629,7 +627,7 @@ export default function PalletDiagram({
           position: 'relative',
           transformStyle: 'preserve-3d',
           ...(overrideRotateY !== undefined
-            ? { transform: `rotateX(${overrideRotateX ?? -25}deg) rotateY(${overrideRotateY}deg)` }
+            ? { transform: `rotateX(-25deg) rotateY(${overrideRotateY}deg)` }
             : rotate
               ? { animation: `${animName} 15s linear infinite` }
               : { transform: 'rotateX(-25deg) rotateY(-35deg)' }
