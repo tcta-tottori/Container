@@ -102,6 +102,17 @@ interface ItemDetailPanelProps {
   onDecrementPallet?: () => void;
 }
 
+/** 2つの矩形を包む矩形を返す（どちらかが無ければある方をそのまま返す） */
+function unionRect(a: DOMRect | null, b: DOMRect | null): DOMRect | null {
+  if (!a) return b;
+  if (!b) return a;
+  const left = Math.min(a.left, b.left);
+  const top = Math.min(a.top, b.top);
+  const right = Math.max(a.right, b.right);
+  const bottom = Math.max(a.bottom, b.bottom);
+  return new DOMRect(left, top, right - left, bottom - top);
+}
+
 /* ===== 類似品アイコン ===== */
 function NameSimilarIcon({ size = 16 }: { size?: number }) {
   return (
@@ -406,6 +417,7 @@ export default function ItemDetailPanel({
 
   /** 全画面の文字が飛び出す元（作業画面の CT 表示） */
   const ctStatRef = useRef<HTMLDivElement | null>(null);
+  const pcsStatRef = useRef<HTMLDivElement | null>(null);
   const autoFsCapRef = useRef<HTMLDivElement | null>(null);
   const autoFsCapSrcRectRef = useRef<DOMRect | null>(null);
   /** 文字を元の CT 表示位置へ写すための移動量と拡大率 */
@@ -654,7 +666,10 @@ export default function ItemDetailPanel({
   const openAutoFullscreen = useCallback(() => {
     // 画面に出ている端数パレットの位置を記録し、そこからゆっくり移動させる
     autoFsSrcRectRef.current = fractionSrcRef.current?.getBoundingClientRect() ?? null;
-    autoFsCapSrcRectRef.current = ctStatRef.current?.getBoundingClientRect() ?? null;
+    autoFsCapSrcRectRef.current = unionRect(
+      ctStatRef.current?.getBoundingClientRect() ?? null,
+      pcsStatRef.current?.getBoundingClientRect() ?? null,
+    );
     autoFsSeqRef.current++;
     setAutoFsRotY(FS_ROT_Y0);
     setAutoFsFlip(null);
@@ -1040,7 +1055,7 @@ export default function ItemDetailPanel({
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1 }}>CT</span>
             </span>
           </div>
-          <div className="detail-sf-item detail-sf-total anim-slide-up" style={{ minWidth: 0, animationDelay: '0.3s' }}>
+          <div ref={pcsStatRef} className="detail-sf-item detail-sf-total anim-slide-up" style={{ minWidth: 0, animationDelay: '0.3s' }}>
             <span className="detail-sf-num-sm detail-sf-pcs" style={{ color: 'rgba(255,255,255,0.6)', display: 'inline-block', textAlign: 'right' }}>{animPCS.toLocaleString()}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.4)' }}>pcs</span>
           </div>
@@ -1296,6 +1311,20 @@ export default function ItemDetailPanel({
                     fontFamily: 'var(--font-body)', fontSize: 'clamp(18px, 6vw, 30px)', fontWeight: 700,
                     lineHeight: 1, color: 'rgba(255,255,255,0.75)', textShadow: '0 2px 8px rgba(0,0,0,0.9)',
                   }}>CT</span>
+                </span>
+                {/* 総数（pcs）も作業画面と同じ内容で並べる */}
+                <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 4, marginLeft: 10 }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 'clamp(26px, 9vw, 50px)', fontWeight: 900,
+                    fontVariantNumeric: 'tabular-nums', letterSpacing: -1, lineHeight: 0.85,
+                    color: 'rgba(255,255,255,0.7)', textShadow: '0 2px 10px rgba(0,0,0,0.9)',
+                  }}>
+                    {animPCS.toLocaleString()}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-body)', fontSize: 'clamp(13px, 4.5vw, 22px)', fontWeight: 700,
+                    lineHeight: 1.2, color: 'rgba(255,255,255,0.5)', textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+                  }}>pcs</span>
                 </span>
               </div>
             </div>
