@@ -23,6 +23,8 @@ const AUTO_FS_OUT_MS = 900;
 const AUTO_FS_SPIN_DELAY_MS = 1200;
 /** 自動回転の速さ（度/秒） */
 const AUTO_FS_SPIN_DPS = 14;
+/** 自動回転がこの角度（1周半）に達したら元に戻る */
+const AUTO_FS_SPIN_END_DEG = 540;
 /** 画面幅いっぱいのスワイプで回る角度 */
 const AUTO_FS_SWIPE_DEG = 180;
 /** 既定の見る角度 */
@@ -401,6 +403,14 @@ export default function ItemDetailPanel({
   const autoFsDragRef = useRef<{ x: number; y: number; rotY: number; moved: boolean } | null>(null);
   /** 最後に触った時刻。これを過ぎると自動回転を再開する */
   const autoFsLastActRef = useRef(0);
+  /** 自動回転で回った累計角度（1周半で自動的に戻る）。触ると 0 に戻す */
+  const autoFsSpunRef = useRef(0);
+  /** 全画面の文字が飛び出す元（作業画面の CT 表示） */
+  const ctStatRef = useRef<HTMLDivElement | null>(null);
+  const autoFsCapRef = useRef<HTMLDivElement | null>(null);
+  const autoFsCapSrcRectRef = useRef<DOMRect | null>(null);
+  /** 文字を元の CT 表示位置へ写すための移動量と拡大率 */
+  const [autoFsCapFlip, setAutoFsCapFlip] = useState<{ dx: number; dy: number; s: number } | null>(null);
   const [animKey, setAnimKey] = useState(item.id);
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
@@ -632,16 +642,19 @@ export default function ItemDetailPanel({
     const seq = ++autoFsSeqRef.current;
     setAutoFsPhase('out');
     setTimeout(() => {
-      if (autoFsSeqRef.current === seq) { setAutoFsPhase('idle'); setAutoFsFlip(null); }
+      if (autoFsSeqRef.current === seq) { setAutoFsPhase('idle'); setAutoFsFlip(null); setAutoFsCapFlip(null); }
     }, AUTO_FS_OUT_MS);
   }, [setAutoFsPhase]);
 
   const openAutoFullscreen = useCallback(() => {
     // 画面に出ている端数パレットの位置を記録し、そこからゆっくり移動させる
     autoFsSrcRectRef.current = fractionSrcRef.current?.getBoundingClientRect() ?? null;
+    autoFsCapSrcRectRef.current = ctStatRef.current?.getBoundingClientRect() ?? null;
     autoFsSeqRef.current++;
     setAutoFsRotY(FS_ROT_Y0);
     setAutoFsFlip(null);
+    setAutoFsCapFlip(null);
+    autoFsSpunRef.current = 0;
     autoFsLastActRef.current = performance.now();
     setAutoFsPhase('measure');
   }, [setAutoFsPhase]);
@@ -661,6 +674,19 @@ export default function ItemDetailPanel({
       } else {
         // 元位置が取れないときは中央から拡大する
         setAutoFsFlip({ dx: 0, dy: 0, s: 0.28 });
+      }
+      // 文字は作業画面の CT 表示の位置・大きさから図と一緒に下りてくる
+      const cap = autoFsCapRef.current?.getBoundingClientRect();
+      const capSrc = autoFsCapSrcRectRef.current;
+      if (cap && cap.height > 0 && capSrc && capSrc.height > 0) {
+        setAutoFsCapFlip({
+          dx: (capSrc.left + capSrc.width / 2) - (cap.left + cap.width / 2),
+          dy: (capSrc.top + capSrc.height / 2) - (cap.top + cap.height / 2),
+          // 数字の大きさをそろえたいので高さ基準で拡大率を決める
+          s: Math.max(0.5, Math.min(2.5, capSrc.height / cap.height)),
+        });
+      } else {
+        setAutoFsCapFlip({ dx: 0, dy: 0, s: 1 });
       }
       setAutoFsPhase('start');
       return;
@@ -692,17 +718,22 @@ export default function ItemDetailPanel({
       const dt = now - last;
       if (dt < 45) return;
       last = now;
-      setAutoFsRotY((v) => v + (AUTO_FS_SPIN_DPS * dt) / 1000);
+      const deg = (AUTO_FS_SPIN_DPS * dt) / 1000;
+      autoFsSpunRef.current += deg;
+      setAutoFsRotY((v) => v + deg);
+      // 1周半まわったら自動で元に戻す
+      if (autoFsSpunRef.current >= AUTO_FS_SPIN_END_DEG) closeAutoFullscreen();
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [autoFs]);
+  }, [autoFs, closeAutoFullscreen]);
 
   // 横スワイプで回転（画面幅いっぱいで180度）
   const handleAutoFsPointerDown = useCallback((e: React.PointerEvent) => {
     if (autoFsPhaseRef.current === 'out') return;
     autoFsDragRef.current = { x: e.clientX, y: e.clientY, rotY: autoFsRotY, moved: false };
     autoFsLastActRef.current = performance.now();
+    autoFsSpunRef.current = 0;
   }, [autoFsRotY]);
 
   const handleAutoFsPointerMove = useCallback((e: React.PointerEvent) => {
@@ -997,7 +1028,7 @@ export default function ItemDetailPanel({
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1 }}>PL</span>
             </span>
           </div>
-          <div className="detail-sf-item anim-slide-up" style={{ minWidth: 0, animationDelay: '0.15s' }}>
+          <div ref={ctStatRef} className="detail-sf-item anim-slide-up" style={{ minWidth: 0, animationDelay: '0.15s' }}>
             <span className="detail-sf-num" style={{ color: '#e8e8e8', textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`, display: 'inline-block', minWidth: '2.2ch', textAlign: 'right' }}>{fmtNum(animCT)}</span>
             <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
               {rawFraction > 0 && rawFraction !== inspectionDeducted && (
@@ -1227,23 +1258,40 @@ export default function ItemDetailPanel({
               />
             </div>
           </div>
-          <div style={{
-            marginTop: 8, textAlign: 'center', pointerEvents: 'none',
-            opacity: autoFs === 'measure' || autoFs === 'out' ? 0 : 1,
-            transition: `opacity ${autoFs === 'out' ? AUTO_FS_OUT_MS : AUTO_FS_IN_MS}ms ease`,
-          }}>
-            <p style={{
-              margin: 0, color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
-              textShadow: `0 0 18px ${accentColor}88, 0 2px 10px rgba(0,0,0,0.9)`,
+          <div style={{ marginTop: 8, textAlign: 'center', pointerEvents: 'none' }}>
+            {/* 残りCT数は作業画面の CT 表示の位置・大きさから、図と一緒に下りてくる */}
+            <div ref={autoFsCapRef} style={{
+              transformOrigin: 'center center',
+              transform: (autoFs === 'in' || autoFs === 'show') || !autoFsCapFlip
+                ? 'translate(0px, 0px) scale(1)'
+                : `translate(${autoFsCapFlip.dx}px, ${autoFsCapFlip.dy}px) scale(${autoFsCapFlip.s})`,
+              transition: autoFs === 'in'
+                ? `transform ${AUTO_FS_IN_MS}ms cubic-bezier(0.33,0.1,0.2,1)`
+                : autoFs === 'out'
+                  ? `transform ${AUTO_FS_OUT_MS}ms cubic-bezier(0.4,0,0.4,1)`
+                  : 'none',
+              opacity: autoFs === 'measure' ? 0 : 1,
             }}>
-              のこり 端数パレット {inspectionDeducted} CT
-            </p>
-            <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.6)', fontSize: 12, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
-              この積み方で仕上げ
-            </p>
-            <p style={{ margin: '10px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 11, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
-              スワイプで回転／図の外をタップで戻る
-            </p>
+              <p style={{
+                margin: 0, color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
+                textShadow: `0 0 18px ${accentColor}88, 0 2px 10px rgba(0,0,0,0.9)`,
+                whiteSpace: 'nowrap',
+              }}>
+                のこり 端数パレット {fmtNum(animCT)} CT
+              </p>
+            </div>
+            {/* 補足の文字は移動後に浮かび上がらせる */}
+            <div style={{
+              opacity: autoFs === 'show' ? 1 : 0,
+              transition: `opacity ${autoFs === 'out' ? AUTO_FS_OUT_MS / 2 : 400}ms ease`,
+            }}>
+              <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.6)', fontSize: 12, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
+                この積み方で仕上げ
+              </p>
+              <p style={{ margin: '10px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 11, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
+                スワイプで回転／図の外をタップで戻る
+              </p>
+            </div>
           </div>
         </div>
       )}
