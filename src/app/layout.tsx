@@ -18,7 +18,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#141720",
+  themeColor: "#1a1d2e", // ヘッダー（--header-bg）と同色にして一体化させる
 };
 
 export default function RootLayout({

@@ -26,6 +26,8 @@
   --font-display: 'Zen Kaku Gothic New', 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif;
   --font-body: 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif;
   --font-mono: 'Inter', sans-serif;
+  /* ステータスバー（ノッチ）の高さ。iOS の黒半透明ステータスバー対策 */
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
 * { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.1) transparent; }
@@ -62,7 +64,8 @@ body {
 /* ===== Header ===== */
 .app-header {
   display: flex; align-items: center;
-  height: 48px; padding: 0 6px;
+  height: calc(48px + var(--safe-top));
+  padding: var(--safe-top) 6px 0;
   background: var(--header-bg);
   border-bottom: 1px solid var(--border-subtle);
   gap: 4px; flex-shrink: 0;
@@ -178,7 +181,7 @@ body {
 /* ===== Menu ===== */
 .menu-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,0.18); backdrop-filter: blur(3px); }
 .menu-panel {
-  position: absolute; top: 48px; left: 0; width: 220px;
+  position: absolute; top: calc(48px + var(--safe-top)); left: 0; width: 220px;
   background: #1e2130; border: 1px solid rgba(255,255,255,0.08);
   border-radius: 0 0 16px 0; padding: 6px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
 }
