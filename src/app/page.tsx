@@ -183,7 +183,7 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, speakCheer, speakThenCheer, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
+  const { speak, speakCheer, speakThenCheer, announceItem, announcePalletChange, announceAllComplete, announceContainerSummary } =
     useSpeech();
 
   const prevItemRef = useRef<string | null>(null);
@@ -920,11 +920,11 @@ export default function Home() {
     const name = currentItem.itemName;
     const remaining = state.items.length - 1;
     deleteCurrent();
-    announceComplete(name);
+    // 品目ごとの完了コールは行わない（作業テンポを優先）。全品目完了時のみコールする。
     if (remaining === 0) {
       setTimeout(() => announceAllComplete(), 1500);
     }
-  }, [currentItem, state.items.length, deleteCurrent, announceComplete, announceAllComplete]);
+  }, [currentItem, state.items.length, deleteCurrent, announceAllComplete]);
 
   const handleSelectItem = useCallback(
     (idx: number) => {
@@ -1469,11 +1469,8 @@ export default function Home() {
                     completedIds={state.completedIds}
                     onSelectItem={handleSelectItem}
                     onCompleteItem={(id: string) => {
-                      const item = state.items.find(it => it.id === id);
+                      // 完了コールは行わない
                       completeItem(id);
-                      if (item) {
-                        announceComplete(item.itemName);
-                      }
                     }}
                     onUncompleteItem={uncompleteItem}
                     onDecrementPallet={handleDecrease}

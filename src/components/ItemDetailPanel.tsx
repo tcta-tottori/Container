@@ -9,14 +9,20 @@ import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
 import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
-/* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） ===== */
-type AutoFsPhase = 'idle' | 'in' | 'show' | 'out';
+/* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） =====
+ * measure: 実寸を測る（非表示）→ start: 元のパレット位置に縮小配置（アニメなし）
+ * → in: 全画面へズーム → show: 操作受付 → out: 元の位置へ戻る
+ * ドラッグで自由回転、タップで45°回転。操作が5秒途切れたら自動で閉じる。 */
+type AutoFsPhase = 'idle' | 'measure' | 'start' | 'in' | 'show' | 'out';
 /** ズームイン時間 */
 const AUTO_FS_IN_MS = 700;
 /** ズームアウト時間 */
 const AUTO_FS_OUT_MS = 600;
-/** 表示開始から自動で閉じるまで（7秒） */
-const AUTO_FS_HOLD_MS = 7000;
+/** 最後の操作から自動で閉じるまで（5秒） */
+const AUTO_FS_IDLE_MS = 5000;
+/** 既定の見る角度 */
+const FS_ROT_Y0 = -35;
+const FS_ROT_X0 = -25;
 
 /**
  * カウントアニメーション（アップ/ダウン対応）
@@ -381,6 +387,15 @@ export default function ItemDetailPanel({
   const autoFsPhaseRef = useRef<AutoFsPhase>('idle');
   const autoFsSeqRef = useRef(0);
   const autoFsHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 全画面の元になる端数パレットの位置（ここからズームする） */
+  const fractionSrcRef = useRef<HTMLDivElement | null>(null);
+  const autoFsSrcRectRef = useRef<DOMRect | null>(null);
+  /** 元の位置へ戻すための移動量と縮小率 */
+  const [autoFsFlip, setAutoFsFlip] = useState<{ dx: number; dy: number; s: number } | null>(null);
+  /** 全画面中の回転角（ドラッグ・タップで変わる） */
+  const [autoFsRotY, setAutoFsRotY] = useState(FS_ROT_Y0);
+  const [autoFsRotX, setAutoFsRotX] = useState(FS_ROT_X0);
+  const autoFsDragRef = useRef<{ x: number; y: number; rotY: number; rotX: number; moved: boolean } | null>(null);
   const [animKey, setAnimKey] = useState(item.id);
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
@@ -600,7 +615,7 @@ export default function ItemDetailPanel({
     }
   }, [fractionZoom, openFractionZoom, closeFractionZoom]);
 
-  // ===== 残りが端数パレットになったら積み方を全画面で一時表示（7秒） =====
+  // ===== 残りが端数パレットになったら積み方を全画面表示（操作が5秒途切れたら戻る） =====
   const setAutoFsPhase = useCallback((phase: AutoFsPhase) => {
     autoFsPhaseRef.current = phase;
     setAutoFs(phase);
@@ -612,19 +627,84 @@ export default function ItemDetailPanel({
     const seq = ++autoFsSeqRef.current;
     setAutoFsPhase('out');
     setTimeout(() => {
-      if (autoFsSeqRef.current === seq) setAutoFsPhase('idle');
+      if (autoFsSeqRef.current === seq) { setAutoFsPhase('idle'); setAutoFsFlip(null); }
     }, AUTO_FS_OUT_MS);
   }, [setAutoFsPhase]);
 
-  const openAutoFullscreen = useCallback(() => {
-    const seq = ++autoFsSeqRef.current;
-    setAutoFsPhase('in');
-    setTimeout(() => {
-      if (autoFsSeqRef.current === seq) setAutoFsPhase('show');
-    }, AUTO_FS_IN_MS);
+  /** 操作があるたびに自動クローズを先送りする */
+  const bumpAutoFsIdle = useCallback(() => {
     if (autoFsHoldRef.current) clearTimeout(autoFsHoldRef.current);
-    autoFsHoldRef.current = setTimeout(closeAutoFullscreen, AUTO_FS_HOLD_MS);
-  }, [setAutoFsPhase, closeAutoFullscreen]);
+    autoFsHoldRef.current = setTimeout(closeAutoFullscreen, AUTO_FS_IDLE_MS);
+  }, [closeAutoFullscreen]);
+
+  const openAutoFullscreen = useCallback(() => {
+    // 画面に出ている端数パレットの位置を記録し、そこからズームさせる
+    autoFsSrcRectRef.current = fractionSrcRef.current?.getBoundingClientRect() ?? null;
+    autoFsSeqRef.current++;
+    setAutoFsRotY(FS_ROT_Y0);
+    setAutoFsRotX(FS_ROT_X0);
+    setAutoFsFlip(null);
+    setAutoFsPhase('measure');
+  }, [setAutoFsPhase]);
+
+  // フェーズ進行: 実寸を測る → 元の位置に置く → 全画面へズーム
+  useEffect(() => {
+    if (autoFs === 'measure') {
+      const box = autoFsBoxRef.current;
+      const src = autoFsSrcRectRef.current;
+      const r = box?.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0 && src && src.width > 0 && src.height > 0) {
+        setAutoFsFlip({
+          dx: (src.left + src.width / 2) - (r.left + r.width / 2),
+          dy: (src.top + src.height / 2) - (r.top + r.height / 2),
+          s: Math.max(0.06, Math.min(src.width / r.width, src.height / r.height)),
+        });
+      } else {
+        // 元位置が取れないときは中央から拡大する
+        setAutoFsFlip({ dx: 0, dy: 0, s: 0.28 });
+      }
+      setAutoFsPhase('start');
+      return;
+    }
+    if (autoFs === 'start') {
+      // 縮小状態を1フレーム描いてからズームを開始する（アニメーションの取りこぼし防止）
+      let raf2 = 0;
+      const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setAutoFsPhase('in')); });
+      return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+    }
+    if (autoFs === 'in') {
+      bumpAutoFsIdle();
+      const t = setTimeout(() => setAutoFsPhase('show'), AUTO_FS_IN_MS);
+      return () => clearTimeout(t);
+    }
+  }, [autoFs, setAutoFsPhase, bumpAutoFsIdle]);
+
+  // ドラッグで自由回転・タップで45°回転。どちらも自動クローズを先送りする。
+  const handleAutoFsPointerDown = useCallback((e: React.PointerEvent) => {
+    if (autoFsPhaseRef.current === 'out') return;
+    autoFsDragRef.current = { x: e.clientX, y: e.clientY, rotY: autoFsRotY, rotX: autoFsRotX, moved: false };
+    bumpAutoFsIdle();
+  }, [autoFsRotY, autoFsRotX, bumpAutoFsIdle]);
+
+  const handleAutoFsPointerMove = useCallback((e: React.PointerEvent) => {
+    const d = autoFsDragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) d.moved = true;
+    setAutoFsRotY(d.rotY + dx * 0.6);
+    // 上下は寝かせすぎ・裏返しを防ぐため制限する
+    setAutoFsRotX(Math.max(-85, Math.min(20, d.rotX - dy * 0.35)));
+    bumpAutoFsIdle();
+  }, [bumpAutoFsIdle]);
+
+  const handleAutoFsPointerUp = useCallback(() => {
+    const d = autoFsDragRef.current;
+    autoFsDragRef.current = null;
+    // 動かさずに離した＝タップ: 45度回して次の面を見せる
+    if (d && !d.moved) setAutoFsRotY((v) => v + 45);
+    bumpAutoFsIdle();
+  }, [bumpAutoFsIdle]);
 
   // アンマウント時にタイマーを掃除
   useEffect(() => () => {
@@ -865,7 +945,7 @@ export default function ItemDetailPanel({
               </div>
             )}
             {inspectionDeducted > 0 && (
-              <div key={`fr-${animKey}`} style={{
+              <div key={`fr-${animKey}`} ref={fractionSrcRef} style={{
                 flex: displayPallets > 0 ? '0 0 35%' : 1,
                 height: displayPallets > 0 ? '75%' : '100%',
                 minWidth: 0, cursor: 'pointer',
@@ -1076,72 +1156,72 @@ export default function ItemDetailPanel({
         </>
       )}
 
-      {/* 端数パレットのみになった時の全画面「積み方」表示（7秒で自動クローズ） */}
+      {/* 端数パレットのみになった時の全画面「積み方」表示
+          元のパレット位置からズームし、背景はガウスぼかし。
+          ドラッグで自由回転・タップで45°回転。操作が5秒途切れたら元に戻る。 */}
       {autoFs !== 'idle' && inspectionDeducted > 0 && (
-        <>
-          <style>{`
-            @keyframes afsBackdropIn { from { opacity: 0; } to { opacity: 1; } }
-            @keyframes afsBackdropOut { from { opacity: 1; } to { opacity: 0; } }
-            @keyframes afsZoomIn {
-              0% { transform: scale(0.28); opacity: 0; }
-              60% { opacity: 1; }
-              100% { transform: scale(1); opacity: 1; }
-            }
-            @keyframes afsZoomOut {
-              0% { transform: scale(1); opacity: 1; }
-              100% { transform: scale(0.28); opacity: 0; }
-            }
-          `}</style>
-          <div
-            onClick={closeAutoFullscreen}
-            style={{
-              position: 'fixed', inset: 0, zIndex: 300,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(6,8,18,0.82)', backdropFilter: 'blur(14px)',
-              animation: autoFs === 'out'
-                ? `afsBackdropOut ${AUTO_FS_OUT_MS}ms ease both`
-                : `afsBackdropIn ${AUTO_FS_IN_MS}ms ease both`,
-              cursor: 'pointer', touchAction: 'none',
-            }}
-          >
-            <div ref={autoFsBoxRef} style={{
-              width: '92vw', height: '62vh',
-              pointerEvents: 'none',
-              transformOrigin: 'center center',
-              animation: autoFs === 'out'
-                ? `afsZoomOut ${AUTO_FS_OUT_MS}ms cubic-bezier(0.4,0,0.7,0.2) both`
-                : `afsZoomIn ${AUTO_FS_IN_MS}ms cubic-bezier(0.16,1,0.3,1) both`,
-            }}>
-              <div style={{
-                width: '100%', height: '100%',
-                transform: `scale(${autoFsScale})`, transformOrigin: 'center center',
-                transition: 'transform 0.3s ease',
-              }}>
-                <PalletDiagram
-                  palletCount={0} fraction={inspectionDeducted}
-                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-                  measurements={item.measurements} wireframe={false}
-                />
-              </div>
-            </div>
+        <div
+          onPointerDown={handleAutoFsPointerDown}
+          onPointerMove={handleAutoFsPointerMove}
+          onPointerUp={handleAutoFsPointerUp}
+          onPointerCancel={handleAutoFsPointerUp}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 300,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            // 背景は元の画面をガウスぼかしで透かす
+            background: 'rgba(8,10,22,0.5)',
+            backdropFilter: 'blur(20px) saturate(1.15)',
+            WebkitBackdropFilter: 'blur(20px) saturate(1.15)',
+            opacity: autoFs === 'measure' || autoFs === 'out' ? 0 : 1,
+            transition: `opacity ${autoFs === 'out' ? AUTO_FS_OUT_MS : AUTO_FS_IN_MS}ms ease`,
+            touchAction: 'none', userSelect: 'none', cursor: 'grab',
+          }}
+        >
+          <div ref={autoFsBoxRef} style={{
+            width: '92vw', height: '58vh',
+            pointerEvents: 'none',
+            transformOrigin: 'center center',
+            transform: (autoFs === 'in' || autoFs === 'show') || !autoFsFlip
+              ? 'translate(0px, 0px) scale(1)'
+              : `translate(${autoFsFlip.dx}px, ${autoFsFlip.dy}px) scale(${autoFsFlip.s})`,
+            transition: autoFs === 'in'
+              ? `transform ${AUTO_FS_IN_MS}ms cubic-bezier(0.16,1,0.3,1)`
+              : autoFs === 'out'
+                ? `transform ${AUTO_FS_OUT_MS}ms cubic-bezier(0.4,0,0.7,0.2)`
+                : 'none',
+            opacity: autoFs === 'measure' ? 0 : 1,
+          }}>
             <div style={{
-              marginTop: 8, textAlign: 'center', pointerEvents: 'none',
-              animation: autoFs === 'out'
-                ? `afsBackdropOut ${AUTO_FS_OUT_MS}ms ease both`
-                : `afsBackdropIn ${AUTO_FS_IN_MS}ms ease both`,
+              width: '100%', height: '100%',
+              transform: `scale(${autoFsScale})`, transformOrigin: 'center center',
             }}>
-              <p style={{
-                margin: 0, color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
-                textShadow: `0 0 18px ${accentColor}88`,
-              }}>
-                のこり 端数パレット {inspectionDeducted} CT
-              </p>
-              <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
-                この積み方で仕上げ
-              </p>
+              <PalletDiagram
+                palletCount={0} fraction={inspectionDeducted}
+                qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+                measurements={item.measurements} wireframe={false}
+                overrideRotateY={autoFsRotY} overrideRotateX={autoFsRotX}
+              />
             </div>
           </div>
-        </>
+          <div style={{
+            marginTop: 8, textAlign: 'center', pointerEvents: 'none',
+            opacity: autoFs === 'measure' || autoFs === 'out' ? 0 : 1,
+            transition: `opacity ${autoFs === 'out' ? AUTO_FS_OUT_MS : AUTO_FS_IN_MS}ms ease`,
+          }}>
+            <p style={{
+              margin: 0, color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
+              textShadow: `0 0 18px ${accentColor}88`,
+            }}>
+              のこり 端数パレット {inspectionDeducted} CT
+            </p>
+            <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
+              この積み方で仕上げ
+            </p>
+            <p style={{ margin: '10px 0 0', color: 'rgba(255,255,255,0.32)', fontSize: 11 }}>
+              スワイプで回転・タップで45°回転／5秒操作しないと戻ります
+            </p>
+          </div>
+        </div>
       )}
 
       {fullscreenPallet && (
