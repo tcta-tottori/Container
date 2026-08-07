@@ -12,6 +12,7 @@ import SizeDiagram, { parseMeas } from './SizeDiagram';
 /* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） =====
  * measure: 実寸を測る（非表示）→ start: 元のパレット位置に縮小配置（アニメなし）
  * → in: 全画面へゆっくり移動 → show: 操作受付 → out: 元の位置へ戻る
+ * 移動中（in / out）も回り続けるので、回転しながら手前に出てきて回転しながら戻る。
  * 横スワイプで回転（画面幅いっぱいで180度）。触っていない間は勢いよく回り始め、
  * 作業画面の端数パレットと同じ速さ（15秒で1回転）まで徐々に落ちる。
  * 表示は7秒で、触ると最後の操作から数え直す。図の外をタップするとすぐ元に戻る。 */
@@ -22,7 +23,7 @@ const AUTO_FS_IN_MS = 1400;
 const AUTO_FS_OUT_MS = 900;
 /** 全画面を表示しておく時間。触ると最後の操作から数え直す */
 const AUTO_FS_HOLD_MS = 7000;
-/** 全画面になってから回り始めるまでの間 */
+/** スワイプをやめてから自動回転に戻るまでの間 */
 const AUTO_FS_SPIN_DELAY_MS = 300;
 /** 自動回転の初速（度/秒）。勢いよく回り始める */
 const AUTO_FS_SPIN_DPS_START = 260;
@@ -648,7 +649,8 @@ export default function ItemDetailPanel({
     autoFsBodyElRef.current = null;
     setAutoFsFlip(null);
     setAutoFsCapFlip(null);
-    autoFsLastActRef.current = performance.now();
+    // 移動を始めた瞬間から回すので、待ち時間は入れない
+    autoFsLastActRef.current = 0;
     autoFsSpinT0Ref.current = 0;
     setAutoFsPhase('measure');
   }, [setAutoFsPhase]);
@@ -718,8 +720,9 @@ export default function ItemDetailPanel({
   }, []);
 
   // 触っていない間は自動回転する。毎フレーム DOM を直接更新するので滑らかに回る。
+  // 出入り（in / out）の移動中も回すので、回転しながら出てきて回転しながら戻る。
   useEffect(() => {
-    if (autoFs !== 'show') return;
+    if (autoFs !== 'in' && autoFs !== 'show' && autoFs !== 'out') return;
     let raf = 0;
     let last = 0;
     const step = (now: number) => {
@@ -1162,7 +1165,7 @@ export default function ItemDetailPanel({
 
       {/* パレット全画面表示モーダル */}
       {/* 端数パレットのみになった時の全画面「積み方」表示
-          元のパレット位置からズームし、背景はガウスぼかし。
+          元のパレット位置から回転しながらズームし、背景はガウスぼかし。
           横スワイプで回転（画面幅で180度）。触っていない間は速い回転から始まり作業画面と同じ速さに落ち着く。
           図の外をタップするとすぐ元に戻る。 */}
       {autoFs !== 'idle' && inspectionDeducted > 0 && (
@@ -1209,6 +1212,7 @@ export default function ItemDetailPanel({
                 qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
                 measurements={item.measurements} wireframe={false}
                 overrideRotateY={autoFsRotRef.current}
+                noIntro
               />
             </div>
           </div>

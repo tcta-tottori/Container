@@ -13,6 +13,8 @@ interface PalletDiagramProps {
   measurements?: string;
   overrideRotateY?: number;
   wireframe?: boolean;
+  /** 出現時のフェードインを省く（全画面表示のように最初から見せたいとき） */
+  noIntro?: boolean;
 }
 
 /* ===== Constants ===== */
@@ -475,7 +477,7 @@ function isJPIType(itemName?: string): boolean {
 
 /* ===== Main Component ===== */
 export default function PalletDiagram({
-  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe,
+  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe, noIntro,
 }: PalletDiagramProps) {
   const isFull = palletCount > 0;
   const isFraction = !isFull && fraction > 0;
@@ -621,7 +623,7 @@ export default function PalletDiagram({
         `}</style>
       )}
       {/* 出現アニメーション用ラッパー（opacityのみ。3D変換なし） */}
-      <div style={{ animation: 'palletFadeUp 1.5s ease 0.5s both' }}>
+      <div style={noIntro ? undefined : { animation: 'palletFadeUp 1.5s ease 0.5s both' }}>
         <div data-pallet-body style={{
           width: pw, height: totalHeight,
           position: 'relative',
