@@ -158,11 +158,7 @@ export default function HeaderBar({
       >
         {workElapsed}
       </span>
-      <span className="header-clock" style={{
-        fontFamily: 'var(--font-mono)', fontSize: 21, fontWeight: 700,
-        color: 'rgba(255,255,255,0.85)', fontVariantNumeric: 'tabular-nums',
-        letterSpacing: 0.5, flexShrink: 0, marginRight: 16,
-      }}>
+      <span className="header-clock" style={{ marginRight: 16 }}>
         {currentTime}
       </span>
 

@@ -26,8 +26,7 @@ import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
 import SettingsPage, { SettingsTab } from '@/components/SettingsPage';
 import HistoryModal from '@/components/HistoryModal';
-import ChangelogPopup from '@/components/ChangelogPopup';
-import { APP_VERSION } from '@/lib/appVersion';
+import { APP_VERSION, APP_UPDATED_TIME } from '@/lib/appVersion';
 import { MenuIcon, UploadIcon, WorkIcon, EditIcon, ChartIcon, ClockIcon, HelpIcon, SettingsIcon } from '@/components/AppIcons';
 import { getWaterSoundEngine, setupWaterAutoResume } from '@/lib/waterSound';
 import { useWaterSound } from '@/hooks/useWaterSound';
@@ -202,7 +201,6 @@ export default function Home() {
   // 設定ページ（コール・水の音・AI写真を集約）。null のときは閉じている
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [changelogOpen, setChangelogOpen] = useState(false);
   const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
   const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
@@ -1333,7 +1331,6 @@ export default function Home() {
           onSelectRecent={handleRecentFileSelected}
         />
       )}
-      {changelogOpen && <ChangelogPopup onClose={() => setChangelogOpen(false)} />}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
 
       {/* メニューオーバーレイ */}
@@ -1379,12 +1376,12 @@ export default function Home() {
               設定
             </button>
 
-            {/* バージョン情報（読込画面から移動） */}
+            {/* バージョン + 更新時刻（読込画面から移動） */}
             <div className="menu-spacer" />
-            <button className="menu-version" onClick={() => { setChangelogOpen(true); setMenuOpen(false); }}>
-              <span>CNS Ver {APP_VERSION}</span>
-              <span className="menu-version-sub">更新内容 ›</span>
-            </button>
+            <div className="menu-version">
+              <span>Ver {APP_VERSION}</span>
+              <span className="menu-version-sub">{APP_UPDATED_TIME}</span>
+            </div>
           </div>
         </div>
       )}

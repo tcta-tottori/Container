@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Inter:wght@300;400;500;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Inter:wght@300;400;500;600;700;800;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Orbitron:wght@500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -26,6 +26,8 @@
   --font-display: 'Zen Kaku Gothic New', 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif;
   --font-body: 'M PLUS Rounded 1c', 'Noto Sans JP', sans-serif;
   --font-mono: 'Inter', sans-serif;
+  /* 時計・経過時間用のデジタル調フォント */
+  --font-clock: 'Orbitron', 'Inter', sans-serif;
   /* ステータスバー（ノッチ）の高さ。iOS の黒半透明ステータスバー対策 */
   --safe-top: env(safe-area-inset-top, 0px);
 }
@@ -91,10 +93,18 @@ body {
   min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis;
 }
 .header-work-elapsed {
-  font-family: var(--font-mono); font-size: 21px; font-variant-numeric: tabular-nums;
-  color: rgba(255,255,255,0.85); font-weight: 700;
+  font-family: var(--font-clock); font-size: 19px; font-variant-numeric: tabular-nums;
+  color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 1px;
   border: none;
+  text-shadow: 0 0 10px rgba(245,158,11,0.35);
   transition: font-size 0.4s ease, color 0.4s ease, transform 0.4s ease;
+}
+/* 時計（デジタル調・ネオングロー） */
+.header-clock {
+  font-family: var(--font-clock); font-size: 21px; font-weight: 700;
+  color: #fff; font-variant-numeric: tabular-nums;
+  letter-spacing: 1.5px; flex-shrink: 0;
+  text-shadow: 0 0 8px rgba(255,255,255,0.45), 0 0 18px rgba(138,180,255,0.25);
 }
 .header-elapsed-flash {
   color: #f59e0b !important;
@@ -228,15 +238,17 @@ body {
 .menu-divider { height: 1px; margin: 6px 12px; background: rgba(255,255,255,0.06); }
 .menu-spacer { flex: 1; min-height: 12px; }
 .menu-version {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  display: flex; align-items: center; gap: 12px;
   width: 100%; margin-top: 4px; padding: 12px 16px;
   border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
   background: rgba(255,255,255,0.03);
-  color: rgba(255,255,255,0.55); font-size: 12px; font-family: var(--font-mono);
-  letter-spacing: 0.3px; cursor: pointer; transition: all 0.12s ease;
+  color: rgba(255,255,255,0.6); font-size: 14px; font-family: var(--font-clock);
+  font-weight: 600; letter-spacing: 1px;
 }
-.menu-version:hover { background: rgba(255,255,255,0.07); color: #fff; }
-.menu-version-sub { font-size: 10px; color: rgba(255,255,255,0.3); }
+.menu-version-sub {
+  font-size: 14px; font-weight: 500; letter-spacing: 1px;
+  color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums;
+}
 
 /* ===== Type badge ===== */
 .type-badge {

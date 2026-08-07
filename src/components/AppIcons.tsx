@@ -57,17 +57,6 @@ export function SettingsIcon(p: IconProps) {
   );
 }
 
-/** クラウドストレージ（ドライブ・白線） */
-export function DriveIcon(p: IconProps) {
-  return (
-    <Svg {...p}>
-      <path d="M9 3h6l6 10.5h-6z" />
-      <path d="M9 3 3 13.5 6 19l6-10.5z" />
-      <path d="M6 19h12l3-5.5H9z" />
-    </Svg>
-  );
-}
-
 /** 履歴（時計） */
 export function ClockIcon(p: IconProps) {
   return <Svg {...p}><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></Svg>;
