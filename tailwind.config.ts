@@ -9,7 +9,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Noto Sans JP"', '"Inter"', "sans-serif"],
+        // 端末の UI と同じ書体（globals.css の --font-ui と合わせる）
+        sans: ["var(--font-ui)"],
       },
     },
   },
