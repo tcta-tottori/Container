@@ -226,11 +226,17 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               </InfoCard>
             </Section>
 
-            <Section title="テーマ切替" color="#a78bfa">
+            <Section title="画面の見かた・クイックメニュー" color="#a78bfa">
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
-                  ヘッダーの<strong style={{ color: '#a78bfa' }}>☀/🌙アイコン</strong>でダークモード⇔ライトモードを切替。
-                  ライトモードでは種類別の鮮やかなグラデーション背景に変わります。設定はブラウザに保存されます。
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#a78bfa' }}>ヘッダー</strong>は1行です。左がメニュー、中央が作業の経過時間（タップで品目別の時間・リセット）、
+                    右が気温・湿度と暑さ指数の色バッジ（緑→黄→オレンジ→赤で危険度）。バッジをタップすると詳細と推移グラフが開きます。
+                  </div>
+                  <div>
+                    <strong style={{ color: '#60a5fa' }}>右下のボタン</strong>を押すと下からメニューが開き、
+                    コンテナの選択・応援コール・天気コール・水の音・SwitchBot 接続をまとめて操作できます。
+                  </div>
                 </div>
               </InfoCard>
             </Section>
@@ -292,10 +298,10 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    ヘッダーの<strong style={{ color: '#67e8f9' }}>水滴ボタン</strong>をタップすると、水の流れる音が<strong style={{ color: '#22d3ee' }}>フェードイン</strong>で流れます。もう一度タップでフェードアウトして停止します。
+                    右下のメニュー →<strong style={{ color: '#67e8f9' }}>「水の音を流す」</strong>をタップすると、水の流れる音が<strong style={{ color: '#22d3ee' }}>フェードイン</strong>で流れます。もう一度タップでフェードアウトして停止します。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#67e8f9' }}>長押し</strong>（またはメニュー →「設定」→「水の音」）で設定が開き、音量・フェード時間・次回起動時の自動再生を変更できます。
+                    行の右にある<strong style={{ color: '#67e8f9' }}>歯車</strong>（またはメニュー →「設定」→「水の音」）で設定が開き、音量・フェード時間・次回起動時の自動再生を変更できます。
                   </div>
                   <div>
                     音声コール中は<strong style={{ color: '#8b5cf6' }}>自動で音量が下がり</strong>、コールが終わると元に戻ります。iPhoneはマナーモードだと鳴りません。

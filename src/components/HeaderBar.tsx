@@ -1,9 +1,10 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Container } from '@/lib/types';
 import { CompletionLogEntry } from '@/hooks/useContainerData';
-import { MenuIcon, WeatherIcon, MegaphoneIcon, DropletIcon } from '@/components/AppIcons';
+import { WeatherData, wbgtLevel } from '@/lib/weatherNews';
+import { SwitchBotReading } from '@/lib/switchbot';
+import { MenuIcon } from '@/components/AppIcons';
 
 export interface ItemTimeLog {
   itemName: string;
@@ -12,62 +13,71 @@ export interface ItemTimeLog {
 }
 
 interface HeaderBarProps {
-  containers: Container[];
-  selectedIdx: number;
-  onSelectContainer: (idx: number) => void;
-  onFileReload?: (file: File) => void;
   workElapsed: string;
   workRawSeconds: number;
   onMenuToggle: () => void;
   onResetWorkTimer: () => void;
   itemTimeLogs: ItemTimeLog[];
   completionLog: CompletionLogEntry[];
-  onContainerAnnounce?: () => void;
-  hasItems?: boolean;
-  onWeather?: () => void;
-  onCheer?: () => void;
-  /** 水の音の再生/停止 */
-  onWater?: () => void;
-  /** 水の音の設定パネルを開く（長押し） */
-  onWaterSettings?: () => void;
-  waterPlaying?: boolean;
+  /** ヘッダー右の気温表示（気象庁データ） */
+  weather?: WeatherData | null;
+  /** SwitchBot の実測値。あれば実測を優先して表示する */
+  switchbot?: SwitchBotReading | null;
+  /** 気温表示のタップ（詳細ポップアップを開く） */
+  onOpenClimate?: () => void;
+}
+
+const TEMP_COLOR = '#fb923c'; // 気温（オレンジ）
+const HUM_COLOR = '#38bdf8';  // 湿度（水色）
+
+/** ヘッダー右: 気温・湿度の数値 + 暑さ指数の色バッジ */
+function HeaderClimate({
+  weather, switchbot, onOpen,
+}: {
+  weather?: WeatherData | null;
+  switchbot?: SwitchBotReading | null;
+  onOpen?: () => void;
+}) {
+  const r = switchbot || weather;
+  if (!r) return null;
+  const lv = wbgtLevel(r.wbgt);
+  return (
+    <button className="header-climate" onClick={onOpen} title="タップで詳細を表示">
+      {switchbot && <span className="header-climate-src">S</span>}
+      <span className="header-climate-val">
+        <span className="header-climate-num" style={{ color: TEMP_COLOR }}>
+          {r.temperature}<span className="header-climate-unit">°C</span>
+        </span>
+        <span className="header-climate-num" style={{ color: HUM_COLOR, fontSize: 15 }}>
+          {Math.round(r.humidity)}<span className="header-climate-unit" style={{ fontSize: 11 }}>%</span>
+        </span>
+      </span>
+      <span
+        className="header-wbgt"
+        style={{ background: `${lv.color}26`, border: `1.5px solid ${lv.color}`, color: lv.color }}
+        title={`暑さ指数 ${r.wbgt}（${lv.label}）`}
+      >
+        <span className="header-wbgt-num">{r.wbgt}</span>
+        <span className="header-wbgt-label">{lv.label}</span>
+      </span>
+    </button>
+  );
 }
 
 export default function HeaderBar({
-  containers,
-  selectedIdx,
-  onSelectContainer,
   workElapsed,
   workRawSeconds,
   onMenuToggle,
   onResetWorkTimer,
   itemTimeLogs,
   completionLog,
-  onWeather,
-  onCheer,
-  onWater,
-  onWaterSettings,
-  waterPlaying,
+  weather,
+  switchbot,
+  onOpenClimate,
 }: HeaderBarProps) {
   const [popupOpen, setPopupOpen] = useState(false);
-  // 水の音ボタンの長押し判定
-  const waterHoldRef = useRef<number | null>(null);
-  const waterHeldRef = useRef(false);
   const [isFlashing, setIsFlashing] = useState(false);
   const lastFlashedAt = useRef(0);
-  const [currentDate, setCurrentDate] = useState('');
-
-  // 日付（現在時刻は端末のステータスバーに出るためヘッダーには表示しない）
-  useEffect(() => {
-    const days = ['日', '月', '火', '水', '木', '金', '土'];
-    const update = () => {
-      const now = new Date();
-      setCurrentDate(`${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}(${days[now.getDay()]})`);
-    };
-    update();
-    const iv = setInterval(update, 30000);
-    return () => clearInterval(iv);
-  }, []);
 
   // 5分ごとに黄色点滅（5秒間）
   useEffect(() => {
@@ -81,81 +91,29 @@ export default function HeaderBar({
 
   return (
     <div className="app-header">
-      {/* ハンバーガーメニュー */}
-      <button onClick={onMenuToggle} className="header-btn" title="メニュー" aria-label="メニュー">
-        <MenuIcon size={24} strokeWidth={2} />
-      </button>
-
-      {/* コンテナ選択（未読込のときは出さない） */}
-      {containers.length > 0 && (
-      <select value={selectedIdx} onChange={(e) => onSelectContainer(Number(e.target.value))} className="header-select">
-        {containers.map((c, i) => {
-          // containerNo が既に (MM/DD) 形式の日付を含む場合は末尾の (MM/DD) を追記しない
-          const hasDateSuffix = /\(\d{1,2}\/\d{1,2}\)\s*$/.test(c.containerNo);
-          return (
-            <option key={c.containerNo} value={i}>
-              {hasDateSuffix ? c.containerNo : `${c.containerNo} (${c.date.slice(5).replace('-', '/')})`}
-            </option>
-          );
-        })}
-      </select>
-      )}
-
-      {/* 天気コールボタン */}
-      {onWeather && (
-        <button onClick={onWeather} className="header-btn" title="天気コール" aria-label="天気コール">
-          <WeatherIcon size={24} strokeWidth={1.9} />
+      {/* 左: メニュー */}
+      <div className="header-left">
+        <button onClick={onMenuToggle} className="header-btn" title="メニュー" aria-label="メニュー">
+          <MenuIcon size={24} strokeWidth={2} />
         </button>
-      )}
+      </div>
 
-      {/* 応援コール（ランダム）ボタン */}
-      {onCheer && (
-        <button onClick={onCheer} className="header-btn" title="応援コール（ランダム）" aria-label="応援コール">
-          <MegaphoneIcon size={24} strokeWidth={1.9} />
-        </button>
-      )}
-
-      {/* 水の音ボタン（タップで再生/停止・長押しで設定） */}
-      {onWater && (
+      {/* 中央: 経過時間 */}
+      <div className="header-center">
         <button
-          onClick={onWater}
-          onContextMenu={(e) => { e.preventDefault(); onWaterSettings?.(); }}
-          onPointerDown={() => {
-            if (!onWaterSettings) return;
-            waterHoldRef.current = window.setTimeout(() => {
-              waterHeldRef.current = true;
-              onWaterSettings();
-            }, 500);
-          }}
-          onPointerUp={() => { if (waterHoldRef.current) { clearTimeout(waterHoldRef.current); waterHoldRef.current = null; } }}
-          onPointerLeave={() => { if (waterHoldRef.current) { clearTimeout(waterHoldRef.current); waterHoldRef.current = null; } }}
-          onClickCapture={(e) => {
-            // 長押しで設定を開いたときは再生/停止させない
-            if (waterHeldRef.current) { e.preventDefault(); e.stopPropagation(); waterHeldRef.current = false; }
-          }}
-          className={`header-btn ${waterPlaying ? 'header-btn-water-on' : ''}`}
-          title="水の音（長押しで設定）"
-          aria-label="水の音"
+          onClick={() => setPopupOpen(true)}
+          className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
+          style={{ background: 'transparent', cursor: 'pointer', padding: '4px 10px' }}
+          title="タップで経過時間の詳細"
         >
-          <DropletIcon size={24} strokeWidth={1.9} />
+          {workElapsed}
         </button>
-      )}
+      </div>
 
-      <div className="flex-1" />
-
-      {/* 日付（横画面のみ）+ 経過時間（黄色） */}
-      <span className="header-date-landscape" style={{
-        fontFamily: 'var(--font-mono)', fontSize: 16, fontWeight: 500,
-        color: 'rgba(255,255,255,0.4)', flexShrink: 0, marginRight: 10,
-      }}>
-        {currentDate}
-      </span>
-      <span
-        className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
-        style={{ color: '#f59e0b', marginRight: 12, flexShrink: 0 }}
-      >
-        {workElapsed}
-      </span>
+      {/* 右: 気温・湿度・暑さ指数 */}
+      <div className="header-right">
+        <HeaderClimate weather={weather} switchbot={switchbot} onOpen={onOpenClimate} />
+      </div>
 
       {/* 経過時間ポップアップ */}
       {popupOpen && (

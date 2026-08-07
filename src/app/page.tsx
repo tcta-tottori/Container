@@ -29,9 +29,9 @@ import { MenuIcon, UploadIcon, WorkIcon, EditIcon, ChartIcon, ClockIcon, HelpIco
 import { getWaterSoundEngine, setupWaterAutoResume } from '@/lib/waterSound';
 import { useWaterSound } from '@/hooks/useWaterSound';
 import WeatherPopup from '@/components/WeatherPopup';
-import ClimateBar, { SwitchBotStatus } from '@/components/ClimateBar';
+import QuickActions from '@/components/QuickActions';
 import SwitchBotPopup from '@/components/SwitchBotPopup';
-import { SwitchBotReading, SwitchBotHistoryPoint, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
+import { SwitchBotReading, SwitchBotHistoryPoint, SwitchBotStatus, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
 import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
@@ -1273,39 +1273,22 @@ export default function Home() {
       )}
 
       <div className="app-layout" style={{ background: 'var(--bg-primary)' }}>
-        {/* ヘッダー */}
+        {/* ヘッダー（1行: メニュー / 経過時間 / 気温） */}
         <HeaderBar
-          containers={state.containers}
-          selectedIdx={state.selectedContainerIdx}
-          onSelectContainer={selectContainer}
-          onFileReload={handleFileLoaded}
           workElapsed={workElapsed}
           workRawSeconds={workRawSeconds}
           onMenuToggle={() => setMenuOpen(!menuOpen)}
           onResetWorkTimer={() => { resetWorkTimer(); setItemTimeLogs([]); }}
           itemTimeLogs={itemTimeLogs}
           completionLog={state.completionLog}
-          onContainerAnnounce={handleContainerSummary}
-          hasItems={state.items.length > 0}
-          onWeather={view === 'work' ? handleWeatherCall : undefined}
-          onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
-          onWater={toggleWater}
-          onWaterSettings={() => setSettingsTab('water')}
-          waterPlaying={waterPlaying}
+          weather={barWeather}
+          switchbot={switchbot}
+          onOpenClimate={() => {
+            if (switchbot) setSbPopupOpen(true);
+            else if (barWeather) setWeatherPopup(barWeather);
+          }}
         />
 
-        {/* 温湿度バー（ヘッダー下・作業ページのみ） */}
-        {view === 'work' && (
-          <ClimateBar
-            weather={barWeather}
-            switchbot={switchbot}
-            sbStatus={sbStatus}
-            sbError={sbError}
-            onToggleSwitchBot={toggleSwitchBot}
-            onOpenWeather={() => { if (barWeather) setWeatherPopup(barWeather); }}
-            onOpenSwitchBot={() => setSbPopupOpen(true)}
-          />
-        )}
         {sbPopupOpen && switchbot && (
           <SwitchBotPopup
             reading={switchbot}
@@ -1314,6 +1297,24 @@ export default function Home() {
             onClose={() => setSbPopupOpen(false)}
           />
         )}
+
+        {/* 右下の展開メニュー（コンテナ選択・応援/天気コール・水の音・SwitchBot） */}
+        <QuickActions
+          containers={state.containers}
+          selectedIdx={state.selectedContainerIdx}
+          onSelectContainer={selectContainer}
+          onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
+          onWeather={view === 'work' ? handleWeatherCall : undefined}
+          waterPlaying={waterPlaying}
+          onWater={toggleWater}
+          onWaterSettings={() => setSettingsTab('water')}
+          switchbot={switchbot}
+          sbStatus={sbStatus}
+          sbError={sbError}
+          onToggleSwitchBot={toggleSwitchBot}
+          onOpenSwitchBot={() => setSbPopupOpen(true)}
+          hidden={menuOpen || manualOpen || settingsTab !== null || historyOpen}
+        />
 
         {/* メインエリア */}
         <div className="main-area">

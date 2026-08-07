@@ -40,6 +40,9 @@ export interface SwitchBotReading {
 
 export type SwitchBotScanState = 'scanning' | 'stopped' | 'error';
 
+/** UI 側で扱う接続状態 */
+export type SwitchBotStatus = 'unsupported' | 'idle' | 'scanning' | 'error';
+
 /** SwitchBot 推移グラフ用の時系列ポイント */
 export interface SwitchBotHistoryPoint {
   /** 時刻 (epoch ms) */
