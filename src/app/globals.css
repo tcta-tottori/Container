@@ -1102,6 +1102,34 @@ body {
   0%   { transform: translateY(var(--river-rise)); }
   100% { transform: translateY(0); }
 }
+
+/*
+ * 水から上がってきた直後の「濡れ」。
+ * 明るい帯が文字の上を下へ流れて、水が伝って落ちたように見せる。
+ * 水面から出てくる勢いに合わせて、上がり切るころに消える。
+ */
+.river-info-body::after {
+  content: ''; position: absolute; left: -6%; right: -6%; top: -14%; bottom: -14%;
+  pointer-events: none;
+  background: linear-gradient(to bottom,
+    rgba(255,255,255,0) 34%,
+    rgba(226,244,252,0.22) 46%,
+    rgba(255,255,255,0.42) 50%,
+    rgba(226,244,252,0.2) 54%,
+    rgba(255,255,255,0) 66%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: river-sheet 1.5s cubic-bezier(0.22, 0.7, 0.3, 1) both;
+}
+/* 沈むときは濡れの演出はいらない */
+.river-stage.hide .river-info-body::after { animation: none; opacity: 0; }
+
+@keyframes river-sheet {
+  0%   { opacity: 0;   transform: translateY(-60%) scaleY(0.75); }
+  25%  { opacity: 0.8; }
+  70%  { opacity: 0.3; }
+  100% { opacity: 0;   transform: translateY(80%) scaleY(1.15); }
+}
 @keyframes river-fall {
   0%   { transform: translateY(0); }
   100% { transform: translateY(var(--river-rise)); }
