@@ -185,13 +185,35 @@ body {
 }
 .header-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
 .header-btn:active { transform: scale(0.94); }
+/*
+ * 経過時間。秒との間の : を動かさないための組み方。
+ * 左右を同じ幅で確保した3列にして、真ん中の : を中央へ固定する。
+ * 1時間を超えて "1:05:23" になっても、増えた桁は左の余白へ伸びるだけ。
+ */
 .header-work-elapsed {
+  /* 数字1文字ぶんの枠。字ごとの幅の違いで揺れないよう、全部この幅に揃える */
+  --hdr-digit: 0.62em;
+  /* : の枠。左右に確保する幅は「H:MM」がちょうど入る大きさ */
+  --hdr-sep: 0.34em;
+  --hdr-side: calc(var(--hdr-digit) * 3 + var(--hdr-sep));
+  display: grid;
+  grid-template-columns: var(--hdr-side) auto var(--hdr-side);
+  align-items: center;
+  padding: 4px 0;
   font-family: var(--font-clock); font-size: 24px; font-variant-numeric: tabular-nums;
-  color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 1px;
+  color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 0;
   border: none;
   text-shadow: 0 0 10px rgba(245,158,11,0.35);
   transition: font-size 0.4s ease, color 0.4s ease, transform 0.4s ease;
 }
+/* 桁が増えたときは左へあふれさせる（: の位置は動かさない） */
+.hdr-time-left { justify-self: end; white-space: nowrap; }
+.hdr-time-right { justify-self: start; white-space: nowrap; }
+.hdr-time-ch {
+  display: inline-block; width: var(--hdr-digit); text-align: center;
+}
+.hdr-time-sep { width: var(--hdr-sep); }
+.hdr-time-colon { display: inline-block; text-align: center; }
 .header-elapsed-flash {
   color: #f59e0b !important;
   animation: elapsed-blink 0.8s ease-in-out infinite;
@@ -1164,30 +1186,30 @@ body {
  */
 .gdrive-backdrop {
   position: fixed; inset: 0; z-index: 320;
-  display: flex; align-items: flex-end; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
   background: rgba(0,0,0,0.72);
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   animation: fadeIn 0.18s ease both;
   -webkit-tap-highlight-color: transparent;
 }
+/* 画面の中央に浮かせる */
 .gdrive-sheet {
-  width: 100%; max-width: 520px;
-  max-height: min(86vh, 720px);
+  width: 100%; max-width: 460px;
+  max-height: min(82vh, 700px);
   display: flex; flex-direction: column;
   background: linear-gradient(165deg, #14122b 0%, #14172c 55%, #0f1224 100%);
-  border: 1.5px solid rgba(255,255,255,0.12);
-  border-bottom: none;
-  border-radius: 22px 22px 0 0;
-  box-shadow: 0 -12px 48px rgba(0,0,0,0.6);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border: 1.5px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6);
   overflow: hidden;
-  animation: gdrive-sheet-up 0.34s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+  animation: gdrive-pop-in 0.24s cubic-bezier(0.22, 0.9, 0.3, 1) both;
 }
-@keyframes gdrive-sheet-up {
-  0%   { transform: translateY(24px); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
+@keyframes gdrive-pop-in {
+  0%   { transform: scale(0.96); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
-/* 上端のつまみ（下から出てきたことが分かる目印） */
+/* 上端の飾り線 */
 .gdrive-grip {
   width: 38px; height: 4px; border-radius: 2px;
   margin: 9px auto 2px;
