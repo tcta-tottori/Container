@@ -8,6 +8,8 @@ import { useCountUp } from '@/hooks/useCountUp';
 import PalletDiagram from './PalletDiagram';
 import { playWaterPush, playSurfaceBreak, playSubmerging } from '@/lib/waterSplash';
 import { getWaterSoundEngine } from '@/lib/waterSound';
+import MistVideo from './MistVideo';
+import { MIST_FROM, MIST_PEAK, MIST_IN_MS, MIST_CLEAR_MS } from '@/lib/mistVideo';
 
 interface RiverModeProps {
   onClose: () => void;
@@ -84,16 +86,13 @@ const EXIT_SWIPE_X = 70;
 /** これ以下の動きはタップ扱い */
 const TAP_SLOP = 10;
 /*
- * 出入りの靄。
- * 入るときは、元の画面に白い靄がかかって真っ白になり、そこから晴れて川が出てくる。
- * 戻るときはその逆で、川が白く覆われてから元の画面が現れる。
+ * 出入りの煙。
+ * 入るときは、元の画面に煙が立ち込めて覆いつくし、そこから晴れて川が出てくる。
+ * 戻るときはその逆で、川が煙で覆われてから元の画面が現れる。
+ * 長さは煙の動画（mistVideo）の濃さの移り変わりに合わせてある。
  */
-/** 元の画面が真っ白になるまで（入るとき） */
-const MIST_IN_MS = 850;
-/** 真っ白から川が見えてくるまで */
-const MIST_CLEAR_MS = 1300;
 /** 靄が覆いつくすまで（閉じるとき）。この後に元の画面へ戻る */
-const MIST_OUT_MS = 850;
+const MIST_OUT_MS = MIST_IN_MS;
 
 /** 表示の段階 */
 type RiverPhase = 'fog-in' | 'clearing' | 'shown' | 'fog-out';
@@ -807,9 +806,16 @@ export default function RiverMode({
       </div>
       </div>{/* river-content 閉じ */}
 
-      {/* 出入りの靄。かかる → 晴れる → （戻るとき）また覆う */}
+      {/* 出入りの煙。立ち込める → 晴れる → （戻るとき）また覆う */}
       {phase !== 'shown' && (
-        <div className={`river-mist ${phase}`} aria-hidden />
+        <div
+          className={`river-mist ${phase}`}
+          style={{ animationDuration: `${phase === 'clearing' ? MIST_CLEAR_MS : MIST_IN_MS}ms` }}
+          aria-hidden
+        >
+          {/* いちばん濃いところで画面が入れ替わるよう、段階ごとに続きから流す */}
+          <MistVideo from={phase === 'clearing' ? MIST_PEAK : MIST_FROM} />
+        </div>
       )}
     </div>
   );

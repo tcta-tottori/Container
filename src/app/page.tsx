@@ -31,6 +31,8 @@ import { useWaterSound } from '@/hooks/useWaterSound';
 import WeatherPopup from '@/components/WeatherPopup';
 import QuickActions from '@/components/QuickActions';
 import RiverMode from '@/components/RiverMode';
+import MistVideo from '@/components/MistVideo';
+import { MIST_PEAK, MIST_CLEAR_MS } from '@/lib/mistVideo';
 import SwitchBotPopup from '@/components/SwitchBotPopup';
 import { SwitchBotReading, SwitchBotHistoryPoint, SwitchBotStatus, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
@@ -40,8 +42,8 @@ import * as XLSX from 'xlsx';
 
 type ViewMode = 'load' | 'work' | 'list' | 'edit' | 'analytics' | 'jkp';
 
-/** せせらぎモードから戻ったあと、残った靄が晴れきるまで（CSS と揃える） */
-const RIVER_TAIL_MS = 1300;
+/** せせらぎモードから戻ったあと、残った煙が晴れきるまで */
+const RIVER_TAIL_MS = MIST_CLEAR_MS;
 
 /* ===== 読込中の全画面表示 =====
  * 起動時のスプラッシュと同じ作りにして、読み込みの間は画面ぜんぶを使う。
@@ -1327,7 +1329,12 @@ export default function Home() {
         />
       )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
-      {riverTail && <div className="river-tail-mist" aria-hidden />}
+      {/* 戻った直後は画面が煙で覆われているので、その続きから晴らす */}
+      {riverTail && (
+        <div className="river-tail-mist" style={{ animationDuration: `${MIST_CLEAR_MS}ms` }} aria-hidden>
+          <MistVideo from={MIST_PEAK} />
+        </div>
+      )}
 
       {riverOpen && (
         <RiverMode
