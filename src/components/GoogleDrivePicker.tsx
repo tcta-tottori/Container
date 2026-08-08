@@ -5,16 +5,24 @@ import { DriveFile, driveErrorMessage, listDriveFiles } from '@/lib/googleDrive'
 import { classifyFile, isImageFile } from '@/lib/fileClassifier';
 
 interface GoogleDrivePickerProps {
-  /** 選び終わったとき。そのまま読み込みへ進む */
+  /** ファイルを選んだとき。タップした時点でそのまま読み込みへ進む */
   onSelect: (files: DriveFile[]) => void;
   /** 閉じる（何も選ばずに戻る） */
   onClose: () => void;
 }
 
-/** 並べ替えの基準 */
-type SortKey = 'name' | 'modified';
+/**
+ * 一覧に出すファイルか。
+ * 作業に使うのは「コンテナ」日程と「JKP」出荷スケジュールだけなので、
+ * 名前にどちらかが入っているものに絞る。フォルダは中を見られるよう常に残す。
+ */
+function isTargetFile(f: DriveFile): boolean {
+  if (f.isFolder) return true;
+  const name = f.name.toUpperCase();
+  return name.includes('コンテナ') || name.includes('JKP');
+}
 
-/** 更新日を「8/6」「昨年8/6」のような短い形にする */
+/** 更新日を「8/6」「2025/8/6」のような短い形にする */
 function shortDate(iso?: string): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -64,7 +72,7 @@ function PhotoGlyph() {
 
 /**
  * Googleドライブのファイルをアプリの中だけで選ぶ画面。
- * ドライブのアプリやブラウザへ出ていかず、選んだらそのまま読み込みへ進む。
+ * コンテナ・JKP のファイルだけを新しい順に並べ、タップしたらすぐ読み込みへ進む。
  */
 export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePickerProps) {
   /** いま開いているフォルダ。先頭が CNS フォルダ（id 未指定 = 既定のフォルダ） */
@@ -72,11 +80,6 @@ export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePick
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  /** 選んだファイル。フォルダを移っても消えないよう、実体ごと持っておく */
-  const [selected, setSelected] = useState<Map<string, DriveFile>>(new Map());
-  const [query, setQuery] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('name');
-  const [sortAsc, setSortAsc] = useState(true);
   /** 読み直し用。押すたびに増やして取得をやり直す */
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -96,55 +99,29 @@ export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePick
     return () => { alive = false; };
   }, [current.id, reloadKey]);
 
+  /** 対象のファイルだけを、フォルダを先頭・更新の新しい順に並べる */
+  const shown = useMemo(() => {
+    return files.filter(isTargetFile).sort((a, b) => {
+      if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+      return (b.modifiedTime || '').localeCompare(a.modifiedTime || '');
+    });
+  }, [files]);
+
+  /** タップ。フォルダなら中へ、ファイルならそのまま読み込みへ */
+  const handleTap = useCallback((f: DriveFile) => {
+    if (f.isFolder) {
+      setPath((prev) => [...prev, { id: f.id, name: f.name }]);
+      return;
+    }
+    onSelect([f]);
+  }, [onSelect]);
+
   // Esc で閉じる
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-
-  /** 絞り込みと並べ替え。フォルダはいつも先頭に置く */
-  const shown = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = q ? files.filter((f) => f.name.toLowerCase().includes(q)) : files;
-    const sorted = [...filtered].sort((a, b) => {
-      if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
-      const diff = sortKey === 'name'
-        ? a.name.localeCompare(b.name, 'ja')
-        : (a.modifiedTime || '').localeCompare(b.modifiedTime || '');
-      return sortAsc ? diff : -diff;
-    });
-    return sorted;
-  }, [files, query, sortKey, sortAsc]);
-
-  const toggle = useCallback((f: DriveFile) => {
-    if (f.isFolder) {
-      setPath((prev) => [...prev, { id: f.id, name: f.name }]);
-      setQuery('');
-      return;
-    }
-    setSelected((prev) => {
-      const next = new Map(prev);
-      if (next.has(f.id)) next.delete(f.id); else next.set(f.id, f);
-      return next;
-    });
-  }, []);
-
-  /** 並べ替えボタン。押されているものをもう一度押すと昇順・降順が入れ替わる */
-  const changeSort = useCallback((key: SortKey) => {
-    setSortKey((prevKey) => {
-      if (prevKey === key) { setSortAsc((asc) => !asc); return prevKey; }
-      setSortAsc(key === 'name');
-      return key;
-    });
-  }, []);
-
-  const handleSubmit = useCallback(() => {
-    const picked = Array.from(selected.values());
-    if (picked.length > 0) onSelect(picked);
-  }, [selected, onSelect]);
-
-  const selectedCount = selected.size;
 
   return (
     <div className="gdrive-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label="Googleドライブからファイルを選択">
@@ -154,7 +131,7 @@ export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePick
         {/* 見出し（いまの場所と閉じるボタン） */}
         <div className="gdrive-head">
           <div className="gdrive-head-text">
-            <p className="gdrive-title">ファイルを選択</p>
+            <p className="gdrive-title">読み込むファイルを選ぶ</p>
             <div className="gdrive-crumbs">
               {path.map((p, i) => (
                 <span key={`${p.id ?? 'root'}-${i}`}>
@@ -162,7 +139,7 @@ export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePick
                   <button
                     type="button"
                     className={`gdrive-crumb${i === path.length - 1 ? ' current' : ''}`}
-                    onClick={() => { if (i < path.length - 1) { setPath(path.slice(0, i + 1)); setQuery(''); } }}
+                    onClick={() => { if (i < path.length - 1) setPath(path.slice(0, i + 1)); }}
                   >
                     {p.name}
                   </button>
@@ -173,25 +150,7 @@ export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePick
           <button type="button" className="gdrive-close" onClick={onClose} aria-label="閉じる">✕</button>
         </div>
 
-        {/* 絞り込みと並べ替え */}
-        <div className="gdrive-tools">
-          <input
-            className="gdrive-search"
-            type="search"
-            inputMode="search"
-            placeholder="ファイル名で絞り込み"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button type="button" className={`gdrive-sort${sortKey === 'name' ? ' on' : ''}`} onClick={() => changeSort('name')}>
-            名前{sortKey === 'name' ? (sortAsc ? ' ↓' : ' ↑') : ''}
-          </button>
-          <button type="button" className={`gdrive-sort${sortKey === 'modified' ? ' on' : ''}`} onClick={() => changeSort('modified')}>
-            更新{sortKey === 'modified' ? (sortAsc ? ' ↑' : ' ↓') : ''}
-          </button>
-        </div>
-
-        {/* 一覧 */}
+        {/* 一覧。タップした時点で読み込みが始まる */}
         <div className="gdrive-list">
           {loading && (
             <div className="gdrive-state">
@@ -211,20 +170,14 @@ export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePick
 
           {!loading && !error && shown.length === 0 && (
             <div className="gdrive-state">
-              <p>{query ? '見つかりませんでした' : '読み込めるファイルがありません'}</p>
+              <p>コンテナ・JKP のファイルがありません</p>
             </div>
           )}
 
           {!loading && !error && shown.map((f) => {
-            const on = selected.has(f.id);
             const { label } = f.isFolder ? { label: 'フォルダ' } : classifyFile(f.name);
             return (
-              <button
-                type="button"
-                key={f.id}
-                className={`gdrive-row${on ? ' on' : ''}`}
-                onClick={() => toggle(f)}
-              >
+              <button type="button" key={f.id} className="gdrive-row" onClick={() => handleTap(f)}>
                 <span className="gdrive-row-icon">
                   {f.isFolder ? <FolderGlyph /> : isImageFile(f.name) ? <PhotoGlyph /> : <ExcelGlyph />}
                 </span>
@@ -236,22 +189,10 @@ export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePick
                     {shortSize(f.size) && <span>{shortSize(f.size)}</span>}
                   </span>
                 </span>
-                {f.isFolder
-                  ? <span className="gdrive-row-chevron" aria-hidden>›</span>
-                  : <span className={`gdrive-check${on ? ' on' : ''}`} aria-hidden>{on ? '✓' : ''}</span>}
+                <span className="gdrive-row-chevron" aria-hidden>›</span>
               </button>
             );
           })}
-        </div>
-
-        {/* 決定 */}
-        <div className="gdrive-foot">
-          <span className="gdrive-count">
-            {selectedCount > 0 ? `${selectedCount}件を選択中` : 'ファイルをタップして選択'}
-          </span>
-          <button type="button" className="gdrive-submit" disabled={selectedCount === 0} onClick={handleSubmit}>
-            読み込む
-          </button>
         </div>
       </div>
     </div>
