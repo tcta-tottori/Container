@@ -7,6 +7,7 @@ import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDe
 import { buildJapanesePartName } from '@/lib/partTranslations';
 import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
 import { displayQuantities } from '@/lib/itemQuantity';
+import { usePalletTap } from '@/hooks/usePalletTap';
 import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
@@ -107,6 +108,7 @@ interface ItemDetailPanelProps {
   onCompleteItem?: (id: string) => void;
   onUncompleteItem?: (id: string) => void;
   onDecrementPallet?: () => void;
+  onIncrementPallet?: () => void;
 }
 
 /** 2つの矩形を包む矩形を返す（どちらかが無ければある方をそのまま返す） */
@@ -390,14 +392,14 @@ function UndoSwipeRow({ children, onSwipe, style, className, onClick }: {
 }
 
 export default function ItemDetailPanel({
-  item, relatedItems, allItems, completedIds, onSelectItem, onCompleteItem, onUncompleteItem, onDecrementPallet,
+  item, relatedItems, allItems, completedIds, onSelectItem, onCompleteItem, onUncompleteItem,
+  onDecrementPallet, onIncrementPallet,
 }: ItemDetailPanelProps) {
   const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
   // 鍋は機種別カラーを使用（上半分の背景・アクセント色を差し替え）
   const nabeColor = getNabeModelColor(item.itemName, item.type);
   const accentColor = nabeColor || colors.accent;
   const [palletFlash, setPalletFlash] = useState(false);
-  const doubleTapRef = useRef<number | null>(null);
   const [fullscreenPallet, setFullscreenPallet] = useState<'full' | 'fraction' | null>(null);
   const [fsRotateY, setFsRotateY] = useState(-35);
   const fsTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
@@ -455,20 +457,15 @@ export default function ItemDetailPanel({
   const upperTransition = transitionPhase === 'fadeout' ? 'opacity 0.4s ease' : transitionPhase === 'fadein' ? 'opacity 0.5s ease' : 'none';
   const showContent = transitionPhase !== 'blank';
 
-  const handlePalletDoubleTap = useCallback(() => {
-    const now = Date.now();
-    if (doubleTapRef.current && now - doubleTapRef.current < 300) {
-      // Double-tap detected
-      doubleTapRef.current = null;
-      if (onDecrementPallet) {
-        onDecrementPallet();
-        setPalletFlash(true);
-        setTimeout(() => setPalletFlash(false), 200);
-      }
-    } else {
-      doubleTapRef.current = now;
-    }
-  }, [onDecrementPallet]);
+  /** パレット数: 1回タップで減らす／2回タップで増やす（元の枚数までしか戻らない） */
+  const flashPallet = useCallback(() => {
+    setPalletFlash(true);
+    setTimeout(() => setPalletFlash(false), 200);
+  }, []);
+  const handlePalletTap = usePalletTap(
+    useCallback(() => { onDecrementPallet?.(); flashPallet(); }, [onDecrementPallet, flashPallet]),
+    useCallback(() => { onIncrementPallet?.(); flashPallet(); }, [onIncrementPallet, flashPallet]),
+  );
   const itemColor = extractColor(item.itemName);
   // 鍋は類似品なし、関連として同じサイズのものを表示
   const isCurrentNabe = item.type === '鍋';
@@ -1027,7 +1024,7 @@ export default function ItemDetailPanel({
         {/* 数量（PL / CT / pcs）— zIndex高めで図の上に表示 */}
         <div key={`stats-${animKey}`} className="detail-stats-free" style={{ position: 'relative', zIndex: 10, justifyContent: 'center', flexShrink: 0 }}>
           <div className="detail-sf-item anim-slide-up" style={{ minWidth: 0 }}>
-            <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
+            <span className="detail-sf-num" onClick={handlePalletTap} style={{
               color: accentColor, textShadow: `0 0 16px ${accentColor}50, 0 2px 4px rgba(0,0,0,0.6)`,
               cursor: 'pointer', transition: 'background 0.15s ease',
               background: palletFlash ? 'rgba(255,255,255,0.25)' : 'transparent',

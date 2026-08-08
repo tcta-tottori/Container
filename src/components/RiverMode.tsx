@@ -3,16 +3,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { displayQuantities } from '@/lib/itemQuantity';
+import { usePalletTap } from '@/hooks/usePalletTap';
 
 interface RiverModeProps {
   onClose: () => void;
-  /** いま作業中の品目。画面上側をタップすると川から情報が浮かび上がる */
+  /** いま作業中の品目。画面をタップすると川から情報が浮かび上がる */
   item?: ContainerItem | null;
   /** パレット数をタップしたときの処理（作業画面の「減らす」と同じ） */
   onDecreasePallet?: () => void;
+  /** パレット数をダブルタップしたときの処理（作業画面の「増やす」と同じ） */
+  onIncreasePallet?: () => void;
+  /** 機種名を上にスワイプ → 次の品目 */
+  onNextItem?: () => void;
+  /** 機種名を下にスワイプ → 前の品目 */
+  onPrevItem?: () => void;
 }
 
-/** タップの波紋 */
+/** タップの波紋（水滴が落ちた水面） */
 interface Ripple {
   x: number; y: number; t: number;
 }
@@ -24,32 +31,31 @@ const VIDEO_MP4 = `${BASE}/videos/river-loop.mp4`;
 const VIDEO_WEBM = `${BASE}/videos/river-loop.webm`;
 const POSTER = `${BASE}/videos/river-poster.jpg`;
 
-/** 画面下側のこの割合をタップすると閉じる（残りの上 2/3 は品目情報の表示） */
+/** 画面下側のこの割合をタップすると閉じる */
 const CLOSE_ZONE = 1 / 3;
 /** 浮かび上がった品目情報が沈むまでの時間 */
 const INFO_MS = 9000;
+/** 機種名のスワイプを切り替えとみなす縦の移動量(px) */
+const SWIPE_Y = 42;
 
-/** ふわっと光る円のスプライト（波紋に使う） */
-function makeBlob(): HTMLCanvasElement {
-  const size = 64;
-  const c = document.createElement('canvas');
-  c.width = size; c.height = size;
-  const g = c.getContext('2d')!;
-  const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.45, 'rgba(255,255,255,0.5)');
-  grad.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, size, size);
-  return c;
+/** 波紋1つの寿命(秒) */
+const RIPPLE_LIFE = 2.2;
+
+/** 時刻を HH:MM で返す */
+function nowHhMm(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 /**
  * せせらぎモード。
- * 川のループ動画を全画面で流す休憩用の表示。
- * 画面上側のタップは波紋が広がるだけ、下 1/3 をタップすると元の画面に戻る。
+ * 川のループ動画を全画面（ステータスバー領域まで）で流す休憩用の表示。
+ * 上側のタップは水滴の波紋＋品目情報の出し入れ、下 1/3 をタップすると元の画面に戻る。
  */
-export default function RiverMode({ onClose, item, onDecreasePallet }: RiverModeProps) {
+export default function RiverMode({
+  onClose, item, onDecreasePallet, onIncreasePallet, onNextItem, onPrevItem,
+}: RiverModeProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const ripplesRef = useRef<Ripple[]>([]);
@@ -57,12 +63,21 @@ export default function RiverMode({ onClose, item, onDecreasePallet }: RiverMode
   /** 品目情報が浮かび上がっているか。key を変えると出現アニメをやり直す */
   const [info, setInfo] = useState<{ shown: boolean; key: number }>({ shown: false, key: 0 });
   const infoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 全画面（ステータスバーを消せた）かどうか。消せたときだけ自前の時計を出す */
+  const [ownClock, setOwnClock] = useState(false);
+  const [clock, setClock] = useState('');
 
   /** 情報を浮かび上がらせて、一定時間で沈める */
   const surfaceInfo = useCallback((restart: boolean) => {
     setInfo((prev) => ({ shown: true, key: restart || !prev.shown ? prev.key + 1 : prev.key }));
     if (infoTimer.current) clearTimeout(infoTimer.current);
     infoTimer.current = setTimeout(() => setInfo((prev) => ({ ...prev, shown: false })), INFO_MS);
+  }, []);
+
+  /** 情報を川に沈める */
+  const sinkInfo = useCallback(() => {
+    if (infoTimer.current) { clearTimeout(infoTimer.current); infoTimer.current = null; }
+    setInfo((prev) => (prev.shown ? { ...prev, shown: false } : prev));
   }, []);
 
   useEffect(() => () => { if (infoTimer.current) clearTimeout(infoTimer.current); }, []);
@@ -96,6 +111,51 @@ export default function RiverMode({ onClose, item, onDecreasePallet }: RiverMode
     };
   }, []);
 
+  /*
+   * ステータスバー領域まで映像で埋める。
+   * - 全画面 API が使える端末（Android など）は全画面にしてステータスバーごと隠し、
+   *   代わりに時刻だけを自前で描く。
+   * - 使えない端末（iOS のホーム画面アプリなど）は black-translucent により
+   *   もともと映像がステータスバーの下まで届くので、theme-color だけ黒に寄せる。
+   */
+  useEffect(() => {
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    const prevTheme = meta?.getAttribute('content') ?? null;
+    meta?.setAttribute('content', '#000000');
+
+    const el = rootRef.current;
+    let entered = false;
+    (async () => {
+      try {
+        if (el && !document.fullscreenElement && el.requestFullscreen) {
+          await el.requestFullscreen({ navigationUI: 'hide' });
+          entered = true;
+        }
+      } catch { /* 全画面にできなくても続行 */ }
+      setOwnClock(entered && !!document.fullscreenElement);
+    })();
+
+    const onFsChange = () => setOwnClock(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      if (meta) {
+        if (prevTheme === null) meta.removeAttribute('content');
+        else meta.setAttribute('content', prevTheme);
+      }
+      if (document.fullscreenElement) { void document.exitFullscreen().catch(() => { /* ignore */ }); }
+    };
+  }, []);
+
+  // 自前の時計（全画面でステータスバーを隠したときだけ表示する）
+  useEffect(() => {
+    if (!ownClock) return;
+    setClock(nowHhMm());
+    const t = setInterval(() => setClock(nowHhMm()), 10000);
+    return () => clearInterval(t);
+  }, [ownClock]);
+
   // 自動再生がブロックされた場合と、バックグラウンド復帰時の再生再開
   useEffect(() => {
     const v = videoRef.current;
@@ -107,7 +167,10 @@ export default function RiverMode({ onClose, item, onDecreasePallet }: RiverMode
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
-  /** 下 1/3 をタップで閉じる。上 2/3 は波紋 + 品目情報の浮かび上がり */
+  /**
+   * 下 1/3 をタップで閉じる。
+   * それ以外は水滴の波紋を落としつつ、品目情報が出ていれば沈め、出ていなければ浮かび上がらせる。
+   */
   const handleTap = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
@@ -117,24 +180,53 @@ export default function RiverMode({ onClose, item, onDecreasePallet }: RiverMode
     }
     ripplesRef.current.push({ x: e.clientX - rect.left, y, t: 0 });
     if (ripplesRef.current.length > 6) ripplesRef.current.shift();
-    if (item) surfaceInfo(false);
-  }, [onClose, item, surfaceInfo]);
+    if (!item) return;
+    if (info.shown) sinkInfo();
+    else surfaceInfo(true);
+  }, [onClose, item, info.shown, sinkInfo, surfaceInfo]);
 
-  /** パレット数をタップ → 作業画面と同じように1枚減らす。表示時間は数え直す */
+  /** パレット数: 1回タップで減らす／2回タップで増やす。表示時間は数え直す */
+  const palletTap = usePalletTap(
+    () => { onDecreasePallet?.(); },
+    () => { onIncreasePallet?.(); },
+  );
   const handlePalletTap = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    onDecreasePallet?.();
+    palletTap();
     surfaceInfo(false);
-  }, [onDecreasePallet, surfaceInfo]);
+  }, [palletTap, surfaceInfo]);
 
-  // ===== タップの波紋 =====
+  /** 機種名を上下にスワイプ → 品目の切り替え */
+  const swipeRef = useRef<{ y: number; x: number } | null>(null);
+  const handleModelDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    // 指が文字の外へ出ても pointerup を受け取れるようにする
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* 対応していなければ無視 */ }
+    swipeRef.current = { y: e.clientY, x: e.clientX };
+  }, []);
+  const handleModelUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    const start = swipeRef.current;
+    swipeRef.current = null;
+    if (!start) return;
+    const dy = e.clientY - start.y;
+    const dx = e.clientX - start.x;
+    if (Math.abs(dy) < SWIPE_Y || Math.abs(dy) < Math.abs(dx)) return;
+    if (dy < 0) onNextItem?.();
+    else onPrevItem?.();
+    // 切り替えた機種をもう一度水面から出す
+    surfaceInfo(true);
+  }, [onNextItem, onPrevItem, surfaceInfo]);
+  const handleModelCancel = useCallback(() => { swipeRef.current = null; }, []);
+
+  // ===== タップの波紋（水滴が落ちた水面） =====
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const blob = makeBlob();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     let W = 0, H = 0;
 
@@ -151,26 +243,47 @@ export default function RiverMode({ onClose, item, onDecreasePallet }: RiverMode
     let last = performance.now();
     let raf = 0;
 
+    /*
+     * 立体的な円ではなく、真上から見た水面の波紋。
+     * 落下点から真円のリングが3本、少しずつ遅れて外へ広がっていく。
+     */
     const draw = (dt: number) => {
       ctx.clearRect(0, 0, W, H);
       const ripples = ripplesRef.current;
       if (ripples.length === 0) return;
       ctx.globalCompositeOperation = 'screen';
+      const maxR = Math.max(W, H) * 0.34;
+
       for (let i = ripples.length - 1; i >= 0; i--) {
         const rp = ripples[i];
         rp.t += dt;
-        if (rp.t > 1.8) { ripples.splice(i, 1); continue; }
-        const p = rp.t / 1.8;
-        const r = 20 + p * 130;
-        ctx.globalAlpha = (1 - p) * 0.32;
-        ctx.lineWidth = 2 * (1 - p) + 0.5;
-        ctx.strokeStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.ellipse(rp.x, rp.y, r, r * 0.42, 0, 0, Math.PI * 2);
-        ctx.stroke();
-        // 中心のきらめき
-        ctx.globalAlpha = (1 - p) * 0.14;
-        ctx.drawImage(blob, rp.x - r * 0.5, rp.y - r * 0.22, r, r * 0.44);
+        if (rp.t > RIPPLE_LIFE) { ripples.splice(i, 1); continue; }
+
+        for (let k = 0; k < 3; k++) {
+          // 後ろのリングほど遅れて出る
+          const t = rp.t - k * 0.16;
+          if (t <= 0) continue;
+          const p = Math.min(1, t / RIPPLE_LIFE);
+          // 広がりは最初が速く、だんだん緩やかに
+          const r = maxR * (1 - Math.pow(1 - p, 2.4)) * (1 - k * 0.14) + 6;
+          const fade = Math.pow(1 - p, 1.6);
+          ctx.globalAlpha = fade * (0.42 - k * 0.1);
+          ctx.lineWidth = (2.2 - k * 0.5) * fade + 0.4;
+          ctx.strokeStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(rp.x, rp.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 落ちた瞬間のしぶき（中心の小さな円が弾けて消える）
+        if (rp.t < 0.34) {
+          const p = rp.t / 0.34;
+          ctx.globalAlpha = (1 - p) * 0.5;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.arc(rp.x, rp.y, 3 + p * 16, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
       ctx.globalAlpha = 1;
     };
@@ -197,7 +310,7 @@ export default function RiverMode({ onClose, item, onDecreasePallet }: RiverMode
   }, []);
 
   return (
-    <div className="river-root" onPointerDown={handleTap}>
+    <div ref={rootRef} className="river-root" onPointerDown={handleTap}>
       <video
         ref={videoRef}
         className="river-video"
@@ -218,33 +331,57 @@ export default function RiverMode({ onClose, item, onDecreasePallet }: RiverMode
       {/* タップの波紋 */}
       <canvas ref={canvasRef} className="river-canvas" />
 
-      {/* 川から浮かび上がる品目情報（石に苔が生えたような文字） */}
-      {item && <RiverInfo item={item} shown={info.shown} animKey={info.key} onPalletTap={handlePalletTap} />}
+      {/* ステータスバーを隠せたときは、時刻だけを映像の上に置く */}
+      {ownClock && <div className="river-clock">{clock}</div>}
+
+      {/* 川から浮かび上がる品目情報 */}
+      {item && (
+        <RiverInfo
+          item={item}
+          shown={info.shown}
+          animKey={info.key}
+          onPalletTap={handlePalletTap}
+          onModelDown={handleModelDown}
+          onModelUp={handleModelUp}
+          onModelCancel={handleModelCancel}
+        />
+      )}
 
       {/* 戻り方のヒント（数秒で消える） */}
       <div className={`river-hint${hintVisible ? '' : ' hide'}`}>
-        {item ? '上をタップで品目情報 ／ 下 1/3 をタップで戻ります' : '画面の下 1/3 をタップで戻ります'}
+        {item ? 'タップで品目情報 ／ 機種名を上下スワイプで切替 ／ 下 1/3 で戻ります' : '画面の下 1/3 をタップで戻ります'}
       </div>
     </div>
   );
 }
 
-/** 川面から浮かび上がる品目情報。文字は石＋苔のテクスチャで描く */
+/** 水面から現れる品目情報。文字は白のみ、しずくを垂らしながら出てくる */
 function RiverInfo({
-  item, shown, animKey, onPalletTap,
+  item, shown, animKey, onPalletTap, onModelDown, onModelUp, onModelCancel,
 }: {
   item: ContainerItem;
   shown: boolean;
   animKey: number;
   onPalletTap: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  onModelDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onModelUp: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onModelCancel: () => void;
 }) {
   const { pallets, cartons, pcs } = displayQuantities(item);
   const model = item.representModel?.trim() || item.itemName;
 
   return (
     <div className={`river-info${shown ? '' : ' hide'}`} key={animKey} aria-hidden={!shown}>
-      <div className="river-info-line river-info-model">
-        <span className="river-stone">{model}</span>
+      <div
+        className="river-info-line river-info-model"
+        onPointerDown={onModelDown}
+        onPointerUp={onModelUp}
+        onPointerCancel={onModelCancel}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Emerge drips={5}>
+          <span className="river-text">{model}</span>
+        </Emerge>
       </div>
       <div className="river-info-line river-info-nums">
         <button
@@ -252,20 +389,64 @@ function RiverInfo({
           className="river-stat river-stat-tap"
           onPointerDown={onPalletTap}
           onClick={(e) => e.stopPropagation()}
-          title="タップでパレットを1枚減らす"
+          title="タップでパレットを1枚減らす／ダブルタップで1枚戻す"
         >
-          <span className="river-stone river-stat-num">{pallets}</span>
-          <span className="river-stone river-stat-label">PL</span>
+          <Emerge drips={4}>
+            <span className="river-text river-stat-num">{pallets}</span>
+            <span className="river-text river-stat-label">PL</span>
+          </Emerge>
         </button>
         <span className="river-stat">
-          <span className="river-stone river-stat-num">{cartons}</span>
-          <span className="river-stone river-stat-label">CT</span>
+          <Emerge drips={4}>
+            <span className="river-text river-stat-num">{cartons}</span>
+            <span className="river-text river-stat-label">CT</span>
+          </Emerge>
         </span>
         <span className="river-stat">
-          <span className="river-stone river-stat-num river-stat-num-sm">{pcs.toLocaleString()}</span>
-          <span className="river-stone river-stat-label">pcs</span>
+          <Emerge drips={3}>
+            <span className="river-text river-stat-num river-stat-num-sm">{pcs.toLocaleString()}</span>
+            <span className="river-text river-stat-label">pcs</span>
+          </Emerge>
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * 水面から出てくる文字のかたまり。
+ * 中身（.river-wet）は水面で切り取られながら現れ、しずくはその外側に置いて切られないようにする。
+ */
+function Emerge({ drips, children }: { drips: number; children: React.ReactNode }) {
+  return (
+    <span className="river-em">
+      <span className="river-wet">{children}</span>
+      <Drips count={drips} />
+    </span>
+  );
+}
+
+/**
+ * 文字から垂れるしずく。
+ * 位置と落ち始めをずらして、水から上がった直後に何滴か落ちるように見せる。
+ */
+function Drips({ count }: { count: number }) {
+  return (
+    <span className="river-drips" aria-hidden>
+      {Array.from({ length: count }, (_, i) => (
+        <span
+          key={i}
+          className="river-drip"
+          style={{
+            left: `${((i + 1) / (count + 1)) * 100}%`,
+            animationDelay: `${0.75 + i * 0.19}s`,
+            // 滴ごとに落ちる速さと大きさを少し変える
+            animationDuration: `${1.05 + (i % 3) * 0.22}s`,
+            width: `${4 + (i % 3)}px`,
+            height: `${5 + (i % 3) * 2}px`,
+          }}
+        />
+      ))}
+    </span>
   );
 }

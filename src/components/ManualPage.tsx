@@ -210,6 +210,20 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               </InfoCard>
             </Section>
 
+            <Section title="パレット数の手動増減" color="#38bdf8">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    作業画面の<strong style={{ color: '#7dd3fc' }}>PL（パレット数）をタップ</strong> → 1枚減らす（音声の「OK」と同じ）。
+                  </div>
+                  <div>
+                    <strong style={{ color: '#7dd3fc' }}>ダブルタップ</strong> → 1枚戻す。
+                    読み込んだ元の枚数を超えて増えることはありません。せせらぎモードでも同じ操作です。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
             <Section title="端数パレット" color="#22c55e">
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
@@ -312,13 +326,22 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     継ぎ目が分からないようにつないだループ映像で、水の音も一緒に流れ始めます。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#7dd3fc' }}>画面の上 2/3</strong> をタップすると波紋が広がり、
-                    いま作業中の機種名とパレット・カートン・pcs が、石に苔が生えたような文字で川から浮かび上がります。
-                    しばらくすると、また川に沈んで消えます。
+                    映像は<strong style={{ color: '#7dd3fc' }}>ステータスバーの領域まで全画面</strong>で流れ、
+                    上部には時刻だけを表示します。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    浮かんでいる<strong style={{ color: '#7dd3fc' }}>パレット数（PL）をタップ</strong>すると、
-                    作業画面と同じようにパレットを1枚減らせます（残り0枚のときは品目が完了になります）。
+                    <strong style={{ color: '#7dd3fc' }}>画面の上 2/3</strong> をタップすると水滴が落ちたような波紋が広がり、
+                    いま作業中の機種名とパレット・カートン・pcs が、白い文字で水面からしずくを垂らしながら現れます。
+                    表示中にもう一度ほかの場所をタップすると下に沈んで消えます（しばらく置いても自動で沈みます）。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    浮かんでいる<strong style={{ color: '#7dd3fc' }}>機種名を上下にスワイプ</strong>すると品目を切り替えられます
+                    （上で次の品目・下で前の品目）。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    浮かんでいる<strong style={{ color: '#7dd3fc' }}>パレット数（PL）をタップ</strong>すると
+                    パレットを1枚減らし（残り0枚のときは品目が完了）、
+                    <strong style={{ color: '#7dd3fc' }}>ダブルタップ</strong>で1枚戻せます（元の枚数が上限）。
                   </div>
                   <div>
                     元の画面に戻るときは
