@@ -968,6 +968,15 @@ export default function Home() {
   const hasData = state.containers.length > 0;
   const view: ViewMode = hasData ? viewMode : 'load';
 
+  // 画面を切り替えたときにドキュメントが少しでもスクロールしていると
+  // ヘッダーが上に隠れてしまうので、念のため先頭に戻しておく
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [view]);
+
   const handleVoiceCommand = useCallback(
     (action: VoiceAction) => {
       switch (action) {
