@@ -257,6 +257,10 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     矢印が出て、下向きから上向きに変わったところで指を離してください。
                     コンテナを読み込んでいるときは、作業内容が消えてしまうので確認画面が出ます。
                   </div>
+                  <div style={{ marginBottom: 8 }}>
+                    作業ページで<strong style={{ color: '#38bdf8' }}>ヘッダーを左右どちらかにスワイプ</strong>すると、
+                    そのまませせらぎモードに入れます。
+                  </div>
                   <div>
                     このアプリは<strong style={{ color: '#a78bfa' }}>縦画面専用</strong>です。
                     スマホを横にすると「画面を縦にしてください」と表示されます。
@@ -322,7 +326,8 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    右下のメニュー →<strong style={{ color: '#7dd3fc' }}>「せせらぎモード」</strong>で、川の映像を全画面表示します。
+                    右下のメニュー →<strong style={{ color: '#7dd3fc' }}>「せせらぎモード」</strong>、または
+                    作業ページで<strong style={{ color: '#7dd3fc' }}>ヘッダーを左右にスワイプ</strong>すると、川の映像を全画面表示します。
                     継ぎ目が分からないようにつないだループ映像で、水の音も一緒に流れ始めます。
                   </div>
                   <div style={{ marginBottom: 8 }}>

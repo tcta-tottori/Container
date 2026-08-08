@@ -30,6 +30,8 @@ interface HeaderBarProps {
    * 読み込み済みのときは、下スワイプの再読み込みで作業内容が消えるため確認をはさむ。
    */
   hasLoadedData?: boolean;
+  /** ヘッダーを左右にスワイプしたとき（せせらぎモードを開く）。作業ページでのみ渡す */
+  onSwipeToRiver?: () => void;
 }
 
 const TEMP_COLOR = '#fb923c'; // 気温（オレンジ）
@@ -44,6 +46,8 @@ const PULL_TRIGGER = 72;
 const PULL_MAX = 108;
 /** これ以下の動きはタップ扱い（ボタンを押せるようにするため） */
 const DRAG_SLOP = 8;
+/** ヘッダーを左右にこれだけ動かしたら、せせらぎモードを開く */
+const SWIPE_X_TRIGGER = 64;
 
 /** 引っぱっている間に出る矢印（しきい値を超えると回って色が変わる） */
 function PullIndicator({
@@ -122,6 +126,7 @@ export default function HeaderBar({
   switchbot,
   onOpenClimate,
   hasLoadedData,
+  onSwipeToRiver,
 }: HeaderBarProps) {
   const [popupOpen, setPopupOpen] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
@@ -132,7 +137,10 @@ export default function HeaderBar({
   const [dragging, setDragging] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmReload, setConfirmReload] = useState(false);
-  const dragRef = useRef<{ id: number; y0: number } | null>(null);
+  const dragRef = useRef<{ id: number; x0: number; y0: number } | null>(null);
+  /** 最新の onSwipeToRiver を onEnd から参照する（依存配列を増やさないため） */
+  const swipeToRiverRef = useRef(onSwipeToRiver);
+  swipeToRiverRef.current = onSwipeToRiver;
   /** 直前の操作がスワイプだったか（クリックを飲み込む判定に使う） */
   const movedRef = useRef(false);
 
@@ -146,7 +154,7 @@ export default function HeaderBar({
   const startPull = (e: React.PointerEvent<HTMLDivElement>) => {
     if (refreshing || popupOpen || confirmReload) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    dragRef.current = { id: e.pointerId, y0: e.clientY };
+    dragRef.current = { id: e.pointerId, x0: e.clientX, y0: e.clientY };
     movedRef.current = false;
     setDragging(true);
   };
@@ -157,15 +165,20 @@ export default function HeaderBar({
     const onMove = (e: PointerEvent) => {
       const d = dragRef.current;
       if (!d || e.pointerId !== d.id) return;
+      const dx = e.clientX - d.x0;
       const dy = e.clientY - d.y0;
-      if (Math.abs(dy) > DRAG_SLOP) movedRef.current = true;
+      if (Math.abs(dy) > DRAG_SLOP || Math.abs(dx) > DRAG_SLOP) movedRef.current = true;
+      // 横に動いているときは再読み込みの引っぱりとは見なさない
+      if (Math.abs(dx) > Math.abs(dy)) { setPull(0); return; }
       // 引くほど重くなるように減衰させる
       setPull(dy > 0 ? Math.min(dy * PULL_RESIST, PULL_MAX) : 0);
     };
     const onEnd = (e: PointerEvent) => {
       const d = dragRef.current;
       if (!d || e.pointerId !== d.id) return;
-      const dy = (e.clientY - d.y0) * PULL_RESIST;
+      const rawDx = e.clientX - d.x0;
+      const rawDy = e.clientY - d.y0;
+      const dy = rawDy * PULL_RESIST;
       dragRef.current = null;
       setDragging(false);
       // スワイプ直後に発生するクリックは、どこに飛んでも1回だけ握りつぶす。
@@ -175,6 +188,12 @@ export default function HeaderBar({
         const swallow = (ev: MouseEvent) => { ev.stopPropagation(); ev.preventDefault(); };
         window.addEventListener('click', swallow, true);
         setTimeout(() => window.removeEventListener('click', swallow, true), 0);
+      }
+      // 左右どちらのスワイプでも、せせらぎモードを開く
+      if (Math.abs(rawDx) >= SWIPE_X_TRIGGER && Math.abs(rawDx) > Math.abs(rawDy)) {
+        setPull(0);
+        swipeToRiverRef.current?.();
+        return;
       }
       if (dy < PULL_TRIGGER) {
         setPull(0);
