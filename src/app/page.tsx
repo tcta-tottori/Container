@@ -1251,6 +1251,9 @@ export default function Home() {
           onClose={closeRiver}
           item={currentItem}
           onDecreasePallet={handleDecrease}
+          onIncreasePallet={handleIncrease}
+          onNextItem={moveNext}
+          onPrevItem={movePrev}
         />
       )}
 
@@ -1408,6 +1411,7 @@ export default function Home() {
                     }}
                     onUncompleteItem={uncompleteItem}
                     onDecrementPallet={handleDecrease}
+                    onIncrementPallet={handleIncrease}
                   />
                 )}
               </div>
