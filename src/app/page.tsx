@@ -1254,6 +1254,7 @@ export default function Home() {
           onIncreasePallet={handleIncrease}
           onNextItem={moveNext}
           onPrevItem={movePrev}
+          workElapsed={workElapsed}
         />
       )}
 
