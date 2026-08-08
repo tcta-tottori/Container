@@ -1246,7 +1246,7 @@ export default function Home() {
         <SettingsPage
           initialTab={settingsTab}
           onClose={() => setSettingsTab(null)}
-          onTestCall={(p) => speakCheer(p)}
+          onTestCall={(p, onDone) => speakCheer(p, onDone)}
         />
       )}
       {weatherPopup && (
