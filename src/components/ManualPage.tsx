@@ -233,10 +233,19 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     <strong style={{ color: '#a78bfa' }}>ヘッダー</strong>は1行です。左がメニュー、中央が作業の経過時間（タップで品目別の時間・リセット）、
                     右が気温・湿度と暑さ指数の色バッジ（緑→黄→オレンジ→赤で危険度）。バッジをタップすると詳細と推移グラフが開きます。
                   </div>
-                  <div>
+                  <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#60a5fa' }}>右下のボタン</strong>（上向きの山マーク）を押すと下からメニューが開き、
                     コンテナの選択・応援コール・天気コール・水の音・せせらぎモード・SwitchBot 接続をまとめて操作できます。
                     開いている間はマークが下向きになります。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#a78bfa' }}>ヘッダーを下にスワイプ</strong>するとアプリを更新（再読み込み）できます。
+                    矢印が出て、下向きから上向きに変わったところで指を離してください。
+                    コンテナを読み込んでいるときは、作業内容が消えてしまうので確認画面が出ます。
+                  </div>
+                  <div>
+                    このアプリは<strong style={{ color: '#a78bfa' }}>縦画面専用</strong>です。
+                    スマホを横にすると「画面を縦にしてください」と表示されます。
                   </div>
                 </div>
               </InfoCard>

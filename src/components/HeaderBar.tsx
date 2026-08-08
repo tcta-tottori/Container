@@ -25,10 +25,51 @@ interface HeaderBarProps {
   switchbot?: SwitchBotReading | null;
   /** 気温表示のタップ（詳細ポップアップを開く） */
   onOpenClimate?: () => void;
+  /**
+   * コンテナを読み込み済みか。
+   * 読み込み済みのときは、下スワイプの再読み込みで作業内容が消えるため確認をはさむ。
+   */
+  hasLoadedData?: boolean;
 }
 
 const TEMP_COLOR = '#fb923c'; // 気温（オレンジ）
 const HUM_COLOR = '#38bdf8';  // 湿度（水色）
+
+/* ===== ヘッダーを下にスワイプして再読み込み ===== */
+/** 指の移動量に掛ける係数（引くほど重く感じるようにする） */
+const PULL_RESIST = 0.55;
+/** これ以上引いたら離したときに再読み込みする */
+const PULL_TRIGGER = 72;
+/** どれだけ引いてもここで止まる */
+const PULL_MAX = 108;
+/** これ以下の動きはタップ扱い（ボタンを押せるようにするため） */
+const DRAG_SLOP = 8;
+
+/** 引っぱっている間に出る矢印（しきい値を超えると回って色が変わる） */
+function PullIndicator({
+  pull, ready, refreshing, dragging,
+}: { pull: number; ready: boolean; refreshing: boolean; dragging: boolean }) {
+  if (pull <= 0 && !refreshing) return null;
+  const progress = Math.min(1, pull / PULL_TRIGGER);
+  return (
+    <div
+      className={`pull-refresh${ready ? ' ready' : ''}${refreshing ? ' spinning' : ''}`}
+      style={{
+        transform: `translate(-50%, ${pull}px)`,
+        opacity: Math.min(1, progress * 1.4),
+        transition: dragging ? 'opacity 0.15s linear' : 'transform 0.32s cubic-bezier(0.22, 0.9, 0.28, 1), opacity 0.25s ease',
+      }}
+      aria-hidden="true"
+    >
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+        style={{ transform: refreshing ? undefined : `rotate(${progress * 180}deg)` }}>
+        <path d="M12 4v12" />
+        <polyline points="6 11 12 17 18 11" />
+      </svg>
+    </div>
+  );
+}
 
 /** ヘッダー右: 気温・湿度の数値 + 暑さ指数の色バッジ */
 function HeaderClimate({
@@ -80,10 +121,87 @@ export default function HeaderBar({
   weather,
   switchbot,
   onOpenClimate,
+  hasLoadedData,
 }: HeaderBarProps) {
   const [popupOpen, setPopupOpen] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
   const lastFlashedAt = useRef(0);
+
+  // ===== ヘッダーから下へスワイプして再読み込み =====
+  const [pull, setPull] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [confirmReload, setConfirmReload] = useState(false);
+  const dragRef = useRef<{ id: number; y0: number } | null>(null);
+  /** 直前の操作がスワイプだったか（クリックを飲み込む判定に使う） */
+  const movedRef = useRef(false);
+
+  const doReload = () => {
+    setConfirmReload(false);
+    setRefreshing(true);
+    setPull(PULL_TRIGGER);
+    window.location.reload();
+  };
+
+  const startPull = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (refreshing || popupOpen || confirmReload) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    dragRef.current = { id: e.pointerId, y0: e.clientY };
+    movedRef.current = false;
+    setDragging(true);
+  };
+
+  useEffect(() => {
+    if (!dragging) return undefined;
+
+    const onMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d || e.pointerId !== d.id) return;
+      const dy = e.clientY - d.y0;
+      if (Math.abs(dy) > DRAG_SLOP) movedRef.current = true;
+      // 引くほど重くなるように減衰させる
+      setPull(dy > 0 ? Math.min(dy * PULL_RESIST, PULL_MAX) : 0);
+    };
+    const onEnd = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d || e.pointerId !== d.id) return;
+      const dy = (e.clientY - d.y0) * PULL_RESIST;
+      dragRef.current = null;
+      setDragging(false);
+      // スワイプ直後に発生するクリックは、どこに飛んでも1回だけ握りつぶす。
+      // （指を離した位置によってはヘッダーの外に飛ぶので、window で受ける）
+      if (movedRef.current) {
+        movedRef.current = false;
+        const swallow = (ev: MouseEvent) => { ev.stopPropagation(); ev.preventDefault(); };
+        window.addEventListener('click', swallow, true);
+        setTimeout(() => window.removeEventListener('click', swallow, true), 0);
+      }
+      if (dy < PULL_TRIGGER) {
+        setPull(0);
+      } else if (hasLoadedData) {
+        // 読み込んだコンテナと作業の進み具合が消えるので、一度確認する
+        setPull(0);
+        setConfirmReload(true);
+      } else {
+        doReload();
+      }
+    };
+
+    // キャプチャ段階で拾う。途中のコンポーネントが stopPropagation しても取りこぼさない
+    const opts = { capture: true } as const;
+    window.addEventListener('pointermove', onMove, opts);
+    window.addEventListener('pointerup', onEnd, opts);
+    window.addEventListener('pointercancel', onEnd, opts);
+    return () => {
+      window.removeEventListener('pointermove', onMove, opts);
+      window.removeEventListener('pointerup', onEnd, opts);
+      window.removeEventListener('pointercancel', onEnd, opts);
+    };
+    // hasLoadedData は onEnd の分岐に使うので依存に入れる
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragging, hasLoadedData]);
+
+  const pullReady = pull >= PULL_TRIGGER;
 
   // 5分ごとに黄色点滅（5秒間）
   useEffect(() => {
@@ -96,7 +214,11 @@ export default function HeaderBar({
   }, [workRawSeconds]);
 
   return (
-    <div className="app-header">
+    <>
+      {/* 引っぱっている量を示す矢印。ヘッダーは overflow: hidden なので外に置く */}
+      <PullIndicator pull={pull} ready={pullReady} refreshing={refreshing} dragging={dragging} />
+
+      <div className="app-header" onPointerDown={startPull}>
       {/* 左: メニュー */}
       <div className="header-left">
         <button onClick={onMenuToggle} className="header-btn" title="メニュー" aria-label="メニュー">
@@ -120,6 +242,27 @@ export default function HeaderBar({
       <div className="header-right">
         <HeaderClimate weather={weather} switchbot={switchbot} onOpen={onOpenClimate} />
       </div>
+      </div>
+
+      {/* 以下のオーバーレイはヘッダーの外に出す。
+          中に置くと、スワイプ直後のクリックを飲み込む処理に巻き込まれてボタンが効かなくなる */}
+
+      {/* 再読み込みの確認（読み込み済みのときだけ） */}
+      {confirmReload && (
+        <div className="reload-confirm-overlay" onClick={() => setConfirmReload(false)}>
+          <div className="reload-confirm" onClick={(e) => e.stopPropagation()}>
+            <div className="reload-confirm-title">アプリを更新しますか？</div>
+            <div className="reload-confirm-body">
+              読み込み中のコンテナと作業の進み具合は消えます。
+              ファイルはメニューの「履歴」から読み直せます。
+            </div>
+            <div className="reload-confirm-actions">
+              <button className="reload-confirm-cancel" onClick={() => setConfirmReload(false)}>やめる</button>
+              <button className="reload-confirm-ok" onClick={doReload}>更新する</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 経過時間ポップアップ */}
       {popupOpen && (
@@ -225,6 +368,6 @@ export default function HeaderBar({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -100,7 +100,78 @@ body {
   overflow: hidden;
   transition: background 0.3s ease;
 }
+/* ヘッダーの縦スワイプは再読み込みに使うので、ブラウザのジェスチャーに渡さない */
+.app-header { touch-action: pan-x; }
 .header-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
+
+/* ===== ヘッダーを下にスワイプして再読み込み ===== */
+.pull-refresh {
+  position: fixed; left: 50%; z-index: 59;
+  top: calc(var(--safe-top) + 14px);
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(26,29,46,0.92);
+  border: 1.5px solid rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.75);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  pointer-events: none;
+}
+.pull-refresh svg { transition: transform 0.18s ease; }
+/* しきい値を超えたら「離せば更新」の合図 */
+.pull-refresh.ready {
+  color: #f59e0b;
+  border-color: rgba(245,158,11,0.65);
+  background: rgba(60,42,12,0.92);
+}
+.pull-refresh.spinning { color: #f59e0b; border-color: rgba(245,158,11,0.65); }
+.pull-refresh.spinning svg { animation: pull-spin 0.9s linear infinite; }
+@keyframes pull-spin { to { transform: rotate(360deg); } }
+
+/* 再読み込みの確認 */
+.reload-confirm-overlay {
+  position: fixed; inset: 0; z-index: 240;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  animation: fadeIn 0.16s ease both;
+}
+.reload-confirm {
+  width: 100%; max-width: 340px;
+  background: #1e2130; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px; padding: 20px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.55);
+}
+.reload-confirm-title { color: #fff; font-size: 16px; font-weight: 800; margin-bottom: 10px; }
+.reload-confirm-body { color: rgba(255,255,255,0.62); font-size: 12.5px; line-height: 1.7; margin-bottom: 18px; }
+.reload-confirm-actions { display: flex; gap: 10px; }
+.reload-confirm-actions button {
+  flex: 1; padding: 11px 0; border-radius: 12px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.reload-confirm-cancel {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.7);
+}
+.reload-confirm-ok {
+  background: rgba(245,158,11,0.16); border: 1px solid rgba(245,158,11,0.5);
+  color: #f59e0b;
+}
+
+/* ===== スマホの横画面はサポートしない ===== */
+.rotate-guard { display: none; }
+/* 横向き かつ 画面が低い＝スマホの横画面のときだけ案内を出す（タブレット・PC は今までどおり） */
+@media (orientation: landscape) and (max-height: 520px) {
+  .rotate-guard {
+    position: fixed; inset: 0; z-index: 9000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px;
+    background: var(--bg-primary, #12131c);
+    color: rgba(255,255,255,0.85); text-align: center;
+    font-family: var(--font-ui);
+  }
+  .rotate-guard svg { color: rgba(255,255,255,0.55); }
+  .rotate-guard-title { font-size: 18px; font-weight: 800; letter-spacing: 0.5px; }
+  .rotate-guard-sub { font-size: 12px; color: rgba(255,255,255,0.5); }
+}
 .header-center { display: flex; align-items: center; justify-content: center; }
 .header-right { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
 .header-btn {

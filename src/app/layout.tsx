@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import OrientationGuard from "@/components/OrientationGuard";
 
 export const metadata: Metadata = {
   title: "Container Navigation System",
@@ -33,7 +34,10 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="32x32" href="/Container/icons/favicon-32.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/Container/icons/apple-touch-icon.png" />
       </head>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <OrientationGuard />
+      </body>
     </html>
   );
 }
