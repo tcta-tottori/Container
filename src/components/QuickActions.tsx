@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Container } from '@/lib/types';
 import { SwitchBotReading, SwitchBotStatus } from '@/lib/switchbot';
-import { MegaphoneIcon, WeatherIcon, DropletIcon, CloseIcon, SettingsIcon } from '@/components/AppIcons';
+import { MegaphoneIcon, WeatherIcon, DropletIcon, CloseIcon, SettingsIcon, RiverIcon } from '@/components/AppIcons';
 
 interface QuickActionsProps {
   /** コンテナ選択（読込済みのときだけ表示） */
@@ -23,6 +23,8 @@ interface QuickActionsProps {
   sbError?: string | null;
   onToggleSwitchBot: () => void;
   onOpenSwitchBot: () => void;
+  /** せせらぎモード（川の映像）を開く */
+  onOpenRiver: () => void;
   /** 左メニューなど別の画面が開いている間は隠す */
   hidden?: boolean;
 }
@@ -95,7 +97,7 @@ export default function QuickActions({
   containers, selectedIdx, onSelectContainer,
   onCheer, onWeather,
   waterPlaying, onWater, onWaterSettings,
-  switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, hidden,
+  switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, hidden,
 }: QuickActionsProps) {
   const [open, setOpen] = useState(false);
   const [sbInfoOpen, setSbInfoOpen] = useState(false);
@@ -203,6 +205,13 @@ export default function QuickActions({
                   <SettingsIcon size={18} />
                 </button>
               }
+            />
+
+            <Row
+              icon={<RiverIcon size={22} />}
+              title="せせらぎモード"
+              sub="川の映像に品目情報が流れます"
+              onClick={() => { onOpenRiver(); setOpen(false); }}
             />
 
             <Row
