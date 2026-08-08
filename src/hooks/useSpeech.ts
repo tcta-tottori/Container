@@ -27,10 +27,18 @@ export function setSpeakCallbacks(
 let _currentAudio: HTMLAudioElement | null = null;
 let _currentAbort: AbortController | null = null;
 let _currentAudioUrl: string | null = null;
+/**
+ * いま進行中のコールの「終わったら呼ぶ」処理。
+ * 試聴ボタンの読込表示のように、鳴り終わりを待っている呼び出し元があるため、
+ * 途中で止めたときも必ず呼んで待ちを解く。
+ */
+let _currentDone: (() => void) | null = null;
 
 /** 現在の音声コール（Gemini / Web Speech）を全てキャンセル */
 export function cancelSpeech(): void {
   if (typeof window === 'undefined') return;
+  const pendingDone = _currentDone;
+  _currentDone = null;
   if (_currentAbort) {
     try { _currentAbort.abort(); } catch { /* ignore */ }
     _currentAbort = null;
@@ -51,6 +59,7 @@ export function cancelSpeech(): void {
     window.speechSynthesis.cancel();
   }
   _onSpeakEnd?.();
+  pendingDone?.();
 }
 
 function speakWebSpeech(text: string, onDone?: () => void, profile?: VoiceProfile): void {
@@ -132,10 +141,25 @@ function isGeminiEngineReady(): boolean {
 /** 指定プロファイルで読み上げる（エンジンの切り替えとフォールバックをまとめる） */
 function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): void {
   if (typeof window === 'undefined') return;
+
+  // 前のコールを待っている人がいたら、割り込んだこの時点で終わりとして解放する
+  const prevDone = _currentDone;
+  _currentDone = null;
+  prevDone?.();
+
+  let called = false;
+  const done = () => {
+    if (called) return;
+    called = true;
+    if (_currentDone === done) _currentDone = null;
+    onDone?.();
+  };
+  _currentDone = done;
+
   if (isGeminiEngineReady()) {
-    void speakGemini(text, styleInstruction(profile), profile.voice, onDone);
+    void speakGemini(text, styleInstruction(profile), profile.voice, done);
   } else {
-    speakWebSpeech(text, onDone, profile);
+    speakWebSpeech(text, done, profile);
   }
 }
 
@@ -149,10 +173,13 @@ function speakThenCheer(pre: string, cheer: string): void {
   speakWith(pre, getVoiceSettings().main, startCheer);
 }
 
-/** 応援コール・あおりコール専用。設定ページの「応援コール」プロファイルで読み上げる。 */
-function speakCheer(text: string): void {
+/**
+ * 応援コール・あおりコール専用。設定ページの「応援コール」プロファイルで読み上げる。
+ * onDone は鳴り終わり（または失敗・中断）で必ず1回だけ呼ばれる。
+ */
+function speakCheer(text: string, onDone?: () => void): void {
   stopCurrentPlayback();
-  speakWith(text, getVoiceSettings().cheer);
+  speakWith(text, getVoiceSettings().cheer, onDone);
 }
 
 /** 経過時間のあおりコール。応援コールと同じプロファイルを使う。 */

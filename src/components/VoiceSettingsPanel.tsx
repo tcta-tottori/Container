@@ -8,13 +8,22 @@ import {
 } from '@/lib/voiceSettings';
 import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/geminiTts';
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
+import { loadCallPhrases, DEFAULT_CALL_PHRASES } from '@/lib/callPhrases';
 
 type ProfileKey = 'main' | 'cheer';
 
-const SAMPLE_TEXT: Record<ProfileKey, string> = {
-  main: 'ポリカバー、3パレットと2ケース。',
-  cheer: 'がんばれ、まさ！',
-};
+const MAIN_SAMPLE = 'ポリカバー、3パレットと2ケース。';
+
+/**
+ * 試聴で読み上げる文。
+ * 応援コールは、下の「コールの内容」に登録してあるものをそのまま使う。
+ * 声を変えたときに、実際に鳴るコールで確かめられるようにするため。
+ */
+function sampleText(key: ProfileKey): string {
+  if (key === 'main') return MAIN_SAMPLE;
+  const phrases = loadCallPhrases();
+  return phrases[0] || DEFAULT_CALL_PHRASES[0];
+}
 
 /** 見出し */
 function Label({ children, hint }: { children: React.ReactNode; hint?: string }) {
@@ -196,7 +205,7 @@ export default function VoiceSettingsPanel() {
 
   const playTest = useCallback(async (key: ProfileKey) => {
     const profile = settings[key];
-    const text = SAMPLE_TEXT[key];
+    const text = sampleText(key);
     if (audioRef.current) { try { audioRef.current.pause(); } catch { /* ignore */ } audioRef.current = null; }
     if (urlRef.current) { try { URL.revokeObjectURL(urlRef.current); } catch { /* ignore */ } urlRef.current = null; }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();

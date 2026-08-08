@@ -1,10 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadCallPhrases, saveCallPhrases, DEFAULT_CALL_PHRASES, isTenMinCheerEnabled, setTenMinCheerEnabled } from '@/lib/callPhrases';
 
 interface CallPhraseSettingsProps {
-  onTest?: (phrase: string) => void;
+  /** 試聴。読み終わったら onDone を呼んでもらい、読込表示を元に戻す */
+  onTest?: (phrase: string, onDone: () => void) => void;
+}
+
+/** 試聴中に出す回転リング */
+function LoadingRing() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+      style={{ animation: 'spin 0.8s linear infinite', display: 'block' }}>
+      <circle cx="12" cy="12" r="9" stroke="rgba(196,181,253,0.25)" strokeWidth="3" />
+      <path d="M12 3a9 9 0 0 1 9 9" stroke="#c4b5fd" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 /**
@@ -15,6 +27,40 @@ export default function CallPhraseSettings({ onTest }: CallPhraseSettingsProps) 
   const [phrases, setPhrases] = useState<string[]>(() => loadCallPhrases());
   const [newPhrase, setNewPhrase] = useState('');
   const [tenMinCheer, setTenMinCheer] = useState<boolean>(() => isTenMinCheerEnabled());
+  /** いま試聴している行。ここだけ読込表示にする */
+  const [playingIdx, setPlayingIdx] = useState<number | null>(null);
+  /** 試聴のたびに増やす番号。古い試聴の終了通知で表示を消さないための目印 */
+  const playTokenRef = useRef(0);
+  const aliveRef = useRef(true);
+  const failsafeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      if (failsafeRef.current) clearTimeout(failsafeRef.current);
+    };
+  }, []);
+
+  /** 試聴する。読み終わり（失敗・中断も含む）で読込表示を戻す */
+  const testAt = useCallback((idx: number, phrase: string) => {
+    if (!onTest) return;
+    const text = phrase.trim();
+    if (!text) return;
+    const token = ++playTokenRef.current;
+    setPlayingIdx(idx);
+
+    const finish = () => {
+      if (!aliveRef.current || playTokenRef.current !== token) return;
+      if (failsafeRef.current) { clearTimeout(failsafeRef.current); failsafeRef.current = null; }
+      setPlayingIdx(null);
+    };
+    // 端末の音声が無言で失敗するなど、終わりが返ってこない場合の保険
+    if (failsafeRef.current) clearTimeout(failsafeRef.current);
+    failsafeRef.current = setTimeout(finish, 30000);
+
+    onTest(text, finish);
+  }, [onTest]);
 
   const toggleTenMinCheer = () => {
     const next = !tenMinCheer;
@@ -58,6 +104,7 @@ export default function CallPhraseSettings({ onTest }: CallPhraseSettingsProps) 
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.6, marginBottom: 14 }}>
         応援コールボタンと10分ごとの定期コールで読み上げる内容です。追加・変更・削除できます。
+        試聴は上の「応援コール」で選んだ声で鳴ります。
       </div>
 
       {/* 10分ごとのコールの応援 ON/OFF */}
@@ -112,15 +159,20 @@ export default function CallPhraseSettings({ onTest }: CallPhraseSettingsProps) 
             />
             {onTest && (
               <button
-                onClick={() => onTest(p)}
-                title="試聴"
+                onClick={() => testAt(i, p)}
+                title={playingIdx === i ? '読み上げ中' : '試聴'}
+                aria-label={playingIdx === i ? '読み上げ中' : '試聴'}
+                aria-busy={playingIdx === i}
                 style={{
                   width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                  background: 'rgba(139,92,246,0.18)', border: '1px solid rgba(167,139,250,0.35)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: playingIdx === i ? 'rgba(139,92,246,0.34)' : 'rgba(139,92,246,0.18)',
+                  border: `1px solid ${playingIdx === i ? 'rgba(167,139,250,0.7)' : 'rgba(167,139,250,0.35)'}`,
                   color: '#c4b5fd', fontSize: 15, cursor: 'pointer',
+                  transition: 'background 0.15s ease, border-color 0.15s ease',
                 }}
               >
-                ▶
+                {playingIdx === i ? <LoadingRing /> : '▶'}
               </button>
             )}
             <button

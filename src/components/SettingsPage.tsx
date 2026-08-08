@@ -10,14 +10,15 @@ import {
   getGeminiModel, setGeminiModel, GEMINI_MODELS, verifyGeminiKey,
 } from '@/lib/geminiApi';
 
+/** 'call' は旧タブ名。音声タブに統合したので voice と同じ画面を開く */
 export type SettingsTab = 'voice' | 'call' | 'water' | 'ai';
 
 interface SettingsPageProps {
   onClose: () => void;
   /** 開いたときに選択しておくタブ */
   initialTab?: SettingsTab;
-  /** コールの試聴 */
-  onTestCall?: (phrase: string) => void;
+  /** コールの試聴。読み終わったら onDone を呼ぶ */
+  onTestCall?: (phrase: string, onDone: () => void) => void;
 }
 
 /** 写真読込（Gemini API）の設定セクション */
@@ -178,16 +179,20 @@ function AiPhotoSettings() {
   );
 }
 
+/*
+ * 声とコール内容は一体で調整するもの（声を変えたらコールの試聴もその声で聴きたい）なので、
+ * 別々のタブに分けず「音声・コール」ひとつにまとめている。
+ */
 const TABS: { id: SettingsTab; label: string; Icon: typeof ChatIcon }[] = [
-  { id: 'voice', label: '音声', Icon: SpeakerIcon },
-  { id: 'call', label: 'コール', Icon: ChatIcon },
+  { id: 'voice', label: '音声・コール', Icon: SpeakerIcon },
   { id: 'water', label: '水の音', Icon: DropletIcon },
   { id: 'ai', label: 'AI写真', Icon: CameraIcon },
 ];
 
-/** コール・水の音・AI写真をまとめて設定するページ */
+/** 音声・コール・水の音・AI写真をまとめて設定するページ */
 export default function SettingsPage({ onClose, initialTab = 'voice', onTestCall }: SettingsPageProps) {
-  const [tab, setTab] = useState<SettingsTab>(initialTab);
+  // 旧「コール」タブ指定で開かれても、統合後の音声タブを出す
+  const [tab, setTab] = useState<SettingsTab>(initialTab === 'call' ? 'voice' : initialTab);
 
   return (
     <div
@@ -259,8 +264,23 @@ export default function SettingsPage({ onClose, initialTab = 'voice', onTestCall
 
         {/* 内容 */}
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {tab === 'voice' && <VoiceSettingsPanel />}
-          {tab === 'call' && <CallPhraseSettings onTest={onTestCall} />}
+          {tab === 'voice' && (
+            <>
+              <VoiceSettingsPanel />
+              {/* 声の設定に続けてコールの内容。声を変えたらすぐ下で試聴して確かめられる */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                margin: '22px 0 14px',
+              }}>
+                <ChatIcon size={16} />
+                <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  コールの内容
+                </span>
+                <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+              </div>
+              <CallPhraseSettings onTest={onTestCall} />
+            </>
+          )}
           {tab === 'water' && <WaterSoundPanel />}
           {tab === 'ai' && <AiPhotoSettings />}
         </div>
