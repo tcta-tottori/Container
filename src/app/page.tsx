@@ -1255,6 +1255,7 @@ export default function Home() {
           onNextItem={moveNext}
           onPrevItem={movePrev}
           workElapsed={workElapsed}
+          climate={switchbot || barWeather}
         />
       )}
 

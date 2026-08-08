@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { displayQuantities } from '@/lib/itemQuantity';
 import { usePalletTap } from '@/hooks/usePalletTap';
+import { ThermometerIcon, HumidityIcon } from '@/components/AppIcons';
+import PalletDiagram from './PalletDiagram';
 
 interface RiverModeProps {
   onClose: () => void;
@@ -19,6 +21,8 @@ interface RiverModeProps {
   onPrevItem?: () => void;
   /** 作業の経過時間（右上に黄色で出す） */
   workElapsed?: string;
+  /** 経過時間の下に出す気温・湿度（SwitchBot があれば実測、なければ気象庁） */
+  climate?: { temperature: number; humidity: number } | null;
 }
 
 /** タップの波紋（水滴が落ちた水面） */
@@ -42,6 +46,10 @@ const SWIPE_Y = 42;
 
 /** 波紋1つの寿命(秒) */
 const RIPPLE_LIFE = 2.2;
+/** 端数パレットの自動回転（作業画面と同じ 15 秒で1回転） */
+const FRACTION_SPIN_DEG_PER_SEC = 360 / 15;
+/** 端数パレットを触ってから自動回転に戻るまで */
+const FRACTION_IDLE_MS = 2500;
 
 /** 時刻を HH:MM で返す */
 function nowHhMm(): string {
@@ -55,7 +63,7 @@ function nowHhMm(): string {
  * 上側のタップは水滴の波紋＋品目情報の出し入れ、下 1/3 をタップすると元の画面に戻る。
  */
 export default function RiverMode({
-  onClose, item, onDecreasePallet, onIncreasePallet, onNextItem, onPrevItem, workElapsed,
+  onClose, item, onDecreasePallet, onIncreasePallet, onNextItem, onPrevItem, workElapsed, climate,
 }: RiverModeProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -222,6 +230,13 @@ export default function RiverMode({
   }, [onNextItem, onPrevItem, surfaceInfo]);
   const handleModelCancel = useCallback(() => { swipeRef.current = null; }, []);
 
+  /** 端数パレットを上下スワイプ → 品目の切り替え（機種名と同じ操作） */
+  const handleFractionSwipeY = useCallback((dy: number) => {
+    if (dy < 0) onNextItem?.();
+    else onPrevItem?.();
+    surfaceInfo(true);
+  }, [onNextItem, onPrevItem, surfaceInfo]);
+
   // ===== タップの波紋（水滴が落ちた水面） =====
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -336,7 +351,21 @@ export default function RiverMode({
       {/* 上端: 左に現在時刻（ステータスバーを隠せたときだけ）／右に作業の経過時間 */}
       <div className="river-topbar">
         <span className="river-clock">{ownClock ? clock : ''}</span>
-        {workElapsed && <span className="river-elapsed">{workElapsed}</span>}
+        <span className="river-topbar-right">
+          {workElapsed && <span className="river-elapsed">{workElapsed}</span>}
+          {climate && (
+            <span className="river-climate">
+              <span className="river-climate-item river-climate-temp">
+                <ThermometerIcon size={13} strokeWidth={2} />
+                {climate.temperature}<span className="river-climate-unit">°C</span>
+              </span>
+              <span className="river-climate-item river-climate-hum">
+                <HumidityIcon size={12} strokeWidth={2} />
+                {Math.round(climate.humidity)}<span className="river-climate-unit">%</span>
+              </span>
+            </span>
+          )}
+        </span>
       </div>
 
       {/* 川から浮かび上がる品目情報。一度もタップされていない間は描画しない
@@ -350,6 +379,7 @@ export default function RiverMode({
           onModelDown={handleModelDown}
           onModelUp={handleModelUp}
           onModelCancel={handleModelCancel}
+          onFractionSwipeY={handleFractionSwipeY}
         />
       )}
 
@@ -363,7 +393,7 @@ export default function RiverMode({
 
 /** 水面から現れる品目情報。文字は白のみ、しずくを垂らしながら出てくる */
 function RiverInfo({
-  item, shown, animKey, onPalletTap, onModelDown, onModelUp, onModelCancel,
+  item, shown, animKey, onPalletTap, onModelDown, onModelUp, onModelCancel, onFractionSwipeY,
 }: {
   item: ContainerItem;
   shown: boolean;
@@ -372,9 +402,13 @@ function RiverInfo({
   onModelDown: (e: React.PointerEvent<HTMLDivElement>) => void;
   onModelUp: (e: React.PointerEvent<HTMLDivElement>) => void;
   onModelCancel: () => void;
+  onFractionSwipeY: (dy: number) => void;
 }) {
   const { pallets, cartons, pcs } = displayQuantities(item);
   const model = item.representModel?.trim() || item.itemName;
+
+  /* 残りが端数ケースだけになったら、作業画面と同じように端数パレットの積み方を出す */
+  const fractionOnly = pallets === 0 && cartons > 0 && item.qtyPerPallet > 0;
 
   return (
     /*
@@ -385,7 +419,7 @@ function RiverInfo({
       {/* 水面の光。マスクの外に置いて、水面の位置そのものを光らせる */}
       <div className="river-surface" />
       <div className="river-info">
-      <div className="river-info-body">
+      <div className={`river-info-body${fractionOnly ? ' with-fraction' : ''}`}>
         <div
           className="river-info-line river-info-model"
           onPointerDown={onModelDown}
@@ -395,7 +429,9 @@ function RiverInfo({
         >
           <span className="river-text">{model}</span>
           <Drips count={6} spread={0.9} />
+          <span className="river-sheet" />
         </div>
+        {fractionOnly && <FractionPallet item={item} cartons={cartons} onSwipeY={onFractionSwipeY} />}
         <div className="river-info-line river-info-nums">
           <button
             type="button"
@@ -416,6 +452,7 @@ function RiverInfo({
             <span className="river-text river-stat-label">pcs</span>
           </span>
           <Drips count={7} spread={0.94} />
+          <span className="river-sheet" />
         </div>
       </div>
       </div>
@@ -424,9 +461,106 @@ function RiverInfo({
 }
 
 /**
+ * 端数パレットの積み方。
+ * 機種名と同じく水面から出てきて、出ている間はゆっくり回り続ける。
+ * 横スワイプで手回し、しばらく触らなければ自動回転に戻る。上下スワイプは品目の切り替え。
+ */
+function FractionPallet({
+  item, cartons, onSwipeY,
+}: {
+  item: ContainerItem;
+  cartons: number;
+  onSwipeY: (dy: number) => void;
+}) {
+  const boxRef = useRef<HTMLDivElement>(null);
+  /** 表示中の角度。React を挟むとカクつくので ref で持って DOM に直接書く */
+  const rotRef = useRef(-35);
+  /** 最後に触った時刻。ここから一定時間たつと自動回転に戻る */
+  const lastActRef = useRef(0);
+  const dragRef = useRef<{ x: number; y: number; lastX: number; moved: boolean } | null>(null);
+
+  // 回転はここで一括して行う（自動回転・手回しのどちらも DOM へ直接反映）
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      if (now - lastActRef.current > FRACTION_IDLE_MS && !dragRef.current) {
+        rotRef.current += FRACTION_SPIN_DEG_PER_SEC * dt;
+      }
+      const body = box.querySelector<HTMLElement>('[data-pallet-body]');
+      if (body) body.style.transform = `rotateX(-25deg) rotateY(${rotRef.current}deg)`;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const onDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* 対応していなければ無視 */ }
+    dragRef.current = { x: e.clientX, y: e.clientY, lastX: e.clientX, moved: false };
+    lastActRef.current = performance.now();
+  }, []);
+
+  const onMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d) return;
+    e.stopPropagation();
+    const dx = e.clientX - d.lastX;
+    d.lastX = e.clientX;
+    if (Math.abs(e.clientX - d.x) > 4 || Math.abs(e.clientY - d.y) > 4) d.moved = true;
+    // 画面幅いっぱいのスワイプで半回転（作業画面の全画面表示と同じ感覚）
+    rotRef.current += (dx / Math.max(1, window.innerWidth)) * 180;
+    lastActRef.current = performance.now();
+  }, []);
+
+  const onUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    const d = dragRef.current;
+    dragRef.current = null;
+    lastActRef.current = performance.now();
+    if (!d) return;
+    const dy = e.clientY - d.y;
+    const dx = e.clientX - d.x;
+    if (Math.abs(dy) >= SWIPE_Y && Math.abs(dy) > Math.abs(dx)) onSwipeY(dy);
+  }, [onSwipeY]);
+
+  return (
+    <div
+      ref={boxRef}
+      className="river-fraction"
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={() => { dragRef.current = null; }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="river-fraction-scale">
+        <PalletDiagram
+          palletCount={0}
+          fraction={cartons}
+          qtyPerPallet={item.qtyPerPallet}
+          type={item.type}
+          itemName={item.itemName}
+          measurements={item.measurements}
+          overrideRotateY={0}
+          noIntro
+        />
+      </div>
+      <Drips count={6} spread={0.8} />
+      <span className="river-sheet" />
+    </div>
+  );
+}
+
+/**
  * 文字から垂れるしずく。
- * 水面から出た直後に、あちこちから大きさと速さの違う滴が落ちる。
- * 落ちきったところで水面に当たったしぶきも出す。
+ * 水面から出た直後がいちばん多く、時間がたつほど数も粒も小さくなって水が引いていく。
  */
 function Drips({ count, spread }: { count: number; spread: number }) {
   return (
@@ -435,15 +569,17 @@ function Drips({ count, spread }: { count: number; spread: number }) {
         // 等間隔だと機械的に見えるので、位置を少しずつずらす
         const base = (i + 0.5) / count;
         const jitter = (((i * 37) % 11) / 11 - 0.5) * (0.9 / count);
-        const size = 5 + ((i * 5) % 4);
+        // 後から落ちる滴ほど小さくして、水が引いていくように見せる
+        const t = i / Math.max(1, count - 1);
+        const size = Math.round(8 - t * 3.4);
         return (
           <span
             key={i}
             className="river-drip"
             style={{
               left: `${(50 + (base + jitter - 0.5) * spread * 100).toFixed(2)}%`,
-              animationDelay: `${1.02 + ((i * 13) % 9) * 0.11}s`,
-              animationDuration: `${1.15 + (i % 4) * 0.18}s`,
+              animationDelay: `${(0.42 + t * 1.9 + ((i * 13) % 7) * 0.06).toFixed(2)}s`,
+              animationDuration: `${(0.95 + (i % 4) * 0.16).toFixed(2)}s`,
               width: `${size}px`,
               height: `${size + 1}px`,
             }}
