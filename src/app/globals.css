@@ -48,6 +48,12 @@ html, body {
   overflow: hidden;
   overscroll-behavior: none;
 }
+/* ドキュメント自体を固定して、アドレスバーの出入りでもページがずれない（ヘッダーが隠れない）ようにする */
+body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+}
 
 body {
   background: var(--bg-primary);
@@ -60,7 +66,11 @@ body {
 }
 
 /* ===== App layout ===== */
-.app-layout { display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100vw; overflow: hidden; }
+.app-layout {
+  display: flex; flex-direction: column; width: 100vw; overflow: hidden;
+  /* 表示領域より高くならないようにして、ヘッダーがスクロールで隠れないようにする */
+  height: 100vh; height: 100svh; height: 100dvh;
+}
 .main-area { display: flex; flex: 1; min-height: 0; position: relative; }
 
 @media (orientation: landscape) {
@@ -121,7 +131,6 @@ body {
 /* 水の音 再生中を右下ボタンで示す */
 .quick-fab-water-on {
   color: #67e8f9;
-  border-color: rgba(103,232,249,0.45);
   animation: water-glow 3.2s ease-in-out infinite;
 }
 @keyframes water-glow {
@@ -144,6 +153,12 @@ body {
   display: flex; flex-direction: column; align-items: flex-end; gap: 3px; line-height: 1.05;
 }
 .header-climate-row { display: inline-flex; align-items: center; gap: 4px; }
+/* SwitchBot 受信中に出す、気象庁の値との差分（数値の左側） */
+.header-climate-diff {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  font-size: 11px; font-weight: 700; line-height: 1.05;
+  font-variant-numeric: tabular-nums; opacity: 0.75;
+}
 .header-climate-num {
   font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;
 }
@@ -156,11 +171,6 @@ body {
 }
 .header-wbgt-num { font-size: 17px; font-weight: 900; line-height: 1.05; }
 .header-wbgt-label { font-size: 9px; font-weight: 700; line-height: 1.1; margin-top: 1px; }
-.header-climate-src {
-  font-size: 10px; font-weight: 800; color: #4ade80;
-  border: 1px solid rgba(74,222,128,0.5); border-radius: 5px;
-  padding: 1px 4px; line-height: 1.1; flex-shrink: 0;
-}
 /* 狭い画面では経過時間と気温が重ならないように少し詰める */
 @media (max-width: 400px) {
   .header-work-elapsed { font-size: 21px !important; letter-spacing: 0.5px; }
@@ -174,10 +184,11 @@ body {
 /* ===== 右下の展開メニュー（クイック操作） ===== */
 .quick-fab {
   position: fixed; right: 16px; bottom: 20px; z-index: 140;
-  width: 56px; height: 56px; border-radius: 18px;
+  width: 48px; height: 48px; border-radius: 15px;
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(160deg, #262a3d 0%, #1c2033 100%);
-  border: 1px solid rgba(255,255,255,0.16);
+  /* 矢印のまわりに枠は出さない */
+  border: none;
   color: rgba(255,255,255,0.9); cursor: pointer;
   box-shadow: 0 8px 24px rgba(0,0,0,0.45);
   transition: transform 0.15s ease, background 0.15s ease;
