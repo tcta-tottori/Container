@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
 import { parsePhotoFile } from '@/lib/photoParser';
 import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel, parseMasterExcel, fetchJkpFromGitHub } from '@/lib/masterLoader';
@@ -795,22 +795,6 @@ export default function Home() {
     [loadData, loadMaster, closeLoading]
   );
 
-  /** せせらぎモードの映像に紛れ込ませる情報（機種名・カートン数など） */
-  const riverWords = useMemo(() => {
-    const out: string[] = [];
-    const container = state.containers[state.selectedContainerIdx];
-    if (container) out.push(container.containerNo);
-    for (const it of state.items) {
-      if (it.representModel) out.push(it.representModel);
-      if (it.itemName) out.push(it.itemName);
-      if (it.partNumber) out.push(it.partNumber);
-      if (it.caseCount > 0) out.push(`${it.caseCount} CT`);
-      if (it.palletCount > 0) out.push(`${it.palletCount} PL`);
-      if (it.totalQty > 0) out.push(`${it.totalQty} pcs`);
-    }
-    return Array.from(new Set(out)).filter((w) => w.length <= 24);
-  }, [state.items, state.containers, state.selectedContainerIdx]);
-
   /** 履歴（最近のファイル）から選ばれたファイルを種類ごとに読み込む */
   const handleRecentFileSelected = useCallback(
     (file: File, fileType: FileType) => {
@@ -1253,7 +1237,7 @@ export default function Home() {
         />
       )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
-      {riverOpen && <RiverMode words={riverWords} onClose={closeRiver} />}
+      {riverOpen && <RiverMode onClose={closeRiver} />}
 
       {/* メニューオーバーレイ */}
       {menuOpen && (

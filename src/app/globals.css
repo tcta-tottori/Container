@@ -808,23 +808,25 @@ body {
   object-fit: cover; object-position: center;
   user-select: none; -webkit-user-drag: none; pointer-events: none;
 }
-/* 木立（上部）: 風でゆっくり揺れる */
-.river-canopy {
-  transform-origin: 50% 100%;
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 24%, rgba(0,0,0,0) 44%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 24%, rgba(0,0,0,0) 44%);
-  animation: river-sway 11s ease-in-out infinite alternate;
-}
-@keyframes river-sway {
-  0%   { transform: rotate(-0.35deg) translateX(-4px) scale(1.012); }
-  50%  { transform: rotate(0.12deg)  translateX(2px)  scale(1.014); }
-  100% { transform: rotate(0.4deg)   translateX(5px)  scale(1.012); }
-}
-/* 川面: 水面マスクで切り出した写真を下流へ流し、2枚を半周ずらして交互にフェード */
-.river-water {
+/* マスクを掛ける外枠。これ自体は動かないので、切り抜き位置は固定されたまま中身だけが動く */
+.river-clip {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
   -webkit-mask-size: cover; mask-size: cover;
   -webkit-mask-position: center; mask-position: center;
   -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+}
+/* 枝葉だけ（葉マスクの内側）を風でゆっくり揺らす。幹・石・地面は背景のまま動かさない */
+.river-canopy {
+  transform-origin: 50% 100%;
+  animation: river-sway 11s ease-in-out infinite alternate;
+}
+@keyframes river-sway {
+  0%   { transform: rotate(-0.16deg) translateX(-1.6px) scale(1.004); }
+  50%  { transform: rotate(0.05deg)  translateX(0.8px)  scale(1.005); }
+  100% { transform: rotate(0.18deg)  translateX(2px)    scale(1.004); }
+}
+/* 川面: 水面マスクの内側で写真を下流へ流し、2枚を半周ずらして交互にフェード */
+.river-water {
   transform-origin: 50% 35%;
   opacity: 0;
   animation: river-flow 6.4s linear infinite;
@@ -844,17 +846,13 @@ body {
   -webkit-mask-position: center; mask-position: center;
   -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
 }
-/* 情報テキストは水面マスクを掛けずに全面へ（読み取れる濃さは描画側で調整） */
-.river-text-canvas {
-  -webkit-mask-image: none !important; mask-image: none !important;
-}
 /* 上流に漂うもや */
 .river-mist {
   position: absolute; left: -20%; right: -20%; top: 6%; height: 46%;
   pointer-events: none;
   background:
-    radial-gradient(55% 60% at 35% 55%, rgba(226,244,255,0.18), rgba(226,244,255,0) 70%),
-    radial-gradient(45% 50% at 68% 40%, rgba(214,240,255,0.14), rgba(214,240,255,0) 70%);
+    radial-gradient(55% 60% at 35% 55%, rgba(226,244,255,0.10), rgba(226,244,255,0) 70%),
+    radial-gradient(45% 50% at 68% 40%, rgba(214,240,255,0.08), rgba(214,240,255,0) 70%);
   filter: blur(6px);
   animation: river-mist-drift 26s ease-in-out infinite alternate;
 }
