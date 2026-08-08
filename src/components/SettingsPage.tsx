@@ -181,7 +181,7 @@ function AiPhotoSettings() {
 const TABS: { id: SettingsTab; label: string; Icon: typeof ChatIcon }[] = [
   { id: 'voice', label: '音声', Icon: SpeakerIcon },
   { id: 'call', label: 'コール', Icon: ChatIcon },
-  { id: 'water', label: '水', Icon: DropletIcon },
+  { id: 'water', label: '水の音', Icon: DropletIcon },
   { id: 'ai', label: 'AI写真', Icon: CameraIcon },
 ];
 

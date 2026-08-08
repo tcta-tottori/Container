@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Jost:wght@200;300;400&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -32,6 +32,8 @@
   --font-mono: var(--font-ui);
   /* 経過時間だけデジタル調のアクセントフォント */
   --font-clock: 'Orbitron', var(--font-ui);
+  /* せせらぎモードの時刻・気温など。細めで落ち着いた幾何学サンセリフ */
+  --font-river: 'Jost', var(--font-ui);
   /* ステータスバー（ノッチ）の高さ。iOS の黒半透明ステータスバー対策 */
   --safe-top: env(safe-area-inset-top, 0px);
 }
@@ -885,11 +887,10 @@ body {
 .river-root {
   position: fixed; inset: 0; z-index: 300;
   overflow: hidden; background: #05131a;
-  animation: river-in 0.6s ease both;
   -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+  /* 横スワイプで戻るので、ブラウザのジェスチャーには渡さない */
+  touch-action: none;
 }
-@keyframes river-in { from { opacity: 0; } to { opacity: 1; } }
 /* 継ぎ目の分からないループ動画を全画面に敷く */
 .river-video {
   position: absolute; inset: 0;
@@ -915,37 +916,66 @@ body {
 /* 左に現在時刻、右に作業の経過時間（黄色）。どちらも映像の上に薄く重ねる */
 .river-topbar {
   position: absolute; left: 0; right: 0;
-  top: calc(env(safe-area-inset-top, 0px) + 6px);
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
   display: flex; align-items: baseline; justify-content: space-between;
-  padding: 0 16px;
-  font-family: var(--font-ui);
+  padding: 0 18px;
+  /* 時刻・経過時間・気温はすべて同じ落ち着いた書体でそろえる */
+  font-family: var(--font-river);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
+  z-index: 25;
 }
 .river-clock {
-  font-size: 15px; font-weight: 600; letter-spacing: 0.06em;
-  color: rgba(255,255,255,0.92);
-  text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+  font-size: 17px; font-weight: 300; letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 1px 8px rgba(0,0,0,0.6);
 }
 .river-topbar-right {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 3px;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
 }
-/* 経過時間は現在時刻と同じ書体・大きさにそろえ、色だけ変える */
 .river-elapsed {
-  font-size: 15px; font-weight: 600; letter-spacing: 0.06em;
-  color: #f5c451;
-  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+  font-size: 17px; font-weight: 300; letter-spacing: 0.14em;
+  color: #f0cf95;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.7);
 }
-/* 経過時間の下に気温と湿度。1行に並べず、改行して左揃えにする */
+/* 気温と湿度はアイコンなしで改行し、右端をそろえる */
 .river-climate {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
-  font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em;
-  text-shadow: 0 1px 6px rgba(0,0,0,0.85);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0;
+  font-size: 13px; font-weight: 300; letter-spacing: 0.1em;
+  line-height: 1.5;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.75);
 }
-.river-climate-item { display: inline-flex; align-items: center; gap: 4px; }
-.river-climate-temp { color: #fb923c; }
-.river-climate-hum { color: #38bdf8; }
-.river-climate-unit { font-size: 10px; opacity: 0.85; }
+.river-climate-temp { color: rgba(251,146,60,0.9); }
+.river-climate-hum { color: rgba(56,189,248,0.9); }
+.river-climate-unit { font-size: 10px; margin-left: 1px; opacity: 0.8; }
+
+/* ===== 開始・終了の靄 ===== */
+/*
+ * 開いた直後は靄が立ちこめていて、ゆっくり晴れて川が見えてくる。
+ * 戻るときは逆に靄が覆いつくし、覆いきったところで元の画面へ戻る。
+ */
+.river-mist {
+  position: absolute; inset: -10%; z-index: 40;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 46% at 28% 34%, rgba(240,247,249,0.95) 0%, rgba(240,247,249,0) 62%),
+    radial-gradient(ellipse 62% 40% at 76% 62%, rgba(230,241,245,0.92) 0%, rgba(230,241,245,0) 60%),
+    radial-gradient(ellipse 90% 60% at 50% 50%, rgba(216,232,238,0.85) 0%, rgba(216,232,238,0.45) 55%, rgba(216,232,238,0.2) 100%),
+    /* 濃さのむらだけだと向こう側が透けるので、下地を1枚敷いて覆いきる */
+    linear-gradient(rgba(222,236,240,0.82), rgba(222,236,240,0.82));
+  filter: blur(14px);
+  animation: river-mist-clear 1.5s cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+.river-mist.out { animation: river-mist-close 0.64s cubic-bezier(0.4, 0, 0.6, 1) both; }
+
+@keyframes river-mist-clear {
+  0%   { opacity: 1; transform: scale(1) translateX(0); }
+  100% { opacity: 0; transform: scale(1.16) translateX(5%); }
+}
+@keyframes river-mist-close {
+  0%   { opacity: 0; transform: scale(1.16) translateX(-5%); }
+  100% { opacity: 1; transform: scale(1) translateX(0); }
+}
 
 /* ===== せせらぎモード: 水面から現れる品目情報 ===== */
 /*
@@ -953,12 +983,6 @@ body {
  * 品目情報はこの線の下から丸ごと上がってきて姿を現す。
  */
 :root { --river-waterline: 60%; }
-
-/* SVG フィルタの定義置き場。描画はしないので場所を取らない */
-.river-fx-defs {
-  position: absolute; width: 0; height: 0;
-  overflow: hidden; pointer-events: none;
-}
 
 /* 表示のまとまり。この中に「水面マスク層」と「水面の光」を並べる */
 .river-stage {
@@ -999,9 +1023,6 @@ body {
   padding: 0 16px;
   animation: river-rise 1.6s cubic-bezier(0.18, 0.86, 0.28, 1) both;
 }
-/* 端数パレットを載せるときは背が高くなるので、位置を上げて深く沈める */
-.river-info-body.with-fraction { top: 9%; --river-rise: 58vh; gap: 12px; }
-
 /* 一定時間たつと、また水面の下へ沈んでいく */
 .river-stage.hide .river-info-body { animation: river-fall 1.4s cubic-bezier(0.42, 0, 0.7, 0.9) both; }
 
@@ -1048,22 +1069,32 @@ body {
     0 6px 18px rgba(0,0,0,0.5);
 }
 
-/* ===== 端数パレット（残りが端数だけになったとき） ===== */
-/* 機種名と同じかたまりの中で、水面から出て回り続ける */
-.river-fraction {
-  position: relative;
-  width: 100%; height: 236px;
+/* ===== 端数パレットの全画面表示（作業画面と同じ見せ方） ===== */
+.river-pfs {
+  position: absolute; inset: 0; z-index: 20;
   display: flex; align-items: center; justify-content: center;
   pointer-events: auto;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
+  /* 図が見やすいように、まわりを少し落とす */
+  background: radial-gradient(ellipse at center, rgba(4,18,22,0.5) 0%, rgba(4,18,22,0.2) 60%, rgba(4,18,22,0) 100%);
+  animation: fadeIn 0.3s ease both;
 }
 /* PalletDiagram は実寸 70px 幅で描かれるので、ここで拡大して見せる */
-.river-fraction-scale {
-  width: 80px; height: 84px;
-  transform: scale(2.7);
+.river-pfs-box {
+  width: 80px; height: 90px;
   transform-origin: center center;
+  will-change: transform;
 }
+/* 図の下に端数のケース数を出す */
+.river-pfs-cap {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(16% + env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: baseline; justify-content: center; gap: 6px;
+  pointer-events: none;
+}
+.river-pfs-cap-num { font-size: clamp(40px, 13vw, 70px); line-height: 1; font-variant-numeric: tabular-nums; }
+.river-pfs-cap-label { font-size: clamp(15px, 4.2vw, 22px); letter-spacing: 0.06em; font-weight: 700; }
 
 .river-info-model .river-text {
   font-size: clamp(24px, 7.4vw, 40px);
@@ -1076,7 +1107,12 @@ body {
   display: inline-flex; align-items: baseline; gap: 5px;
   background: none; border: none; padding: 0; margin: 0;
 }
-.river-stat-num { font-size: clamp(34px, 11vw, 58px); line-height: 1; font-variant-numeric: tabular-nums; }
+.river-stat-num {
+  font-size: clamp(34px, 11vw, 58px); line-height: 1;
+  /* 数え上げの途中で桁が増えても幅が変わらないように、等幅数字＋右揃えにする */
+  font-variant-numeric: tabular-nums;
+  display: inline-block; text-align: right;
+}
 .river-stat-num-sm { font-size: clamp(22px, 6.6vw, 34px); }
 .river-stat-label { font-size: clamp(13px, 3.6vw, 18px); letter-spacing: 0.06em; font-weight: 700; }
 

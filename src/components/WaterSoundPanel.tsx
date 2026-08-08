@@ -1,8 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useWaterSound } from '@/hooks/useWaterSound';
-import { isRiverWaterFxEnabled, setRiverWaterFxEnabled } from '@/lib/riverSettings';
 
 /** 汎用のオン/オフスイッチ */
 function Toggle({ on }: { on: boolean }) {
@@ -18,41 +16,6 @@ function Toggle({ on }: { on: boolean }) {
         width: 22, height: 22, borderRadius: '50%', background: '#fff',
         transition: 'left 0.15s ease',
       }} />
-    </div>
-  );
-}
-
-/**
- * せせらぎモードの水表現（水越しの歪み）を切り替える。
- * 設定は localStorage に持つので、読み込みはマウント後に行う。
- */
-function RiverWaterFxRow() {
-  const [on, setOn] = useState(true);
-  useEffect(() => { setOn(isRiverWaterFxEnabled()); }, []);
-
-  const toggle = () => {
-    const next = !on;
-    setOn(next);
-    setRiverWaterFxEnabled(next);
-  };
-
-  return (
-    <div
-      onClick={toggle}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-        padding: '12px 14px', marginTop: 12, borderRadius: 12,
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>水の表現を使う</div>
-        <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 3 }}>
-          品目情報が水面を出入りするとき、水越しに見えるように文字をゆがませます。
-          動きが重いと感じるときはオフにしてください。
-        </div>
-      </div>
-      <Toggle on={on} />
     </div>
   );
 }
@@ -217,14 +180,6 @@ export default function WaterSoundPanel() {
         iPhoneはマナーモードだと鳴りません。
       </div>
 
-      {/* ===== せせらぎモード ===== */}
-      <div style={{
-        marginTop: 22, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)',
-        color: '#fff', fontSize: 14, fontWeight: 700,
-      }}>
-        せせらぎモード
-      </div>
-      <RiverWaterFxRow />
     </div>
   );
 }
