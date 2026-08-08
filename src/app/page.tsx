@@ -1246,7 +1246,13 @@ export default function Home() {
         />
       )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
-      {riverOpen && <RiverMode onClose={closeRiver} />}
+      {riverOpen && (
+        <RiverMode
+          onClose={closeRiver}
+          item={currentItem}
+          onDecreasePallet={handleDecrease}
+        />
+      )}
 
       {/* メニューオーバーレイ */}
       {menuOpen && (
@@ -1294,7 +1300,8 @@ export default function Home() {
             {/* バージョン + 更新時刻（読込画面から移動） */}
             <div className="menu-spacer" />
             <div className="menu-version">
-              <span>Ver {APP_VERSION}</span>
+              <span className="menu-version-name">CNS</span>
+              <span>Ver.{APP_VERSION}</span>
               <span className="menu-version-sub">{APP_UPDATED_TIME}</span>
             </div>
           </div>

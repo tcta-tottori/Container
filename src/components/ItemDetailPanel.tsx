@@ -6,6 +6,7 @@ import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 import { buildJapanesePartName } from '@/lib/partTranslations';
 import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
+import { displayQuantities } from '@/lib/itemQuantity';
 import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
@@ -598,16 +599,8 @@ export default function ItemDetailPanel({
   // カウントアップアニメーション（フェードアウト中は値をフリーズ）
   const isTransitioning = animKey !== item.id;
   const rawFraction = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-  // 鍋・ジャーポットは検査を抜かない、それ以外は1ケース抜く。
-  // 端数=0でパレットぴったりの場合は1パレットを崩して検査分を抜く。
-  const noInspection = item.type === '鍋' || item.type === 'ジャーポット';
-  const breakPalletForInspection = !noInspection && rawFraction === 0 && item.palletCount > 0 && item.qtyPerPallet > 0;
-  const displayPallets = breakPalletForInspection ? item.palletCount - 1 : item.palletCount;
-  const inspectionDeducted = noInspection
-    ? rawFraction
-    : breakPalletForInspection
-      ? item.qtyPerPallet - 1
-      : (rawFraction > 0 ? rawFraction - 1 : 0);
+  // PL / CT / pcs の求め方は せせらぎモードと共通（src/lib/itemQuantity.ts）
+  const { pallets: displayPallets, cartons: inspectionDeducted } = displayQuantities(item);
   const plTarget = isTransitioning ? undefined : displayPallets;
   const ctTarget = isTransitioning ? undefined : inspectionDeducted;
   const pcsTarget = isTransitioning ? undefined : Math.ceil(item.totalQty);

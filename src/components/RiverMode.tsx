@@ -1,9 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ContainerItem } from '@/lib/types';
+import { displayQuantities } from '@/lib/itemQuantity';
 
 interface RiverModeProps {
   onClose: () => void;
+  /** いま作業中の品目。画面上側をタップすると川から情報が浮かび上がる */
+  item?: ContainerItem | null;
+  /** パレット数をタップしたときの処理（作業画面の「減らす」と同じ） */
+  onDecreasePallet?: () => void;
 }
 
 /** タップの波紋 */
@@ -18,8 +24,10 @@ const VIDEO_MP4 = `${BASE}/videos/river-loop.mp4`;
 const VIDEO_WEBM = `${BASE}/videos/river-loop.webm`;
 const POSTER = `${BASE}/videos/river-poster.jpg`;
 
-/** 画面下側のこの割合をタップすると閉じる */
+/** 画面下側のこの割合をタップすると閉じる（残りの上 2/3 は品目情報の表示） */
 const CLOSE_ZONE = 1 / 3;
+/** 浮かび上がった品目情報が沈むまでの時間 */
+const INFO_MS = 9000;
 
 /** ふわっと光る円のスプライト（波紋に使う） */
 function makeBlob(): HTMLCanvasElement {
@@ -41,11 +49,23 @@ function makeBlob(): HTMLCanvasElement {
  * 川のループ動画を全画面で流す休憩用の表示。
  * 画面上側のタップは波紋が広がるだけ、下 1/3 をタップすると元の画面に戻る。
  */
-export default function RiverMode({ onClose }: RiverModeProps) {
+export default function RiverMode({ onClose, item, onDecreasePallet }: RiverModeProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const ripplesRef = useRef<Ripple[]>([]);
   const [hintVisible, setHintVisible] = useState(true);
+  /** 品目情報が浮かび上がっているか。key を変えると出現アニメをやり直す */
+  const [info, setInfo] = useState<{ shown: boolean; key: number }>({ shown: false, key: 0 });
+  const infoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** 情報を浮かび上がらせて、一定時間で沈める */
+  const surfaceInfo = useCallback((restart: boolean) => {
+    setInfo((prev) => ({ shown: true, key: restart || !prev.shown ? prev.key + 1 : prev.key }));
+    if (infoTimer.current) clearTimeout(infoTimer.current);
+    infoTimer.current = setTimeout(() => setInfo((prev) => ({ ...prev, shown: false })), INFO_MS);
+  }, []);
+
+  useEffect(() => () => { if (infoTimer.current) clearTimeout(infoTimer.current); }, []);
 
   // ヒントは数秒で消す
   useEffect(() => {
@@ -87,7 +107,7 @@ export default function RiverMode({ onClose }: RiverModeProps) {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
-  /** 下 1/3 をタップで閉じる。それ以外は波紋が広がるだけ */
+  /** 下 1/3 をタップで閉じる。上 2/3 は波紋 + 品目情報の浮かび上がり */
   const handleTap = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const y = e.clientY - rect.top;
@@ -97,7 +117,15 @@ export default function RiverMode({ onClose }: RiverModeProps) {
     }
     ripplesRef.current.push({ x: e.clientX - rect.left, y, t: 0 });
     if (ripplesRef.current.length > 6) ripplesRef.current.shift();
-  }, [onClose]);
+    if (item) surfaceInfo(false);
+  }, [onClose, item, surfaceInfo]);
+
+  /** パレット数をタップ → 作業画面と同じように1枚減らす。表示時間は数え直す */
+  const handlePalletTap = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    onDecreasePallet?.();
+    surfaceInfo(false);
+  }, [onDecreasePallet, surfaceInfo]);
 
   // ===== タップの波紋 =====
   useEffect(() => {
@@ -190,9 +218,53 @@ export default function RiverMode({ onClose }: RiverModeProps) {
       {/* タップの波紋 */}
       <canvas ref={canvasRef} className="river-canvas" />
 
+      {/* 川から浮かび上がる品目情報（石に苔が生えたような文字） */}
+      {item && <RiverInfo item={item} shown={info.shown} animKey={info.key} onPalletTap={handlePalletTap} />}
+
       {/* 戻り方のヒント（数秒で消える） */}
       <div className={`river-hint${hintVisible ? '' : ' hide'}`}>
-        画面の下 1/3 をタップで戻ります
+        {item ? '上をタップで品目情報 ／ 下 1/3 をタップで戻ります' : '画面の下 1/3 をタップで戻ります'}
+      </div>
+    </div>
+  );
+}
+
+/** 川面から浮かび上がる品目情報。文字は石＋苔のテクスチャで描く */
+function RiverInfo({
+  item, shown, animKey, onPalletTap,
+}: {
+  item: ContainerItem;
+  shown: boolean;
+  animKey: number;
+  onPalletTap: (e: React.PointerEvent<HTMLButtonElement>) => void;
+}) {
+  const { pallets, cartons, pcs } = displayQuantities(item);
+  const model = item.representModel?.trim() || item.itemName;
+
+  return (
+    <div className={`river-info${shown ? '' : ' hide'}`} key={animKey} aria-hidden={!shown}>
+      <div className="river-info-line river-info-model">
+        <span className="river-stone">{model}</span>
+      </div>
+      <div className="river-info-line river-info-nums">
+        <button
+          type="button"
+          className="river-stat river-stat-tap"
+          onPointerDown={onPalletTap}
+          onClick={(e) => e.stopPropagation()}
+          title="タップでパレットを1枚減らす"
+        >
+          <span className="river-stone river-stat-num">{pallets}</span>
+          <span className="river-stone river-stat-label">PL</span>
+        </button>
+        <span className="river-stat">
+          <span className="river-stone river-stat-num">{cartons}</span>
+          <span className="river-stone river-stat-label">CT</span>
+        </span>
+        <span className="river-stat">
+          <span className="river-stone river-stat-num river-stat-num-sm">{pcs.toLocaleString()}</span>
+          <span className="river-stone river-stat-label">pcs</span>
+        </span>
       </div>
     </div>
   );

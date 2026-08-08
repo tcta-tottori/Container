@@ -41,19 +41,9 @@ function HeaderClimate({
   const r = switchbot || weather;
   if (!r) return null;
   const lv = wbgtLevel(r.wbgt);
-  // SwitchBot 受信中は、気象庁の予報値との差分を数値の左に出す
-  const dTemp = switchbot && weather ? Math.round((switchbot.temperature - weather.temperature) * 10) / 10 : null;
-  const dHum = switchbot && weather ? Math.round(switchbot.humidity - weather.humidity) : null;
-  const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`);
 
   return (
     <button className="header-climate" onClick={onOpen} title="タップで詳細を表示">
-      {(dTemp !== null || dHum !== null) && (
-        <span className="header-climate-diff">
-          <span style={{ color: TEMP_COLOR }}>{dTemp !== null ? sign(dTemp) : ''}</span>
-          <span style={{ color: HUM_COLOR }}>{dHum !== null ? sign(dHum) : ''}</span>
-        </span>
-      )}
       <span className="header-climate-val">
         <span className="header-climate-row" style={{ color: TEMP_COLOR }}>
           <span className="header-climate-num">

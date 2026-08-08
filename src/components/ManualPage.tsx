@@ -302,8 +302,17 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     右下のメニュー →<strong style={{ color: '#7dd3fc' }}>「せせらぎモード」</strong>で、川の映像を全画面表示します。
                     継ぎ目が分からないようにつないだループ映像で、水の音も一緒に流れ始めます。
                   </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#7dd3fc' }}>画面の上 2/3</strong> をタップすると波紋が広がり、
+                    いま作業中の機種名とパレット・カートン・pcs が、石に苔が生えたような文字で川から浮かび上がります。
+                    しばらくすると、また川に沈んで消えます。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    浮かんでいる<strong style={{ color: '#7dd3fc' }}>パレット数（PL）をタップ</strong>すると、
+                    作業画面と同じようにパレットを1枚減らせます（残り0枚のときは品目が完了になります）。
+                  </div>
                   <div>
-                    画面の上側をタップすると波紋が広がります。元の画面に戻るときは
+                    元の画面に戻るときは
                     <strong style={{ color: '#7dd3fc' }}>画面の下 1/3</strong> をタップしてください。
                   </div>
                 </div>
