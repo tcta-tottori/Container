@@ -74,6 +74,8 @@ function LoadingOverlay({ message, progress, closing }: { message: string; progr
         <p style={{
           color: '#fff', fontSize: 12, fontWeight: 600, margin: '0 0 12px', lineHeight: 1.5,
           textShadow: '0 0 6px rgba(255,255,255,0.15)',
+          // ファイル名などを改行して添えられるようにする
+          whiteSpace: 'pre-line', wordBreak: 'break-word',
         }}>
           {message}
         </p>
@@ -482,6 +484,17 @@ export default function Home() {
         setLoadingClosing(false);
       }, 500); // フェードアウト0.5秒
     }, 1000); // 100%表示1秒
+  }, []);
+
+  /**
+   * Googleドライブから取ってくる間のローディング表示。
+   * 取得が終わるとそのまま各ファイルの読込処理が続きを受け持つので、
+   * 選んでから作業ページに着くまで画面が途切れない。
+   */
+  const handleDriveLoading = useCallback((msg: string | null, progress?: number) => {
+    setLoadingMsg(msg);
+    setLoadingProgress(progress ?? 0);
+    if (msg === null) setLoadingClosing(false);
   }, []);
 
   const handleFileLoaded = useCallback(
@@ -1372,6 +1385,7 @@ export default function Home() {
                 onJkpLoaded={handleJkpLoaded}
                 onMasterLoaded={handleMasterLoaded}
                 onPhotoLoaded={handlePhotoLoaded}
+                onLoadingChange={handleDriveLoading}
               />
             </div>
           )}
