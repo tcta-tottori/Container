@@ -328,14 +328,22 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   <div style={{ marginBottom: 8 }}>
                     映像は<strong style={{ color: '#7dd3fc' }}>ステータスバーの領域まで全画面</strong>で流れます。
                     上端は<strong style={{ color: '#7dd3fc' }}>左に現在時刻</strong>、
-                    <strong style={{ color: '#f5c451' }}>右に作業の経過時間</strong>だけを表示します。
+                    <strong style={{ color: '#f5c451' }}>右に作業の経過時間</strong>、
+                    その下に<strong style={{ color: '#fb923c' }}>気温</strong>と<strong style={{ color: '#38bdf8' }}>湿度</strong>だけを表示します。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     開いた直後は映像だけで、品目情報は出ません。
                     <strong style={{ color: '#7dd3fc' }}>画面の上 2/3</strong> をタップすると水滴が落ちたような波紋が広がり、
                     いま作業中の機種名とパレット・カートン・pcs が、画面中ほどの水面から
-                    まとめて浮かび上がって、しずくを垂らしながら白い文字で現れます。
-                    表示中にもう一度ほかの場所をタップすると水面の下へ沈んで消えます（しばらく置いても自動で沈みます）。
+                    まとめて浮かび上がります。出たては水をかぶって水色に見え、
+                    水が引いてしずくが落ちきると白い文字になります。
+                    表示中にもう一度ほかの場所をタップすると、そのまま水面の下へ入って消えます（しばらく置いても自動で沈みます）。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    残りが<strong style={{ color: '#22c55e' }}>端数ケースだけ</strong>になった品目では、
+                    機種名と数量の間に端数パレットの積み方が同じように水面から現れ、回り続けます。
+                    <strong style={{ color: '#7dd3fc' }}>横スワイプで手回し</strong>（手を離してしばらくすると自動回転に戻ります）、
+                    <strong style={{ color: '#7dd3fc' }}>上下スワイプで品目の切り替え</strong>ができます。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     浮かんでいる<strong style={{ color: '#7dd3fc' }}>機種名を上下にスワイプ</strong>すると品目を切り替えられます
