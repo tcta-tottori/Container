@@ -2,9 +2,10 @@
 
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { fetchMasterFileLastUpdate } from '@/lib/masterLoader';
-import { openGooglePicker, downloadFromDrive } from '@/lib/googleDrive';
+import { DriveFile, downloadFromDrive, driveErrorMessage } from '@/lib/googleDrive';
 import { classifyFile, isImageFile, ClassifiedFile } from '@/lib/fileClassifier';
 import { FileIcon } from '@/components/AppIcons';
+import GoogleDrivePicker from '@/components/GoogleDrivePicker';
 
 export type { FileRole, ClassifiedFile } from '@/lib/fileClassifier';
 export { classifyFile, isImageFile } from '@/lib/fileClassifier';
@@ -17,9 +18,18 @@ interface FileDropZoneProps {
   onMasterLoaded?: (file: File) => void;
   onPhotoLoaded?: (file: File) => void;
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
+  /**
+   * Googleドライブから取ってくる間の表示。
+   * ここで読込画面のローディングを出しておくと、選んだあと作業ページに着くまで
+   * 画面が途切れない。msg に null を渡すと消す。
+   */
+  onLoadingChange?: (msg: string | null, progress?: number) => void;
   /** 作業画面のレイアウト内に埋め込んで表示する（ヘッダー・メニューを残す） */
   embedded?: boolean;
 }
+
+/** ドライブから取ってくる間に使う進捗の幅（このあとの解析で 10% 以降を使う） */
+const DRIVE_PROGRESS_MAX = 9;
 
 /* ===== CNSロゴSVG（正方形キューブ + ネオングロー） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
@@ -53,10 +63,12 @@ function GoogleDriveLogo({ size = 26 }: { size?: number }) {
   );
 }
 
-export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded, embedded }: FileDropZoneProps) {
+export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded, onLoadingChange, embedded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
   const [driveBusy, setDriveBusy] = useState(false);
+  /** アプリ内のドライブ選択画面を開いているか */
+  const [pickerOpen, setPickerOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [masterLastUpdate, setMasterLastUpdate] = useState<{ date: string; message: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,12 +80,14 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
     });
   }, []);
 
-  // ファイル名で自動判別・振り分け
+  // ファイル名で自動判別・振り分け（読込を始めたら true を返す）
   const handleFiles = useCallback(
-    (files: FileList | File[]) => {
+    (files: FileList | File[]): boolean => {
       const classified: ClassifiedFile[] = [];
       const aqssFiles: File[] = [];
       let containerFile: File | null = null;
+      /** どれか1つでも読込へ渡せたか。渡せなければ呼び出し側でローディングを消す */
+      let started = false;
 
       for (const f of Array.from(files)) {
         const lowerName = f.name.toLowerCase();
@@ -85,14 +99,14 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
 
         if (role === 'photo') {
           // 画像ファイル → OCRで読込
-          if (onPhotoLoaded) onPhotoLoaded(f);
+          if (onPhotoLoaded) { onPhotoLoaded(f); started = true; }
         } else if (role === 'aqss04l' || role === 'aqss05l') {
           aqssFiles.push(f);
         } else if (role === 'jkp') {
-          if (onJkpLoaded) onJkpLoaded(f);
+          if (onJkpLoaded) { onJkpLoaded(f); started = true; }
         } else if (role === 'master') {
           // マスターデータ（CNS品目一覧）→ 直接読込・反映
-          if (onMasterLoaded) onMasterLoaded(f);
+          if (onMasterLoaded) { onMasterLoaded(f); started = true; }
         } else if (role === 'container' || role === 'container_schedule') {
           // コンテナ作業ファイルとコンテナ日程は両方ともコンテナとして読込
           containerFile = f;
@@ -108,6 +122,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
       // コンテナファイルがあれば即読込・作業ページへ遷移
       if (containerFile) {
         onFileLoaded(containerFile);
+        started = true;
         // コンテナファイルと同時にAQSSがあれば既存データ補完
         if (aqssFiles.length > 0 && onAqssLoaded) onAqssLoaded(aqssFiles);
       } else if (aqssFiles.length > 0) {
@@ -116,10 +131,14 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
         const pk = aqssFiles.find(f => f.name.toUpperCase().includes('AQSS05L'));
         if (inv && onAqssContainerLoaded) {
           onAqssContainerLoaded(inv, pk);
+          started = true;
         } else if (onAqssLoaded) {
           onAqssLoaded(aqssFiles);
+          started = true;
         }
       }
+
+      return started;
     },
     [onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded]
   );
@@ -129,24 +148,42 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
     handleFiles(e.dataTransfer.files);
   }, [handleFiles]);
 
-  const pickFromDrive = useCallback(async () => {
-    if (driveBusy) return;
+  /**
+   * アプリ内で選んだファイルを取ってくる。
+   * 選び終わった時点で読込画面のローディングへ切り替わり、
+   * 取得が終わるとそのまま解析（作業ページへの遷移）へ続く。
+   */
+  const loadFromDrive = useCallback(async (picked: DriveFile[]) => {
+    setPickerOpen(false);
+    if (picked.length === 0) return;
     setDriveBusy(true);
     try {
-      const picked = await openGooglePicker();
-      if (!picked || picked.length === 0) return;
       const files: File[] = [];
-      for (const p of picked) {
-        const file = await downloadFromDrive(p.id, p.name);
+      for (let i = 0; i < picked.length; i++) {
+        const p = picked[i];
+        const label = picked.length > 1
+          ? `Googleドライブから読み込み中... (${i + 1}/${picked.length})`
+          : 'Googleドライブから読み込み中...';
+        // 1ファイルぶんの取得を、全体の進捗のうちの1区画として進める
+        const slice = DRIVE_PROGRESS_MAX / picked.length;
+        onLoadingChange?.(`${label}\n${p.name}`, slice * i);
+        const file = await downloadFromDrive(p, (ratio) => {
+          onLoadingChange?.(`${label}\n${p.name}`, slice * (i + ratio));
+        });
         files.push(file);
       }
-      handleFiles(files);
+
+      onLoadingChange?.('ファイルを確認中...', DRIVE_PROGRESS_MAX);
+      // ここから先は各ファイルの読込処理がローディングの続きを受け持つ
+      const started = handleFiles(files);
+      if (!started) onLoadingChange?.(null);
     } catch (err) {
-      console.error('Google Drive error:', err);
+      onLoadingChange?.(driveErrorMessage(err));
+      setTimeout(() => onLoadingChange?.(null), 2600);
     } finally {
       setDriveBusy(false);
     }
-  }, [driveBusy, handleFiles]);
+  }, [handleFiles, onLoadingChange]);
 
   const gradientStyle = 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)';
 
@@ -241,7 +278,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
 
             {/* ===== Google ドライブ（ドロップゾーンと同じ横幅の大ボタン） ===== */}
             <button
-              onClick={pickFromDrive}
+              onClick={() => setPickerOpen(true)}
               disabled={driveBusy}
               className="cns-action-btn"
               style={{
@@ -272,6 +309,11 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
           </div>{/* 右カラム閉じ */}
         </div>{/* columns閉じ */}
       </div>
+
+      {/* ドライブのファイル選択（アプリ内で完結する） */}
+      {pickerOpen && (
+        <GoogleDrivePicker onSelect={loadFromDrive} onClose={() => setPickerOpen(false)} />
+      )}
     </div>
   );
 }
