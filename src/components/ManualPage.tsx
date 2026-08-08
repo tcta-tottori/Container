@@ -329,26 +329,20 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     右下のメニュー →<strong style={{ color: '#7dd3fc' }}>「せせらぎモード」</strong>、または
                     作業ページで<strong style={{ color: '#7dd3fc' }}>ヘッダーを左右にスワイプ</strong>すると、川の映像を全画面表示します。
                     継ぎ目が分からないようにつないだループ映像で、水の音も一緒に流れ始めます。
+                    入るときと出るときは<strong style={{ color: '#7dd3fc' }}>靄</strong>がかかって切り替わります。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     映像は<strong style={{ color: '#7dd3fc' }}>ステータスバーの領域まで全画面</strong>で流れます。
                     上端は<strong style={{ color: '#7dd3fc' }}>左に現在時刻</strong>、
-                    <strong style={{ color: '#f5c451' }}>右に作業の経過時間</strong>、
+                    <strong style={{ color: '#f0cf95' }}>右に作業の経過時間</strong>、
                     その下に<strong style={{ color: '#fb923c' }}>気温</strong>と<strong style={{ color: '#38bdf8' }}>湿度</strong>だけを表示します。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     開いた直後は映像だけで、品目情報は出ません。
-                    <strong style={{ color: '#7dd3fc' }}>画面の上 2/3</strong> をタップすると水滴が落ちたような波紋が広がり、
-                    いま作業中の機種名とパレット・カートン・pcs が、画面中ほどの水面から
-                    まとめて白い文字で浮かび上がります。出入りの間は、水越しに見えるように文字が波打ちます
-                    （メニュー →「設定」→「水」でオフにできます）。
+                    <strong style={{ color: '#7dd3fc' }}>画面をタップ</strong>すると水滴が落ちたような波紋が広がり、
+                    いま作業中の機種名とパレット・カートン・pcs が、画面中ほどの水面からまとめて浮かび上がります。
+                    カートンと pcs は作業画面と同じように数字が動いて表示されます。
                     表示中にもう一度ほかの場所をタップすると、そのまま水面の下へ入って消えます（しばらく置いても自動で沈みます）。
-                  </div>
-                  <div style={{ marginBottom: 8 }}>
-                    残りが<strong style={{ color: '#22c55e' }}>端数ケースだけ</strong>になった品目では、
-                    機種名と数量の間に端数パレットの積み方が同じように水面から現れ、回り続けます。
-                    <strong style={{ color: '#7dd3fc' }}>横スワイプで手回し</strong>（手を離してしばらくすると自動回転に戻ります）、
-                    <strong style={{ color: '#7dd3fc' }}>上下スワイプで品目の切り替え</strong>ができます。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     浮かんでいる<strong style={{ color: '#7dd3fc' }}>機種名を上下にスワイプ</strong>すると品目を切り替えられます
@@ -359,9 +353,15 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     パレットを1枚減らし（残り0枚のときは品目が完了）、
                     <strong style={{ color: '#7dd3fc' }}>ダブルタップ</strong>で1枚戻せます（元の枚数が上限）。
                   </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#22c55e' }}>カートン数（CT）をタップ</strong>すると、端数パレットの積み方を
+                    作業画面と同じように全画面で表示します（回りながら広がり、7秒で戻ります）。
+                    残りが端数ケースだけになった品目では、切り替えたときに自動で表示されます。
+                    <strong style={{ color: '#7dd3fc' }}>横スワイプで手回し</strong>でき、図をタップするとすぐ戻ります。
+                  </div>
                   <div>
                     元の画面に戻るときは
-                    <strong style={{ color: '#7dd3fc' }}>画面の下 1/3</strong> をタップしてください。
+                    <strong style={{ color: '#7dd3fc' }}>画面を左右どちらかに大きくスワイプ</strong>してください。
                     操作の案内は開いた直後に画面下へ3秒ほど薄く出ます。
                   </div>
                 </div>
