@@ -326,13 +326,16 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     継ぎ目が分からないようにつないだループ映像で、水の音も一緒に流れ始めます。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    映像は<strong style={{ color: '#7dd3fc' }}>ステータスバーの領域まで全画面</strong>で流れ、
-                    上部には時刻だけを表示します。
+                    映像は<strong style={{ color: '#7dd3fc' }}>ステータスバーの領域まで全画面</strong>で流れます。
+                    上端は<strong style={{ color: '#7dd3fc' }}>左に現在時刻</strong>、
+                    <strong style={{ color: '#f5c451' }}>右に作業の経過時間</strong>だけを表示します。
                   </div>
                   <div style={{ marginBottom: 8 }}>
+                    開いた直後は映像だけで、品目情報は出ません。
                     <strong style={{ color: '#7dd3fc' }}>画面の上 2/3</strong> をタップすると水滴が落ちたような波紋が広がり、
-                    いま作業中の機種名とパレット・カートン・pcs が、白い文字で水面からしずくを垂らしながら現れます。
-                    表示中にもう一度ほかの場所をタップすると下に沈んで消えます（しばらく置いても自動で沈みます）。
+                    いま作業中の機種名とパレット・カートン・pcs が、画面中ほどの水面から
+                    まとめて浮かび上がって、しずくを垂らしながら白い文字で現れます。
+                    表示中にもう一度ほかの場所をタップすると水面の下へ沈んで消えます（しばらく置いても自動で沈みます）。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     浮かんでいる<strong style={{ color: '#7dd3fc' }}>機種名を上下にスワイプ</strong>すると品目を切り替えられます
@@ -346,6 +349,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   <div>
                     元の画面に戻るときは
                     <strong style={{ color: '#7dd3fc' }}>画面の下 1/3</strong> をタップしてください。
+                    操作の案内は開いた直後に画面下へ3秒ほど薄く出ます。
                   </div>
                 </div>
               </InfoCard>

@@ -17,6 +17,8 @@ interface RiverModeProps {
   onNextItem?: () => void;
   /** 機種名を下にスワイプ → 前の品目 */
   onPrevItem?: () => void;
+  /** 作業の経過時間（右上に黄色で出す） */
+  workElapsed?: string;
 }
 
 /** タップの波紋（水滴が落ちた水面） */
@@ -53,7 +55,7 @@ function nowHhMm(): string {
  * 上側のタップは水滴の波紋＋品目情報の出し入れ、下 1/3 をタップすると元の画面に戻る。
  */
 export default function RiverMode({
-  onClose, item, onDecreasePallet, onIncreasePallet, onNextItem, onPrevItem,
+  onClose, item, onDecreasePallet, onIncreasePallet, onNextItem, onPrevItem, workElapsed,
 }: RiverModeProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -84,7 +86,7 @@ export default function RiverMode({
 
   // ヒントは数秒で消す
   useEffect(() => {
-    const t = setTimeout(() => setHintVisible(false), 5200);
+    const t = setTimeout(() => setHintVisible(false), 3000);
     return () => clearTimeout(t);
   }, []);
 
@@ -331,11 +333,15 @@ export default function RiverMode({
       {/* タップの波紋 */}
       <canvas ref={canvasRef} className="river-canvas" />
 
-      {/* ステータスバーを隠せたときは、時刻だけを映像の上に置く */}
-      {ownClock && <div className="river-clock">{clock}</div>}
+      {/* 上端: 左に現在時刻（ステータスバーを隠せたときだけ）／右に作業の経過時間 */}
+      <div className="river-topbar">
+        <span className="river-clock">{ownClock ? clock : ''}</span>
+        {workElapsed && <span className="river-elapsed">{workElapsed}</span>}
+      </div>
 
-      {/* 川から浮かび上がる品目情報 */}
-      {item && (
+      {/* 川から浮かび上がる品目情報。一度もタップされていない間は描画しない
+          （沈むアニメーションが開いた直後に流れてしまうのを防ぐ） */}
+      {item && info.key > 0 && (
         <RiverInfo
           item={item}
           shown={info.shown}
@@ -349,7 +355,7 @@ export default function RiverMode({
 
       {/* 戻り方のヒント（数秒で消える） */}
       <div className={`river-hint${hintVisible ? '' : ' hide'}`}>
-        {item ? 'タップで品目情報 ／ 機種名を上下スワイプで切替 ／ 下 1/3 で戻ります' : '画面の下 1/3 をタップで戻ります'}
+        {item ? 'タップで品目情報／機種名を上下スワイプで切替／下 1/3 で戻る' : '画面の下 1/3 をタップで戻ります'}
       </div>
     </div>
   );
@@ -371,82 +377,79 @@ function RiverInfo({
   const model = item.representModel?.trim() || item.itemName;
 
   return (
-    <div className={`river-info${shown ? '' : ' hide'}`} key={animKey} aria-hidden={!shown}>
-      <div
-        className="river-info-line river-info-model"
-        onPointerDown={onModelDown}
-        onPointerUp={onModelUp}
-        onPointerCancel={onModelCancel}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <Emerge drips={5}>
-          <span className="river-text">{model}</span>
-        </Emerge>
-      </div>
-      <div className="river-info-line river-info-nums">
-        <button
-          type="button"
-          className="river-stat river-stat-tap"
-          onPointerDown={onPalletTap}
+    /*
+     * .river-info は画面いっぱいのマスク層。水面の高さでマスクが切れているので、
+     * 中身（.river-info-body）が下から上がってくると水面を境に現れる。
+     */
+    <div className={`river-stage${shown ? '' : ' hide'}`} key={animKey} aria-hidden={!shown}>
+      {/* 水面の光。マスクの外に置いて、水面の位置そのものを光らせる */}
+      <div className="river-surface" />
+      <div className="river-info">
+      <div className="river-info-body">
+        <div
+          className="river-info-line river-info-model"
+          onPointerDown={onModelDown}
+          onPointerUp={onModelUp}
+          onPointerCancel={onModelCancel}
           onClick={(e) => e.stopPropagation()}
-          title="タップでパレットを1枚減らす／ダブルタップで1枚戻す"
         >
-          <Emerge drips={4}>
+          <span className="river-text">{model}</span>
+          <Drips count={6} spread={0.9} />
+        </div>
+        <div className="river-info-line river-info-nums">
+          <button
+            type="button"
+            className="river-stat river-stat-tap"
+            onPointerDown={onPalletTap}
+            onClick={(e) => e.stopPropagation()}
+            title="タップでパレットを1枚減らす／ダブルタップで1枚戻す"
+          >
             <span className="river-text river-stat-num">{pallets}</span>
             <span className="river-text river-stat-label">PL</span>
-          </Emerge>
-        </button>
-        <span className="river-stat">
-          <Emerge drips={4}>
+          </button>
+          <span className="river-stat">
             <span className="river-text river-stat-num">{cartons}</span>
             <span className="river-text river-stat-label">CT</span>
-          </Emerge>
-        </span>
-        <span className="river-stat">
-          <Emerge drips={3}>
+          </span>
+          <span className="river-stat">
             <span className="river-text river-stat-num river-stat-num-sm">{pcs.toLocaleString()}</span>
             <span className="river-text river-stat-label">pcs</span>
-          </Emerge>
-        </span>
+          </span>
+          <Drips count={7} spread={0.94} />
+        </div>
+      </div>
       </div>
     </div>
   );
 }
 
 /**
- * 水面から出てくる文字のかたまり。
- * 中身（.river-wet）は水面で切り取られながら現れ、しずくはその外側に置いて切られないようにする。
- */
-function Emerge({ drips, children }: { drips: number; children: React.ReactNode }) {
-  return (
-    <span className="river-em">
-      <span className="river-wet">{children}</span>
-      <Drips count={drips} />
-    </span>
-  );
-}
-
-/**
  * 文字から垂れるしずく。
- * 位置と落ち始めをずらして、水から上がった直後に何滴か落ちるように見せる。
+ * 水面から出た直後に、あちこちから大きさと速さの違う滴が落ちる。
+ * 落ちきったところで水面に当たったしぶきも出す。
  */
-function Drips({ count }: { count: number }) {
+function Drips({ count, spread }: { count: number; spread: number }) {
   return (
     <span className="river-drips" aria-hidden>
-      {Array.from({ length: count }, (_, i) => (
-        <span
-          key={i}
-          className="river-drip"
-          style={{
-            left: `${((i + 1) / (count + 1)) * 100}%`,
-            animationDelay: `${0.75 + i * 0.19}s`,
-            // 滴ごとに落ちる速さと大きさを少し変える
-            animationDuration: `${1.05 + (i % 3) * 0.22}s`,
-            width: `${4 + (i % 3)}px`,
-            height: `${5 + (i % 3) * 2}px`,
-          }}
-        />
-      ))}
+      {Array.from({ length: count }, (_, i) => {
+        // 等間隔だと機械的に見えるので、位置を少しずつずらす
+        const base = (i + 0.5) / count;
+        const jitter = (((i * 37) % 11) / 11 - 0.5) * (0.9 / count);
+        const size = 5 + ((i * 5) % 4);
+        return (
+          <span
+            key={i}
+            className="river-drip"
+            style={{
+              left: `${(50 + (base + jitter - 0.5) * spread * 100).toFixed(2)}%`,
+              animationDelay: `${1.02 + ((i * 13) % 9) * 0.11}s`,
+              animationDuration: `${1.15 + (i % 4) * 0.18}s`,
+              width: `${size}px`,
+              height: `${size + 1}px`,
+            }}
+          />
+        );
+      })}
     </span>
   );
 }
