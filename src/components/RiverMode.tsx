@@ -6,7 +6,7 @@ import { displayQuantities } from '@/lib/itemQuantity';
 import { usePalletTap } from '@/hooks/usePalletTap';
 import { useCountUp } from '@/hooks/useCountUp';
 import PalletDiagram from './PalletDiagram';
-import { playSurfacing, playSubmerging } from '@/lib/waterSplash';
+import { playWaterPush, playSurfaceBreak, playSubmerging } from '@/lib/waterSplash';
 import { getWaterSoundEngine } from '@/lib/waterSound';
 
 interface RiverModeProps {
@@ -43,6 +43,10 @@ interface Surfacing {
   t: number;
   /** 出てくる(true) か 沈む(false) か */
   up: boolean;
+  /** 水面を破った（沈むときは呑まれた）か */
+  broke: boolean;
+  /** 破った時刻（t 基準） */
+  breakT: number;
   /** 飛び散ったしずく */
   drops: Drop[];
 }
@@ -57,8 +61,10 @@ interface Drop {
 
 /** 水面の高さ（画面に対する割合）。CSS の --river-waterline と合わせる */
 const WATERLINE_FALLBACK = 0.6;
-/** 出てくる水面表現の長さ(秒)。文字がせり上がる時間に合わせる */
+/** 水面が割れてからの表現の長さ(秒) */
 const SURFACE_LIFE = 1.7;
+/** 文字が水面へ来るのを待つ上限(秒)。何かの拍子に来なくても片付ける */
+const SURFACE_WAIT_MAX = 3;
 /** 水面を横から見ているので、輪は縦につぶれた楕円で描く */
 const SURFACE_FLATTEN = 0.26;
 
@@ -174,28 +180,17 @@ export default function RiverMode({
     return () => { clearTimeout(toClear); clearTimeout(toShown); };
   }, []);
 
-  /** 水面が割れる／呑まれる表現を始める */
+  /**
+   * 水面の表現を始める。
+   *
+   * 割れる瞬間は「文字が実際に水面の高さへ来たとき」に合わせたいので、
+   * ここでは始めるだけにして、割れる合図は描画側（文字の位置を毎回見ている）に任せる。
+   * こうしておけば、出てくる動きと水面の動きがずれない。
+   */
   const startSurfacing = useCallback((up: boolean) => {
-    const drops: Drop[] = [];
-    if (up) {
-      // 割れた水面から飛び散るしずく。中心ほど高く上がる
-      const n = 7;
-      for (let i = 0; i < n; i++) {
-        // 等間隔だと落ちた跡が並んでしまうので、位置も速さもばらつかせる
-        const spread = ((i + Math.random() * 0.8) / n) * 2 - 1; // -1..1
-        drops.push({
-          x: spread * (0.2 + Math.random() * 0.18),
-          y: 0,
-          vx: spread * (0.12 + Math.random() * 0.12),
-          vy: -(0.5 + Math.random() * 0.75) * (1 - Math.abs(spread) * 0.4),
-          dead: false,
-          r: 1.1 + Math.random() * 1.6,
-        });
-      }
-    }
-    surfaceRef.current = { t: 0, up, drops };
-    if (up) playSurfacing();
-    else playSubmerging();
+    surfaceRef.current = { t: 0, up, broke: false, breakT: 0, drops: [] };
+    // 出るときは、水を押しのける低い音から先に鳴らす
+    if (up) playWaterPush();
   }, []);
 
   /*
@@ -480,18 +475,76 @@ export default function RiverMode({
      *
      * 水面は横から見ているので、輪はどれも縦につぶした楕円で描く。
      */
+    /** いま画面に出ている品目情報のかたまり（水面を破る位置を見るのに使う） */
+    let bodyEl: HTMLElement | null = null;
+    const bodyTopPx = (): number | null => {
+      if (!bodyEl || !bodyEl.isConnected) bodyEl = document.querySelector('.river-info-body');
+      if (!bodyEl) return null;
+      return bodyEl.getBoundingClientRect().top;
+    };
+
+    /** しずくを飛ばす（水面が割れた瞬間に呼ぶ） */
+    const launchDrops = (s: Surfacing) => {
+      const n = 7;
+      for (let i = 0; i < n; i++) {
+        // 等間隔だと落ちた跡が並んでしまうので、位置も速さもばらつかせる
+        const spread = ((i + Math.random() * 0.8) / n) * 2 - 1; // -1..1
+        s.drops.push({
+          x: spread * (0.2 + Math.random() * 0.18),
+          y: 0,
+          vx: spread * (0.12 + Math.random() * 0.12),
+          vy: -(0.5 + Math.random() * 0.75) * (1 - Math.abs(spread) * 0.4),
+          dead: false,
+          r: 1.1 + Math.random() * 1.6,
+        });
+      }
+    };
+
+    /*
+     * 品目情報が水面から出てくるところ。
+     *
+     * 1. 文字が水面へ近づくにつれて、水面が下から押されて盛り上がる
+     * 2. 文字が水面の高さに達した瞬間に割れて、輪が横へ広がる（音もここで鳴らす）
+     * 3. 飛んだしずくが落ちて、当たった所に小さな輪が残る
+     *
+     * 割れる瞬間を文字の位置から決めているので、出てくる動きと必ず合う。
+     * 水面は横から見ているので、輪はどれも縦につぶした楕円で描く。
+     */
     const drawSurfacing = (dt: number, waterY: number) => {
       const s = surfaceRef.current;
       if (!s) return;
       s.t += dt;
-      if (s.t > SURFACE_LIFE) { surfaceRef.current = null; return; }
+      // 割れたあとは決まった時間で、割れる前は来なければ諦めて片付ける
+      if (s.broke ? s.t - s.breakT > SURFACE_LIFE : s.t > SURFACE_WAIT_MAX) {
+        surfaceRef.current = null;
+        return;
+      }
 
       const cx = W / 2;
-      const p = s.t / SURFACE_LIFE;
+      const top = bodyTopPx();
+
+      // 水面を破った（沈むときは呑まれた）瞬間をとらえる
+      if (!s.broke && top != null) {
+        const reached = s.up ? top <= waterY : top >= waterY;
+        if (reached) {
+          s.broke = true;
+          s.breakT = s.t;
+          if (s.up) { launchDrops(s); playSurfaceBreak(); }
+          else playSubmerging();
+        }
+      }
+
+      const since = s.t - s.breakT;
 
       if (s.up) {
-        // 1. 盛り上がり（押し上げられて、割れると同時にしぼむ）
-        const swell = s.t < 0.42 ? Math.sin((s.t / 0.42) * Math.PI) : 0;
+        // 1. 盛り上がり。文字が近いほど高く持ち上がり、割れた直後にしぼむ
+        let swell = 0;
+        if (!s.broke) {
+          const dist = top == null ? H : top - waterY;
+          swell = Math.max(0, Math.min(1, 1 - dist / (H * 0.16)));
+        } else if (since < 0.3) {
+          swell = 1 - since / 0.3;
+        }
         if (swell > 0.01) {
           const rx = W * 0.3 * (0.45 + swell * 0.55);
           const ry = rx * SURFACE_FLATTEN;
@@ -507,9 +560,11 @@ export default function RiverMode({
           ctx.fill();
         }
 
+        if (!s.broke) { ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; return; }
+
         // 2. 横へ広がる輪
         for (let k = 0; k < 3; k++) {
-          const t = s.t - (0.24 + k * 0.2);
+          const t = since - k * 0.2;
           if (t <= 0) continue;
           const q = Math.min(1, t / 1.1);
           const rx = W * (0.12 + 0.62 * (1 - Math.pow(1 - q, 2.3)));
@@ -551,16 +606,16 @@ export default function RiverMode({
           }
           const px = cx + d.x * W * 0.5;
           const py = waterY + d.y * H * 0.17;
-          ctx.globalAlpha = Math.min(1, 0.75 - p * 0.3);
+          ctx.globalAlpha = Math.max(0.15, 0.75 - since * 0.3);
           ctx.fillStyle = 'rgba(238,250,255,0.9)';
           ctx.beginPath();
           // 落ちる速さに合わせて縦に伸ばすと、しずくらしく見える
           ctx.ellipse(px, py, d.r, d.r * (1 + Math.min(1.6, Math.abs(d.vy) * 1.1)), 0, 0, Math.PI * 2);
           ctx.fill();
         }
-      } else {
+      } else if (s.broke) {
         // 沈むとき。水面がへこんで、内へ吸い込まれる輪ができる
-        const dip = s.t < 0.6 ? Math.sin((s.t / 0.6) * Math.PI) : 0;
+        const dip = since < 0.6 ? Math.sin((since / 0.6) * Math.PI) : 0;
         if (dip > 0.01) {
           const rx = W * 0.34;
           ctx.globalCompositeOperation = 'multiply';
@@ -574,7 +629,7 @@ export default function RiverMode({
           ctx.fill();
         }
         for (let k = 0; k < 2; k++) {
-          const t = s.t - k * 0.22;
+          const t = since - k * 0.22;
           if (t <= 0) continue;
           const q = Math.min(1, t / 0.95);
           const rx = W * (0.5 - 0.36 * q);   // 内側へ縮む

@@ -96,10 +96,10 @@ function droplet(ctx: AudioContext, out: GainNode, at: number, freq: number, pea
 }
 
 /**
- * 水面から出てくる音。
- * 水を押しのける低い音 → 水面が割れるしぶき → 落ちる水滴、の順に重ねる。
+ * 水を押しのける、こもった音。
+ * 文字が水面へ近づいている間に鳴らす（まだ割れていない）。
  */
-export function playSurfacing(): void {
+export function playWaterPush(): void {
   const vol = waterVolume();
   if (vol <= 0.001) return;
   const ctx = getCtx();
@@ -110,20 +110,37 @@ export function playSurfacing(): void {
   out.connect(ctx.destination);
 
   const t = ctx.currentTime + 0.02;
+  burst(ctx, out, t, { type: 'lowpass', freqFrom: 520, freqTo: 240, peak: 0.3, attack: 0.26, decay: 0.45 });
 
-  // 水を押しのける、こもった音
-  burst(ctx, out, t, { type: 'lowpass', freqFrom: 520, freqTo: 240, peak: 0.32, attack: 0.16, decay: 0.5 });
+  window.setTimeout(() => { try { out.disconnect(); } catch { /* ignore */ } }, 1100);
+}
+
+/**
+ * 水面が割れた瞬間の音。
+ * しぶき → 流れ落ちる水 → 落ちた水滴、の順に重ねる。
+ * 画面の割れる瞬間に合わせて呼ぶ。
+ */
+export function playSurfaceBreak(): void {
+  const vol = waterVolume();
+  if (vol <= 0.001) return;
+  const ctx = getCtx();
+  if (!ctx) return;
+
+  const out = ctx.createGain();
+  out.gain.value = vol;
+  out.connect(ctx.destination);
+
+  const t = ctx.currentTime + 0.02;
   // 水面が割れるしぶき
-  burst(ctx, out, t + 0.16, { type: 'bandpass', freqFrom: 1500, freqTo: 3200, q: 0.9, peak: 0.3, attack: 0.012, decay: 0.34 });
+  burst(ctx, out, t, { type: 'bandpass', freqFrom: 1500, freqTo: 3200, q: 0.9, peak: 0.32, attack: 0.012, decay: 0.34 });
   // 流れ落ちる水
-  burst(ctx, out, t + 0.3, { type: 'highpass', freqFrom: 900, freqTo: 2200, peak: 0.12, attack: 0.1, decay: 0.6 });
+  burst(ctx, out, t + 0.14, { type: 'highpass', freqFrom: 900, freqTo: 2200, peak: 0.12, attack: 0.1, decay: 0.6 });
   // 落ちた水滴
-  droplet(ctx, out, t + 0.42, 1250, 0.1);
-  droplet(ctx, out, t + 0.58, 980, 0.075);
-  droplet(ctx, out, t + 0.79, 1450, 0.055);
+  droplet(ctx, out, t + 0.28, 1250, 0.1);
+  droplet(ctx, out, t + 0.44, 980, 0.075);
+  droplet(ctx, out, t + 0.65, 1450, 0.055);
 
-  // 鳴り終わったら片付ける
-  window.setTimeout(() => { try { out.disconnect(); } catch { /* ignore */ } }, 1600);
+  window.setTimeout(() => { try { out.disconnect(); } catch { /* ignore */ } }, 1400);
 }
 
 /** 水面へ沈んでいく音。低くこもって、最後にひと呑みする */

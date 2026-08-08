@@ -1054,7 +1054,12 @@ body {
  * 水面の高さ。ここを境に、下は見えず・上は見える。
  * 品目情報はこの線の下から丸ごと上がってきて姿を現す。
  */
-:root { --river-waterline: 60%; }
+:root {
+  /* 水面の高さ。品目の数字のすぐ下に来るようにしてある（ここから出てくる） */
+  --river-waterline: 53%;
+  /* 水面が盛り上がってから割れるまで。文字が水面を破る瞬間と合わせる */
+  --river-break: 0.34s;
+}
 
 /* 表示のまとまり。この中に「水面マスク層」と「水面の光」を並べる */
 .river-stage {
@@ -1090,10 +1095,11 @@ body {
  */
 .river-info-body {
   --river-rise: 34vh;
-  position: absolute; left: 0; right: 0; top: 37%;
+  position: absolute; left: 0; right: 0; top: 32%;
   display: flex; flex-direction: column; align-items: center; gap: 20px;
   padding: 0 16px;
-  animation: river-rise 1.6s cubic-bezier(0.18, 0.86, 0.28, 1) both;
+  /* 先に水面が盛り上がる時間をとってから、割れると同時に出てくる */
+  animation: river-rise 1.6s cubic-bezier(0.18, 0.86, 0.28, 1) var(--river-break) both;
 }
 /* 一定時間たつと、また水面の下へ沈んでいく */
 .river-stage.hide .river-info-body { animation: river-fall 1.4s cubic-bezier(0.42, 0, 0.7, 0.9) both; }
@@ -1119,7 +1125,7 @@ body {
     rgba(255,255,255,0) 66%);
   mix-blend-mode: screen;
   opacity: 0;
-  animation: river-sheet 1.5s cubic-bezier(0.22, 0.7, 0.3, 1) both;
+  animation: river-sheet 1.5s cubic-bezier(0.22, 0.7, 0.3, 1) var(--river-break) both;
 }
 /* 沈むときは濡れの演出はいらない */
 .river-stage.hide .river-info-body::after { animation: none; opacity: 0; }
@@ -1142,6 +1148,12 @@ body {
   width: 132%; height: 240%;
   background: radial-gradient(ellipse at center,
     rgba(4,20,16,0.6) 0%, rgba(4,20,16,0.34) 44%, rgba(4,20,16,0) 74%);
+  /*
+   * 下端は水面のマスクで切られるため、そのままだと切り口が
+   * 「白っぽい円盤」の縁として見えてしまう。先にぼかして消しておく。
+   */
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 38%, rgba(0,0,0,0) 72%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 38%, rgba(0,0,0,0) 72%);
   pointer-events: none;
 }
 
