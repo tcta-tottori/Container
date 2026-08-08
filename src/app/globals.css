@@ -1014,11 +1014,11 @@ body {
   pointer-events: none; overflow: hidden;
 }
 /* 元の画面に煙が立ち込めて覆いつくすまで（長さは煙の動画に合わせて指定される） */
-.river-mist.fog-in { animation: river-mist-gather 1.6s linear both; }
+.river-mist.fog-in { animation: river-mist-gather 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.98) both; }
 /* 覆いつくした所から晴れて川が見えてくるまで */
-.river-mist.clearing { animation: river-mist-clear 1.2s linear both; }
+.river-mist.clearing { animation: river-mist-clear 1.2s cubic-bezier(0.2, 0.5, 0.3, 1) both; }
 /* 戻るとき。川が煙で覆われるまで */
-.river-mist.fog-out { animation: river-mist-gather 1.6s linear both; }
+.river-mist.fog-out { animation: river-mist-gather 1.6s cubic-bezier(0.45, 0.05, 0.55, 0.98) both; }
 
 /* 覆いきるための白い下地。ぼかしてむらを作る */
 .river-mist::before,
@@ -1067,7 +1067,7 @@ body {
 .river-tail-mist {
   position: fixed; inset: 0; z-index: 305;
   pointer-events: none; overflow: hidden;
-  animation: river-mist-clear 1.2s linear both;
+  animation: river-mist-clear 1.2s cubic-bezier(0.2, 0.5, 0.3, 1) both;
 }
 
 /* ===== せせらぎモード: 水面から現れる品目情報 ===== */
@@ -1079,7 +1079,7 @@ body {
   /* 水面の高さ。品目の数字のすぐ下に来るようにしてある（ここから出てくる） */
   --river-waterline: 53%;
   /* 水面が盛り上がってから割れるまで。文字が水面を破る瞬間と合わせる */
-  --river-break: 0.34s;
+  --river-break: 1.2s;
 }
 
 /* 表示のまとまり。この中に「水面マスク層」と「水面の光」を並べる */

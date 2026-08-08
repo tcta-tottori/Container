@@ -6,7 +6,6 @@ import { displayQuantities } from '@/lib/itemQuantity';
 import { usePalletTap } from '@/hooks/usePalletTap';
 import { useCountUp } from '@/hooks/useCountUp';
 import PalletDiagram from './PalletDiagram';
-import { playWaterPush, playSurfaceBreak, playSubmerging } from '@/lib/waterSplash';
 import { getWaterSoundEngine } from '@/lib/waterSound';
 import MistVideo from './MistVideo';
 import { MIST_FROM, MIST_PEAK, MIST_IN_MS, MIST_CLEAR_MS } from '@/lib/mistVideo';
@@ -76,6 +75,30 @@ const BASE = process.env.NODE_ENV === 'production' ? '/Container' : '';
  * せせらぎモードの音は、この動画に入っている川の音を使う。
  */
 const VIDEO_MP4 = `${BASE}/videos/river-loop.mp4`;
+
+/*
+ * 動画の使い分け。
+ *
+ * 元の映像は10秒で、後半に「水面から水柱が上がって落ちる」場面が入っている。
+ * そのまま流すと何もしていなくても10秒ごとに水柱が上がってしまうので、
+ * ふだんは静かな前半だけを繰り返し、文字を出すときだけ水柱の場面を流す。
+ *
+ * 実測した中身:
+ *   0.0〜7.4秒  静かな流れ（水柱なし・音も穏やか）
+ *   7.8〜8.8秒  水柱が立ち上がる
+ *   9.0秒       落ちて着水する音がいちばん大きい
+ *   9.9秒       おさまる
+ */
+const CLIPS = {
+  /** 何もしていないとき。静かな流れだけを繰り返す */
+  idle: { from: 0, to: 7.4 },
+  /** 文字を出すとき。水面が動き出して水柱が上がる */
+  emerge: { from: 7.55, to: 9.95 },
+  /** 文字が戻るとき。落ちて着水するところ */
+  land: { from: 8.75, to: 9.95 },
+} as const;
+
+type ClipName = keyof typeof CLIPS;
 
 /** 浮かび上がった品目情報が沈むまでの時間 */
 const INFO_MS = 9000;
@@ -160,6 +183,38 @@ export default function RiverMode({
   const [ownClock, setOwnClock] = useState(false);
   const [clock, setClock] = useState('');
 
+  /** いま流している区間。何もしていないときは静かな前半を繰り返す */
+  const clipRef = useRef<ClipName>('idle');
+
+  /** 区間を切り替えて、その頭から流す */
+  const playClip = useCallback((name: ClipName) => {
+    clipRef.current = name;
+    const v = videoRef.current;
+    if (!v) return;
+    try { v.currentTime = CLIPS[name].from; } catch { /* まだ動かせないときは次の機会に */ }
+    void v.play().catch(() => { /* 流せなくても表示は続ける */ });
+  }, []);
+
+  /*
+   * 区間の終わりまで来たら、静かな前半へ戻す。
+   * 動画の loop 任せだと後半の水柱まで流れてしまうので、毎フレーム見て折り返す。
+   */
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    let raf = 0;
+    const tick = () => {
+      const c = CLIPS[clipRef.current];
+      if (v.currentTime >= c.to) {
+        clipRef.current = 'idle';
+        try { v.currentTime = CLIPS.idle.from; } catch { /* ignore */ }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   /** 靄をかけてから元の画面へ戻る */
   const closeWithMist = useCallback(() => {
     if (closingRef.current) return;
@@ -188,9 +243,9 @@ export default function RiverMode({
    */
   const startSurfacing = useCallback((up: boolean) => {
     surfaceRef.current = { t: 0, up, broke: false, breakT: 0, drops: [] };
-    // 出るときは、水を押しのける低い音から先に鳴らす
-    if (up) playWaterPush();
-  }, []);
+    // 映像も、水柱が上がる場面／着水する場面へ切り替える（音もそこに入っている）
+    playClip(up ? 'emerge' : 'land');
+  }, [playClip]);
 
   /*
    * 出す・沈めるは、水面表現と音を1回だけ鳴らしたいので
@@ -528,8 +583,7 @@ export default function RiverMode({
         if (reached) {
           s.broke = true;
           s.breakT = s.t;
-          if (s.up) { launchDrops(s); playSurfaceBreak(); }
-          else playSubmerging();
+          if (s.up) launchDrops(s);
         }
       }
 
