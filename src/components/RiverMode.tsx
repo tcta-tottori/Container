@@ -416,8 +416,6 @@ function RiverInfo({
      * 中身（.river-info-body）が下から上がってくると水面を境に現れる。
      */
     <div className={`river-stage${shown ? '' : ' hide'}`} key={animKey} aria-hidden={!shown}>
-      {/* 水面の光。マスクの外に置いて、水面の位置そのものを光らせる */}
-      <div className="river-surface" />
       <div className="river-info">
       <div className={`river-info-body${fractionOnly ? ' with-fraction' : ''}`}>
         <div
@@ -428,8 +426,6 @@ function RiverInfo({
           onClick={(e) => e.stopPropagation()}
         >
           <span className="river-text">{model}</span>
-          <Drips count={6} spread={0.9} />
-          <span className="river-sheet" />
         </div>
         {fractionOnly && <FractionPallet item={item} cartons={cartons} onSwipeY={onFractionSwipeY} />}
         <div className="river-info-line river-info-nums">
@@ -451,8 +447,6 @@ function RiverInfo({
             <span className="river-text river-stat-num river-stat-num-sm">{pcs.toLocaleString()}</span>
             <span className="river-text river-stat-label">pcs</span>
           </span>
-          <Drips count={7} spread={0.94} />
-          <span className="river-sheet" />
         </div>
       </div>
       </div>
@@ -552,40 +546,6 @@ function FractionPallet({
           noIntro
         />
       </div>
-      <Drips count={6} spread={0.8} />
-      <span className="river-sheet" />
     </div>
-  );
-}
-
-/**
- * 文字から垂れるしずく。
- * 水面から出た直後がいちばん多く、時間がたつほど数も粒も小さくなって水が引いていく。
- */
-function Drips({ count, spread }: { count: number; spread: number }) {
-  return (
-    <span className="river-drips" aria-hidden>
-      {Array.from({ length: count }, (_, i) => {
-        // 等間隔だと機械的に見えるので、位置を少しずつずらす
-        const base = (i + 0.5) / count;
-        const jitter = (((i * 37) % 11) / 11 - 0.5) * (0.9 / count);
-        // 後から落ちる滴ほど小さくして、水が引いていくように見せる
-        const t = i / Math.max(1, count - 1);
-        const size = Math.round(8 - t * 3.4);
-        return (
-          <span
-            key={i}
-            className="river-drip"
-            style={{
-              left: `${(50 + (base + jitter - 0.5) * spread * 100).toFixed(2)}%`,
-              animationDelay: `${(0.42 + t * 1.9 + ((i * 13) % 7) * 0.06).toFixed(2)}s`,
-              animationDuration: `${(0.95 + (i % 4) * 0.16).toFixed(2)}s`,
-              width: `${size}px`,
-              height: `${size + 1}px`,
-            }}
-          />
-        );
-      })}
-    </span>
   );
 }
