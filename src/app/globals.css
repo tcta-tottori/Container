@@ -100,8 +100,8 @@ body {
   overflow: hidden;
   transition: background 0.3s ease;
 }
-/* ヘッダーの縦スワイプは再読み込みに使うので、ブラウザのジェスチャーに渡さない */
-.app-header { touch-action: pan-x; }
+/* ヘッダーのスワイプは縦=再読み込み・横=せせらぎモードに使うので、ブラウザに渡さない */
+.app-header { touch-action: none; }
 .header-left { display: flex; align-items: center; gap: 6px; min-width: 0; }
 
 /* ===== ヘッダーを下にスワイプして再読み込み ===== */

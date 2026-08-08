@@ -1325,6 +1325,7 @@ export default function Home() {
           weather={barWeather}
           switchbot={switchbot}
           hasLoadedData={hasData}
+          onSwipeToRiver={view === 'work' ? openRiver : undefined}
           onOpenClimate={() => {
             if (switchbot) setSbPopupOpen(true);
             else if (barWeather) setWeatherPopup(barWeather);
