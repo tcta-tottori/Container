@@ -102,6 +102,11 @@ export function ThermometerIcon(p: IconProps) {
   return <Svg {...p}><path d="M14 14.8V4.5a2 2 0 1 0-4 0v10.3a4 4 0 1 0 4 0z" /></Svg>;
 }
 
+/** せせらぎモード（流れ） */
+export function RiverIcon(p: IconProps) {
+  return <Svg {...p}><path d="M3 7.5c2.4-2 4.6-2 7 0s4.6 2 7 0 2.6-1.4 4-.4" /><path d="M3 13c2.4-2 4.6-2 7 0s4.6 2 7 0 2.6-1.4 4-.4" /><path d="M3 18.5c2.4-2 4.6-2 7 0s4.6 2 7 0 2.6-1.4 4-.4" /></Svg>;
+}
+
 /** 湿度（しずく + 目盛り） */
 export function HumidityIcon(p: IconProps) {
   return <Svg {...p}><path d="M12 3.5 7.4 9.2a5.9 5.9 0 1 0 9.2 0L12 3.5z" /></Svg>;

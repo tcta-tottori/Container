@@ -791,3 +791,108 @@ body {
 .stat-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 8px 12px; box-shadow: var(--shadow-sm); }
 .stat-label { font-size: 10px; font-weight: 500; letter-spacing: 0.8px; text-transform: uppercase; opacity: 0.5; margin-bottom: 2px; }
 .stat-value { font-family: var(--font-mono); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+
+/* ===== せせらぎモード（川の映像 + 情報が紛れ込む） ===== */
+.river-root {
+  position: fixed; inset: 0; z-index: 300;
+  overflow: hidden; background: #05131a;
+  animation: river-in 0.6s ease both;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+@keyframes river-in { from { opacity: 0; } to { opacity: 1; } }
+.river-layer {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+  user-select: none; -webkit-user-drag: none; pointer-events: none;
+}
+/* 木立（上部）: 風でゆっくり揺れる */
+.river-canopy {
+  transform-origin: 50% 100%;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 24%, rgba(0,0,0,0) 44%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 24%, rgba(0,0,0,0) 44%);
+  animation: river-sway 11s ease-in-out infinite alternate;
+}
+@keyframes river-sway {
+  0%   { transform: rotate(-0.35deg) translateX(-4px) scale(1.012); }
+  50%  { transform: rotate(0.12deg)  translateX(2px)  scale(1.014); }
+  100% { transform: rotate(0.4deg)   translateX(5px)  scale(1.012); }
+}
+/* 川面: 水面マスクで切り出した写真を下流へ流し、2枚を半周ずらして交互にフェード */
+.river-water {
+  -webkit-mask-size: cover; mask-size: cover;
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  transform-origin: 50% 35%;
+  opacity: 0;
+  animation: river-flow 6.4s linear infinite;
+  will-change: transform, opacity;
+}
+.river-water-b { animation-delay: -3.2s; }
+@keyframes river-flow {
+  0%   { transform: translate3d(0, -8px, 0) scale(1.005); opacity: 0; }
+  22%  { opacity: 0.9; }
+  78%  { opacity: 0.9; }
+  100% { transform: translate3d(0, 20px, 0) scale(1.03); opacity: 0; }
+}
+/* 流れ・情報テキストは水面マスクの内側だけに描く */
+.river-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+  -webkit-mask-size: cover; mask-size: cover;
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+}
+/* 情報テキストは水面マスクを掛けずに全面へ（読み取れる濃さは描画側で調整） */
+.river-text-canvas {
+  -webkit-mask-image: none !important; mask-image: none !important;
+}
+/* 上流に漂うもや */
+.river-mist {
+  position: absolute; left: -20%; right: -20%; top: 6%; height: 46%;
+  pointer-events: none;
+  background:
+    radial-gradient(55% 60% at 35% 55%, rgba(226,244,255,0.18), rgba(226,244,255,0) 70%),
+    radial-gradient(45% 50% at 68% 40%, rgba(214,240,255,0.14), rgba(214,240,255,0) 70%);
+  filter: blur(6px);
+  animation: river-mist-drift 26s ease-in-out infinite alternate;
+}
+@keyframes river-mist-drift {
+  0%   { transform: translate3d(-3%, 0, 0) scale(1); opacity: 0.75; }
+  50%  { transform: translate3d(2%, -1.5%, 0) scale(1.06); opacity: 1; }
+  100% { transform: translate3d(6%, 1%, 0) scale(1.02); opacity: 0.8; }
+}
+
+/* 戻るボタン（✦） */
+.river-exit {
+  position: absolute; right: 18px; bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+  width: 68px; height: 68px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(6, 28, 36, 0.28);
+  border: 1px solid rgba(255,255,255,0.22);
+  color: rgba(255,255,255,0.9); cursor: pointer;
+  backdrop-filter: blur(2px);
+  animation: river-sparkle 3.4s ease-in-out infinite;
+  -webkit-tap-highlight-color: transparent;
+}
+.river-exit:active { transform: scale(0.94); }
+@keyframes river-sparkle {
+  0%, 100% { opacity: 0.5; box-shadow: 0 0 0 rgba(255,255,255,0); }
+  50% { opacity: 1; box-shadow: 0 0 22px rgba(214,246,255,0.45); }
+}
+.river-hint {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+  text-align: center; font-size: 13px; font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+.river-hint.hide { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .river-canopy, .river-water, .river-mist { animation: none; }
+  .river-water { opacity: 0; }
+}

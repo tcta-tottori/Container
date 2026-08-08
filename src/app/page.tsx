@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parseExcelFile } from '@/lib/excelParser';
 import { parsePhotoFile } from '@/lib/photoParser';
 import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExcel, parseMasterExcel, fetchJkpFromGitHub } from '@/lib/masterLoader';
@@ -30,6 +30,7 @@ import { getWaterSoundEngine, setupWaterAutoResume } from '@/lib/waterSound';
 import { useWaterSound } from '@/hooks/useWaterSound';
 import WeatherPopup from '@/components/WeatherPopup';
 import QuickActions from '@/components/QuickActions';
+import RiverMode from '@/components/RiverMode';
 import SwitchBotPopup from '@/components/SwitchBotPopup';
 import { SwitchBotReading, SwitchBotHistoryPoint, SwitchBotStatus, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
@@ -199,6 +200,9 @@ export default function Home() {
   // 設定ページ（コール・水の音・AI写真を集約）。null のときは閉じている
   const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // せせらぎモード（川の映像）
+  const [riverOpen, setRiverOpen] = useState(false);
+  const riverStartedWaterRef = useRef(false);
   const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
   const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
@@ -791,6 +795,22 @@ export default function Home() {
     [loadData, loadMaster, closeLoading]
   );
 
+  /** せせらぎモードの映像に紛れ込ませる情報（機種名・カートン数など） */
+  const riverWords = useMemo(() => {
+    const out: string[] = [];
+    const container = state.containers[state.selectedContainerIdx];
+    if (container) out.push(container.containerNo);
+    for (const it of state.items) {
+      if (it.representModel) out.push(it.representModel);
+      if (it.itemName) out.push(it.itemName);
+      if (it.partNumber) out.push(it.partNumber);
+      if (it.caseCount > 0) out.push(`${it.caseCount} CT`);
+      if (it.palletCount > 0) out.push(`${it.palletCount} PL`);
+      if (it.totalQty > 0) out.push(`${it.totalQty} pcs`);
+    }
+    return Array.from(new Set(out)).filter((w) => w.length <= 24);
+  }, [state.items, state.containers, state.selectedContainerIdx]);
+
   /** 履歴（最近のファイル）から選ばれたファイルを種類ごとに読み込む */
   const handleRecentFileSelected = useCallback(
     (file: File, fileType: FileType) => {
@@ -1083,6 +1103,21 @@ export default function Home() {
   // 作業用BGM（水の流れる音）
   const { playing: waterPlaying, toggle: toggleWater } = useWaterSound();
 
+  /** せせらぎモードを開く（水の音が止まっていれば一緒に流す） */
+  const openRiver = useCallback(() => {
+    if (!waterPlaying) { riverStartedWaterRef.current = true; toggleWater(); }
+    else riverStartedWaterRef.current = false;
+    setRiverOpen(true);
+  }, [waterPlaying, toggleWater]);
+
+  /** せせらぎモードを閉じる（こちらで流し始めた水の音は止める） */
+  const closeRiver = useCallback(() => {
+    setRiverOpen(false);
+    if (riverStartedWaterRef.current && waterPlaying) toggleWater();
+    riverStartedWaterRef.current = false;
+  }, [waterPlaying, toggleWater]);
+
+
   // 前回の再生状態を自動再開（ブラウザ制限のため最初の操作を待って再生）
   useEffect(() => setupWaterAutoResume(), []);
 
@@ -1218,6 +1253,7 @@ export default function Home() {
         />
       )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
+      {riverOpen && <RiverMode words={riverWords} onClose={closeRiver} />}
 
       {/* メニューオーバーレイ */}
       {menuOpen && (
@@ -1313,7 +1349,8 @@ export default function Home() {
           sbError={sbError}
           onToggleSwitchBot={toggleSwitchBot}
           onOpenSwitchBot={() => setSbPopupOpen(true)}
-          hidden={menuOpen || manualOpen || settingsTab !== null || historyOpen}
+          onOpenRiver={openRiver}
+          hidden={menuOpen || manualOpen || settingsTab !== null || historyOpen || riverOpen}
         />
 
         {/* メインエリア */}

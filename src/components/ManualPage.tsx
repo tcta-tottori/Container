@@ -235,7 +235,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   </div>
                   <div>
                     <strong style={{ color: '#60a5fa' }}>右下のボタン</strong>（四角の中の山マーク）を押すと下からメニューが開き、
-                    コンテナの選択・応援コール・天気コール・水の音・SwitchBot 接続をまとめて操作できます。
+                    コンテナの選択・応援コール・天気コール・水の音・せせらぎモード・SwitchBot 接続をまとめて操作できます。
                     開いている間はマークが下向きになります。
                   </div>
                 </div>
@@ -290,6 +290,22 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   </div>
                   <div>
                     <strong style={{ color: '#a78bfa' }}>声・トーンの設定</strong>: メニュー →「設定」→「音声」で、使う音声API・話す人・トーン・速さ・音量を変更できます（通常コールと応援コールで別々に設定）。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
+            <Section title="せせらぎモード" color="#38bdf8">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    右下のメニュー →<strong style={{ color: '#7dd3fc' }}>「せせらぎモード」</strong>で、川の映像を全画面表示します。
+                    川が流れ、木立が風で揺れ、水面には作業中の<strong style={{ color: '#fff' }}>機種名・品番・カートン数(CT)・パレット数(PL)</strong>などが
+                    ゆっくり流れて現れます。水の音も一緒に流れ始めます。
+                  </div>
+                  <div>
+                    画面をタップすると波紋が広がります。元の画面に戻るときは
+                    <strong style={{ color: '#7dd3fc' }}>右下の ✦</strong> をタップしてください。
                   </div>
                 </div>
               </InfoCard>
