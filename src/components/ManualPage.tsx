@@ -300,8 +300,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
                     右下のメニュー →<strong style={{ color: '#7dd3fc' }}>「せせらぎモード」</strong>で、川の映像を全画面表示します。
-                    川が流れ、枝葉が風で揺れ、靄が漂います（地面・石・木の根元は止まったままです）。
-                    水の音も一緒に流れ始めます。
+                    継ぎ目が分からないようにつないだループ映像で、水の音も一緒に流れ始めます。
                   </div>
                   <div>
                     画面の上側をタップすると波紋が広がります。元の画面に戻るときは
