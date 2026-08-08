@@ -248,7 +248,8 @@ export default function Home() {
   const [riverOpen, setRiverOpen] = useState(false);
   /** せせらぎモードから戻ったあと、元の画面の上で晴れていく靄 */
   const [riverTail, setRiverTail] = useState(false);
-  const riverStartedWaterRef = useRef(false);
+  /** せせらぎモードに入るとき、こちらで水の音BGMを止めたか（戻すときの目印） */
+  const riverPausedWaterRef = useRef(false);
   const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
   const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
@@ -1161,22 +1162,26 @@ export default function Home() {
   // 作業用BGM（水の流れる音）
   const { playing: waterPlaying, toggle: toggleWater } = useWaterSound();
 
-  /** せせらぎモードを開く（水の音が止まっていれば一緒に流す） */
+  /**
+   * せせらぎモードを開く。
+   * 中では動画に入っている川の音を使うので、流れている水の音BGMはいったん止める
+   * （二重に川の音が鳴らないように）。戻ったら元に戻す。
+   */
   const openRiver = useCallback(() => {
-    if (!waterPlaying) { riverStartedWaterRef.current = true; toggleWater(); }
-    else riverStartedWaterRef.current = false;
+    if (waterPlaying) { riverPausedWaterRef.current = true; toggleWater(); }
+    else riverPausedWaterRef.current = false;
     setRiverOpen(true);
   }, [waterPlaying, toggleWater]);
 
   /**
-   * せせらぎモードを閉じる（こちらで流し始めた水の音は止める）。
+   * せせらぎモードを閉じる（入るときに止めた水の音BGMは元に戻す）。
    * 閉じた時点では画面が靄で真っ白なので、その靄を引き継いで晴れさせる。
    */
   const closeRiver = useCallback(() => {
     setRiverOpen(false);
     setRiverTail(true);
-    if (riverStartedWaterRef.current && waterPlaying) toggleWater();
-    riverStartedWaterRef.current = false;
+    if (riverPausedWaterRef.current && !waterPlaying) toggleWater();
+    riverPausedWaterRef.current = false;
   }, [waterPlaying, toggleWater]);
 
   // 残した靄は晴れきったら片付ける

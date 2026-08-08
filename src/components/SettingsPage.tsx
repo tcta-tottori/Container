@@ -4,14 +4,15 @@ import { useState } from 'react';
 import CallPhraseSettings from '@/components/CallPhraseSettings';
 import WaterSoundPanel from '@/components/WaterSoundPanel';
 import VoiceSettingsPanel from '@/components/VoiceSettingsPanel';
-import { ChatIcon, DropletIcon, CameraIcon, SettingsIcon, CloseIcon, SpeakerIcon } from '@/components/AppIcons';
+import { ChatIcon, DropletIcon, CameraIcon, SettingsIcon, CloseIcon, SpeakerIcon, RotateIcon } from '@/components/AppIcons';
+import ScreenSettings from '@/components/ScreenSettings';
 import {
   getGeminiKey, setGeminiKey, clearGeminiKey,
   getGeminiModel, setGeminiModel, GEMINI_MODELS, verifyGeminiKey,
 } from '@/lib/geminiApi';
 
 /** 'call' は旧タブ名。音声タブに統合したので voice と同じ画面を開く */
-export type SettingsTab = 'voice' | 'call' | 'water' | 'ai';
+export type SettingsTab = 'voice' | 'call' | 'water' | 'screen' | 'ai';
 
 interface SettingsPageProps {
   onClose: () => void;
@@ -186,6 +187,7 @@ function AiPhotoSettings() {
 const TABS: { id: SettingsTab; label: string; Icon: typeof ChatIcon }[] = [
   { id: 'voice', label: '音声・コール', Icon: SpeakerIcon },
   { id: 'water', label: '水の音', Icon: DropletIcon },
+  { id: 'screen', label: '画面', Icon: RotateIcon },
   { id: 'ai', label: 'AI写真', Icon: CameraIcon },
 ];
 
@@ -282,6 +284,7 @@ export default function SettingsPage({ onClose, initialTab = 'voice', onTestCall
             </>
           )}
           {tab === 'water' && <WaterSoundPanel />}
+          {tab === 'screen' && <ScreenSettings />}
           {tab === 'ai' && <AiPhotoSettings />}
         </div>
       </div>

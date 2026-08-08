@@ -1,23 +1,29 @@
 'use client';
 
-import { useEffect } from 'react';
-
-/** 画面の向きを固定できる端末では縦にロックする（対応していなければ何もしない） */
-type LockableOrientation = ScreenOrientation & { lock?: (o: string) => Promise<void> };
+import { useEffect, useState } from 'react';
+import {
+  OrientationMode, applyOrientationMode, getOrientationMode, subscribeOrientationMode,
+} from '@/lib/screenOrientation';
 
 /**
- * スマホの横画面表示をやめるためのガード。
+ * 画面の向きのガード。
  *
- * - インストール済み PWA では manifest の `orientation: portrait` が効く。
- * - ブラウザ表示では向きを固定できないので、スマホサイズの横画面のときだけ
- *   「縦にしてください」の案内を全画面でかぶせる（タブレット・PC の横画面は今までどおり）。
+ * 「端末にしたがう」ときは何もしない（自動回転の設定どおりに回る）。
+ * 「縦向きで固定」のときだけ、向きを固定したうえで、
+ * 固定できない環境ではスマホの横画面に「縦にしてください」の案内をかぶせる。
  */
 export default function OrientationGuard() {
+  // SSR と初期描画をそろえるため、設定の読み出しはマウント後に行う
+  const [mode, setMode] = useState<OrientationMode>('device');
+
   useEffect(() => {
-    const so = window.screen?.orientation as LockableOrientation | undefined;
-    // 全画面（PWA）でないと失敗するが、失敗しても案内表示があるので無視してよい
-    void so?.lock?.('portrait').catch(() => { /* 非対応 */ });
+    const current = getOrientationMode();
+    setMode(current);
+    applyOrientationMode(current);
+    return subscribeOrientationMode(setMode);
   }, []);
+
+  if (mode !== 'portrait') return null;
 
   return (
     <div className="rotate-guard" role="alert">
@@ -30,7 +36,7 @@ export default function OrientationGuard() {
         <polyline points="5.9 4.1 8.8 4.5 8.4 7.4" />
       </svg>
       <div className="rotate-guard-title">画面を縦にしてください</div>
-      <div className="rotate-guard-sub">このアプリは縦画面で使います</div>
+      <div className="rotate-guard-sub">設定で「端末にしたがう」に変えられます</div>
     </div>
   );
 }

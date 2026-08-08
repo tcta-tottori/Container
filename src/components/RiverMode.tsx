@@ -7,6 +7,7 @@ import { usePalletTap } from '@/hooks/usePalletTap';
 import { useCountUp } from '@/hooks/useCountUp';
 import PalletDiagram from './PalletDiagram';
 import { playSurfacing, playSubmerging } from '@/lib/waterSplash';
+import { getWaterSoundEngine } from '@/lib/waterSound';
 
 interface RiverModeProps {
   onClose: () => void;
@@ -63,9 +64,8 @@ const SURFACE_FLATTEN = 0.26;
 
 const BASE = process.env.NODE_ENV === 'production' ? '/Container' : '';
 /**
- * 川のループ動画（約10秒・H.264）。
- * 何かが水面から出てくる場面が入っていて、品目情報の出し方と合わせている。
- * 音は自前の水音（waterSplash）と BGM で作るので、動画側は鳴らさない。
+ * 川のループ動画（約10秒・H.264・音声つき）。
+ * せせらぎモードの音は、この動画に入っている川の音を使う。
  */
 const VIDEO_MP4 = `${BASE}/videos/river-loop.mp4`;
 
@@ -306,15 +306,51 @@ export default function RiverMode({
     return () => clearInterval(t);
   }, [ownClock]);
 
-  // 自動再生がブロックされた場合と、バックグラウンド復帰時の再生再開
+  /*
+   * 再生と音。
+   *
+   * 自動再生は「音が出ない」ことが条件なので、まず消音のまま流し始めて、
+   * 流れ出してから音を出す（せせらぎモードはタップで開くので、この形なら通る）。
+   * 音の大きさは「水の音」設定に合わせるので、絞っていれば小さく、0 なら鳴らない。
+   */
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const play = () => { void v.play().catch(() => { /* 再生できなくてもポスター画像を表示 */ }); };
+
+    const applyVolume = () => {
+      let vol = 0.4;
+      try { vol = getWaterSoundEngine().getVolume(); } catch { /* 既定のまま */ }
+      v.volume = Math.max(0, Math.min(1, vol));
+      v.muted = vol <= 0.001;
+    };
+
+    const play = () => {
+      v.muted = true;
+      void v.play()
+        .then(() => {
+          applyVolume();
+          /*
+           * 音を出した拍子に止められる端末があるため、その場合は
+           * 消音に戻してでも映像だけは流し続ける（真っ暗になるのを防ぐ）。
+           */
+          window.setTimeout(() => {
+            if (v.paused) { v.muted = true; void v.play().catch(() => { /* ignore */ }); }
+          }, 300);
+        })
+        .catch(() => { /* 再生できなくても表示は続ける */ });
+    };
     play();
+
+    // 「水の音」の音量を動かしたら、こちらにも効かせる
+    let unsubscribe: (() => void) | null = null;
+    try { unsubscribe = getWaterSoundEngine().subscribe(applyVolume); } catch { /* ignore */ }
+
     const onVis = () => { if (!document.hidden) play(); };
     document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      unsubscribe?.();
+    };
   }, []);
 
   /* ===== 数量。端数だけになったら作業画面と同じように積み方を全画面で出す ===== */
@@ -653,7 +689,6 @@ export default function RiverMode({
         className="river-video"
         autoPlay
         loop
-        muted
         playsInline
         preload="auto"
         disablePictureInPicture
