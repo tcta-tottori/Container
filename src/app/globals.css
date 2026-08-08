@@ -954,6 +954,12 @@ body {
  */
 :root { --river-waterline: 60%; }
 
+/* SVG フィルタの定義置き場。描画はしないので場所を取らない */
+.river-fx-defs {
+  position: absolute; width: 0; height: 0;
+  overflow: hidden; pointer-events: none;
+}
+
 /* 表示のまとまり。この中に「水面マスク層」と「水面の光」を並べる */
 .river-stage {
   position: absolute; inset: 0;
