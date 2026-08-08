@@ -936,13 +936,13 @@ body {
   color: #f5c451;
   text-shadow: 0 1px 6px rgba(0,0,0,0.8);
 }
-/* 経過時間の下に気温と湿度 */
+/* 経過時間の下に気温と湿度。1行に並べず、改行して左揃えにする */
 .river-climate {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
   font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em;
   text-shadow: 0 1px 6px rgba(0,0,0,0.85);
 }
-.river-climate-item { display: inline-flex; align-items: center; gap: 3px; }
+.river-climate-item { display: inline-flex; align-items: center; gap: 4px; }
 .river-climate-temp { color: #fb923c; }
 .river-climate-hum { color: #38bdf8; }
 .river-climate-unit { font-size: 10px; opacity: 0.85; }
@@ -1018,32 +1018,6 @@ body {
   pointer-events: none;
 }
 
-/* 水面の光の線。何かが出入りしている間だけ、水面の位置が光る */
-.river-surface {
-  position: absolute; left: -4%; right: -4%;
-  top: calc(var(--river-waterline) - 4.5%);
-  height: 9%;
-  background: linear-gradient(180deg,
-    rgba(255,255,255,0) 0%,
-    rgba(212,242,255,0.3) 38%,
-    rgba(255,255,255,0.62) 52%,
-    rgba(168,216,235,0.26) 66%,
-    rgba(255,255,255,0) 100%);
-  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
-  filter: blur(4px);
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: river-surface-glow 1.7s ease both;
-}
-.river-stage.hide .river-surface { animation: river-surface-glow 1.3s ease both; }
-@keyframes river-surface-glow {
-  0%   { opacity: 0; transform: scaleY(0.6); }
-  22%  { opacity: 1; transform: scaleY(1.1); }
-  70%  { opacity: 0.55; transform: scaleY(1); }
-  100% { opacity: 0; transform: scaleY(0.7); }
-}
-
 .river-info-line {
   position: relative;
   display: flex; align-items: baseline; justify-content: center;
@@ -1066,58 +1040,6 @@ body {
   text-shadow:
     0 1px 3px rgba(0,0,0,0.6),
     0 6px 18px rgba(0,0,0,0.5);
-  /* 出てきた直後は水をかぶって水色。乾くにつれて白くなる */
-  animation: river-text-dry 2.8s ease-out both;
-}
-.river-stage.hide .river-text { animation: none; }
-@keyframes river-text-dry {
-  0% {
-    color: #b4e2f5;
-    text-shadow:
-      0 0 12px rgba(146,214,240,0.85),
-      0 2px 6px rgba(0,0,0,0.5);
-  }
-  55% {
-    color: #dff2fb;
-    text-shadow:
-      0 0 6px rgba(146,214,240,0.4),
-      0 2px 6px rgba(0,0,0,0.55);
-  }
-  100% {
-    color: #ffffff;
-    text-shadow:
-      0 1px 3px rgba(0,0,0,0.6),
-      0 6px 18px rgba(0,0,0,0.5);
-  }
-}
-
-/*
- * かぶった水そのもの。
- * 出た直後は全体が水に覆われていて、水位が上から下へ引いていくように消える。
- */
-.river-sheet {
-  position: absolute; left: -10%; right: -10%; top: -18%; bottom: -24%;
-  /* 上下は色の濃さで、左右はマスクで溶かす（四角い板に見せない） */
-  background: linear-gradient(180deg,
-    rgba(168,224,246,0) 0%,
-    rgba(140,208,236,0.34) 24%,
-    rgba(196,236,250,0.58) 60%,
-    rgba(188,230,246,0.3) 86%,
-    rgba(255,255,255,0) 100%);
-  -webkit-mask-image: linear-gradient(90deg,
-    transparent 0%, rgba(0,0,0,0.85) 18%, #000 34%, #000 66%, rgba(0,0,0,0.85) 82%, transparent 100%);
-  mask-image: linear-gradient(90deg,
-    transparent 0%, rgba(0,0,0,0.85) 18%, #000 34%, #000 66%, rgba(0,0,0,0.85) 82%, transparent 100%);
-  filter: blur(6px);
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: river-sheet-drain 2.8s cubic-bezier(0.3, 0, 0.35, 1) both;
-}
-.river-stage.hide .river-sheet { animation: none; opacity: 0; }
-@keyframes river-sheet-drain {
-  0%   { clip-path: inset(0 0 0 0); }
-  50%  { clip-path: inset(44% 0 0 0); }
-  100% { clip-path: inset(100% 0 0 0); }
 }
 
 /* ===== 端数パレット（残りが端数だけになったとき） ===== */
@@ -1130,65 +1052,11 @@ body {
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
 }
-/* 端数パレットの水は、図のまわりだけに掛ける（画面いっぱいに広がらないように） */
-.river-fraction > .river-sheet { left: 24%; right: 24%; top: 4%; bottom: -6%; }
 /* PalletDiagram は実寸 70px 幅で描かれるので、ここで拡大して見せる */
 .river-fraction-scale {
   width: 80px; height: 84px;
   transform: scale(2.7);
   transform-origin: center center;
-}
-
-/* ===== 文字から垂れるしずく ===== */
-.river-drips {
-  position: absolute; left: 0; right: 0; top: 0; bottom: 0;
-  pointer-events: none;
-}
-/*
- * しずく1粒。
- * 上が細く下がふくらんだ雫の形にして、光が入る側に白いハイライト、
- * 反対側に暗い縁を入れて水滴らしく見せる。
- */
-.river-drip {
-  position: absolute; bottom: 2%;
-  border-radius: 52% 52% 60% 60% / 66% 66% 46% 46%;
-  background:
-    radial-gradient(circle at 32% 26%, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.55) 22%, rgba(255,255,255,0) 46%),
-    radial-gradient(circle at 66% 78%, rgba(120,176,200,0.5) 0%, rgba(120,176,200,0) 55%),
-    linear-gradient(170deg, rgba(232,248,255,0.82) 0%, rgba(176,214,232,0.62) 55%, rgba(226,246,255,0.8) 100%);
-  box-shadow:
-    inset 0 -1px 2px rgba(255,255,255,0.7),
-    0 0 6px rgba(214,242,255,0.55);
-  opacity: 0;
-  animation-name: river-drip-fall;
-  animation-timing-function: cubic-bezier(0.45, 0, 0.9, 0.6);
-  animation-fill-mode: both;
-  animation-iteration-count: 1;
-}
-/* 落ちた先でぶつかって散る小さなしぶき */
-.river-drip::after {
-  content: ''; position: absolute; left: 50%; top: 100%;
-  width: 300%; height: 90%;
-  transform: translateX(-50%);
-  border: 1px solid rgba(255,255,255,0.8);
-  border-radius: 50%;
-  opacity: 0;
-  animation: river-drip-splash 0.42s ease-out both;
-  animation-delay: inherit;
-}
-
-/* ふくらむ → 糸を引いて切れる → 伸びながら落ちて消える */
-@keyframes river-drip-fall {
-  0%   { opacity: 0;    transform: translate(-50%, -2px) scale(0.35, 0.3); }
-  14%  { opacity: 0.95; transform: translate(-50%, 1px) scale(1.16, 0.86); }
-  26%  { opacity: 1;    transform: translate(-50%, 6px) scale(0.78, 1.42); }
-  70%  { opacity: 0.9;  transform: translate(-50%, 42px) scale(0.62, 1.72); }
-  100% { opacity: 0;    transform: translate(-50%, 78px) scale(0.5, 1.95); }
-}
-@keyframes river-drip-splash {
-  0%, 72% { opacity: 0; transform: translateX(-50%) translateY(72px) scale(0.2, 0.2); }
-  86%     { opacity: 0.55; transform: translateX(-50%) translateY(80px) scale(1, 0.5); }
-  100%    { opacity: 0; transform: translateX(-50%) translateY(82px) scale(1.5, 0.65); }
 }
 
 .river-info-model .river-text {
@@ -1229,7 +1097,5 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .river-info-body,
   .river-stage.hide .river-info-body { animation-duration: 0.01s; }
-  .river-drip, .river-surface, .river-sheet { display: none; }
-  .river-text { animation: none; }
   .river-stat-tap::before { animation: none; opacity: 0.5; }
 }
