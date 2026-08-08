@@ -131,3 +131,8 @@ export function FileIcon(p: IconProps) {
 export function CloseIcon(p: IconProps) {
   return <Svg {...p}><line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" /></Svg>;
 }
+
+/** 画面の向き（回転） */
+export function RotateIcon(p: IconProps) {
+  return <Svg {...p}><rect x="8.5" y="2.5" width="7" height="19" rx="2" /><path d="M4 14.5A8 8 0 0 1 7.4 4.2" /><polyline points="4.7 3.6 7.8 4.1 7.3 7.2" /><path d="M20 9.5a8 8 0 0 1-3.4 10.3" /><polyline points="19.3 20.4 16.2 19.9 16.7 16.8" /></Svg>;
+}

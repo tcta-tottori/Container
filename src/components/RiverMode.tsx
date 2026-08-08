@@ -6,6 +6,8 @@ import { displayQuantities } from '@/lib/itemQuantity';
 import { usePalletTap } from '@/hooks/usePalletTap';
 import { useCountUp } from '@/hooks/useCountUp';
 import PalletDiagram from './PalletDiagram';
+import { playSurfacing, playSubmerging } from '@/lib/waterSplash';
+import { getWaterSoundEngine } from '@/lib/waterSound';
 
 interface RiverModeProps {
   onClose: () => void;
@@ -28,14 +30,44 @@ interface RiverModeProps {
 /** タップの波紋（水滴が落ちた水面） */
 interface Ripple {
   x: number; y: number; t: number;
+  /** 広がりの大きさ。しずくが落ちた小さな輪は 1 より小さくする */
+  s?: number;
 }
 
+/**
+ * 品目情報が水面から出てくるときの、水面のほう。
+ * 盛り上がり → 割れて広がる輪 → 飛んだしずくが落ちて戻る、を1つの出来事として持つ。
+ */
+interface Surfacing {
+  /** 経過時間(秒) */
+  t: number;
+  /** 出てくる(true) か 沈む(false) か */
+  up: boolean;
+  /** 飛び散ったしずく */
+  drops: Drop[];
+}
+
+/** 水面から飛んだしずく。落ちて水面に当たると小さな輪を残す */
+interface Drop {
+  x: number; y: number; vx: number; vy: number;
+  /** 落ちて消えたか */
+  dead: boolean;
+  r: number;
+}
+
+/** 水面の高さ（画面に対する割合）。CSS の --river-waterline と合わせる */
+const WATERLINE_FALLBACK = 0.6;
+/** 出てくる水面表現の長さ(秒)。文字がせり上がる時間に合わせる */
+const SURFACE_LIFE = 1.7;
+/** 水面を横から見ているので、輪は縦につぶれた楕円で描く */
+const SURFACE_FLATTEN = 0.26;
+
 const BASE = process.env.NODE_ENV === 'production' ? '/Container' : '';
-/** 継ぎ目が分からないように末尾と先頭をクロスフェードして作ったループ動画（約6.5秒・音声なし） */
+/**
+ * 川のループ動画（約10秒・H.264・音声つき）。
+ * せせらぎモードの音は、この動画に入っている川の音を使う。
+ */
 const VIDEO_MP4 = `${BASE}/videos/river-loop.mp4`;
-/** H.264 を再生できない環境向け（Chromium の一部ビルドなど） */
-const VIDEO_WEBM = `${BASE}/videos/river-loop.webm`;
-const POSTER = `${BASE}/videos/river-poster.jpg`;
 
 /** 浮かび上がった品目情報が沈むまでの時間 */
 const INFO_MS = 9000;
@@ -108,6 +140,8 @@ export default function RiverMode({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const ripplesRef = useRef<Ripple[]>([]);
+  /** いま進行中の「水面が割れる」表現。無いときは null */
+  const surfaceRef = useRef<Surfacing | null>(null);
   const [hintVisible, setHintVisible] = useState(true);
   /** 品目情報が浮かび上がっているか。key を変えると出現アニメをやり直す */
   const [info, setInfo] = useState<{ shown: boolean; key: number }>({ shown: false, key: 0 });
@@ -140,18 +174,61 @@ export default function RiverMode({
     return () => { clearTimeout(toClear); clearTimeout(toShown); };
   }, []);
 
+  /** 水面が割れる／呑まれる表現を始める */
+  const startSurfacing = useCallback((up: boolean) => {
+    const drops: Drop[] = [];
+    if (up) {
+      // 割れた水面から飛び散るしずく。中心ほど高く上がる
+      const n = 7;
+      for (let i = 0; i < n; i++) {
+        // 等間隔だと落ちた跡が並んでしまうので、位置も速さもばらつかせる
+        const spread = ((i + Math.random() * 0.8) / n) * 2 - 1; // -1..1
+        drops.push({
+          x: spread * (0.2 + Math.random() * 0.18),
+          y: 0,
+          vx: spread * (0.12 + Math.random() * 0.12),
+          vy: -(0.5 + Math.random() * 0.75) * (1 - Math.abs(spread) * 0.4),
+          dead: false,
+          r: 1.1 + Math.random() * 1.6,
+        });
+      }
+    }
+    surfaceRef.current = { t: 0, up, drops };
+    if (up) playSurfacing();
+    else playSubmerging();
+  }, []);
+
+  /*
+   * 出す・沈めるは、水面表現と音を1回だけ鳴らしたいので
+   * 「いま出ているか」を ref でも持っておき、状態更新の外で判断する。
+   */
+  const shownRef = useRef(false);
+
   /** 情報を浮かび上がらせて、一定時間で沈める */
   const surfaceInfo = useCallback((restart: boolean) => {
-    setInfo((prev) => ({ shown: true, key: restart || !prev.shown ? prev.key + 1 : prev.key }));
+    const fresh = restart || !shownRef.current;
+    shownRef.current = true;
+    if (fresh) startSurfacing(true);
+    setInfo((prev) => ({ shown: true, key: fresh ? prev.key + 1 : prev.key }));
+
     if (infoTimer.current) clearTimeout(infoTimer.current);
-    infoTimer.current = setTimeout(() => setInfo((prev) => ({ ...prev, shown: false })), INFO_MS);
-  }, []);
+    infoTimer.current = setTimeout(() => {
+      infoTimer.current = null;
+      if (!shownRef.current) return;
+      shownRef.current = false;
+      startSurfacing(false);
+      setInfo((prev) => ({ ...prev, shown: false }));
+    }, INFO_MS);
+  }, [startSurfacing]);
 
   /** 情報を川に沈める */
   const sinkInfo = useCallback(() => {
     if (infoTimer.current) { clearTimeout(infoTimer.current); infoTimer.current = null; }
-    setInfo((prev) => (prev.shown ? { ...prev, shown: false } : prev));
-  }, []);
+    if (!shownRef.current) return;
+    shownRef.current = false;
+    startSurfacing(false);
+    setInfo((prev) => ({ ...prev, shown: false }));
+  }, [startSurfacing]);
 
   useEffect(() => () => { if (infoTimer.current) clearTimeout(infoTimer.current); }, []);
 
@@ -229,15 +306,51 @@ export default function RiverMode({
     return () => clearInterval(t);
   }, [ownClock]);
 
-  // 自動再生がブロックされた場合と、バックグラウンド復帰時の再生再開
+  /*
+   * 再生と音。
+   *
+   * 自動再生は「音が出ない」ことが条件なので、まず消音のまま流し始めて、
+   * 流れ出してから音を出す（せせらぎモードはタップで開くので、この形なら通る）。
+   * 音の大きさは「水の音」設定に合わせるので、絞っていれば小さく、0 なら鳴らない。
+   */
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const play = () => { void v.play().catch(() => { /* 再生できなくてもポスター画像を表示 */ }); };
+
+    const applyVolume = () => {
+      let vol = 0.4;
+      try { vol = getWaterSoundEngine().getVolume(); } catch { /* 既定のまま */ }
+      v.volume = Math.max(0, Math.min(1, vol));
+      v.muted = vol <= 0.001;
+    };
+
+    const play = () => {
+      v.muted = true;
+      void v.play()
+        .then(() => {
+          applyVolume();
+          /*
+           * 音を出した拍子に止められる端末があるため、その場合は
+           * 消音に戻してでも映像だけは流し続ける（真っ暗になるのを防ぐ）。
+           */
+          window.setTimeout(() => {
+            if (v.paused) { v.muted = true; void v.play().catch(() => { /* ignore */ }); }
+          }, 300);
+        })
+        .catch(() => { /* 再生できなくても表示は続ける */ });
+    };
     play();
+
+    // 「水の音」の音量を動かしたら、こちらにも効かせる
+    let unsubscribe: (() => void) | null = null;
+    try { unsubscribe = getWaterSoundEngine().subscribe(applyVolume); } catch { /* ignore */ }
+
     const onVis = () => { if (!document.hidden) play(); };
     document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      unsubscribe?.();
+    };
   }, []);
 
   /* ===== 数量。端数だけになったら作業画面と同じように積み方を全画面で出す ===== */
@@ -333,6 +446,12 @@ export default function RiverMode({
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     let W = 0, H = 0;
 
+    // 水面の高さは CSS 側（--river-waterline）に合わせる
+    const waterlineRaw = getComputedStyle(document.documentElement)
+      .getPropertyValue('--river-waterline').trim();
+    const parsed = parseFloat(waterlineRaw);
+    const waterline = Number.isFinite(parsed) ? parsed / 100 : WATERLINE_FALLBACK;
+
     const resize = () => {
       W = canvas.clientWidth || window.innerWidth;
       H = canvas.clientHeight || window.innerHeight;
@@ -352,8 +471,132 @@ export default function RiverMode({
      * 本物の波紋は、外へ広がる山と谷が交互に並ぶ。
      * 明るい線（山）のすぐ内側に暗い線（谷）を重ねて、水面が凹んで見えるようにしている。
      */
+    /*
+     * 品目情報が水面から出てくるところ。
+     *
+     * 1. 水面が下から押されて盛り上がる
+     * 2. 割れて、輪が横へ広がる
+     * 3. 飛んだしずくが落ちて、当たった所に小さな輪が残る
+     *
+     * 水面は横から見ているので、輪はどれも縦につぶした楕円で描く。
+     */
+    const drawSurfacing = (dt: number, waterY: number) => {
+      const s = surfaceRef.current;
+      if (!s) return;
+      s.t += dt;
+      if (s.t > SURFACE_LIFE) { surfaceRef.current = null; return; }
+
+      const cx = W / 2;
+      const p = s.t / SURFACE_LIFE;
+
+      if (s.up) {
+        // 1. 盛り上がり（押し上げられて、割れると同時にしぼむ）
+        const swell = s.t < 0.42 ? Math.sin((s.t / 0.42) * Math.PI) : 0;
+        if (swell > 0.01) {
+          const rx = W * 0.3 * (0.45 + swell * 0.55);
+          const ry = rx * SURFACE_FLATTEN;
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = swell * 0.3;
+          const g = ctx.createRadialGradient(cx, waterY - ry * 0.5, 1, cx, waterY, rx);
+          g.addColorStop(0, 'rgba(236,248,255,0.9)');
+          g.addColorStop(0.55, 'rgba(190,222,236,0.35)');
+          g.addColorStop(1, 'rgba(190,222,236,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.ellipse(cx, waterY - ry * 0.35, rx, ry * 1.25, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 2. 横へ広がる輪
+        for (let k = 0; k < 3; k++) {
+          const t = s.t - (0.24 + k * 0.2);
+          if (t <= 0) continue;
+          const q = Math.min(1, t / 1.1);
+          const rx = W * (0.12 + 0.62 * (1 - Math.pow(1 - q, 2.3)));
+          const ry = rx * SURFACE_FLATTEN;
+          const fade = Math.pow(1 - q, 1.8) * (1 - k * 0.24);
+          if (fade <= 0.01) continue;
+
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = fade * 0.42;
+          ctx.lineWidth = 2 * fade + 0.5;
+          ctx.strokeStyle = '#eaf6ff';
+          ctx.beginPath();
+          ctx.ellipse(cx, waterY, rx, ry, 0, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // 輪のすぐ内側の影。水面が波打っているように見える
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalAlpha = fade * 0.22;
+          ctx.lineWidth = 2.2 * fade + 0.4;
+          ctx.strokeStyle = '#587a8c';
+          ctx.beginPath();
+          ctx.ellipse(cx, waterY + 1.5, Math.max(1, rx - 5), Math.max(1, ry - 1.4), 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 3. しずく
+        ctx.globalCompositeOperation = 'screen';
+        for (const d of s.drops) {
+          if (d.dead) continue;
+          d.vy += 2.1 * dt;          // 落ちる
+          d.x += d.vx * dt;
+          d.y += d.vy * dt;
+          if (d.y >= 0 && d.vy > 0) {
+            d.dead = true;
+            // 落ちた所に小さな波紋を残す
+            ripplesRef.current.push({ x: cx + d.x * W * 0.5, y: waterY, t: 0, s: 0.3 + Math.random() * 0.15 });
+            if (ripplesRef.current.length > 10) ripplesRef.current.shift();
+            continue;
+          }
+          const px = cx + d.x * W * 0.5;
+          const py = waterY + d.y * H * 0.17;
+          ctx.globalAlpha = Math.min(1, 0.75 - p * 0.3);
+          ctx.fillStyle = 'rgba(238,250,255,0.9)';
+          ctx.beginPath();
+          // 落ちる速さに合わせて縦に伸ばすと、しずくらしく見える
+          ctx.ellipse(px, py, d.r, d.r * (1 + Math.min(1.6, Math.abs(d.vy) * 1.1)), 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        // 沈むとき。水面がへこんで、内へ吸い込まれる輪ができる
+        const dip = s.t < 0.6 ? Math.sin((s.t / 0.6) * Math.PI) : 0;
+        if (dip > 0.01) {
+          const rx = W * 0.34;
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalAlpha = dip * 0.3;
+          const g = ctx.createRadialGradient(cx, waterY, 1, cx, waterY, rx);
+          g.addColorStop(0, 'rgba(60,92,106,0.9)');
+          g.addColorStop(1, 'rgba(60,92,106,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.ellipse(cx, waterY, rx, rx * SURFACE_FLATTEN * 1.3, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        for (let k = 0; k < 2; k++) {
+          const t = s.t - k * 0.22;
+          if (t <= 0) continue;
+          const q = Math.min(1, t / 0.95);
+          const rx = W * (0.5 - 0.36 * q);   // 内側へ縮む
+          const fade = Math.pow(1 - q, 1.6) * (1 - k * 0.3);
+          if (fade <= 0.01) continue;
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = fade * 0.3;
+          ctx.lineWidth = 1.8 * fade + 0.4;
+          ctx.strokeStyle = '#dcecf6';
+          ctx.beginPath();
+          ctx.ellipse(cx, waterY, Math.max(1, rx), Math.max(1, rx * SURFACE_FLATTEN), 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    };
+
     const draw = (dt: number) => {
       ctx.clearRect(0, 0, W, H);
+      drawSurfacing(dt, H * waterline);
       const ripples = ripplesRef.current;
       if (ripples.length === 0) return;
       const maxR = Math.min(W, H) * RIPPLE_MAX_R;
@@ -369,7 +612,7 @@ export default function RiverMode({
           if (t <= 0) continue;
           const p = Math.min(1, t / RIPPLE_LIFE);
           // 広がりは最初が速く、だんだん緩やかに
-          const r = maxR * (1 - Math.pow(1 - p, 2.6)) * (1 - k * 0.1) + 3;
+          const r = maxR * (rp.s ?? 1) * (1 - Math.pow(1 - p, 2.6)) * (1 - k * 0.1) + 3;
           const fade = Math.pow(1 - p, 1.9) * (1 - k * 0.22);
           if (fade <= 0.01) continue;
 
@@ -444,10 +687,8 @@ export default function RiverMode({
       <video
         ref={videoRef}
         className="river-video"
-        poster={POSTER}
         autoPlay
         loop
-        muted
         playsInline
         preload="auto"
         disablePictureInPicture
@@ -455,7 +696,6 @@ export default function RiverMode({
         tabIndex={-1}
       >
         <source src={VIDEO_MP4} type="video/mp4" />
-        <source src={VIDEO_WEBM} type="video/webm" />
       </video>
 
       {/* タップの波紋 */}
