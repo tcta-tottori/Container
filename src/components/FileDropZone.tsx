@@ -28,8 +28,11 @@ interface FileDropZoneProps {
   embedded?: boolean;
 }
 
-/** ドライブから取ってくる間に使う進捗の幅（このあとの解析で 10% 以降を使う） */
-const DRIVE_PROGRESS_MAX = 9;
+/**
+ * ドライブから取ってくる間に使う進捗の幅。
+ * このあとの解析はここから先を受け持つ（読込画面の進捗は戻らないようにしてある）。
+ */
+const DRIVE_PROGRESS_MAX = 45;
 
 /* ===== CNSロゴSVG（正方形キューブ + ネオングロー） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {

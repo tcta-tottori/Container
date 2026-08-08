@@ -12,6 +12,33 @@ export interface ItemTimeLog {
   timestamp: number;
 }
 
+/**
+ * 経過時間を「秒との間の : 」が動かない形で並べる。
+ *
+ * 数字は書体によって字ごとの幅が違うので、1文字ずつ同じ幅の枠に入れて揺れを止める。
+ * さらに左右を同じ幅で確保しているので、1時間を超えて "1:05:23" と桁が増えても
+ * 増えたぶんは左へ伸びるだけで、中央の : は同じ場所に留まる。
+ */
+function ElapsedDigits({ value }: { value: string }) {
+  // 秒の直前の : を中央に置く（"05:23" → 05 / 23、"1:05:23" → 1:05 / 23）
+  const cut = value.lastIndexOf(':');
+  const left = cut >= 0 ? value.slice(0, cut) : value;
+  const right = cut >= 0 ? value.slice(cut + 1) : '';
+
+  const chars = (s: string) =>
+    s.split('').map((c, i) => (
+      <span key={i} className={c === ':' ? 'hdr-time-ch hdr-time-sep' : 'hdr-time-ch'}>{c}</span>
+    ));
+
+  return (
+    <>
+      <span className="hdr-time-left">{chars(left)}</span>
+      <span className="hdr-time-sep hdr-time-colon">:</span>
+      <span className="hdr-time-right">{chars(right)}</span>
+    </>
+  );
+}
+
 interface HeaderBarProps {
   workElapsed: string;
   workRawSeconds: number;
@@ -250,10 +277,11 @@ export default function HeaderBar({
         <button
           onClick={() => setPopupOpen(true)}
           className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
-          style={{ background: 'transparent', cursor: 'pointer', padding: '4px 10px' }}
+          style={{ background: 'transparent', cursor: 'pointer' }}
           title="タップで経過時間の詳細"
+          aria-label={`経過時間 ${workElapsed}`}
         >
-          {workElapsed}
+          <ElapsedDigits value={workElapsed} />
         </button>
       </div>
 

@@ -40,70 +40,117 @@ import * as XLSX from 'xlsx';
 
 type ViewMode = 'load' | 'work' | 'list' | 'edit' | 'analytics' | 'jkp';
 
-/* ===== おしゃれな読込ポップアップ ===== */
+/* ===== 読込中の全画面表示 =====
+ * 起動時のスプラッシュと同じ作りにして、読み込みの間は画面ぜんぶを使う。
+ * 進み具合はキューブを囲むリングと下の帯の両方で見せる。
+ */
 function LoadingOverlay({ message, progress, closing }: { message: string; progress: number; closing?: boolean }) {
+  const pct = Math.max(0, Math.min(100, progress));
+  // リング（半径28）の円周ぶんを進捗で塗る
+  const R = 28;
+  const circumference = 2 * Math.PI * R;
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 300,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(16px)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '0 28px',
+      background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)',
       animation: closing ? 'loadFadeOut 0.5s ease both' : 'fadeIn 0.15s ease both',
     }}>
       <style>{`
-        @keyframes spinCircle { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes loadFadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes neonPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+        @keyframes loadHue { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(28deg); } }
+        @keyframes loadSheen { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
       `}</style>
-      <div style={{
-        background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
-        border: '1.5px solid rgba(255,255,255,0.15)',
-        borderRadius: 24, padding: '32px 40px', textAlign: 'center',
-        boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 24px 60px rgba(0,0,0,0.6)',
-        width: '90%', maxWidth: 300,
-      }}>
-        {/* サークル読込アニメーション */}
-        <div style={{ width: 48, height: 48, margin: '0 auto 16px' }}>
-          <svg width="48" height="48" viewBox="0 0 48 48" style={{ animation: 'spinCircle 0.9s linear infinite' }}>
-            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="3"
-              strokeLinecap="round" strokeDasharray="90 36"
-              style={{ filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.2))' }} />
-          </svg>
-        </div>
 
-        {/* メッセージ */}
-        <p style={{
-          color: '#fff', fontSize: 12, fontWeight: 600, margin: '0 0 12px', lineHeight: 1.5,
-          textShadow: '0 0 6px rgba(255,255,255,0.15)',
-          // ファイル名などを改行して添えられるようにする
-          whiteSpace: 'pre-line', wordBreak: 'break-word',
-        }}>
-          {message}
-        </p>
-
-        {/* 進捗率 */}
-        <p style={{
-          color: '#fff', fontSize: 20, fontWeight: 800, margin: '0 0 10px',
-          fontFamily: 'var(--font-mono)',
-          textShadow: '0 0 8px rgba(255,255,255,0.3), 0 0 16px rgba(255,255,255,0.12)',
-        }}>
-          {Math.round(progress)}%
-        </p>
-
-        {/* プログレスバー */}
+      {/* キューブ + 進捗リング */}
+      <div style={{ position: 'relative', width: 132, height: 132, marginBottom: 30 }}>
         <div style={{
-          width: '100%', height: 4, borderRadius: 2,
-          background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
-          border: '0.5px solid rgba(255,255,255,0.1)',
+          position: 'absolute', inset: 8, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(124,92,232,0.28) 0%, rgba(74,122,247,0.10) 45%, transparent 72%)',
+          animation: 'neonPulse 2.5s ease-in-out infinite',
+        }} />
+        <svg width="132" height="132" viewBox="0 0 72 72" style={{ position: 'absolute', inset: 0 }}>
+          <defs>
+            <linearGradient id="loadRing" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#4a7af7" />
+              <stop offset="40%" stopColor="#6b52d4" />
+              <stop offset="72%" stopColor="#9b45c9" />
+              <stop offset="100%" stopColor="#c0549a" />
+            </linearGradient>
+          </defs>
+          <circle cx="36" cy="36" r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
+          {/* 進捗ぶんだけ塗るリング。12時から時計回りに伸びる */}
+          <circle
+            cx="36" cy="36" r={R} fill="none" stroke="url(#loadRing)" strokeWidth="4" strokeLinecap="round"
+            strokeDasharray={`${(circumference * pct) / 100} ${circumference}`}
+            style={{
+              transform: 'rotate(-90deg)', transformOrigin: '50% 50%',
+              transition: 'stroke-dasharray 0.35s ease',
+              filter: 'drop-shadow(0 0 5px rgba(124,92,232,0.6))',
+            }}
+          />
+        </svg>
+        {/* 中央のキューブ */}
+        <svg width="56" height="56" viewBox="0 0 64 64" fill="none"
+          style={{
+            position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
+            animation: 'neonPulse 2.5s ease-in-out infinite',
+            filter: 'drop-shadow(0 0 6px rgba(138,180,255,0.5))',
+          }}>
+          <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none">
+            <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
+            <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
+            <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
+          </g>
+        </svg>
+      </div>
+
+      {/* 進捗率 */}
+      <div style={{
+        fontSize: 42, fontWeight: 800, lineHeight: 1, marginBottom: 16,
+        fontFamily: 'var(--font-clock)', letterSpacing: 1,
+        background: 'linear-gradient(135deg, #6ea8ff 0%, #9b7ae8 45%, #c56fc0 100%)',
+        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+        animation: 'loadHue 6s ease-in-out infinite',
+      }}>
+        {Math.round(pct)}<span style={{ fontSize: 20, fontWeight: 700 }}>%</span>
+      </div>
+
+      {/* プログレスバー（帯の中を光が流れる） */}
+      <div style={{
+        position: 'relative', width: '100%', maxWidth: 320, height: 8, borderRadius: 999,
+        background: 'rgba(255,255,255,0.07)', overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20,
+      }}>
+        <div style={{
+          position: 'relative', height: '100%', borderRadius: 999,
+          width: `${pct}%`, overflow: 'hidden',
+          background: 'linear-gradient(90deg, #4a7af7 0%, #6b52d4 38%, #9b45c9 70%, #c0549a 100%)',
+          boxShadow: '0 0 12px rgba(107,82,212,0.55), 0 0 24px rgba(155,69,201,0.28)',
+          transition: 'width 0.35s cubic-bezier(0.33,0.1,0.2,1)',
+          animation: 'loadHue 6s ease-in-out infinite',
         }}>
           <div style={{
-            height: '100%', borderRadius: 2,
-            background: 'rgba(255,255,255,0.85)',
-            boxShadow: '0 0 5px rgba(255,255,255,0.25), 0 0 10px rgba(255,255,255,0.08)',
-            width: `${progress}%`,
-            transition: 'width 0.3s ease',
+            position: 'absolute', top: 0, bottom: 0, width: '38%',
+            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
+            animation: 'loadSheen 1.6s linear infinite',
           }} />
         </div>
       </div>
+
+      {/* メッセージ */}
+      <p style={{
+        color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: 600, margin: 0,
+        lineHeight: 1.7, textAlign: 'center', maxWidth: 340,
+        // ファイル名などを改行して添えられるようにする
+        whiteSpace: 'pre-line', wordBreak: 'break-word',
+        textShadow: '0 0 10px rgba(138,180,255,0.25)',
+      }}>
+        {message}
+      </p>
     </div>
   );
 }
@@ -473,6 +520,14 @@ export default function Home() {
     }
   }, [handleSbReading]);
 
+  /**
+   * 読込の進み具合。Googleドライブから取ってくる分と、そのあとの解析とで
+   * 別々に数えているため、あとの段階が小さい値を出しても戻さない。
+   */
+  const advanceProgress = useCallback((p: number) => {
+    setLoadingProgress((prev) => (p > prev ? p : prev));
+  }, []);
+
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
     setLoadingProgress(100);
@@ -502,7 +557,7 @@ export default function Home() {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('Excelファイルを読み込み中...');
-      setLoadingProgress(10);
+      advanceProgress(10);
       try {
         // 1. 作業ファイルをパース
         const result = await parseExcelFile(file);
@@ -512,20 +567,20 @@ export default function Home() {
           await new Promise((r) => setTimeout(r, 2500));
           return;
         }
-        setLoadingProgress(25);
+        advanceProgress(25);
 
         // 2. GitHubから最新マスタを確実に取得（Meas.等の最新データ反映）
         setLoadingMsg('GitHubから最新の品目一覧を取得中...');
-        setLoadingProgress(35);
+        advanceProgress(35);
         const masterItems = await fetchMasterData();
         if (masterItems.length > 0) {
           loadMaster(masterItems);
         }
-        setLoadingProgress(60);
+        advanceProgress(60);
 
         // 3. マスタと紐付（気高コード＋新建高コード両方で検索）
         setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
-        setLoadingProgress(70);
+        advanceProgress(70);
         const allItems = result.containers.flatMap(c => c.items);
         const { linkedItems, linked, total } = linkItemsWithMaster(allItems, masterItems);
 
@@ -538,7 +593,7 @@ export default function Home() {
         }
 
         setLoadingMsg(`紐付完了: ${linked}/${total}件  データを表示中...`);
-        setLoadingProgress(90);
+        advanceProgress(90);
 
         // 5. データをロード（紐付済みの状態で表示）
         loadData(result.containers);
@@ -557,7 +612,7 @@ export default function Home() {
         closeLoading();
       }
     },
-    [loadData, loadMaster, closeLoading]
+    [loadData, loadMaster, closeLoading, advanceProgress]
   );
 
   const handleAqssLoaded = useCallback(
@@ -678,10 +733,10 @@ export default function Home() {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('写真を解析中...');
-      setLoadingProgress(5);
+      advanceProgress(5);
       try {
         const { container, errors } = await parsePhotoFile(file, (p, msg) => {
-          setLoadingProgress(p);
+          advanceProgress(p);
           setLoadingMsg(msg);
         });
         if (!container || container.items.length === 0) {
@@ -715,7 +770,7 @@ export default function Home() {
         closeLoading();
       }
     },
-    [loadData, loadMaster, closeLoading],
+    [loadData, loadMaster, closeLoading, advanceProgress],
   );
 
   const handleJkpLoaded = useCallback(
@@ -724,7 +779,7 @@ export default function Home() {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('JKPファイルを読み込み中...');
-      setLoadingProgress(5);
+      advanceProgress(5);
       // UIの更新を待つ
       await new Promise(r => setTimeout(r, 50));
       try {
@@ -805,7 +860,7 @@ export default function Home() {
         closeLoading();
       }
     },
-    [loadData, loadMaster, closeLoading]
+    [loadData, loadMaster, closeLoading, advanceProgress]
   );
 
   /** 履歴（最近のファイル）から選ばれたファイルを種類ごとに読み込む */
