@@ -40,15 +40,41 @@ import * as XLSX from 'xlsx';
 
 type ViewMode = 'load' | 'work' | 'list' | 'edit' | 'analytics' | 'jkp';
 
+/** せせらぎモードから戻ったあと、残った靄が晴れきるまで（CSS と揃える） */
+const RIVER_TAIL_MS = 1300;
+
 /* ===== 読込中の全画面表示 =====
  * 起動時のスプラッシュと同じ作りにして、読み込みの間は画面ぜんぶを使う。
  * 進み具合はキューブを囲むリングと下の帯の両方で見せる。
  */
 function LoadingOverlay({ message, progress, closing }: { message: string; progress: number; closing?: boolean }) {
-  const pct = Math.max(0, Math.min(100, progress));
-  // リング（半径28）の円周ぶんを進捗で塗る
-  const R = 28;
-  const circumference = 2 * Math.PI * R;
+  /*
+   * 実際の進捗は段階ごとに飛ぶので、そのまま出すと数字も帯もカクつく。
+   * 表示用の値を毎フレーム目標へ近づけて、なめらかに動かす。
+   */
+  const target = Math.max(0, Math.min(100, progress));
+  const [shown, setShown] = useState(0);
+  const shownRef = useRef(0);
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const diff = target - shownRef.current;
+      if (Math.abs(diff) < 0.4) {
+        shownRef.current = target;
+        setShown(target);
+        return;
+      }
+      // 残りの距離に応じて詰める（近づくほどゆっくり止まる）
+      shownRef.current += diff * 0.12;
+      setShown(shownRef.current);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+
+  const pct = shown;
 
   return (
     <div style={{
@@ -61,45 +87,18 @@ function LoadingOverlay({ message, progress, closing }: { message: string; progr
       <style>{`
         @keyframes loadFadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }
         @keyframes neonPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
-        @keyframes loadHue { 0%, 100% { filter: hue-rotate(0deg); } 50% { filter: hue-rotate(28deg); } }
         @keyframes loadSheen { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
       `}</style>
 
-      {/* キューブ + 進捗リング */}
-      <div style={{ position: 'relative', width: 132, height: 132, marginBottom: 30 }}>
+      {/* キューブ（起動時のスプラッシュと同じもの） */}
+      <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 34 }}>
         <div style={{
-          position: 'absolute', inset: 8, borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(124,92,232,0.28) 0%, rgba(74,122,247,0.10) 45%, transparent 72%)',
+          position: 'absolute', inset: -16, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, transparent 70%)',
           animation: 'neonPulse 2.5s ease-in-out infinite',
         }} />
-        <svg width="132" height="132" viewBox="0 0 72 72" style={{ position: 'absolute', inset: 0 }}>
-          <defs>
-            <linearGradient id="loadRing" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#4a7af7" />
-              <stop offset="40%" stopColor="#6b52d4" />
-              <stop offset="72%" stopColor="#9b45c9" />
-              <stop offset="100%" stopColor="#c0549a" />
-            </linearGradient>
-          </defs>
-          <circle cx="36" cy="36" r={R} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="4" />
-          {/* 進捗ぶんだけ塗るリング。12時から時計回りに伸びる */}
-          <circle
-            cx="36" cy="36" r={R} fill="none" stroke="url(#loadRing)" strokeWidth="4" strokeLinecap="round"
-            strokeDasharray={`${(circumference * pct) / 100} ${circumference}`}
-            style={{
-              transform: 'rotate(-90deg)', transformOrigin: '50% 50%',
-              transition: 'stroke-dasharray 0.35s ease',
-              filter: 'drop-shadow(0 0 5px rgba(124,92,232,0.6))',
-            }}
-          />
-        </svg>
-        {/* 中央のキューブ */}
-        <svg width="56" height="56" viewBox="0 0 64 64" fill="none"
-          style={{
-            position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)',
-            animation: 'neonPulse 2.5s ease-in-out infinite',
-            filter: 'drop-shadow(0 0 6px rgba(138,180,255,0.5))',
-          }}>
+        <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
+          style={{ position: 'relative', animation: 'neonPulse 2.5s ease-in-out infinite' }}>
           <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none">
             <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
             <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
@@ -108,34 +107,30 @@ function LoadingOverlay({ message, progress, closing }: { message: string; progr
         </svg>
       </div>
 
-      {/* 進捗率 */}
+      {/* 進捗率（スプラッシュの Loading と同じ見た目の白文字） */}
       <div style={{
-        fontSize: 42, fontWeight: 800, lineHeight: 1, marginBottom: 16,
-        fontFamily: 'var(--font-clock)', letterSpacing: 1,
-        background: 'linear-gradient(135deg, #6ea8ff 0%, #9b7ae8 45%, #c56fc0 100%)',
-        WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-        animation: 'loadHue 6s ease-in-out infinite',
+        fontSize: 22, fontWeight: 600, lineHeight: 1, marginBottom: 18,
+        color: '#fff', fontFamily: 'Inter, sans-serif', letterSpacing: 3,
+        textShadow: '0 0 10px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.35), 0 0 40px rgba(255,255,255,0.15)',
       }}>
-        {Math.round(pct)}<span style={{ fontSize: 20, fontWeight: 700 }}>%</span>
+        {Math.round(pct)}%
       </div>
 
-      {/* プログレスバー（帯の中を光が流れる） */}
+      {/* プログレスバー（太めの帯。中を光が流れる） */}
       <div style={{
-        position: 'relative', width: '100%', maxWidth: 320, height: 8, borderRadius: 999,
+        position: 'relative', width: '100%', maxWidth: 320, height: 16, borderRadius: 999,
         background: 'rgba(255,255,255,0.07)', overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.08)', marginBottom: 20,
+        border: '1px solid rgba(255,255,255,0.1)', marginBottom: 22,
       }}>
         <div style={{
           position: 'relative', height: '100%', borderRadius: 999,
           width: `${pct}%`, overflow: 'hidden',
           background: 'linear-gradient(90deg, #4a7af7 0%, #6b52d4 38%, #9b45c9 70%, #c0549a 100%)',
-          boxShadow: '0 0 12px rgba(107,82,212,0.55), 0 0 24px rgba(155,69,201,0.28)',
-          transition: 'width 0.35s cubic-bezier(0.33,0.1,0.2,1)',
-          animation: 'loadHue 6s ease-in-out infinite',
+          boxShadow: '0 0 14px rgba(107,82,212,0.55), 0 0 28px rgba(155,69,201,0.28)',
         }}>
           <div style={{
             position: 'absolute', top: 0, bottom: 0, width: '38%',
-            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
+            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)',
             animation: 'loadSheen 1.6s linear infinite',
           }} />
         </div>
@@ -147,7 +142,7 @@ function LoadingOverlay({ message, progress, closing }: { message: string; progr
         lineHeight: 1.7, textAlign: 'center', maxWidth: 340,
         // ファイル名などを改行して添えられるようにする
         whiteSpace: 'pre-line', wordBreak: 'break-word',
-        textShadow: '0 0 10px rgba(138,180,255,0.25)',
+        textShadow: '0 0 10px rgba(255,255,255,0.2)',
       }}>
         {message}
       </p>
@@ -251,6 +246,8 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   // せせらぎモード（川の映像）
   const [riverOpen, setRiverOpen] = useState(false);
+  /** せせらぎモードから戻ったあと、元の画面の上で晴れていく靄 */
+  const [riverTail, setRiverTail] = useState(false);
   const riverStartedWaterRef = useRef(false);
   const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
@@ -1171,12 +1168,23 @@ export default function Home() {
     setRiverOpen(true);
   }, [waterPlaying, toggleWater]);
 
-  /** せせらぎモードを閉じる（こちらで流し始めた水の音は止める） */
+  /**
+   * せせらぎモードを閉じる（こちらで流し始めた水の音は止める）。
+   * 閉じた時点では画面が靄で真っ白なので、その靄を引き継いで晴れさせる。
+   */
   const closeRiver = useCallback(() => {
     setRiverOpen(false);
+    setRiverTail(true);
     if (riverStartedWaterRef.current && waterPlaying) toggleWater();
     riverStartedWaterRef.current = false;
   }, [waterPlaying, toggleWater]);
+
+  // 残した靄は晴れきったら片付ける
+  useEffect(() => {
+    if (!riverTail) return;
+    const t = setTimeout(() => setRiverTail(false), RIVER_TAIL_MS);
+    return () => clearTimeout(t);
+  }, [riverTail]);
 
 
   // 前回の再生状態を自動再開（ブラウザ制限のため最初の操作を待って再生）
@@ -1314,6 +1322,8 @@ export default function Home() {
         />
       )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
+      {riverTail && <div className="river-tail-mist" aria-hidden />}
+
       {riverOpen && (
         <RiverMode
           onClose={closeRiver}

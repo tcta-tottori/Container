@@ -45,11 +45,25 @@ const SWIPE_Y = 42;
 const EXIT_SWIPE_X = 70;
 /** これ以下の動きはタップ扱い */
 const TAP_SLOP = 10;
+/*
+ * 出入りの靄。
+ * 入るときは、元の画面に白い靄がかかって真っ白になり、そこから晴れて川が出てくる。
+ * 戻るときはその逆で、川が白く覆われてから元の画面が現れる。
+ */
+/** 元の画面が真っ白になるまで（入るとき） */
+const MIST_IN_MS = 850;
+/** 真っ白から川が見えてくるまで */
+const MIST_CLEAR_MS = 1300;
 /** 靄が覆いつくすまで（閉じるとき）。この後に元の画面へ戻る */
-const MIST_OUT_MS = 640;
+const MIST_OUT_MS = 850;
 
-/** 波紋1つの寿命(秒) */
-const RIPPLE_LIFE = 2.2;
+/** 表示の段階 */
+type RiverPhase = 'fog-in' | 'clearing' | 'shown' | 'fog-out';
+
+/** 波紋1つの寿命(秒)。指を離したあたりで消える短さ */
+const RIPPLE_LIFE = 1.5;
+/** 波紋の広がる大きさ（画面の短い辺に対する割合）。触った所の周りだけ揺れる */
+const RIPPLE_MAX_R = 0.13;
 
 /* ===== 端数パレットの全画面表示（作業画面と同じ見せ方） ===== */
 /** 小さい状態から全画面へ広がる時間 */
@@ -98,8 +112,8 @@ export default function RiverMode({
   /** 品目情報が浮かび上がっているか。key を変えると出現アニメをやり直す */
   const [info, setInfo] = useState<{ shown: boolean; key: number }>({ shown: false, key: 0 });
   const infoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** 靄で覆っている最中（この間に元の画面へ戻す） */
-  const [closing, setClosing] = useState(false);
+  /** 表示の段階。靄がかかる→晴れる→表示中→靄が覆う、と進む */
+  const [phase, setPhase] = useState<RiverPhase>('fog-in');
   const closingRef = useRef(false);
   /** 端数パレットの全画面表示を出しているか */
   const [palletFs, setPalletFs] = useState(false);
@@ -111,9 +125,20 @@ export default function RiverMode({
   const closeWithMist = useCallback(() => {
     if (closingRef.current) return;
     closingRef.current = true;
-    setClosing(true);
+    setPhase('fog-out');
     setTimeout(onClose, MIST_OUT_MS);
   }, [onClose]);
+
+  // 開いた直後: 元の画面が白くなる → 川を出す → 靄が晴れる
+  useEffect(() => {
+    const toClear = setTimeout(() => {
+      if (!closingRef.current) setPhase('clearing');
+    }, MIST_IN_MS);
+    const toShown = setTimeout(() => {
+      if (!closingRef.current) setPhase('shown');
+    }, MIST_IN_MS + MIST_CLEAR_MS);
+    return () => { clearTimeout(toClear); clearTimeout(toShown); };
+  }, []);
 
   /** 情報を浮かび上がらせて、一定時間で沈める */
   const surfaceInfo = useCallback((restart: boolean) => {
@@ -322,15 +347,16 @@ export default function RiverMode({
     let raf = 0;
 
     /*
-     * 立体的な円ではなく、真上から見た水面の波紋。
-     * 落下点から真円のリングが3本、少しずつ遅れて外へ広がっていく。
+     * 水滴が落ちた水面。触った所の周りだけが小さく揺れる。
+     *
+     * 本物の波紋は、外へ広がる山と谷が交互に並ぶ。
+     * 明るい線（山）のすぐ内側に暗い線（谷）を重ねて、水面が凹んで見えるようにしている。
      */
     const draw = (dt: number) => {
       ctx.clearRect(0, 0, W, H);
       const ripples = ripplesRef.current;
       if (ripples.length === 0) return;
-      ctx.globalCompositeOperation = 'screen';
-      const maxR = Math.max(W, H) * 0.34;
+      const maxR = Math.min(W, H) * RIPPLE_MAX_R;
 
       for (let i = ripples.length - 1; i >= 0; i--) {
         const rp = ripples[i];
@@ -338,32 +364,48 @@ export default function RiverMode({
         if (rp.t > RIPPLE_LIFE) { ripples.splice(i, 1); continue; }
 
         for (let k = 0; k < 3; k++) {
-          // 後ろのリングほど遅れて出る
-          const t = rp.t - k * 0.16;
+          // 後ろの輪ほど遅れて出て、内側に残る
+          const t = rp.t - k * 0.13;
           if (t <= 0) continue;
           const p = Math.min(1, t / RIPPLE_LIFE);
           // 広がりは最初が速く、だんだん緩やかに
-          const r = maxR * (1 - Math.pow(1 - p, 2.4)) * (1 - k * 0.14) + 6;
-          const fade = Math.pow(1 - p, 1.6);
-          ctx.globalAlpha = fade * (0.42 - k * 0.1);
-          ctx.lineWidth = (2.2 - k * 0.5) * fade + 0.4;
-          ctx.strokeStyle = '#ffffff';
+          const r = maxR * (1 - Math.pow(1 - p, 2.6)) * (1 - k * 0.1) + 3;
+          const fade = Math.pow(1 - p, 1.9) * (1 - k * 0.22);
+          if (fade <= 0.01) continue;
+
+          // 山（明るい側）
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = fade * 0.34;
+          ctx.lineWidth = 1.5 * fade + 0.5;
+          ctx.strokeStyle = '#eaf6ff';
           ctx.beginPath();
           ctx.arc(rp.x, rp.y, r, 0, Math.PI * 2);
           ctx.stroke();
+
+          // 谷（すぐ内側の影）。これがあると水面が凹んで見える
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.globalAlpha = fade * 0.2;
+          ctx.lineWidth = 1.8 * fade + 0.4;
+          ctx.strokeStyle = '#5d7f92';
+          ctx.beginPath();
+          ctx.arc(rp.x, rp.y, Math.max(1, r - 2.4 - k * 0.6), 0, Math.PI * 2);
+          ctx.stroke();
         }
 
-        // 落ちた瞬間のしぶき（中心の小さな円が弾けて消える）
-        if (rp.t < 0.34) {
-          const p = rp.t / 0.34;
-          ctx.globalAlpha = (1 - p) * 0.5;
-          ctx.lineWidth = 1.6;
+        // 落ちた瞬間のへこみ（中心が小さく沈んで戻る）
+        if (rp.t < 0.22) {
+          const p = rp.t / 0.22;
+          ctx.globalCompositeOperation = 'screen';
+          ctx.globalAlpha = (1 - p) * 0.42;
+          ctx.lineWidth = 1.4;
+          ctx.strokeStyle = '#eaf6ff';
           ctx.beginPath();
-          ctx.arc(rp.x, rp.y, 3 + p * 16, 0, Math.PI * 2);
+          ctx.arc(rp.x, rp.y, 2 + p * 7, 0, Math.PI * 2);
           ctx.stroke();
         }
       }
       ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
     };
 
     const tick = (now: number) => {
@@ -388,7 +430,17 @@ export default function RiverMode({
   }, []);
 
   return (
-    <div ref={rootRef} className="river-root" onPointerDown={handleDown} onPointerUp={handleUp}>
+    /*
+     * 靄がかかりきるまでは、この層を透かして元の画面を見せる（背景も中身も出さない）。
+     * 真っ白になってから川に入れ替わるので、切り替わる瞬間が見えない。
+     */
+    <div
+      ref={rootRef}
+      className={`river-root${phase === 'fog-in' ? ' bare' : ''}`}
+      onPointerDown={handleDown}
+      onPointerUp={handleUp}
+    >
+      <div className="river-content">
       <video
         ref={videoRef}
         className="river-video"
@@ -458,9 +510,12 @@ export default function RiverMode({
           ? 'タップで情報・上下スワイプで機種切替・横スワイプで戻る'
           : '横にスワイプすると戻ります'}
       </div>
+      </div>{/* river-content 閉じ */}
 
-      {/* 開始と終了の靄。開いたときは晴れていき、戻るときは覆っていく */}
-      <div className={`river-mist${closing ? ' out' : ''}`} aria-hidden />
+      {/* 出入りの靄。かかる → 晴れる → （戻るとき）また覆う */}
+      {phase !== 'shown' && (
+        <div className={`river-mist ${phase}`} aria-hidden />
+      )}
     </div>
   );
 }

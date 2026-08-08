@@ -191,11 +191,19 @@ body {
  * 1時間を超えて "1:05:23" になっても、増えた桁は左の余白へ伸びるだけ。
  */
 .header-work-elapsed {
-  /* 数字1文字ぶんの枠。字ごとの幅の違いで揺れないよう、全部この幅に揃える */
-  --hdr-digit: 0.62em;
-  /* : の枠。左右に確保する幅は「H:MM」がちょうど入る大きさ */
-  --hdr-sep: 0.34em;
-  --hdr-side: calc(var(--hdr-digit) * 3 + var(--hdr-sep));
+  /*
+   * 数字1文字ぶんの枠。字ごとの幅の違いで揺れないよう、全部この幅に揃える。
+   * ch は「その書体の 0 の幅」なので、書体が変わっても枠が足りなくならない。
+   * わずかに余裕を持たせて、0 より広い字がきても重ならないようにしている。
+   */
+  --hdr-digit: 1.2ch;
+  /*
+   * : の枠。左右に確保するのは「MM」ぶんだけにして、ヘッダーを詰めすぎない。
+   * 1時間を超えて "1:" が増えたときは、右寄せの左側が枠からはみ出して左へ伸びる。
+   * 枠の幅は変わらないので、中央の : は動かない。
+   */
+  --hdr-sep: 0.5ch;
+  --hdr-side: calc(var(--hdr-digit) * 2 + var(--hdr-sep));
   display: grid;
   grid-template-columns: var(--hdr-side) auto var(--hdr-side);
   align-items: center;
@@ -990,6 +998,11 @@ body {
  * 開いた直後は靄が立ちこめていて、ゆっくり晴れて川が見えてくる。
  * 戻るときは逆に靄が覆いつくし、覆いきったところで元の画面へ戻る。
  */
+/* 靄がかかりきるまでは、この層を透かして元の画面を見せる */
+.river-root.bare { background: transparent; pointer-events: none; }
+.river-content { position: absolute; inset: 0; }
+.river-root.bare .river-content { opacity: 0; }
+
 .river-mist {
   position: absolute; inset: -10%; z-index: 40;
   pointer-events: none;
@@ -1000,17 +1013,40 @@ body {
     /* 濃さのむらだけだと向こう側が透けるので、下地を1枚敷いて覆いきる */
     linear-gradient(rgba(222,236,240,0.82), rgba(222,236,240,0.82));
   filter: blur(14px);
-  animation: river-mist-clear 1.5s cubic-bezier(0.3, 0, 0.2, 1) both;
 }
-.river-mist.out { animation: river-mist-close 0.64s cubic-bezier(0.4, 0, 0.6, 1) both; }
+/* 元の画面に靄がかかって真っ白になるまで */
+.river-mist.fog-in { animation: river-mist-gather 0.85s linear both; }
+/* 真っ白から晴れて川が見えてくるまで */
+.river-mist.clearing { animation: river-mist-clear 1.3s linear both; }
+/* 戻るとき。川が白く覆われるまで */
+.river-mist.fog-out { animation: river-mist-gather 0.85s linear both; }
 
+@keyframes river-mist-gather {
+  0%   { opacity: 0; transform: scale(1.18) translateX(-5%); }
+  55%  { opacity: 0.75; }
+  100% { opacity: 1; transform: scale(1) translateX(0); }
+}
 @keyframes river-mist-clear {
   0%   { opacity: 1; transform: scale(1) translateX(0); }
+  45%  { opacity: 0.72; }
   100% { opacity: 0; transform: scale(1.16) translateX(5%); }
 }
-@keyframes river-mist-close {
-  0%   { opacity: 0; transform: scale(1.16) translateX(-5%); }
-  100% { opacity: 1; transform: scale(1) translateX(0); }
+
+/*
+ * 戻ったあと、元の画面の上に残す靄。
+ * せせらぎモードを閉じた時点では画面が真っ白なので、
+ * ここから晴れていくことで元の画面が現れる。
+ */
+.river-tail-mist {
+  position: fixed; inset: -10%; z-index: 305;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 70% 46% at 28% 34%, rgba(240,247,249,0.95) 0%, rgba(240,247,249,0) 62%),
+    radial-gradient(ellipse 62% 40% at 76% 62%, rgba(230,241,245,0.92) 0%, rgba(230,241,245,0) 60%),
+    radial-gradient(ellipse 90% 60% at 50% 50%, rgba(216,232,238,0.85) 0%, rgba(216,232,238,0.45) 55%, rgba(216,232,238,0.2) 100%),
+    linear-gradient(rgba(222,236,240,0.82), rgba(222,236,240,0.82));
+  filter: blur(14px);
+  animation: river-mist-clear 1.3s linear both;
 }
 
 /* ===== せせらぎモード: 水面から現れる品目情報 ===== */
@@ -1247,38 +1283,10 @@ body {
 }
 .gdrive-close:active { background: rgba(255,255,255,0.12); }
 
-.gdrive-tools {
-  display: flex; align-items: center; gap: 8px;
-  padding: 0 16px 10px;
-  flex-shrink: 0;
-}
-.gdrive-search {
-  flex: 1; min-width: 0;
-  padding: 9px 12px; border-radius: 11px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: #fff; font-size: 13px;
-  outline: none;
-}
-.gdrive-search::placeholder { color: rgba(255,255,255,0.3); }
-.gdrive-search:focus { border-color: rgba(107,82,212,0.6); background: rgba(255,255,255,0.07); }
-.gdrive-sort {
-  padding: 8px 11px; border-radius: 11px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.5); font-size: 12px; font-weight: 600;
-  white-space: nowrap; cursor: pointer;
-}
-.gdrive-sort.on {
-  background: rgba(107,82,212,0.22);
-  border-color: rgba(138,180,255,0.4);
-  color: #cbd9ff;
-}
-
 .gdrive-list {
   flex: 1; min-height: 120px;
   overflow-y: auto; overscroll-behavior: contain;
-  padding: 0 10px 6px;
+  padding: 0 10px 12px;
 }
 .gdrive-row {
   width: 100%;
@@ -1291,10 +1299,6 @@ body {
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 .gdrive-row:active { background: rgba(255,255,255,0.08); }
-.gdrive-row.on {
-  background: rgba(107,82,212,0.18);
-  border-color: rgba(138,180,255,0.45);
-}
 .gdrive-row-icon { display: flex; flex-shrink: 0; }
 .gdrive-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .gdrive-row-name {
@@ -1308,13 +1312,7 @@ body {
 /* 何のファイルとして読まれるか（コンテナ作業ファイル・マスターデータなど） */
 .gdrive-row-label { color: rgba(155,122,232,0.95); font-weight: 600; }
 .gdrive-row-chevron { color: rgba(255,255,255,0.3); font-size: 20px; flex-shrink: 0; padding-right: 4px; }
-.gdrive-check {
-  width: 22px; height: 22px; flex-shrink: 0;
-  border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.22);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 800; color: #fff;
-}
-.gdrive-check.on { background: #6b52d4; border-color: #8ab4ff; }
+
 
 /* 接続中・エラー・空のとき */
 .gdrive-state {
@@ -1336,28 +1334,10 @@ body {
   color: #cbd9ff; font-size: 12.5px; font-weight: 700; cursor: pointer;
 }
 
-.gdrive-foot {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 11px 16px 14px;
-  border-top: 1px solid rgba(255,255,255,0.07);
-  background: rgba(0,0,0,0.2);
-  flex-shrink: 0;
-}
-.gdrive-count { font-size: 11.5px; color: rgba(255,255,255,0.45); }
-.gdrive-submit {
-  padding: 11px 26px; border-radius: 13px;
-  background: linear-gradient(135deg, #4a7af7 0%, #6b52d4 55%, #9b45c9 100%);
-  border: none; color: #fff; font-size: 14px; font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 6px 20px rgba(75,122,247,0.28);
-  transition: opacity 0.2s ease, transform 0.15s ease;
-}
-.gdrive-submit:disabled {
-  background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.28);
-  box-shadow: none; cursor: default;
-}
-.gdrive-submit:not(:disabled):active { transform: scale(0.97); }
+
+
+
+
 
 @media (prefers-reduced-motion: reduce) {
   .gdrive-sheet { animation-duration: 0.01s; }
