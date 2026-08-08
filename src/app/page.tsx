@@ -1319,6 +1319,7 @@ export default function Home() {
           completionLog={state.completionLog}
           weather={barWeather}
           switchbot={switchbot}
+          hasLoadedData={hasData}
           onOpenClimate={() => {
             if (switchbot) setSbPopupOpen(true);
             else if (barWeather) setWeatherPopup(barWeather);
