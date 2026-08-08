@@ -300,12 +300,12 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
                     右下のメニュー →<strong style={{ color: '#7dd3fc' }}>「せせらぎモード」</strong>で、川の映像を全画面表示します。
-                    川が流れ、木立が風で揺れ、水面には作業中の<strong style={{ color: '#fff' }}>機種名・品番・カートン数(CT)・パレット数(PL)</strong>などが
-                    ゆっくり流れて現れます。水の音も一緒に流れ始めます。
+                    川が流れ、枝葉が風で揺れ、靄が漂います（地面・石・木の根元は止まったままです）。
+                    水の音も一緒に流れ始めます。
                   </div>
                   <div>
-                    画面をタップすると波紋が広がります。元の画面に戻るときは
-                    <strong style={{ color: '#7dd3fc' }}>右下の ✦</strong> をタップしてください。
+                    画面の上側をタップすると波紋が広がります。元の画面に戻るときは
+                    <strong style={{ color: '#7dd3fc' }}>画面の下 1/3</strong> をタップしてください。
                   </div>
                 </div>
               </InfoCard>
