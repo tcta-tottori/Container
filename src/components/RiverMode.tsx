@@ -5,6 +5,7 @@ import { ContainerItem } from '@/lib/types';
 import { displayQuantities } from '@/lib/itemQuantity';
 import { usePalletTap } from '@/hooks/usePalletTap';
 import { ThermometerIcon, HumidityIcon } from '@/components/AppIcons';
+import { isRiverWaterFxEnabled } from '@/lib/riverSettings';
 import PalletDiagram from './PalletDiagram';
 
 interface RiverModeProps {
@@ -51,6 +52,16 @@ const FRACTION_SPIN_DEG_PER_SEC = 360 / 15;
 /** 端数パレットを触ってから自動回転に戻るまで */
 const FRACTION_IDLE_MS = 2500;
 
+/* ===== 水越しの歪み（SVG フィルタ） ===== */
+/** フィルタの id。CSS の filter: url(#...) から参照する */
+const WATER_FX_ID = 'riverWaterFx';
+/** 出てくるときに歪みが収まるまでの時間(ms)。出現アニメと合わせる */
+const FX_IN_MS = 1600;
+/** 沈むときに歪みが強くなるまでの時間(ms)。沈むアニメと合わせる */
+const FX_OUT_MS = 1400;
+/** 歪みの最大量(px)。これ以上だと文字が読めなくなる */
+const FX_MAX = 16;
+
 /** 時刻を HH:MM で返す */
 function nowHhMm(): string {
   const d = new Date();
@@ -73,6 +84,8 @@ export default function RiverMode({
   /** 品目情報が浮かび上がっているか。key を変えると出現アニメをやり直す */
   const [info, setInfo] = useState<{ shown: boolean; key: number }>({ shown: false, key: 0 });
   const infoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 水越しの歪みを掛けるか（設定ページで切り替える。開いたときの値を使う） */
+  const [waterFx] = useState(() => isRiverWaterFxEnabled());
   /** 全画面（ステータスバーを消せた）かどうか。消せたときだけ自前の時計を出す */
   const [ownClock, setOwnClock] = useState(false);
   const [clock, setClock] = useState('');
@@ -380,6 +393,7 @@ export default function RiverMode({
           onModelUp={handleModelUp}
           onModelCancel={handleModelCancel}
           onFractionSwipeY={handleFractionSwipeY}
+          waterFx={waterFx}
         />
       )}
 
@@ -393,7 +407,7 @@ export default function RiverMode({
 
 /** 水面から現れる品目情報。文字は白のみ、しずくを垂らしながら出てくる */
 function RiverInfo({
-  item, shown, animKey, onPalletTap, onModelDown, onModelUp, onModelCancel, onFractionSwipeY,
+  item, shown, animKey, onPalletTap, onModelDown, onModelUp, onModelCancel, onFractionSwipeY, waterFx,
 }: {
   item: ContainerItem;
   shown: boolean;
@@ -403,6 +417,7 @@ function RiverInfo({
   onModelUp: (e: React.PointerEvent<HTMLDivElement>) => void;
   onModelCancel: () => void;
   onFractionSwipeY: (dy: number) => void;
+  waterFx: boolean;
 }) {
   const { pallets, cartons, pcs } = displayQuantities(item);
   const model = item.representModel?.trim() || item.itemName;
@@ -410,14 +425,19 @@ function RiverInfo({
   /* 残りが端数ケースだけになったら、作業画面と同じように端数パレットの積み方を出す */
   const fractionOnly = pallets === 0 && cartons > 0 && item.qtyPerPallet > 0;
 
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const dispRef = useRef<SVGFEDisplacementMapElement>(null);
+  useWaterDistortion(waterFx, shown, bodyRef, dispRef);
+
   return (
     /*
      * .river-info は画面いっぱいのマスク層。水面の高さでマスクが切れているので、
      * 中身（.river-info-body）が下から上がってくると水面を境に現れる。
      */
     <div className={`river-stage${shown ? '' : ' hide'}`} key={animKey} aria-hidden={!shown}>
+      {waterFx && <WaterFxDefs dispRef={dispRef} />}
       <div className="river-info">
-      <div className={`river-info-body${fractionOnly ? ' with-fraction' : ''}`}>
+      <div ref={bodyRef} className={`river-info-body${fractionOnly ? ' with-fraction' : ''}`}>
         <div
           className="river-info-line river-info-model"
           onPointerDown={onModelDown}
@@ -548,4 +568,92 @@ function FractionPallet({
       </div>
     </div>
   );
+}
+
+/**
+ * 水越しに見える歪みのフィルタ定義。
+ * feTurbulence で作った雲状のノイズを feDisplacementMap の変位量に使い、
+ * 文字を水面ごしに見たようにゆがませる。
+ * ノイズは1回作れば良いので毎フレーム作り直さず、揺れ幅（scale）だけを動かす。
+ */
+function WaterFxDefs({ dispRef }: { dispRef: React.Ref<SVGFEDisplacementMapElement> }) {
+  return (
+    <svg className="river-fx-defs" aria-hidden focusable="false">
+      <filter
+        id={WATER_FX_ID}
+        x="-25%" y="-25%" width="150%" height="150%"
+        colorInterpolationFilters="sRGB"
+        filterUnits="objectBoundingBox"
+      >
+        {/* 横に長く伸びたゆるやかなノイズ。水面のうねりに近い形になる */}
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.008 0.02"
+          numOctaves={1}
+          seed={7}
+          result="noise"
+        />
+        {/*
+          ノイズをぼかしてから使うのが肝心。
+          そのまま使うと変位が急に変わって文字の縁がギザギザに裂けてしまう。
+          ぼかすと変位がなだらかにつながり、文字は読めるまま水面ごしのように波打つ。
+          ノイズは動かさないので、このぼかしは1回計算されるだけで毎フレームの負担にはならない。
+        */}
+        <feGaussianBlur in="noise" stdDeviation={3} result="softNoise" />
+        <feDisplacementMap
+          ref={dispRef}
+          in="SourceGraphic"
+          in2="softNoise"
+          scale={0}
+          xChannelSelector="R"
+          yChannelSelector="G"
+        />
+      </filter>
+    </svg>
+  );
+}
+
+/**
+ * 歪みの掛かり具合を時間で動かす。
+ * 出てくるときは大きな歪みから 0 へ（水から上がって落ち着く）、
+ * 沈むときは 0 から大きな歪みへ（水に入っていく）。
+ * 落ち着いたらフィルタ自体を外して、描画の負担を残さないようにする。
+ */
+function useWaterDistortion(
+  enabled: boolean,
+  shown: boolean,
+  bodyRef: React.RefObject<HTMLDivElement | null>,
+  dispRef: React.RefObject<SVGFEDisplacementMapElement | null>,
+) {
+  useEffect(() => {
+    if (!enabled) return;
+    const body = bodyRef.current;
+    const disp = dispRef.current;
+    if (!body || !disp) return;
+
+    const dur = shown ? FX_IN_MS : FX_OUT_MS;
+    const t0 = performance.now();
+    let raf = 0;
+
+    body.style.filter = `url(#${WATER_FX_ID})`;
+
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / dur);
+      // 出るときは収まる方向、沈むときは強くなる方向
+      const amount = shown ? Math.pow(1 - p, 1.7) : Math.pow(p, 1.4);
+      disp.setAttribute('scale', (FX_MAX * amount).toFixed(2));
+      if (p < 1) {
+        raf = requestAnimationFrame(tick);
+      } else if (shown) {
+        // 落ち着いたらフィルタを外す（掛けっぱなしは文字がにじむし重い）
+        body.style.filter = '';
+      }
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      body.style.filter = '';
+    };
+  }, [enabled, shown, bodyRef, dispRef]);
 }
