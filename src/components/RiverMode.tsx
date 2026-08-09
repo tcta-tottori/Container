@@ -35,13 +35,21 @@ interface Ripple {
 
 const BASE = process.env.NODE_ENV === 'production' ? '/Container' : '';
 /**
- * 川の動画（約9.3秒・H.264・音声つき）。
- *
+ * 川の動画（約10秒・H.264・音声つき）。
  * 中身は穏やかな流れだけで、水面から何かが出てくるような場面は入っていない。
- * 末尾と先頭を重ねてあるので、そのまま繰り返しても継ぎ目が見えず、音も途切れない。
  * せせらぎモードの音は、この動画に入っている川の音を使う。
  */
 const VIDEO_MP4 = `${BASE}/videos/river-loop.mp4`;
+
+/**
+ * 繰り返しの重ね時間(秒)。
+ *
+ * video の loop 任せだと、末尾から先頭へ戻るときに音が一瞬切れ、映像も引っかかる。
+ * そこで同じ動画を2つ用意し、終わりが近づいたらもう一方を頭から流し始めて、
+ * この時間をかけて絵と音を入れ替える。どちらも同じ穏やかな流れなので、
+ * 重ねている間も「ずっと流れ続けている」ように見える。
+ */
+const LOOP_FADE = 0.6;
 
 /** 浮かび上がった品目情報が沈むまでの時間 */
 const INFO_MS = 9000;
@@ -109,7 +117,9 @@ export default function RiverMode({
 }: RiverModeProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  /** 同じ動画を2つ。片方を流している間にもう片方を頭出しして、継ぎ目なくつなぐ */
+  const videoARef = useRef<HTMLVideoElement>(null);
+  const videoBRef = useRef<HTMLVideoElement>(null);
   const ripplesRef = useRef<Ripple[]>([]);
   const [hintVisible, setHintVisible] = useState(true);
   /** 品目情報が浮かび上がっているか。key を変えると出現アニメをやり直す */
@@ -249,47 +259,126 @@ export default function RiverMode({
   }, [ownClock]);
 
   /*
-   * 再生と音。
+   * 再生・繰り返し・音。
+   *
+   * video の loop に任せると、末尾から先頭へ戻るところで音が一瞬切れ、
+   * 映像も引っかかる。そこで同じ動画を2つ持ち、終わりが近づいたら
+   * もう一方を頭から流し始めて、LOOP_FADE 秒かけて絵と音を入れ替える。
+   * どちらも同じ穏やかな流れなので、重なっている間も流れ続けて見える。
    *
    * 自動再生は「音が出ない」ことが条件なので、まず消音のまま流し始めて、
    * 流れ出してから音を出す（せせらぎモードはタップで開くので、この形なら通る）。
    * 音の大きさは「水の音」設定に合わせるので、絞っていれば小さく、0 なら鳴らない。
    */
   useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
+    const a = videoARef.current;
+    const b = videoBRef.current;
+    if (!a || !b) return;
 
-    const applyVolume = () => {
-      let vol = 0.4;
-      try { vol = getWaterSoundEngine().getVolume(); } catch { /* 既定のまま */ }
-      v.volume = Math.max(0, Math.min(1, vol));
-      v.muted = vol <= 0.001;
+    /** 「水の音」設定の音量。0 なら鳴らさない */
+    let base = 0.4;
+    const readVolume = () => {
+      try { base = getWaterSoundEngine().getVolume(); } catch { /* 既定のまま */ }
+      base = Math.max(0, Math.min(1, base));
+    };
+    readVolume();
+
+    /** いま表に出ている方 */
+    let front = a;
+    let back = b;
+    /** 入れ替え中か */
+    let fading = false;
+
+    /**
+     * 絵と音の配分を決める。p=0 で front だけ、p=1 で back だけ。
+     * 音は足したときの大きさが変わらないよう、sin/cos で振り分ける。
+     */
+    const mix = (p: number) => {
+      const q = Math.max(0, Math.min(1, p));
+      front.style.opacity = String(1 - q);
+      back.style.opacity = String(q);
+      const mute = base <= 0.001;
+      front.muted = mute;
+      back.muted = mute;
+      front.volume = base * Math.cos((q * Math.PI) / 2);
+      back.volume = base * Math.sin((q * Math.PI) / 2);
     };
 
-    const play = () => {
+    /** 消音のまま流し始めて、流れ出したら設定どおりの音量にする */
+    const start = (v: HTMLVideoElement, onPlaying?: () => void) => {
       v.muted = true;
       void v.play()
-        .then(() => {
-          applyVolume();
-          /*
-           * 音を出した拍子に止められる端末があるため、その場合は
-           * 消音に戻してでも映像だけは流し続ける（真っ暗になるのを防ぐ）。
-           */
-          window.setTimeout(() => {
-            if (v.paused) { v.muted = true; void v.play().catch(() => { /* ignore */ }); }
-          }, 300);
-        })
-        .catch(() => { /* 再生できなくても表示は続ける */ });
+        .then(() => { onPlaying?.(); })
+        .catch(() => { /* 流せなくても表示は続ける */ });
     };
-    play();
+
+    back.style.opacity = '0';
+    back.volume = 0;
+    front.style.opacity = '1';
+    start(front, () => {
+      mix(0);
+      /*
+       * 音を出した拍子に止められる端末があるため、その場合は
+       * 消音に戻してでも映像だけは流し続ける（真っ暗になるのを防ぐ）。
+       */
+      window.setTimeout(() => {
+        if (front.paused) { front.muted = true; void front.play().catch(() => { /* ignore */ }); }
+      }, 300);
+    });
+
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const dur = front.duration;
+      if (!Number.isFinite(dur) || dur <= LOOP_FADE) return;
+
+      const left = dur - front.currentTime;
+
+      // 終わりが近づいたら、もう一方を頭から流し始める
+      if (!fading && left <= LOOP_FADE) {
+        fading = true;
+        try { back.currentTime = 0; } catch { /* まだ動かせないときはそのまま */ }
+        start(back);
+      }
+      if (!fading) return;
+
+      /*
+       * 入れ替えの進み具合。もう一方が間に合わなかった場合に備えて、
+       * front が終わってしまったときは即座に入れ替える。
+       */
+      const p = front.ended ? 1 : Math.min(1, Math.max(0, 1 - left / LOOP_FADE));
+      mix(p);
+      if (p < 1) return;
+
+      // 入れ替え完了。表と裏を交代して、下がった方を頭に戻して止める
+      const done = front;
+      front = back;
+      back = done;
+      fading = false;
+      front.style.opacity = '1';
+      back.style.opacity = '0';
+      back.volume = 0;
+      back.pause();
+      try { back.currentTime = 0; } catch { /* ignore */ }
+      // 交代した直後に取りこぼしがないよう、表は必ず流れている状態にする
+      if (front.paused) start(front);
+    };
+    raf = requestAnimationFrame(tick);
 
     // 「水の音」の音量を動かしたら、こちらにも効かせる
+    const onVolume = () => {
+      readVolume();
+      mix(fading ? 1 - (front.duration - front.currentTime) / LOOP_FADE : 0);
+    };
     let unsubscribe: (() => void) | null = null;
-    try { unsubscribe = getWaterSoundEngine().subscribe(applyVolume); } catch { /* ignore */ }
+    try { unsubscribe = getWaterSoundEngine().subscribe(onVolume); } catch { /* ignore */ }
 
-    const onVis = () => { if (!document.hidden) play(); };
+    // 戻ってきたときに止まったままにならないようにする
+    const onVis = () => { if (!document.hidden && front.paused) start(front); };
     document.addEventListener('visibilitychange', onVis);
+
     return () => {
+      cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', onVis);
       unsubscribe?.();
     };
@@ -496,16 +585,29 @@ export default function RiverMode({
       onPointerUp={handleUp}
     >
       <div className="river-content">
+      {/* 同じ動画を2つ重ねて、終わりが近づいたら裏の1本に流れを渡す（音も絵も切れない） */}
       <video
-        ref={videoRef}
+        ref={videoARef}
         className="river-video"
         autoPlay
-        loop
         playsInline
         preload="auto"
         disablePictureInPicture
         controls={false}
         tabIndex={-1}
+      >
+        <source src={VIDEO_MP4} type="video/mp4" />
+      </video>
+      <video
+        ref={videoBRef}
+        className="river-video"
+        style={{ opacity: 0 }}
+        playsInline
+        preload="auto"
+        disablePictureInPicture
+        controls={false}
+        tabIndex={-1}
+        aria-hidden
       >
         <source src={VIDEO_MP4} type="video/mp4" />
       </video>
