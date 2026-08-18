@@ -26,6 +26,10 @@ interface RiverModeProps {
   workElapsed?: string;
   /** 経過時間の下に出す気温・湿度（SwitchBot があれば実測、なければ気象庁） */
   climate?: { temperature: number; humidity: number } | null;
+  /** 一時停止中か。止めている間は川の映像と音も止める */
+  paused?: boolean;
+  /** 右上の経過時間をタップしたときの一時停止・再開 */
+  onTogglePause?: () => void;
 }
 
 /** タップの波紋（水滴が落ちた水面） */
@@ -118,12 +122,18 @@ function nowHhMm(): string {
  */
 export default function RiverMode({
   onClose, item, onDecreasePallet, onIncreasePallet, onNextItem, onPrevItem, workElapsed, climate,
+  paused = false, onTogglePause,
 }: RiverModeProps) {
+  /** 一時停止中か。動画のつなぎ処理（毎フレーム）から見るので ref でも持つ */
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
   const rootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   /** 同じ動画を2つ。片方を流している間にもう片方を頭出しして、継ぎ目なくつなぐ */
   const videoARef = useRef<HTMLVideoElement>(null);
   const videoBRef = useRef<HTMLVideoElement>(null);
+  /** 動画の一時停止・再開。ループのつなぎ処理の中で作って、ここに預ける */
+  const pauseCtlRef = useRef<{ pause: () => void; resume: () => void } | null>(null);
   const ripplesRef = useRef<Ripple[]>([]);
   const [hintVisible, setHintVisible] = useState(true);
   /** 品目情報が浮かび上がっているか。key を変えると出現アニメをやり直す */
@@ -344,6 +354,8 @@ export default function RiverMode({
     let raf = 0;
     const tick = () => {
       raf = requestAnimationFrame(tick);
+      // 一時停止中は動画を止めているので、つなぎの進み具合も見ない
+      if (pausedRef.current) return;
       const dur = front.duration;
       if (!Number.isFinite(dur) || dur <= LOOP_FADE) return;
 
@@ -388,16 +400,43 @@ export default function RiverMode({
     let unsubscribe: (() => void) | null = null;
     try { unsubscribe = getWaterSoundEngine().subscribe(onVolume); } catch { /* ignore */ }
 
+    /*
+     * 一時停止・再開。表に出ている方だけ流し直せばよい（裏は頭出しで止めてある）。
+     * 川の音は動画に入っている音なので、止めれば映像と一緒にせせらぎも止まる。
+     */
+    pauseCtlRef.current = {
+      pause: () => { front.pause(); back.pause(); },
+      resume: () => {
+        // 入れ替えの途中で止めていたら、裏の1本も一緒に流し直す
+        const left = front.duration - front.currentTime;
+        const p = fading && Number.isFinite(left) ? Math.min(1, Math.max(0, 1 - left / LOOP_FADE)) : 0;
+        start(front, () => mix(p));
+        if (fading) start(back, () => mix(p));
+      },
+    };
+
     // 戻ってきたときに止まったままにならないようにする
-    const onVis = () => { if (!document.hidden && front.paused) start(front); };
+    const onVis = () => { if (!document.hidden && front.paused && !pausedRef.current) start(front); };
     document.addEventListener('visibilitychange', onVis);
 
     return () => {
       cancelAnimationFrame(raf);
       document.removeEventListener('visibilitychange', onVis);
       unsubscribe?.();
+      pauseCtlRef.current = null;
     };
   }, []);
+
+  /** 一時停止の切り替えを動画に効かせる（初回の再生はループ側に任せる） */
+  const everPausedRef = useRef(false);
+  useEffect(() => {
+    if (paused) everPausedRef.current = true;
+    else if (!everPausedRef.current) return;
+    const ctl = pauseCtlRef.current;
+    if (!ctl) return;
+    if (paused) ctl.pause();
+    else ctl.resume();
+  }, [paused]);
 
   /* ===== 数量。端数だけになったら作業画面と同じように積み方を全画面で出す ===== */
   const quantities = item ? displayQuantities(item) : null;
@@ -634,7 +673,22 @@ export default function RiverMode({
       <div className="river-topbar">
         <span className="river-clock">{ownClock ? clock : ''}</span>
         <span className="river-topbar-right">
-          {workElapsed && <span className="river-elapsed">{workElapsed}</span>}
+          {workElapsed && (
+            onTogglePause ? (
+              <button
+                type="button"
+                className={`river-elapsed river-elapsed-btn${paused ? ' paused' : ''}`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onPointerUp={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); onTogglePause(); }}
+                title={paused ? 'タップで再開' : 'タップで一時停止'}
+              >
+                {workElapsed}
+              </button>
+            ) : (
+              <span className="river-elapsed">{workElapsed}</span>
+            )
+          )}
           {climate && (
             <span className="river-climate">
               <span className="river-climate-temp">
@@ -671,6 +725,19 @@ export default function RiverMode({
           cartons={quantities.cartons}
           onDone={() => setPalletFs(false)}
         />
+      )}
+
+      {/* 一時停止中の目印。触れば再開できる */}
+      {paused && (
+        <button
+          type="button"
+          className="river-paused"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onTogglePause?.(); }}
+        >
+          一時停止中 — タップで再開
+        </button>
       )}
 
       {/* 戻り方のヒント（数秒で消える） */}

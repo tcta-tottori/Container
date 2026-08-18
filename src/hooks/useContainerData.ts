@@ -28,6 +28,8 @@ export interface ContainerState {
   completionLog: CompletionLogEntry[];
   itemStartTime: number | null;
   workStartTime: number | null;
+  /** 一時停止した時刻（epoch ms）。null なら動いている */
+  workPausedAt: number | null;
   autoAnnounce: boolean;
 }
 
@@ -48,7 +50,9 @@ export type Action =
   | { type: 'DELETE_ITEM'; idx: number }
   | { type: 'COMPLETE_ITEM'; id: string }
   | { type: 'UNCOMPLETE_ITEM'; id: string }
-  | { type: 'RESET_WORK_TIMER' };
+  | { type: 'RESET_WORK_TIMER' }
+  | { type: 'PAUSE_WORK' }
+  | { type: 'RESUME_WORK' };
 
 const initialState: ContainerState = {
   containers: [],
@@ -62,6 +66,7 @@ const initialState: ContainerState = {
   completionLog: [],
   itemStartTime: null,
   workStartTime: null,
+  workPausedAt: null,
   autoAnnounce: true,
 };
 
@@ -118,6 +123,7 @@ function reducer(state: ContainerState, action: Action): ContainerState {
         completionLog: [],
         itemStartTime: Date.now(),
         workStartTime: Date.now(),
+        workPausedAt: null,
       };
     }
 
@@ -140,6 +146,7 @@ function reducer(state: ContainerState, action: Action): ContainerState {
         completionLog: [],
         itemStartTime: Date.now(),
         workStartTime: Date.now(),
+        workPausedAt: null,
       };
     }
 
@@ -325,7 +332,28 @@ function reducer(state: ContainerState, action: Action): ContainerState {
     }
 
     case 'RESET_WORK_TIMER':
-      return { ...state, workStartTime: Date.now(), completionLog: [] };
+      return { ...state, workStartTime: Date.now(), workPausedAt: null, completionLog: [] };
+
+    /*
+     * 一時停止。休憩に入ったところで時計を止める。
+     * 止めている間の時間は経過時間にも品目ごとの時間にも入れたくないので、
+     * 再開のときに止めていた分だけ開始時刻をうしろへずらす。
+     */
+    case 'PAUSE_WORK': {
+      if (state.workStartTime === null || state.workPausedAt !== null) return state;
+      return { ...state, workPausedAt: Date.now() };
+    }
+
+    case 'RESUME_WORK': {
+      if (state.workPausedAt === null) return state;
+      const paused = Date.now() - state.workPausedAt;
+      return {
+        ...state,
+        workStartTime: state.workStartTime === null ? null : state.workStartTime + paused,
+        itemStartTime: state.itemStartTime === null ? null : state.itemStartTime + paused,
+        workPausedAt: null,
+      };
+    }
 
     default:
       return state;
@@ -416,6 +444,8 @@ export function useContainerData() {
     () => dispatch({ type: 'RESET_WORK_TIMER' }),
     []
   );
+  const pauseWork = useCallback(() => dispatch({ type: 'PAUSE_WORK' }), []);
+  const resumeWork = useCallback(() => dispatch({ type: 'RESUME_WORK' }), []);
 
   return {
     state,
@@ -439,5 +469,7 @@ export function useContainerData() {
     completeItem,
     uncompleteItem,
     resetWorkTimer,
+    pauseWork,
+    resumeWork,
   };
 }

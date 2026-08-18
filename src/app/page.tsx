@@ -225,9 +225,16 @@ export default function Home() {
     completeItem,
     uncompleteItem,
     resetWorkTimer,
+    pauseWork,
+    resumeWork,
   } = useContainerData();
 
-  const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
+  /** 一時停止中か（経過時間・音声コール・水の音・せせらぎをまとめて止めている） */
+  const workPaused = state.workPausedAt !== null;
+  const workPausedRef = useRef(workPaused);
+  workPausedRef.current = workPaused;
+
+  const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime, state.workPausedAt);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
   const { speak, speakCheer, speakThenCheer, announceItem, announcePalletChange, announceAllComplete, announceContainerSummary } =
     useSpeech();
@@ -349,6 +356,8 @@ export default function Home() {
   const firstItemSkipRef = useRef(true);
   useEffect(() => {
     if (!currentItem || !state.autoAnnounce) return;
+    // 一時停止中（休憩中）はコールしない
+    if (workPausedRef.current) return;
     if (prevItemRef.current !== currentItem.id) {
       prevItemRef.current = currentItem.id;
       if (firstItemSkipRef.current) {
@@ -365,6 +374,7 @@ export default function Home() {
       // 完了コールとの重複回避（2秒待機）
       setTimeout(() => {
         if (state.completedIds.has(currentItem.id)) return;
+        if (workPausedRef.current) return;
         announceItem(currentItem, state.items);
       }, 2000);
     }
@@ -395,47 +405,69 @@ export default function Home() {
 
   /**
    * コールに使う SwitchBot の実測値を返す。
-   * 接続（スキャン）中かつ受信から10分以内のときだけ有効。それ以外は気象庁データを使う。
+   * 接続中（スキャンを動かしている）かつ受信から10分以内のときだけ有効。
+   * それ以外は気象庁データを使う。
+   *
+   * 接続の判定に sbStopRef（スキャンを止める関数）も見るのは、受信は続いているのに
+   * 一時的なエラー通知で status が 'error' に振れることがあるため。
    */
   const getSbClimate = useCallback((): SwitchBotReading | null => {
     const { reading, status } = sbLiveRef.current;
-    if (status !== 'scanning' || !reading) return null;
+    const connected = status === 'scanning' || sbStopRef.current !== null;
+    if (!connected || !reading) return null;
     if (Date.now() - reading.updatedAt > 10 * 60 * 1000) return null;
     return reading;
   }, []);
 
   // 10分ごとの定期進捗コール（作業中のみ）
-  // 「10分経過しました」+ ランダム応援フレーズ。毎回応援フレーズが変わる。
+  // 「10分経過しました」+ 気温 + ランダム応援フレーズ。毎回応援フレーズが変わる。
   const periodicStateRef = useRef({ items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode });
   periodicStateRef.current = { items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode };
-  // deps は workStartTime のみ。items.length を入れると品目完了のたびに
-  // インターバルが張り直されて 10 分カウントがリセットされ、コールが永久に発火しない。
+
+  /**
+   * 「◯分経過しました」＋気温のコール。
+   * SwitchBot 接続中は、その場の実測値（気温・湿度・暑さ指数＋警戒レベル）をコールする。
+   * 実測値があるときは気象庁の取得を待たない（通信が遅い・つながらない場合でも実測を読む）。
+   */
+  const announceElapsedCall = useCallback((minutes: number) => {
+    const sb = getSbClimate();
+    const say = (text: string) => {
+      // 応援コールは設定がオンのときだけ、応援リストから取ってそのまま（別発話で）続ける
+      if (isTenMinCheerEnabled()) speakThenCheer(text, getRandomCallPhrase());
+      else speak(text);
+    };
+    if (sb) {
+      say(`${minutes}分経過しました。${climateToSpeech(sb, true)}`);
+      // コールした数値がそのまま見えるよう、SwitchBot のポップアップを出す
+      setSbPopupOpen(true);
+      // バーの気象庁データだけは裏で更新しておく
+      void fetchWeather().then((w) => { if (w) setBarWeather(w); });
+      return;
+    }
+    void fetchWeather().then((w) => {
+      say(`${minutes}分経過しました。${currentTempToSpeech(w, null)}`);
+      if (w) { setWeatherPopup(w); setBarWeather(w); }
+    });
+  }, [getSbClimate, speak, speakThenCheer]);
+
+  /*
+   * 何回めの 10 分までコールしたか。
+   * 経過時間そのもの（workRawSeconds）で数えるので、一時停止して止めている間は進まない。
+   * setInterval で数えていたころのように、止めた時間ぶんコールがずれることもない。
+   */
+  const tenMinStepRef = useRef(0);
   useEffect(() => {
-    if (!state.workStartTime) return;
-    const startedAt = state.workStartTime;
-    const interval = setInterval(() => {
-      const { items, completedIds, autoAnnounce, viewMode: vm } = periodicStateRef.current;
-      if (!autoAnnounce || vm !== 'work') return;
-      const remaining = items.filter((it) => !completedIds.has(it.id));
-      if (remaining.length === 0) return;
-      // 実際の経過時間を 10 分単位でコール（10分、20分、30分…）
-      const minutes = Math.max(10, Math.round((Date.now() - startedAt) / 600000) * 10);
-      // 経過アナウンス＋現在気温を先に読み上げ。応援コールは設定がオンの時のみ
-      // 応援リストから取得してそのまま（別発話で）コールする。温湿度ポップアップも表示。
-      // SwitchBot 接続中は実測の気温・湿度・暑さ指数（＋危険/注意などの警戒レベル）をコールする
-      const sb = getSbClimate();
-      fetchWeather().then(w => {
-        const pre = `${minutes}分経過しました。${currentTempToSpeech(w, sb)}`;
-        if (isTenMinCheerEnabled()) {
-          speakThenCheer(pre, getRandomCallPhrase());
-        } else {
-          speak(pre);
-        }
-        if (w) { setWeatherPopup(w); setBarWeather(w); }
-      });
-    }, 10 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [state.workStartTime, speakThenCheer, speak, getSbClimate]);
+    const step = Math.floor(workRawSeconds / 600);
+    // リセットや読み直しで時間が戻ったら数え直す
+    if (step < tenMinStepRef.current) tenMinStepRef.current = step;
+    if (step === 0 || step === tenMinStepRef.current) return;
+    tenMinStepRef.current = step;
+    const { items, completedIds, autoAnnounce, viewMode: vm } = periodicStateRef.current;
+    if (!autoAnnounce || vm !== 'work') return;
+    const remaining = items.filter((it) => !completedIds.has(it.id));
+    if (remaining.length === 0) return;
+    announceElapsedCall(step * 10);
+  }, [workRawSeconds, announceElapsedCall]);
 
   // 温湿度バー: 気象庁データを起動時＋10分ごとに取得
   useEffect(() => {
@@ -1164,6 +1196,31 @@ export default function Home() {
   // 作業用BGM（水の流れる音）
   const { playing: waterPlaying, toggle: toggleWater } = useWaterSound();
 
+  /** 一時停止のときにこちらで水の音BGMを止めたか（再開で戻すための目印） */
+  const pausedWaterRef = useRef(false);
+
+  /**
+   * 経過時間の一時停止・再開。
+   * 休憩に入ったら時計を止めるだけでなく、いま鳴っている音声コールも切り、
+   * 水の音BGMも止める（せせらぎモード中なら川の映像と音が止まる）。
+   * 再開したら、こちらで止めた水の音だけを元に戻す。
+   */
+  const toggleWorkPause = useCallback(() => {
+    if (workPaused) {
+      resumeWork();
+      if (pausedWaterRef.current) {
+        pausedWaterRef.current = false;
+        if (!waterPlaying) toggleWater();
+      }
+      return;
+    }
+    if (!state.workStartTime) return;
+    cancelSpeech();
+    if (waterPlaying) { pausedWaterRef.current = true; toggleWater(); }
+    else pausedWaterRef.current = false;
+    pauseWork();
+  }, [workPaused, resumeWork, pauseWork, state.workStartTime, waterPlaying, toggleWater]);
+
   /**
    * せせらぎモードを開く。
    * 中では動画に入っている川の音を使うので、流れている水の音BGMはいったん止める
@@ -1346,6 +1403,8 @@ export default function Home() {
           onPrevItem={movePrev}
           workElapsed={workElapsed}
           climate={switchbot || barWeather}
+          paused={workPaused}
+          onTogglePause={state.workStartTime ? toggleWorkPause : undefined}
         />
       )}
 
@@ -1409,7 +1468,9 @@ export default function Home() {
           workElapsed={workElapsed}
           workRawSeconds={workRawSeconds}
           onMenuToggle={() => setMenuOpen(!menuOpen)}
-          onResetWorkTimer={() => { resetWorkTimer(); setItemTimeLogs([]); }}
+          onResetWorkTimer={() => { resetWorkTimer(); setItemTimeLogs([]); tenMinStepRef.current = 0; }}
+          workPaused={workPaused}
+          onToggleWorkPause={state.workStartTime ? toggleWorkPause : undefined}
           itemTimeLogs={itemTimeLogs}
           completionLog={state.completionLog}
           weather={barWeather}

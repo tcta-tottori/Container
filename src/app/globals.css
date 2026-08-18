@@ -174,7 +174,7 @@ body {
   .rotate-guard-title { font-size: 18px; font-weight: 800; letter-spacing: 0.5px; }
   .rotate-guard-sub { font-size: 12px; color: rgba(255,255,255,0.5); }
 }
-.header-center { display: flex; align-items: center; justify-content: center; }
+.header-center { position: relative; display: flex; align-items: center; justify-content: center; }
 .header-right { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
 .header-btn {
   display: flex; align-items: center; justify-content: center;
@@ -229,6 +229,25 @@ body {
 @keyframes elapsed-blink {
   0%, 100% { color: #f59e0b; }
   50% { color: rgba(245,158,11,0.3); }
+}
+
+/* 一時停止中の経過時間。止まっているとひと目で分かるよう色を落として静かに脈打たせる */
+.header-elapsed-paused {
+  color: rgba(255,255,255,0.42) !important;
+  animation: elapsed-paused-pulse 2.4s ease-in-out infinite;
+}
+@keyframes elapsed-paused-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+/* 経過時間の下に出す「一時停止中」。数字を動かさないよう重ねて置く */
+.header-paused-badge {
+  position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 3px;
+  white-space: nowrap;
+  font-size: 9px; font-weight: 800; letter-spacing: 0.5px;
+  color: #fbbf24;
+  pointer-events: none;
 }
 
 /* 水の音 再生中を右下ボタンで示す */
@@ -981,6 +1000,31 @@ body {
   font-size: 19px; font-weight: 600; letter-spacing: 0.1em;
   color: #ffd79a;
   text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 2px 12px rgba(0,0,0,0.7);
+}
+/* 経過時間をタップすると一時停止・再開できる（上端の帯は素通しなのでここだけ拾う） */
+.river-elapsed-btn {
+  background: transparent; border: none; padding: 2px 4px; margin: -2px -4px;
+  font-family: inherit; cursor: pointer;
+  pointer-events: auto;
+}
+.river-elapsed-btn.paused {
+  color: rgba(255,255,255,0.5);
+  animation: elapsed-paused-pulse 2.4s ease-in-out infinite;
+}
+/* 一時停止中の帯（触ると再開） */
+.river-paused {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 5;
+  padding: 12px 22px; border-radius: 999px;
+  background: rgba(10,14,20,0.55);
+  border: 1px solid rgba(255,255,255,0.28);
+  backdrop-filter: blur(6px);
+  color: rgba(255,255,255,0.92);
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em;
+  white-space: nowrap;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+  cursor: pointer;
+  animation: elapsed-paused-pulse 2.8s ease-in-out infinite;
 }
 /* 気温と湿度はアイコンなしで改行し、右端をそろえる */
 .river-climate {

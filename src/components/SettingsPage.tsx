@@ -4,7 +4,7 @@ import { useState } from 'react';
 import CallPhraseSettings from '@/components/CallPhraseSettings';
 import WaterSoundPanel from '@/components/WaterSoundPanel';
 import VoiceSettingsPanel from '@/components/VoiceSettingsPanel';
-import { ChatIcon, DropletIcon, CameraIcon, SettingsIcon, CloseIcon, SpeakerIcon, RotateIcon } from '@/components/AppIcons';
+import { ChatIcon, DropletIcon, CameraIcon, SettingsIcon, CloseIcon, SpeakerIcon, RotateIcon, ExternalLinkIcon } from '@/components/AppIcons';
 import ScreenSettings from '@/components/ScreenSettings';
 import {
   getGeminiKey, setGeminiKey, clearGeminiKey,
@@ -21,6 +21,9 @@ interface SettingsPageProps {
   /** コールの試聴。読み終わったら onDone を呼ぶ */
   onTestCall?: (phrase: string, onDone: () => void) => void;
 }
+
+/** Gemini API キーを取りに行く Google AI Studio のページ */
+const AI_STUDIO_URL = 'https://aistudio.google.com/app/apikey';
 
 /** 写真読込（Gemini API）の設定セクション */
 function AiPhotoSettings() {
@@ -58,13 +61,32 @@ function AiPhotoSettings() {
 
       <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.7, marginBottom: 16 }}>
         Google Gemini API を使って写真から高精度に品目を抽出します。<br />
-        API キーは <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer"
+        API キーは <a href={AI_STUDIO_URL} target="_blank" rel="noreferrer"
           style={{ color: '#8ab4ff', textDecoration: 'underline' }}>Google AI Studio</a> で無料取得できます（Flash モデルは無料枠あり）。
       </p>
 
-      <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 600, display: 'block', marginBottom: 7 }}>
-        API キー
-      </label>
+      {/* API キーの見出しの右に、取得ページ（AI Studio）へ飛ぶボタンを置く */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+        <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 600, flex: 1 }}>
+          API キー
+        </label>
+        <a
+          href={AI_STUDIO_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="Google AI Studio でAPIキーを取得"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 11px', borderRadius: 999,
+            background: 'rgba(138,180,255,0.12)', border: '1px solid rgba(138,180,255,0.35)',
+            color: '#8ab4ff', fontSize: 11.5, fontWeight: 700,
+            textDecoration: 'none', whiteSpace: 'nowrap',
+          }}
+        >
+          <ExternalLinkIcon size={13} strokeWidth={2} />
+          AI Studio でキーを取得
+        </a>
+      </div>
       <input
         type="password"
         value={keyDraft}

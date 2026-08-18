@@ -27,8 +27,11 @@ export function useTimer(startTime: number | null) {
   return elapsed;
 }
 
-/** 作業経過時間フック（フォーマット済み + 生秒数） */
-export function useWorkTimer(startTime: number | null) {
+/**
+ * 作業経過時間フック（フォーマット済み + 生秒数）。
+ * pausedAt に時刻が入っている間は、その時点の値で止めたままにする。
+ */
+export function useWorkTimer(startTime: number | null, pausedAt: number | null = null) {
   const [rawSeconds, setRawSeconds] = useState(0);
   const [formatted, setFormatted] = useState('00:00');
 
@@ -40,7 +43,9 @@ export function useWorkTimer(startTime: number | null) {
     }
 
     const update = () => {
-      const diff = Math.floor((Date.now() - startTime) / 1000);
+      // 一時停止中は止めた時刻で数える（1秒ごとの更新もいらない）
+      const now = pausedAt ?? Date.now();
+      const diff = Math.max(0, Math.floor((now - startTime) / 1000));
       setRawSeconds(diff);
       const h = Math.floor(diff / 3600);
       const m = Math.floor((diff % 3600) / 60);
@@ -53,9 +58,10 @@ export function useWorkTimer(startTime: number | null) {
     };
 
     update();
+    if (pausedAt !== null) return;
     const id = setInterval(update, 1000);
     return () => clearInterval(id);
-  }, [startTime]);
+  }, [startTime, pausedAt]);
 
   return { formatted, rawSeconds };
 }

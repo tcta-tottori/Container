@@ -244,8 +244,14 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#a78bfa' }}>ヘッダー</strong>は1行です。左がメニュー、中央が作業の経過時間（タップで品目別の時間・リセット）、
+                    <strong style={{ color: '#a78bfa' }}>ヘッダー</strong>は1行です。左がメニュー、中央が作業の経過時間（タップで品目別の時間・一時停止・リセット）、
                     右が気温・湿度と暑さ指数の色バッジ（緑→黄→オレンジ→赤で危険度）。バッジをタップすると詳細と推移グラフが開きます。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#fbbf24' }}>一時停止</strong>: 経過時間をタップして「一時停止」を押すと、休憩の間だけ時計を止められます。
+                    止めている間は<strong style={{ color: '#fbbf24' }}>音声コール・水の音・せせらぎモードの映像と川の音も止まり</strong>、10分ごとのコールも数えません。
+                    ヘッダーには「一時停止中」と出ます。もう一度押すと止めたところから続き、止めていた時間は経過時間に入りません。
+                    せせらぎモード中は<strong style={{ color: '#f0cf95' }}>右上の経過時間をタップ</strong>しても止められます。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#60a5fa' }}>右下のボタン</strong>（上向きの山マーク）を押すと下からメニューが開き、
@@ -313,7 +319,8 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     <strong style={{ color: '#ef4444' }}>OKコマンド後</strong>: 「残り○パレットと○ケース。」のみコール（次の品目コールはなし）。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#f59e0b' }}>10分ごとのコール</strong>: 経過時間＋気温・湿度・暑さ指数と警戒レベル（危険／厳重警戒／警戒／注意）をコール。SwitchBot 接続中は実測値を使います。
+                    <strong style={{ color: '#f59e0b' }}>10分ごとのコール</strong>: 経過時間＋気温・湿度・暑さ指数と警戒レベル（危険／厳重警戒／警戒／注意）をコール。
+                    SwitchBot 接続中は、その場の実測値（「実測の気温…」）をコールし、コールした数値のポップアップも出ます。一時停止中は数えません。
                   </div>
                   <div>
                     <strong style={{ color: '#a78bfa' }}>声・トーンの設定</strong>: メニュー →「設定」→「音声」で、使う音声API・話す人・トーン・速さ・音量を変更できます（通常コールと応援コールで別々に設定）。
@@ -334,7 +341,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   <div style={{ marginBottom: 8 }}>
                     映像は<strong style={{ color: '#7dd3fc' }}>ステータスバーの領域まで全画面</strong>で流れます。
                     上端は<strong style={{ color: '#7dd3fc' }}>左に現在時刻</strong>、
-                    <strong style={{ color: '#f0cf95' }}>右に作業の経過時間</strong>、
+                    <strong style={{ color: '#f0cf95' }}>右に作業の経過時間</strong>（タップで一時停止・再開）、
                     その下に<strong style={{ color: '#fb923c' }}>気温</strong>と<strong style={{ color: '#38bdf8' }}>湿度</strong>だけを表示します。
                   </div>
                   <div style={{ marginBottom: 8 }}>

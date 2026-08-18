@@ -9,6 +9,7 @@ import {
 import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/geminiTts';
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
 import { loadCallPhrases, DEFAULT_CALL_PHRASES } from '@/lib/callPhrases';
+import { ExternalLinkIcon } from '@/components/AppIcons';
 
 type ProfileKey = 'main' | 'cheer';
 
@@ -26,6 +27,31 @@ function sampleText(key: ProfileKey): string {
 }
 
 /** 見出し */
+/** Gemini API キーを取りに行く Google AI Studio のページ */
+const AI_STUDIO_URL = 'https://aistudio.google.com/app/apikey';
+
+/** AI Studio（キーの取得ページ）へ飛ぶボタン */
+function AiStudioLink() {
+  return (
+    <a
+      href={AI_STUDIO_URL}
+      target="_blank"
+      rel="noreferrer"
+      title="Google AI Studio でAPIキーを取得"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '6px 11px', borderRadius: 999,
+        background: 'rgba(138,180,255,0.12)', border: '1px solid rgba(138,180,255,0.35)',
+        color: '#8ab4ff', fontSize: 11.5, fontWeight: 700,
+        textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+      }}
+    >
+      <ExternalLinkIcon size={13} strokeWidth={2} />
+      AI Studio でキーを取得
+    </a>
+  );
+}
+
 function Label({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div style={{ marginBottom: 7 }}>
@@ -300,7 +326,13 @@ export default function VoiceSettingsPanel() {
 
       {settings.engine === 'gemini' && (
         <>
-          <Label hint="AI写真の設定と共通のキーです">Gemini API キー</Label>
+          {/* キー欄のすぐ上に、取得ページ（AI Studio）へ飛ぶボタンを並べる */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Label hint="AI写真の設定と共通のキーです">Gemini API キー</Label>
+            </div>
+            <AiStudioLink />
+          </div>
           <input
             type="password"
             value={keyDraft}
