@@ -136,3 +136,18 @@ export function CloseIcon(p: IconProps) {
 export function RotateIcon(p: IconProps) {
   return <Svg {...p}><rect x="8.5" y="2.5" width="7" height="19" rx="2" /><path d="M4 14.5A8 8 0 0 1 7.4 4.2" /><polyline points="4.7 3.6 7.8 4.1 7.3 7.2" /><path d="M20 9.5a8 8 0 0 1-3.4 10.3" /><polyline points="19.3 20.4 16.2 19.9 16.7 16.8" /></Svg>;
 }
+
+/** 一時停止（2本の縦棒） */
+export function PauseIcon(p: IconProps) {
+  return <Svg {...p}><line x1="9" y1="4.5" x2="9" y2="19.5" /><line x1="15" y1="4.5" x2="15" y2="19.5" /></Svg>;
+}
+
+/** 再開（三角） */
+export function PlayIcon(p: IconProps) {
+  return <Svg {...p}><path d="M7 4.8v14.4l12-7.2z" /></Svg>;
+}
+
+/** 外部リンク（枠から飛び出す矢印） */
+export function ExternalLinkIcon(p: IconProps) {
+  return <Svg {...p}><path d="M13.5 4.5H19.5V10.5" /><line x1="19.5" y1="4.5" x2="11" y2="13" /><path d="M18 14.5v4A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6h4" /></Svg>;
+}

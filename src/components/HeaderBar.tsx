@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react';
 import { CompletionLogEntry } from '@/hooks/useContainerData';
 import { WeatherData, wbgtLevel } from '@/lib/weatherNews';
 import { SwitchBotReading } from '@/lib/switchbot';
-import { MenuIcon, ThermometerIcon, HumidityIcon } from '@/components/AppIcons';
+import { MenuIcon, ThermometerIcon, HumidityIcon, PauseIcon, PlayIcon } from '@/components/AppIcons';
 
 export interface ItemTimeLog {
   itemName: string;
@@ -44,6 +44,10 @@ interface HeaderBarProps {
   workRawSeconds: number;
   onMenuToggle: () => void;
   onResetWorkTimer: () => void;
+  /** 経過時間を一時停止しているか */
+  workPaused?: boolean;
+  /** 一時停止・再開の切り替え（音声・水の音・せせらぎもまとめて止まる） */
+  onToggleWorkPause?: () => void;
   itemTimeLogs: ItemTimeLog[];
   completionLog: CompletionLogEntry[];
   /** ヘッダー右の気温表示（気象庁データ） */
@@ -147,6 +151,8 @@ export default function HeaderBar({
   workRawSeconds,
   onMenuToggle,
   onResetWorkTimer,
+  workPaused = false,
+  onToggleWorkPause,
   itemTimeLogs,
   completionLog,
   weather,
@@ -249,15 +255,16 @@ export default function HeaderBar({
 
   const pullReady = pull >= PULL_TRIGGER;
 
-  // 5分ごとに黄色点滅（5秒間）
+  // 5分ごとに黄色点滅（5秒間）。一時停止中は数えていないので光らせない
   useEffect(() => {
+    if (workPaused) return;
     if (workRawSeconds > 0 && workRawSeconds % 300 === 0 && lastFlashedAt.current !== workRawSeconds) {
       lastFlashedAt.current = workRawSeconds;
       setIsFlashing(true);
       const timer = setTimeout(() => setIsFlashing(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [workRawSeconds]);
+  }, [workRawSeconds, workPaused]);
 
   return (
     <>
@@ -272,17 +279,23 @@ export default function HeaderBar({
         </button>
       </div>
 
-      {/* 中央: 経過時間 */}
+      {/* 中央: 経過時間（一時停止中は色を落として「一時停止中」を出す） */}
       <div className="header-center">
         <button
           onClick={() => setPopupOpen(true)}
-          className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}`}
+          className={`header-work-elapsed ${isFlashing ? 'header-elapsed-flash' : ''}${workPaused ? ' header-elapsed-paused' : ''}`}
           style={{ background: 'transparent', cursor: 'pointer' }}
-          title="タップで経過時間の詳細"
-          aria-label={`経過時間 ${workElapsed}`}
+          title={workPaused ? '一時停止中 — タップで詳細' : 'タップで経過時間の詳細'}
+          aria-label={`経過時間 ${workElapsed}${workPaused ? '（一時停止中）' : ''}`}
         >
           <ElapsedDigits value={workElapsed} />
         </button>
+        {workPaused && (
+          <span className="header-paused-badge">
+            <PauseIcon size={10} strokeWidth={3} />
+            一時停止中
+          </span>
+        )}
       </div>
 
       {/* 右: 気温・湿度・暑さ指数 */}
@@ -326,11 +339,40 @@ export default function HeaderBar({
           }} onClick={e => e.stopPropagation()}>
             {/* 経過時間表示 */}
             <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>作業経過時間</div>
-              <div style={{ fontSize: 32, fontWeight: 900, color: '#f59e0b', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 4 }}>
+                {workPaused ? '作業経過時間（一時停止中）' : '作業経過時間'}
+              </div>
+              <div style={{
+                fontSize: 32, fontWeight: 900,
+                color: workPaused ? 'rgba(255,255,255,0.45)' : '#f59e0b',
+                fontFamily: 'var(--font-mono)',
+              }}>
                 {workElapsed}
               </div>
             </div>
+
+            {/* 一時停止・再開。休憩の間は時計も音声も水の音も止める */}
+            {onToggleWorkPause && (
+              <button
+                onClick={() => { onToggleWorkPause(); setPopupOpen(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: workPaused ? 'rgba(52,211,153,0.12)' : 'rgba(245,158,11,0.12)',
+                  border: `1px solid ${workPaused ? 'rgba(52,211,153,0.3)' : 'rgba(245,158,11,0.3)'}`,
+                  borderRadius: 10, padding: '11px 16px',
+                  color: workPaused ? '#6ee7b7' : '#fbbf24',
+                  fontWeight: 700, fontSize: 13, cursor: 'pointer', marginBottom: 10,
+                }}
+              >
+                {workPaused ? <PlayIcon size={16} strokeWidth={2} /> : <PauseIcon size={16} strokeWidth={2.4} />}
+                {workPaused ? '作業を再開' : '一時停止'}
+              </button>
+            )}
+            {onToggleWorkPause && (
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, marginBottom: 14, textAlign: 'center' }}>
+                一時停止中は経過時間が止まり、音声コール・水の音・せせらぎも止まります
+              </div>
+            )}
 
             {/* リセットボタン */}
             <button
