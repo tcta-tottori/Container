@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS,
   VoiceSettings, VoiceProfile, VoiceEngine,
-  getVoiceSettings, saveVoiceSettings, styleInstruction,
+  getVoiceSettings, saveVoiceSettings, styleInstruction, webSpeechVolume,
 } from '@/lib/voiceSettings';
+import { MAX_VOLUME, applyVolume, isBoostSupported } from '@/lib/audioBoost';
 import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/geminiTts';
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
 import { loadCallPhrases, DEFAULT_CALL_PHRASES } from '@/lib/callPhrases';
@@ -211,6 +212,11 @@ export default function VoiceSettingsPanel() {
   const [ttsError, setTtsError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const urlRef = useRef<string | null>(null);
+  const detachRef = useRef<(() => void) | null>(null);
+  // SSR とクライアントで初期描画をそろえるため、対応判定はマウント後に行う
+  const [boostSupported, setBoostSupported] = useState(true);
+
+  useEffect(() => { setBoostSupported(isBoostSupported()); }, []);
 
   useEffect(() => {
     setTtsError(getLastTtsError());
@@ -220,6 +226,7 @@ export default function VoiceSettingsPanel() {
   // パネルを閉じたら試聴を止める
   useEffect(() => () => {
     if (audioRef.current) { try { audioRef.current.pause(); } catch { /* ignore */ } }
+    if (detachRef.current) { detachRef.current(); detachRef.current = null; }
     if (urlRef.current) { try { URL.revokeObjectURL(urlRef.current); } catch { /* ignore */ } }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
   }, []);
@@ -233,6 +240,7 @@ export default function VoiceSettingsPanel() {
     const profile = settings[key];
     const text = sampleText(key);
     if (audioRef.current) { try { audioRef.current.pause(); } catch { /* ignore */ } audioRef.current = null; }
+    if (detachRef.current) { detachRef.current(); detachRef.current = null; }
     if (urlRef.current) { try { URL.revokeObjectURL(urlRef.current); } catch { /* ignore */ } urlRef.current = null; }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
 
@@ -241,7 +249,7 @@ export default function VoiceSettingsPanel() {
       u.lang = 'ja-JP';
       u.rate = Math.min(2, Math.max(0.5, profile.rate * 1.1));
       u.pitch = Math.min(2, Math.max(0, profile.pitch));
-      u.volume = settings.volume;
+      u.volume = webSpeechVolume(settings);
       window.speechSynthesis.speak(u);
       return;
     }
@@ -255,10 +263,13 @@ export default function VoiceSettingsPanel() {
       });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
-      audio.volume = settings.volume;
+      const detach = await applyVolume(audio, settings.volume);
       audioRef.current = audio;
       urlRef.current = url;
+      detachRef.current = detach;
       const cleanup = () => {
+        detach();
+        if (detachRef.current === detach) detachRef.current = null;
         if (urlRef.current === url) { URL.revokeObjectURL(url); urlRef.current = null; }
         if (audioRef.current === audio) audioRef.current = null;
       };
@@ -436,10 +447,30 @@ export default function VoiceSettingsPanel() {
       )}
 
       <Slider
-        label="音量" value={settings.volume} min={0} max={1} step={0.05}
+        label="音量" value={settings.volume} min={0} max={MAX_VOLUME} step={0.05}
         format={(v) => `${Math.round(v * 100)}%`}
         onChange={(v) => update({ ...settings, volume: v })}
       />
+      <div style={{
+        color: '#64748b', fontSize: 11, lineHeight: 1.6, marginBottom: 16,
+        padding: '8px 11px', borderRadius: 9,
+        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+      }}>
+        100% は端末の音量そのまま。それ以上は Gemini TTS のコールを増幅して鳴らす（最大 300%）。
+        {settings.engine === 'web' && (
+          <>
+            <br />
+            端末の音声はブラウザの仕様で 100% が上限です。もっと大きくしたいときは
+            Gemini TTS に切り替えるか、端末側のメディア音量を上げてください。
+          </>
+        )}
+        {settings.engine !== 'web' && !boostSupported && (
+          <>
+            <br />
+            この端末は増幅に対応していないため 100% が上限になります。
+          </>
+        )}
+      </div>
 
       {/* ===== コール別プロファイル ===== */}
       <div style={{

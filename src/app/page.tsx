@@ -24,7 +24,7 @@ import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
 import SettingsPage, { SettingsTab } from '@/components/SettingsPage';
 import HistoryModal from '@/components/HistoryModal';
-import { APP_VERSION, APP_UPDATED_TIME } from '@/lib/appVersion';
+import { APP_VERSION, APP_UPDATED } from '@/lib/appVersion';
 import { MenuIcon, UploadIcon, WorkIcon, EditIcon, ChartIcon, ClockIcon, HelpIcon, SettingsIcon } from '@/components/AppIcons';
 import { getWaterSoundEngine, setupWaterAutoResume } from '@/lib/waterSound';
 import { useWaterSound } from '@/hooks/useWaterSound';
@@ -1451,12 +1451,12 @@ export default function Home() {
               設定
             </button>
 
-            {/* バージョン + 更新時刻（読込画面から移動） */}
+            {/* バージョン + 更新日時（読込画面から移動） */}
             <div className="menu-spacer" />
             <div className="menu-version">
               <span className="menu-version-name">CNS</span>
               <span>Ver.{APP_VERSION}</span>
-              <span className="menu-version-sub">{APP_UPDATED_TIME}</span>
+              <span className="menu-version-sub">{APP_UPDATED}</span>
             </div>
           </div>
         </div>

@@ -7,6 +7,8 @@
  * 値は localStorage（`cns_voice_settings`）に JSON で保存する。
  */
 
+import { MAX_VOLUME } from '@/lib/audioBoost';
+
 const STORAGE_KEY = 'cns_voice_settings';
 
 /** 旧バージョンのキー（自動移行用） */
@@ -74,7 +76,11 @@ export interface VoiceSettings {
   main: VoiceProfile;
   /** 応援・あおりコール */
   cheer: VoiceProfile;
-  /** 音量（0〜1）。Web Speech と Gemini 再生の両方に反映 */
+  /**
+   * 音量（0〜3）。1.0 が端末の音量そのまま。
+   * 1.0 を超える分は Web Audio のゲインで持ち上げる（`src/lib/audioBoost.ts`）。
+   * 端末の音声（Web Speech API）は音を取り出せないため 1.0 が上限になる。
+   */
   volume: number;
 }
 
@@ -132,7 +138,7 @@ export function getVoiceSettings(): VoiceSettings {
     model: typeof parsed.model === 'string' && parsed.model ? parsed.model : DEFAULT_TTS_MODEL,
     main: normalizeProfile(parsed.main, DEFAULT_VOICE_SETTINGS.main),
     cheer: normalizeProfile(parsed.cheer, DEFAULT_VOICE_SETTINGS.cheer),
-    volume: clamp(Number(parsed.volume ?? 1), 0, 1),
+    volume: clamp(Number(parsed.volume ?? 1), 0, MAX_VOLUME),
   };
   return _cache;
 }
@@ -142,7 +148,7 @@ export function saveVoiceSettings(next: VoiceSettings): void {
     ...next,
     main: normalizeProfile(next.main, DEFAULT_VOICE_SETTINGS.main),
     cheer: normalizeProfile(next.cheer, DEFAULT_VOICE_SETTINGS.cheer),
-    volume: clamp(Number(next.volume), 0, 1),
+    volume: clamp(Number(next.volume), 0, MAX_VOLUME),
   };
   if (typeof window !== 'undefined') {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(_cache)); } catch { /* ignore */ }
@@ -167,6 +173,14 @@ export function styleInstruction(p: VoiceProfile): string {
   if (p.pitch >= 1.25) parts.push('高めの声で');
   else if (p.pitch <= 0.85) parts.push('低めの声で');
   return parts.join('、');
+}
+
+/**
+ * 端末の音声（Web Speech API）に渡す音量。
+ * `SpeechSynthesisUtterance.volume` の上限は 1.0 で、ブースト分は反映できない。
+ */
+export function webSpeechVolume(settings: VoiceSettings): number {
+  return Math.min(1, Math.max(0, settings.volume));
 }
 
 /** 表示用のトーン名 */

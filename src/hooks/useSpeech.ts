@@ -5,7 +5,8 @@ import { ContainerItem } from '@/lib/types';
 import { itemNameForSpeech, areSimilarItems } from '@/lib/typeDetector';
 import { geminiGenerateSpeech } from '@/lib/geminiTts';
 import { getGeminiKey } from '@/lib/geminiApi';
-import { getVoiceSettings, styleInstruction, VoiceProfile } from '@/lib/voiceSettings';
+import { getVoiceSettings, styleInstruction, webSpeechVolume, VoiceProfile } from '@/lib/voiceSettings';
+import { applyVolume } from '@/lib/audioBoost';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
@@ -27,6 +28,8 @@ export function setSpeakCallbacks(
 let _currentAudio: HTMLAudioElement | null = null;
 let _currentAbort: AbortController | null = null;
 let _currentAudioUrl: string | null = null;
+/** ブースト用に繋いだ Web Audio ノードを切り離す処理 */
+let _currentDetach: (() => void) | null = null;
 /**
  * いま進行中のコールの「終わったら呼ぶ」処理。
  * 試聴ボタンの読込表示のように、鳴り終わりを待っている呼び出し元があるため、
@@ -55,6 +58,7 @@ export function cancelSpeech(): void {
     try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ }
     _currentAudioUrl = null;
   }
+  if (_currentDetach) { _currentDetach(); _currentDetach = null; }
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
   }
@@ -75,7 +79,8 @@ function speakWebSpeech(text: string, onDone?: () => void, profile?: VoiceProfil
   u.lang = 'ja-JP';
   u.rate = Math.min(2, Math.max(0.5, p.rate * 1.1));
   u.pitch = Math.min(2, Math.max(0, p.pitch));
-  u.volume = settings.volume;
+  // 端末の音声は仕様上 1.0 が上限。ブースト分は乗せられない
+  u.volume = webSpeechVolume(settings);
   const voices = window.speechSynthesis.getVoices();
   const jaVoice = voices.find((v) => v.lang.startsWith('ja'));
   if (jaVoice) u.voice = jaVoice;
@@ -99,10 +104,15 @@ async function speakGemini(text: string, stylePrefix?: string, voice?: string, o
     if (abort.signal.aborted) return;
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
-    audio.volume = getVoiceSettings().volume;
+    // 100%超はここで Web Audio のゲインに載せ替える
+    const detach = await applyVolume(audio, getVoiceSettings().volume);
+    if (abort.signal.aborted) { detach(); URL.revokeObjectURL(url); return; }
     _currentAudio = audio;
     _currentAudioUrl = url;
+    _currentDetach = detach;
     const releaseUrl = () => {
+      detach();
+      if (_currentDetach === detach) _currentDetach = null;
       if (_currentAudioUrl === url) { URL.revokeObjectURL(url); _currentAudioUrl = null; }
       if (_currentAudio === audio) _currentAudio = null;
     };
@@ -130,6 +140,7 @@ function stopCurrentPlayback(): void {
     _currentAudio = null;
   }
   if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
+  if (_currentDetach) { _currentDetach(); _currentDetach = null; }
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
 
