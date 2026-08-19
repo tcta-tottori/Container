@@ -470,7 +470,7 @@ body {
 .menu-version-name { color: rgba(255,255,255,0.75); font-weight: 800; letter-spacing: 1.2px; }
 .menu-version-sub {
   margin-left: auto;
-  font-size: 13px; font-weight: 500; letter-spacing: 0.8px;
+  font-size: 12px; font-weight: 500; letter-spacing: 0.4px; white-space: nowrap;
   color: rgba(255,255,255,0.4); font-variant-numeric: tabular-nums;
 }
 
