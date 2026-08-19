@@ -43,9 +43,15 @@ Excelファイルから品目データを読み込み、リアルタイムの作
 - **プロファイル**: 「通常コール」と「応援コール」で、話す人（10種）・トーン・速さ・高さを別々に設定できる。
   トーンはプリセット（はっきり／穏やか／明るい／応援／急かす／低め）か自由記述。
   速さ・高さは Web Speech では数値でそのまま、Gemini では指示文（「ゆっくりと」「低めの声で」等）に変換して渡す。
-- **音量**: 両エンジン共通。試聴ボタンで実際の声を確認できる。
+- **音量**: 0〜300%。100% が端末の音量そのままで、それを超える分は Web Audio のゲインで増幅する
+  （`src/lib/audioBoost.ts`）。荷降ろし現場の騒音でコールが小さいときに使う。
+  増幅の前にコンプレッサーを通し、語尾など小さい部分を持ち上げてから上げるので歪みにくい。
+  端末の音声（Web Speech API）は再生される音を取り出せないため、`SpeechSynthesisUtterance.volume` の
+  上限 1.0 = 100% が上限になる（設定画面にもその旨を出す）。大きくしたいときは Gemini TTS に切り替えるか、
+  端末側のメディア音量を上げる。試聴ボタンで実際の声と音量を確認できる。
 - 実装: `src/lib/voiceSettings.ts`（設定）、`src/components/VoiceSettingsPanel.tsx`（UI）、
-  `src/lib/geminiTts.ts`（Gemini TTS クライアント）、`src/hooks/useSpeech.ts`（コール生成）。
+  `src/lib/geminiTts.ts`（Gemini TTS クライアント）、`src/lib/audioBoost.ts`（音量ブースト）、
+  `src/hooks/useSpeech.ts`（コール生成）。
 
 #### 気温・暑さ指数のコール
 天気コール（🌦ボタン / 「天気」）・気温コール（「気温」）・10分ごとの定期コールでは、
