@@ -32,6 +32,23 @@ WebAssembly（sherpa-onnx / Next-gen Kaldi）で読み上げます。通信が�
 k2-fsa が Hugging Face Spaces で公開している TTS のデモ（WebAssembly 版）から、
 同じ4ファイルを取ってきて置いても動きます。
 
+## 置くときの注意（ファイルの大きさ）
+
+`.data` はモデルによって数十〜百 MB になります。GitHub の Web 画面からのアップロードは
+1ファイル 25MB までなので、大きいファイルは **git で push** してください（git は100MBまで）。
+
+```
+# 例: 手元のPCで
+git clone https://github.com/tcta-tottori/Container
+cd Container
+git checkout claude/init-container-app-0RJFr   # 公開しているブランチ
+cp /path/to/sherpa-onnx-wasm-main-tts.* /path/to/sherpa-onnx-tts.js public/sherpa/
+git add public/sherpa && git commit -m "sherpa-onnx の日本語モデルを追加" && git push
+```
+
+push すると GitHub Actions が自動でデプロイし、アプリの「モデルを準備する」で読み込めるようになります。
+100MB を超えるモデルは GitHub に置けないので、その場合は次の「別の場所に置くとき」を使ってください。
+
 ## 別の場所に置くとき
 
 `.data` はモデルによっては数十〜百 MB になります。リポジトリに入れたくない場合は、

@@ -96,8 +96,16 @@ async function fetchWithCache(
   const hit = cache ? await cache.match(url) : undefined;
   if (hit) { onProgress?.(1); return hit; }
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url.split('/').pop()} が読み込めません (HTTP ${res.status})`);
+  const res = await fetch(url).catch(() => null);
+  if (!res) {
+    throw new Error(`${url.split('/').pop()} を取りに行けませんでした（通信を確認してください）`);
+  }
+  if (!res.ok) {
+    const err = new Error(`${url.split('/').pop()} が読み込めません (HTTP ${res.status})`);
+    // 404 は「まだファイルを置いていない」ケース。案内を出し分けるため印を付ける
+    if (res.status === 404) (err as Error & { missing?: boolean }).missing = true;
+    throw err;
+  }
 
   const total = Number(res.headers.get('content-length') || 0);
   let body: Response = res;
@@ -131,6 +139,8 @@ export async function clearSherpaCache(): Promise<void> {
   _tts = null;
   _loading = null;
   _loadedBase = '';
+  _failedBase = '';
+  _failedError = '';
   setState({ status: 'idle', progress: 0, message: '', error: null, numSpeakers: 1 });
 }
 
@@ -150,6 +160,19 @@ let _tts: OfflineTts | null = null;
 let _loading: Promise<OfflineTts> | null = null;
 /** いま読み込んであるアセットの置き場。設定で変わったら読み込み直す */
 let _loadedBase = '';
+/**
+ * 読み込みに失敗した置き場所と、その理由。
+ * 覚えておかないとコールのたびに同じファイルを取りに行って、
+ * そのぶん端末の音声に切り替わるのが遅くなる。
+ * 「モデルを準備する」を押したときと、置き場所を変えたときにやり直す。
+ */
+let _failedBase = '';
+let _failedError = '';
+
+/** ファイルが1つも置かれていないときの案内文 */
+const MISSING_MESSAGE = 'モデルのファイルがまだ置かれていません。'
+  + 'sherpa-onnx-wasm-main-tts.js / .wasm / .data と sherpa-onnx-tts.js の4つを'
+  + '「モデルの置き場所」に置いてください。置くまではコールは端末の音声で鳴ります。';
 
 /** JavaScript をグローバルスコープで実行する（Emscripten の Module 受け渡しに必要） */
 function runScript(code: string, name: string): Promise<void> {
@@ -168,6 +191,8 @@ async function loadTts(): Promise<OfflineTts> {
   const base = resolveBaseUrl();
   if (_tts && _loadedBase === base) return _tts;
   if (_loading && _loadedBase === base) return _loading;
+  // 一度失敗した置き場所は、やり直すまで取りに行かない（コールを待たせないため）
+  if (_failedBase === base) throw new Error(_failedError);
 
   _loadedBase = base;
   _tts = null;
@@ -231,9 +256,12 @@ async function loadTts(): Promise<OfflineTts> {
   } catch (e) {
     _loading = null;
     _loadedBase = '';
-    const msg = e instanceof Error ? e.message : String(e);
+    const missing = (e as Error & { missing?: boolean })?.missing === true;
+    const msg = missing ? MISSING_MESSAGE : (e instanceof Error ? e.message : String(e));
+    _failedBase = base;
+    _failedError = msg;
     setState({ status: 'error', progress: 0, message: '', error: msg });
-    throw e;
+    throw new Error(msg);
   }
 }
 
@@ -243,7 +271,9 @@ export function isSherpaReady(): boolean {
 }
 
 /** 先に読み込んでおく（設定ページの「準備する」ボタン・アプリ起動時に使う） */
-export async function prepareSherpaTts(): Promise<void> {
+export async function prepareSherpaTts(retry = false): Promise<void> {
+  // ボタンから押したときは、前に失敗していてももう一度取りに行く
+  if (retry) { _failedBase = ''; _failedError = ''; }
   await loadTts();
 }
 

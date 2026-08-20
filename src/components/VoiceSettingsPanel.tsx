@@ -522,7 +522,7 @@ export default function VoiceSettingsPanel() {
 
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <button
-              onClick={() => { void prepareSherpaTts().catch(() => { /* 状態は下に出る */ }); }}
+              onClick={() => { void prepareSherpaTts(true).catch(() => { /* 状態は下に出る */ }); }}
               disabled={sherpa.status === 'loading'}
               style={{
                 flex: 1, padding: '12px', borderRadius: 10,
@@ -579,7 +579,7 @@ export default function VoiceSettingsPanel() {
               padding: '9px 12px', borderRadius: 10, wordBreak: 'break-all',
               background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
             }}>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>読み込みに失敗しました</div>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>まだ使えません</div>
               {sherpa.error}
             </div>
           )}
