@@ -240,6 +240,25 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               </InfoCard>
             </Section>
 
+            <Section title="ジャーポットの積み方" color="#c084fc">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#c084fc' }}>PDU の機種</strong>: 2箱がシュリンクでひとかたまり（1玉＝2ケース）になっています。
+                    パレットの半面に<strong style={{ color: '#fbbf24' }}>横長置き2玉＋縦長置き3玉</strong>、
+                    もう半面は互い違いに置いて、<strong style={{ color: '#fbbf24' }}>1段10玉（20ケース）</strong>。
+                    2段目からは段ごとに互い違いに積みます。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#60a5fa' }}>段数</strong>: 30・40サイズは5段目まで、50サイズは4段目まで。
+                  </div>
+                  <div>
+                    <strong style={{ color: '#94a3b8' }}>PDZ など他の機種</strong>: これまでどおり1段4個の積み方です。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
             <Section title="画面の見かた・クイックメニュー" color="#a78bfa">
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>

@@ -32,8 +32,10 @@ export function calculateStackLayers(
   type: ItemType, itemName: string, qtyPerPallet: number, measurements?: string,
 ): number {
   if (type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName)) {
-    const m = itemName.match(/(30|40|50)/);
-    return m && parseInt(m[1]) >= 50 ? 4 : 5;
+    // 30・40サイズは5段目まで、50サイズは4段目まで。
+    // サイズは機種名（PDU-A40A など）の数字で見る。電圧表記を拾わないよう機種名の直後を優先する。
+    const m = itemName.match(/(?:PD[RUZ]|PVW)[^0-9]{0,4}(\d{2})/) || itemName.match(/(30|40|50)/);
+    return m && parseInt(m[1], 10) >= 50 ? 4 : 5;
   }
   if (type === 'ポリカバー' || type === '鍋') {
     return (itemName.includes('180') || /18[RWCS]/.test(itemName)) ? 4 : 5;
@@ -133,11 +135,22 @@ function wireframeFace(opacity: number): React.CSSProperties {
 }
 
 /* ===== CSS 3D Cardboard Box (properly positioned in 3D space) ===== */
-function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe }: {
+function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, split }: {
   x: number; y: number; w: number; d: number; h: number;
   topBase: number; palletDepth: number; wireframe?: boolean;
+  /** シュリンクで2箱をまとめた玉。継ぎ目を描いて「2箱で1玉」と分かるようにする */
+  split?: 'w' | 'd';
 }) {
   const zOffset = palletDepth / 2 - y - d / 2;
+  // 継ぎ目（縦線）。幅方向の分割なら正面・背面に、奥行方向の分割なら側面に出る
+  const seamV = split ? (
+    <div style={{
+      position: 'absolute', left: '49%', top: 0, width: '2%', height: '100%',
+      background: 'rgba(90,70,45,0.45)',
+    }} />
+  ) : null;
+  const seamOnFront = split === 'w' ? seamV : null;
+  const seamOnSide = split === 'd' ? seamV : null;
 
   if (wireframe) {
     return (
@@ -171,13 +184,20 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe }: {
         ...cardboardFace(0.55),
       }}>
         <div style={{ position: 'absolute', left: '44%', top: 0, width: '12%', height: '28%', background: 'rgba(200,180,140,0.35)' }} />
+        {seamOnFront}
       </div>
       {/* Back */}
-      <div style={{ position: 'absolute', width: w, height: h, transform: `rotateY(180deg) translateZ(${d / 2}px)`, ...cardboardFace(0.3) }} />
+      <div style={{ position: 'absolute', width: w, height: h, transform: `rotateY(180deg) translateZ(${d / 2}px)`, ...cardboardFace(0.3) }}>
+        {seamOnFront}
+      </div>
       {/* Left */}
-      <div style={{ position: 'absolute', width: d, height: h, left: (w - d) / 2, transform: `rotateY(-90deg) translateZ(${w / 2}px)`, ...cardboardFace(0.4) }} />
+      <div style={{ position: 'absolute', width: d, height: h, left: (w - d) / 2, transform: `rotateY(-90deg) translateZ(${w / 2}px)`, ...cardboardFace(0.4) }}>
+        {seamOnSide}
+      </div>
       {/* Right */}
-      <div style={{ position: 'absolute', width: d, height: h, left: (w - d) / 2, transform: `rotateY(90deg) translateZ(${w / 2}px)`, ...cardboardFace(0.45) }} />
+      <div style={{ position: 'absolute', width: d, height: h, left: (w - d) / 2, transform: `rotateY(90deg) translateZ(${w / 2}px)`, ...cardboardFace(0.45) }}>
+        {seamOnSide}
+      </div>
       {/* Top with tape cross */}
       <div style={{
         position: 'absolute', width: w, height: d, top: (h - d) / 2,
@@ -186,6 +206,12 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe }: {
       }}>
         <div style={{ position: 'absolute', left: '44%', top: 0, width: '12%', height: '100%', background: 'rgba(200,180,140,0.4)' }} />
         <div style={{ position: 'absolute', top: '44%', left: 0, width: '100%', height: '12%', background: 'rgba(200,180,140,0.35)' }} />
+        {split === 'w' && (
+          <div style={{ position: 'absolute', left: '49%', top: 0, width: '2%', height: '100%', background: 'rgba(90,70,45,0.45)' }} />
+        )}
+        {split === 'd' && (
+          <div style={{ position: 'absolute', top: '49%', left: 0, width: '100%', height: '2%', background: 'rgba(90,70,45,0.45)' }} />
+        )}
       </div>
       {/* Bottom */}
       <div style={{ position: 'absolute', width: w, height: d, top: (h - d) / 2, transform: `rotateX(-90deg) translateZ(${h / 2}px)`, ...cardboardFace(0.25) }} />
@@ -197,6 +223,8 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe }: {
 interface BoxSlot {
   x: number; y: number; z: number;
   w: number; d: number; h: number;
+  /** 2箱をシュリンクで1玉にしている場合の継ぎ目の向き（'w'=幅方向で2分割 / 'd'=奥行方向） */
+  split?: 'w' | 'd';
 }
 
 /**
@@ -327,6 +355,66 @@ function buildJarPotSlots(
           w: bw, d: bd, h: bhPx,
         });
       }
+    }
+  }
+  return slots;
+}
+
+/**
+ * PDU ジャーポットの積み方
+ *
+ * PDU が付くポットは2箱がシュリンクで1つにまとまっている（＝1玉 = 2ケース）。
+ * パレットの半面に「横長置き2玉 ＋ 縦長置き3玉」で5玉、
+ * もう半面は互い違い（左右を入れ替えた向き）に5玉を置いて、1段 10玉（20ケース）。
+ * 2段目からは段ごとに互い違いにして、荷崩れしないように積む。
+ *
+ *   1段目（奥半分）        1段目（手前半分）
+ *   ┌─────┬──┬──┬──┐    ┌──┬──┬──┬─────┐
+ *   │ 横長 │縦│縦│縦│    │縦│縦│縦│ 横長 │
+ *   ├─────┤  │  │  │    │  │  │  ├─────┤
+ *   │ 横長 │  │  │  │    │  │  │  │ 横長 │
+ *   └─────┴──┴──┴──┘    └──┴──┴──┴─────┘
+ *
+ * 玉の短辺 s はパレット幅の1/5。横長の長辺（2s）＋縦長3玉（3s）でちょうど幅に収まる。
+ */
+const PDU_CASES_PER_BUNDLE = 2;
+const PDU_BUNDLES_PER_LAYER = 10;
+
+function buildPduJarPotSlots(
+  bhPx: number, layers: number, pw: number, pd: number,
+): BoxSlot[] {
+  const s = pw / 5;      // 玉の短辺
+  const l = s * 2;       // 玉の長辺（2箱ぶん）
+  // 前後に余る分は均等に空ける（奥行きは 4s ぶん使う）
+  const yTop = Math.max(0, (pd - 4 * s) / 2);
+
+  /** 半面ぶんの並び。landscapeLeft = 横長2玉を左に置く（false なら左右反転） */
+  const halfSlots = (y0: number, landscapeLeft: boolean): Omit<BoxSlot, 'z' | 'h'>[] => {
+    const landscapeX = landscapeLeft ? 0 : 3 * s;
+    const portraitX = landscapeLeft ? l : 0;
+    const out: Omit<BoxSlot, 'z' | 'h'>[] = [];
+    // 横長置き2玉（奥行き方向に重ねる）
+    for (let i = 0; i < 2; i++) {
+      out.push({ x: landscapeX, y: y0 + i * s, w: l, d: s, split: 'w' });
+    }
+    // 縦長置き3玉（横に並べる）
+    for (let i = 0; i < 3; i++) {
+      out.push({ x: portraitX + i * s, y: y0, w: s, d: l, split: 'd' });
+    }
+    return out;
+  };
+
+  const slots: BoxSlot[] = [];
+  for (let layer = 0; layer < layers; layer++) {
+    // 段ごとに互い違い（奥半分と手前半分の向きを入れ替える）
+    const flip = layer % 2 === 1;
+    const z = PALLET_H_PX + layer * bhPx;
+    const layerSlots = [
+      ...halfSlots(yTop, !flip),      // 奥半分
+      ...halfSlots(yTop + l, flip),   // 手前半分（半面ごとに互い違い）
+    ];
+    for (const b of layerSlots) {
+      slots.push({ ...b, z, h: bhPx });
     }
   }
   return slots;
@@ -475,6 +563,11 @@ function isJPIType(itemName?: string): boolean {
   return !!itemName && /JPI[+\-]?[A-Z]/.test(itemName.replace(/\s/g, ''));
 }
 
+/** PDU が付くジャーポット（2箱シュリンクで1玉の積み方）。PDZ など他の機種は従来どおり */
+export function isPduJarPot(itemName?: string): boolean {
+  return !!itemName && /PDU/i.test(itemName);
+}
+
 /* ===== Main Component ===== */
 export default function PalletDiagram({
   palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe, noIntro,
@@ -487,6 +580,9 @@ export default function PalletDiagram({
   const isNabe = type === '鍋';
   const isJPI = isJPIType(itemName);
   const isJarPot = type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName || '');
+  const isPdu = isJarPot && isPduJarPot(itemName);
+  // PDU は2箱で1玉のため、図に描く1個 = 2ケース
+  const casesPerBox = isPdu ? PDU_CASES_PER_BUNDLE : 1;
 
   // Calculate pallet dimensions in cm
   let palletWcm: number;
@@ -519,7 +615,10 @@ export default function PalletDiagram({
   // Build slots
   let allSlots: BoxSlot[];
   let perLayer: number;
-  if (isJarPot) {
+  if (isPdu) {
+    allSlots = buildPduJarPotSlots(bh, layers, pw, pd);
+    perLayer = PDU_BUNDLES_PER_LAYER;
+  } else if (isJarPot) {
     allSlots = buildJarPotSlots(bh, layers, pw, pd);
     perLayer = 4;
   } else if (isNabe) {
@@ -568,8 +667,11 @@ export default function PalletDiagram({
     }
   }
 
+  // PDU は2ケースで1玉なので、端数のケース数を玉数に直してから図に起こす
+  const drawnFraction = casesPerBox > 1 ? Math.ceil(fraction / casesPerBox) : fraction;
+
   // 端数表示: allSlotsが足りない場合、必要な段数まで拡張
-  const displayQty = isFull ? perLayer * layers : fraction;
+  const displayQty = isFull ? perLayer * layers : drawnFraction;
   if (displayQty > allSlots.length && perLayer > 0) {
     const neededLayers = Math.ceil(displayQty / perLayer);
     const templateH = allSlots.length > 0 ? allSlots[0].h : bh;
@@ -590,7 +692,7 @@ export default function PalletDiagram({
     filled = allSlots.length;
   } else {
     // 端数: 下段は満杯、最上段のみ四隅積み
-    renderSlots = buildFractionSlots(allSlots, perLayer, fraction);
+    renderSlots = buildFractionSlots(allSlots, perLayer, drawnFraction);
     filled = renderSlots.length;
   }
 
@@ -649,6 +751,7 @@ export default function PalletDiagram({
               topBase={boxTop}
               palletDepth={pd}
               wireframe={wireframe}
+              split={slot.split}
             />
           );
         })}
