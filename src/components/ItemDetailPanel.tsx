@@ -6,78 +6,38 @@ import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 import { buildJapanesePartName } from '@/lib/partTranslations';
 import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
+import { displayQuantities } from '@/lib/itemQuantity';
+import { usePalletTap } from '@/hooks/usePalletTap';
+import { useCountUp } from '@/hooks/useCountUp';
 import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
-/* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） ===== */
-type AutoFsPhase = 'idle' | 'in' | 'show' | 'out';
-/** ズームイン時間 */
-const AUTO_FS_IN_MS = 700;
-/** ズームアウト時間 */
-const AUTO_FS_OUT_MS = 600;
-/** 表示開始から自動で閉じるまで（7秒） */
+/* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） =====
+ * measure: 実寸を測る（非表示）→ start: 元のパレット位置に縮小配置（アニメなし）
+ * → in: 全画面へゆっくり移動 → show: 操作受付 → out: 元の位置へ戻る
+ * 移動中（in / out）も回り続けるので、回転しながら手前に出てきて回転しながら戻る。
+ * 横スワイプで回転（画面幅いっぱいで180度）。触っていない間は勢いよく回り始め、
+ * 作業画面の端数パレットと同じ速さ（15秒で1回転）まで徐々に落ちる。
+ * 表示は7秒で、触ると最後の操作から数え直す。図の外をタップするとすぐ元に戻る。 */
+type AutoFsPhase = 'idle' | 'measure' | 'start' | 'in' | 'show' | 'out';
+/** 元の位置から全画面へ移動する時間（ゆっくり見せる） */
+const AUTO_FS_IN_MS = 1400;
+/** 元の位置へ戻る時間 */
+const AUTO_FS_OUT_MS = 900;
+/** 全画面を表示しておく時間。触ると最後の操作から数え直す */
 const AUTO_FS_HOLD_MS = 7000;
-
-/**
- * カウントアニメーション（アップ/ダウン対応）
- * - key変更: 0.4秒待機→1秒で0→targetまでカウントアップ
- * - target変更(key同一): 0.5秒で旧値→新値にスムーズ遷移（カウントダウン/アップ）
- */
-function useCountUp(target: number, key: string, freeze?: boolean): number {
-  const [value, setValue] = useState(target);
-  const rafRef = useRef<number>(0);
-  const targetRef = useRef(target);
-  const keyRef = useRef(key);
-  const prevValueRef = useRef(target);
-
-  // key が変わったとき: 0→targetへカウントアップ
-  useEffect(() => {
-    keyRef.current = key;
-    targetRef.current = target;
-    prevValueRef.current = 0;
-    setValue(0);
-    cancelAnimationFrame(rafRef.current);
-    const startTime = performance.now() + 400;
-    const duration = 1000;
-    const animate = (now: number) => {
-      if (now < startTime) { setValue(0); rafRef.current = requestAnimationFrame(animate); return; }
-      const progress = Math.min((now - startTime) / duration, 1);
-      const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
-      const t = targetRef.current;
-      const v = Math.round(eased * t);
-      setValue(v);
-      if (progress < 1) rafRef.current = requestAnimationFrame(animate);
-      else { setValue(t); prevValueRef.current = t; }
-    };
-    rafRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(rafRef.current);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-
-  // target が変わったとき（key同一 = パレット減少等）: スムーズ遷移
-  useEffect(() => {
-    if (keyRef.current !== key || freeze) return;
-    const from = prevValueRef.current;
-    const to = target;
-    if (from === to) return;
-    targetRef.current = to;
-    cancelAnimationFrame(rafRef.current);
-    const startTime = performance.now();
-    const duration = 500;
-    const animate = (now: number) => {
-      const progress = Math.min((now - startTime) / duration, 1);
-      const eased = progress < 0.5 ? 2 * progress * progress : 1 - (-2 * progress + 2) ** 2 / 2;
-      const v = Math.round(from + (to - from) * eased);
-      setValue(v);
-      if (progress < 1) rafRef.current = requestAnimationFrame(animate);
-      else { setValue(to); prevValueRef.current = to; }
-    };
-    rafRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [target, key]);
-
-  return value;
-}
+/** スワイプをやめてから自動回転に戻るまでの間 */
+const AUTO_FS_SPIN_DELAY_MS = 300;
+/** 自動回転の初速（度/秒）。勢いよく回り始める */
+const AUTO_FS_SPIN_DPS_START = 260;
+/** 落ち着いたあとの速さ。作業画面の端数パレット（15秒で1回転）と同じにする */
+const AUTO_FS_SPIN_DPS_END = 360 / 15;
+/** 初速から終速へ近づく時定数（秒）。3倍の時間でほぼ終速になる */
+const AUTO_FS_SPIN_EASE_SEC = 1.8;
+/** 画面幅いっぱいのスワイプで回る角度 */
+const AUTO_FS_SWIPE_DEG = 180;
+/** 既定の見る角度 */
+const FS_ROT_Y0 = -35;
 
 interface ItemDetailPanelProps {
   item: ContainerItem;
@@ -88,6 +48,18 @@ interface ItemDetailPanelProps {
   onCompleteItem?: (id: string) => void;
   onUncompleteItem?: (id: string) => void;
   onDecrementPallet?: () => void;
+  onIncrementPallet?: () => void;
+}
+
+/** 2つの矩形を包む矩形を返す（どちらかが無ければある方をそのまま返す） */
+function unionRect(a: DOMRect | null, b: DOMRect | null): DOMRect | null {
+  if (!a) return b;
+  if (!b) return a;
+  const left = Math.min(a.left, b.left);
+  const top = Math.min(a.top, b.top);
+  const right = Math.max(a.right, b.right);
+  const bottom = Math.max(a.bottom, b.bottom);
+  return new DOMRect(left, top, right - left, bottom - top);
 }
 
 /* ===== 類似品アイコン ===== */
@@ -360,27 +332,46 @@ function UndoSwipeRow({ children, onSwipe, style, className, onClick }: {
 }
 
 export default function ItemDetailPanel({
-  item, relatedItems, allItems, completedIds, onSelectItem, onCompleteItem, onUncompleteItem, onDecrementPallet,
+  item, relatedItems, allItems, completedIds, onSelectItem, onCompleteItem, onUncompleteItem,
+  onDecrementPallet, onIncrementPallet,
 }: ItemDetailPanelProps) {
   const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
   // 鍋は機種別カラーを使用（上半分の背景・アクセント色を差し替え）
   const nabeColor = getNabeModelColor(item.itemName, item.type);
   const accentColor = nabeColor || colors.accent;
   const [palletFlash, setPalletFlash] = useState(false);
-  const doubleTapRef = useRef<number | null>(null);
   const [fullscreenPallet, setFullscreenPallet] = useState<'full' | 'fraction' | null>(null);
   const [fsRotateY, setFsRotateY] = useState(-35);
   const fsTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
-  const [fractionZoom, setFractionZoom] = useState<'idle' | 'zoomIn' | 'show' | 'zoomOut'>('idle');
-  const [fzRotateY, setFzRotateY] = useState(0);
-  const [fzManual, setFzManual] = useState(false);
-  const fzTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
-  const fzAutoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 端数パレットのみになった時の全画面表示
   const [autoFs, setAutoFs] = useState<AutoFsPhase>('idle');
   const autoFsPhaseRef = useRef<AutoFsPhase>('idle');
   const autoFsSeqRef = useRef(0);
   const autoFsHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 全画面の元になる端数パレットの位置（ここからズームする） */
+  const fractionSrcRef = useRef<HTMLDivElement | null>(null);
+  const autoFsSrcRectRef = useRef<DOMRect | null>(null);
+  /** 元の位置へ戻すための移動量と縮小率 */
+  const [autoFsFlip, setAutoFsFlip] = useState<{ dx: number; dy: number; s: number } | null>(null);
+  /**
+   * 全画面中の回転角。React の再描画を挟むと 20fps 程度になってカクつくため、
+   * 角度は ref で持ち、毎フレーム DOM の transform を直接書き換える。
+   */
+  const autoFsRotRef = useRef(FS_ROT_Y0);
+  const autoFsBodyElRef = useRef<HTMLElement | null>(null);
+  const autoFsDragRef = useRef<{ x: number; y: number; rotY: number; moved: boolean } | null>(null);
+  /** 最後に触った時刻。これを過ぎると自動回転を再開する */
+  const autoFsLastActRef = useRef(0);
+  /** 自動回転を始めた時刻。ここからの経過で回転速度を落としていく */
+  const autoFsSpinT0Ref = useRef(0);
+
+  /** 全画面の文字が飛び出す元（作業画面の CT 表示） */
+  const ctStatRef = useRef<HTMLDivElement | null>(null);
+  const pcsStatRef = useRef<HTMLDivElement | null>(null);
+  const autoFsCapRef = useRef<HTMLDivElement | null>(null);
+  const autoFsCapSrcRectRef = useRef<DOMRect | null>(null);
+  /** 文字を元の CT 表示位置へ写すための移動量と拡大率 */
+  const [autoFsCapFlip, setAutoFsCapFlip] = useState<{ dx: number; dy: number; s: number } | null>(null);
   const [animKey, setAnimKey] = useState(item.id);
   const [transitionPhase, setTransitionPhase] = useState<'visible' | 'fadeout' | 'blank' | 'fadein'>('visible');
   const prevItemIdRef = useRef(item.id);
@@ -406,20 +397,15 @@ export default function ItemDetailPanel({
   const upperTransition = transitionPhase === 'fadeout' ? 'opacity 0.4s ease' : transitionPhase === 'fadein' ? 'opacity 0.5s ease' : 'none';
   const showContent = transitionPhase !== 'blank';
 
-  const handlePalletDoubleTap = useCallback(() => {
-    const now = Date.now();
-    if (doubleTapRef.current && now - doubleTapRef.current < 300) {
-      // Double-tap detected
-      doubleTapRef.current = null;
-      if (onDecrementPallet) {
-        onDecrementPallet();
-        setPalletFlash(true);
-        setTimeout(() => setPalletFlash(false), 200);
-      }
-    } else {
-      doubleTapRef.current = now;
-    }
-  }, [onDecrementPallet]);
+  /** パレット数: 1回タップで減らす／2回タップで増やす（元の枚数までしか戻らない） */
+  const flashPallet = useCallback(() => {
+    setPalletFlash(true);
+    setTimeout(() => setPalletFlash(false), 200);
+  }, []);
+  const handlePalletTap = usePalletTap(
+    useCallback(() => { onDecrementPallet?.(); flashPallet(); }, [onDecrementPallet, flashPallet]),
+    useCallback(() => { onIncrementPallet?.(); flashPallet(); }, [onIncrementPallet, flashPallet]),
+  );
   const itemColor = extractColor(item.itemName);
   // 鍋は類似品なし、関連として同じサイズのものを表示
   const isCurrentNabe = item.type === '鍋';
@@ -550,16 +536,8 @@ export default function ItemDetailPanel({
   // カウントアップアニメーション（フェードアウト中は値をフリーズ）
   const isTransitioning = animKey !== item.id;
   const rawFraction = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-  // 鍋・ジャーポットは検査を抜かない、それ以外は1ケース抜く。
-  // 端数=0でパレットぴったりの場合は1パレットを崩して検査分を抜く。
-  const noInspection = item.type === '鍋' || item.type === 'ジャーポット';
-  const breakPalletForInspection = !noInspection && rawFraction === 0 && item.palletCount > 0 && item.qtyPerPallet > 0;
-  const displayPallets = breakPalletForInspection ? item.palletCount - 1 : item.palletCount;
-  const inspectionDeducted = noInspection
-    ? rawFraction
-    : breakPalletForInspection
-      ? item.qtyPerPallet - 1
-      : (rawFraction > 0 ? rawFraction - 1 : 0);
+  // PL / CT / pcs の求め方は せせらぎモードと共通（src/lib/itemQuantity.ts）
+  const { pallets: displayPallets, cartons: inspectionDeducted } = displayQuantities(item);
   const plTarget = isTransitioning ? undefined : displayPallets;
   const ctTarget = isTransitioning ? undefined : inspectionDeducted;
   const pcsTarget = isTransitioning ? undefined : Math.ceil(item.totalQty);
@@ -567,40 +545,7 @@ export default function ItemDetailPanel({
   const animCT = useCountUp(ctTarget ?? 0, animKey, isTransitioning);
   const animPCS = useCountUp(pcsTarget ?? 0, animKey, isTransitioning);
 
-  // 端数パレットズーム: タップで開く・再タップ or 5秒で閉じる
-  const closeFractionZoom = useCallback(() => {
-    if (fzAutoTimerRef.current) clearTimeout(fzAutoTimerRef.current);
-    fzAutoTimerRef.current = null;
-    setFractionZoom('zoomOut');
-    setTimeout(() => { setFractionZoom('idle'); setFzRotateY(0); setFzManual(false); }, 500);
-  }, []);
-
-  const openFractionZoom = useCallback((autoClose = false) => {
-    if (fractionZoom === 'show' || fractionZoom === 'zoomIn') {
-      closeFractionZoom();
-      return;
-    }
-    if (fractionZoom === 'zoomOut') return;
-    setFzRotateY(0);
-    setFzManual(false);
-    setFractionZoom('zoomIn');
-    setTimeout(() => setFractionZoom('show'), 500);
-    if (autoClose) {
-      if (fzAutoTimerRef.current) clearTimeout(fzAutoTimerRef.current);
-      fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000);
-    }
-  }, [fractionZoom, closeFractionZoom]);
-
-  // タップ時: 手動ズーム（何度でも可、5秒自動閉じ）
-  const handleFractionTap = useCallback(() => {
-    if (fractionZoom === 'show' || fractionZoom === 'zoomIn') {
-      closeFractionZoom();
-    } else {
-      openFractionZoom(true);
-    }
-  }, [fractionZoom, openFractionZoom, closeFractionZoom]);
-
-  // ===== 残りが端数パレットになったら積み方を全画面で一時表示（7秒） =====
+  // ===== 残りが端数パレットになったら積み方を全画面表示（操作が5秒途切れたら戻る） =====
   const setAutoFsPhase = useCallback((phase: AutoFsPhase) => {
     autoFsPhaseRef.current = phase;
     setAutoFs(phase);
@@ -612,19 +557,157 @@ export default function ItemDetailPanel({
     const seq = ++autoFsSeqRef.current;
     setAutoFsPhase('out');
     setTimeout(() => {
-      if (autoFsSeqRef.current === seq) setAutoFsPhase('idle');
+      if (autoFsSeqRef.current === seq) { setAutoFsPhase('idle'); setAutoFsFlip(null); setAutoFsCapFlip(null); }
     }, AUTO_FS_OUT_MS);
   }, [setAutoFsPhase]);
 
-  const openAutoFullscreen = useCallback(() => {
-    const seq = ++autoFsSeqRef.current;
-    setAutoFsPhase('in');
-    setTimeout(() => {
-      if (autoFsSeqRef.current === seq) setAutoFsPhase('show');
-    }, AUTO_FS_IN_MS);
+  /** 表示時間を数え直す（触るたびに呼ぶ） */
+  const bumpAutoFsHold = useCallback(() => {
     if (autoFsHoldRef.current) clearTimeout(autoFsHoldRef.current);
     autoFsHoldRef.current = setTimeout(closeAutoFullscreen, AUTO_FS_HOLD_MS);
-  }, [setAutoFsPhase, closeAutoFullscreen]);
+  }, [closeAutoFullscreen]);
+
+  const openAutoFullscreen = useCallback(() => {
+    // 画面に出ている端数パレットの位置を記録し、そこからゆっくり移動させる
+    autoFsSrcRectRef.current = fractionSrcRef.current?.getBoundingClientRect() ?? null;
+    autoFsCapSrcRectRef.current = unionRect(
+      ctStatRef.current?.getBoundingClientRect() ?? null,
+      pcsStatRef.current?.getBoundingClientRect() ?? null,
+    );
+    autoFsSeqRef.current++;
+    autoFsRotRef.current = FS_ROT_Y0;
+    autoFsBodyElRef.current = null;
+    setAutoFsFlip(null);
+    setAutoFsCapFlip(null);
+    // 移動を始めた瞬間から回すので、待ち時間は入れない
+    autoFsLastActRef.current = 0;
+    autoFsSpinT0Ref.current = 0;
+    setAutoFsPhase('measure');
+  }, [setAutoFsPhase]);
+
+  /** 端数パレットのタップ: 自動表示と同じ全画面を開く（表示中なら閉じる） */
+  const handleFractionTap = useCallback(() => {
+    if (autoFsPhaseRef.current === 'idle') openAutoFullscreen();
+    else closeAutoFullscreen();
+  }, [openAutoFullscreen, closeAutoFullscreen]);
+
+  // フェーズ進行: 実寸を測る → 元の位置に置く → 全画面へ移動
+  useEffect(() => {
+    if (autoFs === 'measure') {
+      const box = autoFsBoxRef.current;
+      const src = autoFsSrcRectRef.current;
+      const r = box?.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0 && src && src.width > 0 && src.height > 0) {
+        setAutoFsFlip({
+          dx: (src.left + src.width / 2) - (r.left + r.width / 2),
+          dy: (src.top + src.height / 2) - (r.top + r.height / 2),
+          s: Math.max(0.06, Math.min(src.width / r.width, src.height / r.height)),
+        });
+      } else {
+        // 元位置が取れないときは中央から拡大する
+        setAutoFsFlip({ dx: 0, dy: 0, s: 0.28 });
+      }
+      // 文字は作業画面の CT 表示の位置・大きさから図と一緒に下りてくる
+      const cap = autoFsCapRef.current?.getBoundingClientRect();
+      const capSrc = autoFsCapSrcRectRef.current;
+      if (cap && cap.height > 0 && capSrc && capSrc.height > 0) {
+        setAutoFsCapFlip({
+          dx: (capSrc.left + capSrc.width / 2) - (cap.left + cap.width / 2),
+          dy: (capSrc.top + capSrc.height / 2) - (cap.top + cap.height / 2),
+          // 数字の大きさをそろえたいので高さ基準で拡大率を決める
+          s: Math.max(0.5, Math.min(2.5, capSrc.height / cap.height)),
+        });
+      } else {
+        setAutoFsCapFlip({ dx: 0, dy: 0, s: 1 });
+      }
+      setAutoFsPhase('start');
+      return;
+    }
+    if (autoFs === 'start') {
+      // 縮小状態を1フレーム描いてから移動を開始する（アニメーションの取りこぼし防止）
+      let raf2 = 0;
+      const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setAutoFsPhase('in')); });
+      return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+    }
+    if (autoFs === 'in') {
+      bumpAutoFsHold();
+      const t = setTimeout(() => setAutoFsPhase('show'), AUTO_FS_IN_MS);
+      return () => clearTimeout(t);
+    }
+  }, [autoFs, setAutoFsPhase, bumpAutoFsHold]);
+
+  /** 回転角をパレットへ即座に反映する（再描画を挟まない） */
+  const applyAutoFsRot = useCallback((deg: number) => {
+    autoFsRotRef.current = deg;
+    let el = autoFsBodyElRef.current;
+    if (!el || !el.isConnected) {
+      el = (autoFsBoxRef.current?.querySelector('[data-pallet-body]') as HTMLElement | null) ?? null;
+      autoFsBodyElRef.current = el;
+      // 合成レイヤーに載せて、回転のたびに描き直さないようにする
+      if (el) el.style.willChange = 'transform';
+    }
+    if (el) el.style.transform = `rotateX(-25deg) rotateY(${deg}deg)`;
+  }, []);
+
+  // 触っていない間は自動回転する。毎フレーム DOM を直接更新するので滑らかに回る。
+  // 出入り（in / out）の移動中も回すので、回転しながら出てきて回転しながら戻る。
+  useEffect(() => {
+    if (autoFs !== 'in' && autoFs !== 'show' && autoFs !== 'out') return;
+    let raf = 0;
+    let last = 0;
+    const step = (now: number) => {
+      raf = requestAnimationFrame(step);
+      if (autoFsDragRef.current || now - autoFsLastActRef.current < AUTO_FS_SPIN_DELAY_MS) {
+        last = now;
+        return;
+      }
+      if (!last) { last = now; return; }
+      if (!autoFsSpinT0Ref.current) autoFsSpinT0Ref.current = now;
+      const dt = now - last;
+      last = now;
+      // 初速から終速へ指数的に近づける（勢いよく回り始めて、作業画面と同じ速さに落ち着く）
+      const elapsed = (now - autoFsSpinT0Ref.current) / 1000;
+      const dps = AUTO_FS_SPIN_DPS_END
+        + (AUTO_FS_SPIN_DPS_START - AUTO_FS_SPIN_DPS_END) * Math.exp(-elapsed / AUTO_FS_SPIN_EASE_SEC);
+      applyAutoFsRot(autoFsRotRef.current + (dps * dt) / 1000);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [autoFs, applyAutoFsRot]);
+
+  // 横スワイプで回転（画面幅いっぱいで180度）
+  const handleAutoFsPointerDown = useCallback((e: React.PointerEvent) => {
+    if (autoFsPhaseRef.current === 'out') return;
+    autoFsDragRef.current = { x: e.clientX, y: e.clientY, rotY: autoFsRotRef.current, moved: false };
+    autoFsLastActRef.current = performance.now();
+    bumpAutoFsHold();
+  }, [bumpAutoFsHold]);
+
+  const handleAutoFsPointerMove = useCallback((e: React.PointerEvent) => {
+    const d = autoFsDragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    if (Math.abs(dx) > 6 || Math.abs(e.clientY - d.y) > 6) d.moved = true;
+    const degPerPx = AUTO_FS_SWIPE_DEG / Math.max(1, window.innerWidth);
+    applyAutoFsRot(d.rotY + dx * degPerPx);
+    autoFsLastActRef.current = performance.now();
+    bumpAutoFsHold();
+  }, [bumpAutoFsHold, applyAutoFsRot]);
+
+  const handleAutoFsPointerUp = useCallback((e: React.PointerEvent) => {
+    const d = autoFsDragRef.current;
+    autoFsDragRef.current = null;
+    autoFsLastActRef.current = performance.now();
+    bumpAutoFsHold();
+    if (!d || d.moved) return;
+    // 図の外をタップしたら元に戻す（図の上のタップは何もしない）
+    const body = autoFsBoxRef.current?.querySelector('[data-pallet-body]') as HTMLElement | null;
+    const r = body?.getBoundingClientRect();
+    const onFigure = !!r
+      && e.clientX >= r.left - 16 && e.clientX <= r.right + 16
+      && e.clientY >= r.top - 16 && e.clientY <= r.bottom + 16;
+    if (!onFigure) closeAutoFullscreen();
+  }, [closeAutoFullscreen, bumpAutoFsHold]);
 
   // アンマウント時にタイマーを掃除
   useEffect(() => () => {
@@ -865,7 +948,7 @@ export default function ItemDetailPanel({
               </div>
             )}
             {inspectionDeducted > 0 && (
-              <div key={`fr-${animKey}`} style={{
+              <div key={`fr-${animKey}`} ref={fractionSrcRef} style={{
                 flex: displayPallets > 0 ? '0 0 35%' : 1,
                 height: displayPallets > 0 ? '75%' : '100%',
                 minWidth: 0, cursor: 'pointer',
@@ -881,7 +964,7 @@ export default function ItemDetailPanel({
         {/* 数量（PL / CT / pcs）— zIndex高めで図の上に表示 */}
         <div key={`stats-${animKey}`} className="detail-stats-free" style={{ position: 'relative', zIndex: 10, justifyContent: 'center', flexShrink: 0 }}>
           <div className="detail-sf-item anim-slide-up" style={{ minWidth: 0 }}>
-            <span className="detail-sf-num" onClick={handlePalletDoubleTap} style={{
+            <span className="detail-sf-num" onClick={handlePalletTap} style={{
               color: accentColor, textShadow: `0 0 16px ${accentColor}50, 0 2px 4px rgba(0,0,0,0.6)`,
               cursor: 'pointer', transition: 'background 0.15s ease',
               background: palletFlash ? 'rgba(255,255,255,0.25)' : 'transparent',
@@ -894,7 +977,7 @@ export default function ItemDetailPanel({
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1 }}>PL</span>
             </span>
           </div>
-          <div className="detail-sf-item anim-slide-up" style={{ minWidth: 0, animationDelay: '0.15s' }}>
+          <div ref={ctStatRef} className="detail-sf-item anim-slide-up" style={{ minWidth: 0, animationDelay: '0.15s' }}>
             <span className="detail-sf-num" style={{ color: '#e8e8e8', textShadow: `0 0 16px ${accentColor}30, 0 2px 4px rgba(0,0,0,0.6)`, display: 'inline-block', minWidth: '2.2ch', textAlign: 'right' }}>{fmtNum(animCT)}</span>
             <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
               {rawFraction > 0 && rawFraction !== inspectionDeducted && (
@@ -903,7 +986,7 @@ export default function ItemDetailPanel({
               <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1 }}>CT</span>
             </span>
           </div>
-          <div className="detail-sf-item detail-sf-total anim-slide-up" style={{ minWidth: 0, animationDelay: '0.3s' }}>
+          <div ref={pcsStatRef} className="detail-sf-item detail-sf-total anim-slide-up" style={{ minWidth: 0, animationDelay: '0.3s' }}>
             <span className="detail-sf-num-sm detail-sf-pcs" style={{ color: 'rgba(255,255,255,0.6)', display: 'inline-block', textAlign: 'right' }}>{animPCS.toLocaleString()}</span>
             <span className="detail-sf-label" style={{ color: 'rgba(255,255,255,0.4)' }}>pcs</span>
           </div>
@@ -1011,137 +1094,122 @@ export default function ItemDetailPanel({
       </div>
 
       {/* パレット全画面表示モーダル */}
-      {/* 端数パレット上半分ズーム表示 */}
-      {fractionZoom !== 'idle' && inspectionDeducted > 0 && (
-        <>
-          <style>{`
-            @keyframes fzBlurIn { 0% { backdrop-filter: blur(0); opacity: 0; } 100% { backdrop-filter: blur(2px); opacity: 1; } }
-            @keyframes fzBlurOut { 0% { backdrop-filter: blur(2px); opacity: 1; } 100% { backdrop-filter: blur(0); opacity: 0; } }
-            @keyframes fzZoomIn { 0% { transform: scale(0) rotate(0deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
-            @keyframes fzZoomOut { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(0); opacity: 0; } }
-          `}</style>
-          {/* 上半分ぼかし（暗くしない） */}
-          <div className="detail-upper" style={{
-            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
-            background: 'rgba(0,0,0,0.08)',
-            animation: fractionZoom === 'zoomOut' ? 'fzBlurOut 0.5s ease both' : 'fzBlurIn 0.3s ease both',
-            pointerEvents: fractionZoom === 'show' ? 'auto' : 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 0, gap: 0, touchAction: 'none', cursor: 'grab',
+      {/* 端数パレットのみになった時の全画面「積み方」表示
+          元のパレット位置から回転しながらズームし、背景はガウスぼかし。
+          横スワイプで回転（画面幅で180度）。触っていない間は速い回転から始まり作業画面と同じ速さに落ち着く。
+          図の外をタップするとすぐ元に戻る。 */}
+      {autoFs !== 'idle' && inspectionDeducted > 0 && (
+        <div
+          onPointerDown={handleAutoFsPointerDown}
+          onPointerMove={handleAutoFsPointerMove}
+          onPointerUp={handleAutoFsPointerUp}
+          onPointerCancel={handleAutoFsPointerUp}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 300,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            // 背景は明るさを変えず、ガウスぼかしだけを掛ける
+            background: 'transparent',
+            backdropFilter: 'blur(18px)',
+            WebkitBackdropFilter: 'blur(18px)',
+            opacity: autoFs === 'measure' || autoFs === 'out' ? 0 : 1,
+            transition: `opacity ${autoFs === 'out' ? AUTO_FS_OUT_MS : AUTO_FS_IN_MS}ms ease`,
+            touchAction: 'none', userSelect: 'none', cursor: 'grab',
           }}
-            onClick={(e) => { if (!fzTouchRef.current) { e.stopPropagation(); closeFractionZoom(); } }}
-            onTouchStart={(e) => { fzTouchRef.current = { startX: e.touches[0].clientX, startRotY: fzRotateY }; }}
-            onTouchMove={(e) => {
-              if (!fzTouchRef.current) return;
-              e.preventDefault();
-              setFzManual(true);
-              setFzRotateY(fzTouchRef.current.startRotY + (e.touches[0].clientX - fzTouchRef.current.startX) * 0.5);
-              if (fzAutoTimerRef.current) { clearTimeout(fzAutoTimerRef.current); fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000); }
-            }}
-            onTouchEnd={() => {
-              if (fzTouchRef.current) {
-                const dx = Math.abs(fzRotateY - fzTouchRef.current.startRotY);
-                fzTouchRef.current = null;
-                if (dx > 3) return; // スワイプ時はclickで閉じない
-              }
-            }}
-            onMouseDown={(e) => { fzTouchRef.current = { startX: e.clientX, startRotY: fzRotateY }; }}
-            onMouseMove={(e) => {
-              if (!fzTouchRef.current || !e.buttons) return;
-              setFzManual(true);
-              setFzRotateY(fzTouchRef.current.startRotY + (e.clientX - fzTouchRef.current.startX) * 0.5);
-              if (fzAutoTimerRef.current) { clearTimeout(fzAutoTimerRef.current); fzAutoTimerRef.current = setTimeout(closeFractionZoom, 5000); }
-            }}
-            onMouseUp={() => {
-              if (fzTouchRef.current) {
-                const dx = Math.abs(fzRotateY - fzTouchRef.current.startRotY);
-                fzTouchRef.current = null;
-                if (dx > 3) return;
-              }
-            }}
-          >
+        >
+          <div ref={autoFsBoxRef} style={{
+            width: '92vw', height: '58vh',
+            pointerEvents: 'none',
+            transformOrigin: 'center center',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden',
+            transform: (autoFs === 'in' || autoFs === 'show') || !autoFsFlip
+              ? 'translate(0px, 0px) scale(1)'
+              : `translate(${autoFsFlip.dx}px, ${autoFsFlip.dy}px) scale(${autoFsFlip.s})`,
+            transition: autoFs === 'in'
+              ? `transform ${AUTO_FS_IN_MS}ms cubic-bezier(0.33,0.1,0.2,1)`
+              : autoFs === 'out'
+                ? `transform ${AUTO_FS_OUT_MS}ms cubic-bezier(0.4,0,0.4,1)`
+                : 'none',
+            opacity: autoFs === 'measure' ? 0 : 1,
+          }}>
             <div style={{
-              width: '90%', height: '90%', transform: fractionZoom === 'show' ? 'scale(1.8)' : undefined,
-              animation: fractionZoom === 'zoomIn' ? 'fzZoomIn 0.5s cubic-bezier(0.2,0.8,0.3,1) both'
-                : fractionZoom === 'zoomOut' ? 'fzZoomOut 0.5s ease both'
-                : undefined,
+              width: '100%', height: '100%',
+              transform: `scale(${autoFsScale})`, transformOrigin: 'center center',
+              willChange: 'transform',
             }}>
-              <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet}
-                type={item.type} itemName={item.itemName} measurements={item.measurements}
-                overrideRotateY={fractionZoom === 'show' && fzManual ? fzRotateY : undefined}
-                wireframe={false}
+              <PalletDiagram
+                palletCount={0} fraction={inspectionDeducted}
+                qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+                measurements={item.measurements} wireframe={false}
+                overrideRotateY={autoFsRotRef.current}
+                noIntro
               />
             </div>
           </div>
-        </>
-      )}
-
-      {/* 端数パレットのみになった時の全画面「積み方」表示（7秒で自動クローズ） */}
-      {autoFs !== 'idle' && inspectionDeducted > 0 && (
-        <>
-          <style>{`
-            @keyframes afsBackdropIn { from { opacity: 0; } to { opacity: 1; } }
-            @keyframes afsBackdropOut { from { opacity: 1; } to { opacity: 0; } }
-            @keyframes afsZoomIn {
-              0% { transform: scale(0.28); opacity: 0; }
-              60% { opacity: 1; }
-              100% { transform: scale(1); opacity: 1; }
-            }
-            @keyframes afsZoomOut {
-              0% { transform: scale(1); opacity: 1; }
-              100% { transform: scale(0.28); opacity: 0; }
-            }
-          `}</style>
-          <div
-            onClick={closeAutoFullscreen}
-            style={{
-              position: 'fixed', inset: 0, zIndex: 300,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(6,8,18,0.82)', backdropFilter: 'blur(14px)',
-              animation: autoFs === 'out'
-                ? `afsBackdropOut ${AUTO_FS_OUT_MS}ms ease both`
-                : `afsBackdropIn ${AUTO_FS_IN_MS}ms ease both`,
-              cursor: 'pointer', touchAction: 'none',
-            }}
-          >
-            <div ref={autoFsBoxRef} style={{
-              width: '92vw', height: '62vh',
-              pointerEvents: 'none',
+          <div style={{ marginTop: 8, textAlign: 'center', pointerEvents: 'none' }}>
+            {/* 残りCT数は作業画面の CT 表示の位置・大きさから、図と一緒に下りてくる */}
+            <div ref={autoFsCapRef} style={{
               transformOrigin: 'center center',
-              animation: autoFs === 'out'
-                ? `afsZoomOut ${AUTO_FS_OUT_MS}ms cubic-bezier(0.4,0,0.7,0.2) both`
-                : `afsZoomIn ${AUTO_FS_IN_MS}ms cubic-bezier(0.16,1,0.3,1) both`,
+              willChange: 'transform',
+              transform: (autoFs === 'in' || autoFs === 'show') || !autoFsCapFlip
+                ? 'translate(0px, 0px) scale(1)'
+                : `translate(${autoFsCapFlip.dx}px, ${autoFsCapFlip.dy}px) scale(${autoFsCapFlip.s})`,
+              transition: autoFs === 'in'
+                ? `transform ${AUTO_FS_IN_MS}ms cubic-bezier(0.33,0.1,0.2,1)`
+                : autoFs === 'out'
+                  ? `transform ${AUTO_FS_OUT_MS}ms cubic-bezier(0.4,0,0.4,1)`
+                  : 'none',
+              opacity: autoFs === 'measure' ? 0 : 1,
             }}>
-              <div style={{
-                width: '100%', height: '100%',
-                transform: `scale(${autoFsScale})`, transformOrigin: 'center center',
-                transition: 'transform 0.3s ease',
-              }}>
-                <PalletDiagram
-                  palletCount={0} fraction={inspectionDeducted}
-                  qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-                  measurements={item.measurements} wireframe={false}
-                />
+              {/* 作業画面の CT 表示と同じ内容を、大きいサイズで見せる */}
+              <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 6 }}>
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 'clamp(56px, 20vw, 110px)',
+                  fontWeight: 900, fontVariantNumeric: 'tabular-nums', letterSpacing: -3,
+                  lineHeight: 0.78, color: '#fff',
+                  textShadow: `0 0 26px ${accentColor}77, 0 3px 14px rgba(0,0,0,0.9)`,
+                }}>
+                  {fmtNum(animCT)}
+                </span>
+                <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  {rawFraction > 0 && rawFraction !== inspectionDeducted && (
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 'clamp(16px, 5vw, 26px)', fontWeight: 700,
+                      lineHeight: 1, color: '#e8e8e8', textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+                    }}>({rawFraction})</span>
+                  )}
+                  <span style={{
+                    fontFamily: 'var(--font-body)', fontSize: 'clamp(18px, 6vw, 30px)', fontWeight: 700,
+                    lineHeight: 1, color: 'rgba(255,255,255,0.75)', textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+                  }}>CT</span>
+                </span>
+                {/* 総数（pcs）も作業画面と同じ内容で並べる */}
+                <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 4, marginLeft: 10 }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 'clamp(26px, 9vw, 50px)', fontWeight: 900,
+                    fontVariantNumeric: 'tabular-nums', letterSpacing: -1, lineHeight: 0.85,
+                    color: 'rgba(255,255,255,0.7)', textShadow: '0 2px 10px rgba(0,0,0,0.9)',
+                  }}>
+                    {animPCS.toLocaleString()}
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-body)', fontSize: 'clamp(13px, 4.5vw, 22px)', fontWeight: 700,
+                    lineHeight: 1.2, color: 'rgba(255,255,255,0.5)', textShadow: '0 2px 8px rgba(0,0,0,0.9)',
+                  }}>pcs</span>
+                </span>
               </div>
             </div>
+            {/* 補足の文字は移動後に浮かび上がらせる */}
             <div style={{
-              marginTop: 8, textAlign: 'center', pointerEvents: 'none',
-              animation: autoFs === 'out'
-                ? `afsBackdropOut ${AUTO_FS_OUT_MS}ms ease both`
-                : `afsBackdropIn ${AUTO_FS_IN_MS}ms ease both`,
+              opacity: autoFs === 'show' ? 1 : 0,
+              transition: `opacity ${autoFs === 'out' ? AUTO_FS_OUT_MS / 2 : 400}ms ease`,
             }}>
-              <p style={{
-                margin: 0, color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: 0.5,
-                textShadow: `0 0 18px ${accentColor}88`,
-              }}>
-                のこり 端数パレット {inspectionDeducted} CT
-              </p>
-              <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
-                この積み方で仕上げ
+              <p style={{ margin: '12px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: 11, textShadow: '0 2px 8px rgba(0,0,0,0.9)' }}>
+                スワイプで回転／図の外をタップで戻る
               </p>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {fullscreenPallet && (

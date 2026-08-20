@@ -6,7 +6,7 @@
  * - ニュース: 外部APIは制限があるためRSS/スクレイピングの代替としてWeb検索を使用
  */
 
-// 鳥取市気高町宝木の座標
+// 鳥取市気高町宝木の座標（表示・読み上げ上の地名は「鳥取市」に統一）
 const HOUKI_LAT = 35.4833;
 const HOUKI_LON = 134.1167;
 
@@ -124,19 +124,48 @@ export async function fetchWeather(): Promise<WeatherData | null> {
   }
 }
 
-/** 天気ボタン用コール：現在の気温・湿度・暑さ指数 */
-export function weatherToSpeech(w: WeatherData): string {
-  const lv = wbgtLevel(w.wbgt).label;
-  return `現在の気温${w.temperature}度、湿度${w.humidity}%、暑さ指数${w.wbgt}、${lv}です。`;
+/** 気温・湿度・暑さ指数の観測値（気象庁データ / SwitchBot 実測 共通） */
+export interface ClimateReading {
+  temperature: number;
+  humidity: number;
+  wbgt: number;
 }
 
-/** 定期コール等の先頭に付ける現在気温・暑さ指数フレーズ */
-export function currentTempToSpeech(w: WeatherData): string {
-  return `現在の気温${w.temperature}度、暑さ指数${w.wbgt}。`;
+/**
+ * 気温・湿度・暑さ指数＋警戒レベル（危険/厳重警戒/警戒/注意）のコール文。
+ * 「休憩してください」等のアドバイスは読み上げない（数値と警戒レベルのみ）。
+ * @param fromSwitchBot SwitchBot の実測値の場合は true（読み上げで実測と区別する）
+ */
+export function climateToSpeech(r: ClimateReading, fromSwitchBot = false): string {
+  const lv = wbgtLevel(r.wbgt).label;
+  const head = fromSwitchBot ? '実測の気温' : '現在の気温';
+  return `${head}${r.temperature}度、湿度${Math.round(r.humidity)}%、暑さ指数${r.wbgt}、${lv}です。`;
 }
 
-export function temperatureToSpeech(w: WeatherData): string {
-  return `けたかちょうの気温。現在${w.temperature}度、体感${w.feelsLike}度。最高${w.maxTemp}度、最低${w.minTemp}度。`;
+/** 本日の予報（最高気温・1日を通した降水確率）のコール文 */
+export function forecastToSpeech(w: WeatherData): string {
+  return `今日の最高気温は${w.maxTemp}度、降水確率は${w.precipitationProb}%です。`;
+}
+
+/**
+ * 天気ボタン用コール：現在の気温・湿度・暑さ指数（SwitchBot 接続中は実測値）に加え、
+ * その日の最高気温と1日を通した降水確率を読み上げる。
+ */
+export function weatherToSpeech(w: WeatherData, sb?: ClimateReading | null): string {
+  return `${climateToSpeech(sb || w, !!sb)}${forecastToSpeech(w)}`;
+}
+
+/** 定期コール等の先頭に付ける気温・湿度・暑さ指数フレーズ（SwitchBot 接続中は実測値） */
+export function currentTempToSpeech(w: WeatherData | null, sb?: ClimateReading | null): string {
+  const r = sb || w;
+  if (!r) return '';
+  return climateToSpeech(r, !!sb);
+}
+
+/** 気温コール：現地の気温・湿度・暑さ指数＋警戒レベルと予報（SwitchBot 接続中は実測値） */
+export function temperatureToSpeech(w: WeatherData, sb?: ClimateReading | null): string {
+  const head = sb ? '' : '鳥取市の、';
+  return `${head}${climateToSpeech(sb || w, !!sb)}体感${w.feelsLike}度。今日の最高気温は${w.maxTemp}度、最低${w.minTemp}度、降水確率は${w.precipitationProb}%です。`;
 }
 
 // ニュース取得（Google News RSS経由）

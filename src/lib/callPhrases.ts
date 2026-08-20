@@ -8,6 +8,7 @@
 
 const STORAGE_KEY = 'cns_call_phrases';
 const TENMIN_CHEER_KEY = 'cns_call_10min_cheer';
+const TENMIN_CLIMATE_KEY = 'cns_call_10min_climate';
 
 /** 10分ごとのコールで応援コールを読み上げるか（デフォルト: オフ） */
 export function isTenMinCheerEnabled(): boolean {
@@ -19,6 +20,21 @@ export function isTenMinCheerEnabled(): boolean {
 export function setTenMinCheerEnabled(on: boolean): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(TENMIN_CHEER_KEY, on ? '1' : '0');
+}
+
+/**
+ * 10分ごとのコールで気温・湿度も読み上げるか（デフォルト: オフ）。
+ * 既定では「◯分経過しました」だけをコールする。
+ */
+export function isTenMinClimateEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(TENMIN_CLIMATE_KEY) === '1';
+}
+
+/** 10分ごとのコールの気温・湿度読み上げ ON/OFF を保存 */
+export function setTenMinClimateEnabled(on: boolean): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(TENMIN_CLIMATE_KEY, on ? '1' : '0');
 }
 
 /** デフォルトのコールフレーズ（以前指定した固有名入りのコール） */

@@ -40,6 +40,9 @@ export interface SwitchBotReading {
 
 export type SwitchBotScanState = 'scanning' | 'stopped' | 'error';
 
+/** UI 側で扱う接続状態 */
+export type SwitchBotStatus = 'unsupported' | 'idle' | 'scanning' | 'error';
+
 /** SwitchBot 推移グラフ用の時系列ポイント */
 export interface SwitchBotHistoryPoint {
   /** 時刻 (epoch ms) */
@@ -242,16 +245,41 @@ export async function startSwitchBotScan(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let scan: any;
   try {
-    // acceptAllAdvertisements で全アドバタイズを受信し、handler 側で SwitchBot を選別。
+    /*
+     * SwitchBot だけを拾う条件でスキャンする。
+     * 全アドバタイズを受け取る形にすると、許可を求める画面に近くの
+     * Bluetooth 機器がすべて並んでしまい、どれを選べばよいか分からなくなるため。
+     *
+     * 室内計はサービスデータ、防水/屋外計はメーカーデータで飛んでくるので、
+     * どちらの条件も並べておく（いずれかに当たれば受信できる）。
+     */
     scan = await bt.requestLEScan({
-      acceptAllAdvertisements: true,
+      filters: [
+        ...SB_SERVICE_UUIDS.map((uuid) => ({ services: [uuid] })),
+        { manufacturerData: [{ companyIdentifier: SB_COMPANY_ID }] },
+      ],
       keepRepeatedDevices: true,
     });
   } catch (e) {
-    bt.removeEventListener('advertisementreceived', handler);
-    const msg = e instanceof Error ? e.message : String(e);
-    onState?.('error', msg);
-    throw e;
+    const name = (e as { name?: string })?.name;
+    // 利用者が画面を閉じた・断ったときは、そこで終わり（全受信で出し直さない）
+    const declined = name === 'NotFoundError' || name === 'NotAllowedError' || name === 'AbortError';
+    const fail = () => {
+      bt.removeEventListener('advertisementreceived', handler);
+      const msg = e instanceof Error ? e.message : String(e);
+      onState?.('error', msg);
+      throw e;
+    };
+    if (declined) fail();
+    // 条件つきスキャンに対応していない端末では、全受信に切り替えて動くようにしておく
+    try {
+      scan = await bt.requestLEScan({
+        acceptAllAdvertisements: true,
+        keepRepeatedDevices: true,
+      });
+    } catch {
+      fail();
+    }
   }
 
   onState?.('scanning');

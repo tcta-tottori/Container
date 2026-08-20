@@ -8,97 +8,149 @@ import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
 import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
-import { GEMINI_VOICES, getSelectedVoice, setSelectedVoice, isGeminiTtsEnabled, setGeminiTtsEnabled, getGeminiTtsModel, setGeminiTtsModel, getLastTtsError, subscribeTtsError, DEFAULT_GEMINI_TTS_MODEL, geminiGenerateSpeech } from '@/lib/geminiTts';
-import { getGeminiKey } from '@/lib/geminiApi';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
-import { itemNameForSpeech } from '@/lib/typeDetector';
-import { saveRecentFile } from '@/lib/recentFiles';
+import { itemNameForCall } from '@/lib/partTranslations';
+import { displayQuantities, quantitiesAfterPalletRemoved, quantityToSpeech } from '@/lib/itemQuantity';
+import { saveRecentFile, FileType } from '@/lib/recentFiles';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
-import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
-import { getRandomCallPhrase, isTenMinCheerEnabled } from '@/lib/callPhrases';
+import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, climateToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
+import { getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled } from '@/lib/callPhrases';
+import { getVoiceSettings, subscribeVoiceSettings, VoiceSettings } from '@/lib/voiceSettings';
+import { prepareSherpaTts } from '@/lib/sherpaTts';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
 import VoiceFeedback from '@/components/VoiceFeedback';
 import ManualPage from '@/components/ManualPage';
-import CallPhraseSettings from '@/components/CallPhraseSettings';
+import SettingsPage, { SettingsTab } from '@/components/SettingsPage';
+import HistoryModal from '@/components/HistoryModal';
+import { APP_VERSION, APP_UPDATED } from '@/lib/appVersion';
+import { MenuIcon, UploadIcon, WorkIcon, EditIcon, ChartIcon, ClockIcon, HelpIcon, SettingsIcon } from '@/components/AppIcons';
+import { getWaterSoundEngine, setupWaterAutoResume } from '@/lib/waterSound';
+import { useWaterSound } from '@/hooks/useWaterSound';
 import WeatherPopup from '@/components/WeatherPopup';
-import ClimateBar, { SwitchBotStatus } from '@/components/ClimateBar';
+import QuickActions from '@/components/QuickActions';
+import RiverMode from '@/components/RiverMode';
+import MistVideo from '@/components/MistVideo';
+import { MIST_PEAK, MIST_CLEAR_MS } from '@/lib/mistVideo';
 import SwitchBotPopup from '@/components/SwitchBotPopup';
-import { SwitchBotReading, SwitchBotHistoryPoint, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
+import { SwitchBotReading, SwitchBotHistoryPoint, SwitchBotStatus, isSwitchBotScanSupported, startSwitchBotScan } from '@/lib/switchbot';
 import ContainerAnalyticsPage from '@/components/ContainerAnalyticsPage';
 import JkpSchedulePage from '@/components/JkpSchedulePage';
-import HistoryPanel from '@/components/HistoryPanel';
 import { JkpShipment, parseJkpSheet1, parseJkpVolume, parseJkpUpdata, jkpToContainerItems, getScheduleDatesInRange } from '@/lib/jkpParser';
 import * as XLSX from 'xlsx';
 
-type ViewMode = 'work' | 'list' | 'edit' | 'analytics' | 'jkp' | 'history';
+type ViewMode = 'load' | 'work' | 'list' | 'edit' | 'analytics' | 'jkp';
 
-/* ===== おしゃれな読込ポップアップ ===== */
+/** せせらぎモードから戻ったあと、残った煙が晴れきるまで */
+const RIVER_TAIL_MS = MIST_CLEAR_MS;
+
+/* ===== 読込中の全画面表示 =====
+ * 起動時のスプラッシュと同じ作りにして、読み込みの間は画面ぜんぶを使う。
+ * 進み具合はキューブを囲むリングと下の帯の両方で見せる。
+ */
 function LoadingOverlay({ message, progress, closing }: { message: string; progress: number; closing?: boolean }) {
+  /*
+   * 実際の進捗は段階ごとに飛ぶので、そのまま出すと数字も帯もカクつく。
+   * 表示用の値を毎フレーム目標へ近づけて、なめらかに動かす。
+   */
+  const target = Math.max(0, Math.min(100, progress));
+  const [shown, setShown] = useState(0);
+  const shownRef = useRef(0);
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const diff = target - shownRef.current;
+      if (Math.abs(diff) < 0.4) {
+        shownRef.current = target;
+        setShown(target);
+        return;
+      }
+      // 残りの距離に応じて詰める（近づくほどゆっくり止まる）
+      shownRef.current += diff * 0.12;
+      setShown(shownRef.current);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);
+
+  const pct = shown;
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 300,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(16px)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      padding: '0 28px',
+      background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 30%, #0e1225 70%, #0a0c1e 100%)',
       animation: closing ? 'loadFadeOut 0.5s ease both' : 'fadeIn 0.15s ease both',
     }}>
       <style>{`
-        @keyframes spinCircle { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes loadFadeOut { 0% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes neonPulse { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+        @keyframes loadSheen { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
       `}</style>
-      <div style={{
-        background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
-        border: '1.5px solid rgba(255,255,255,0.15)',
-        borderRadius: 24, padding: '32px 40px', textAlign: 'center',
-        boxShadow: '0 0 30px rgba(255,255,255,0.03), 0 24px 60px rgba(0,0,0,0.6)',
-        width: '90%', maxWidth: 300,
-      }}>
-        {/* サークル読込アニメーション */}
-        <div style={{ width: 48, height: 48, margin: '0 auto 16px' }}>
-          <svg width="48" height="48" viewBox="0 0 48 48" style={{ animation: 'spinCircle 0.9s linear infinite' }}>
-            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="3"
-              strokeLinecap="round" strokeDasharray="90 36"
-              style={{ filter: 'drop-shadow(0 0 3px rgba(255,255,255,0.2))' }} />
-          </svg>
-        </div>
 
-        {/* メッセージ */}
-        <p style={{
-          color: '#fff', fontSize: 12, fontWeight: 600, margin: '0 0 12px', lineHeight: 1.5,
-          textShadow: '0 0 6px rgba(255,255,255,0.15)',
-        }}>
-          {message}
-        </p>
-
-        {/* 進捗率 */}
-        <p style={{
-          color: '#fff', fontSize: 20, fontWeight: 800, margin: '0 0 10px',
-          fontFamily: 'var(--font-mono)',
-          textShadow: '0 0 8px rgba(255,255,255,0.3), 0 0 16px rgba(255,255,255,0.12)',
-        }}>
-          {Math.round(progress)}%
-        </p>
-
-        {/* プログレスバー */}
+      {/* キューブ（起動時のスプラッシュと同じもの） */}
+      <div style={{ position: 'relative', width: 72, height: 72, marginBottom: 34 }}>
         <div style={{
-          width: '100%', height: 4, borderRadius: 2,
-          background: 'rgba(255,255,255,0.08)', overflow: 'hidden',
-          border: '0.5px solid rgba(255,255,255,0.1)',
+          position: 'absolute', inset: -16, borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 45%, transparent 70%)',
+          animation: 'neonPulse 2.5s ease-in-out infinite',
+        }} />
+        <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
+          style={{ position: 'relative', animation: 'neonPulse 2.5s ease-in-out infinite' }}>
+          <g transform="translate(32,32)" stroke="#fff" strokeWidth="3" strokeLinejoin="round" fill="none">
+            <polygon points="0,-20.88 18,-10.44 0,0 -18,-10.44"/>
+            <polygon points="-18,-10.44 0,0 0,20.88 -18,10.44"/>
+            <polygon points="18,-10.44 0,0 0,20.88 18,10.44"/>
+          </g>
+        </svg>
+      </div>
+
+      {/* 進捗率（スプラッシュの Loading と同じ見た目の白文字） */}
+      <div style={{
+        fontSize: 22, fontWeight: 600, lineHeight: 1, marginBottom: 18,
+        color: '#fff', fontFamily: 'Inter, sans-serif', letterSpacing: 3,
+        textShadow: '0 0 10px rgba(255,255,255,0.7), 0 0 20px rgba(255,255,255,0.35), 0 0 40px rgba(255,255,255,0.15)',
+      }}>
+        {Math.round(pct)}%
+      </div>
+
+      {/* プログレスバー（太めの帯。中を光が流れる） */}
+      <div style={{
+        position: 'relative', width: '100%', maxWidth: 320, height: 16, borderRadius: 999,
+        background: 'rgba(255,255,255,0.07)', overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.1)', marginBottom: 22,
+      }}>
+        <div style={{
+          position: 'relative', height: '100%', borderRadius: 999,
+          width: `${pct}%`, overflow: 'hidden',
+          background: 'linear-gradient(90deg, #4a7af7 0%, #6b52d4 38%, #9b45c9 70%, #c0549a 100%)',
+          boxShadow: '0 0 14px rgba(107,82,212,0.55), 0 0 28px rgba(155,69,201,0.28)',
         }}>
           <div style={{
-            height: '100%', borderRadius: 2,
-            background: 'rgba(255,255,255,0.85)',
-            boxShadow: '0 0 5px rgba(255,255,255,0.25), 0 0 10px rgba(255,255,255,0.08)',
-            width: `${progress}%`,
-            transition: 'width 0.3s ease',
+            position: 'absolute', top: 0, bottom: 0, width: '38%',
+            background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent)',
+            animation: 'loadSheen 1.6s linear infinite',
           }} />
         </div>
       </div>
+
+      {/* メッセージ */}
+      <p style={{
+        color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: 600, margin: 0,
+        lineHeight: 1.7, textAlign: 'center', maxWidth: 340,
+        // ファイル名などを改行して添えられるようにする
+        whiteSpace: 'pre-line', wordBreak: 'break-word',
+        textShadow: '0 0 10px rgba(255,255,255,0.2)',
+      }}>
+        {message}
+      </p>
     </div>
   );
 }
@@ -176,12 +228,32 @@ export default function Home() {
     completeItem,
     uncompleteItem,
     resetWorkTimer,
+    pauseWork,
+    resumeWork,
   } = useContainerData();
 
-  const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime);
+  /** 一時停止中か（経過時間・音声コール・水の音・せせらぎをまとめて止めている） */
+  const workPaused = state.workPausedAt !== null;
+  const workPausedRef = useRef(workPaused);
+  workPausedRef.current = workPaused;
+
+  const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime, state.workPausedAt);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, speakCheer, speakThenCheer, announceItem, announcePalletChange, announceComplete, announceAllComplete, announceContainerSummary } =
+  const { speak, speakCheer, speakThenCheer, announceItem, announceAllComplete, announceContainerSummary } =
     useSpeech();
+
+  /**
+   * sherpa-onnx（端末内 TTS）を選んでいるときは、最初のコールで待たされないよう
+   * 先にモデルを読み込んでおく。設定を切り替えたときも読み込む。
+   */
+  useEffect(() => {
+    const preload = (s: VoiceSettings) => {
+      if (s.engine !== 'sherpa' || !s.sherpa.preload) return;
+      void prepareSherpaTts().catch(() => { /* 失敗しても端末の音声で鳴る */ });
+    };
+    preload(getVoiceSettings());
+    return subscribeVoiceSettings(preload);
+  }, []);
 
   const prevItemRef = useRef<string | null>(null);
   const currentItemRef = useRef(currentItem);
@@ -194,7 +266,15 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('work');
   const [menuOpen, setMenuOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
-  const [callSettingsOpen, setCallSettingsOpen] = useState(false);
+  // 設定ページ（コール・水の音・AI写真を集約）。null のときは閉じている
+  const [settingsTab, setSettingsTab] = useState<SettingsTab | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  // せせらぎモード（川の映像）
+  const [riverOpen, setRiverOpen] = useState(false);
+  /** せせらぎモードから戻ったあと、元の画面の上で晴れていく靄 */
+  const [riverTail, setRiverTail] = useState(false);
+  /** せせらぎモードに入るとき、こちらで水の音BGMを止めたか（戻すときの目印） */
+  const riverPausedWaterRef = useRef(false);
   const [weatherPopup, setWeatherPopup] = useState<WeatherData | null>(null);
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
   const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
@@ -288,10 +368,12 @@ export default function Home() {
     });
   }, [state.items, state.masterItems, state.containers, state.selectedContainerIdx, updateItem]);
 
-  // 品目切替時の自動アナウンス（コンテナ読込直後の最初の品目はスキップ — 概要コールと混ざるため）
-  const firstItemSkipRef = useRef(true);
+  // 品目切替時の自動アナウンス
+  const firstItemSkipRef = useRef(false);
   useEffect(() => {
     if (!currentItem || !state.autoAnnounce) return;
+    // 一時停止中（休憩中）はコールしない
+    if (workPausedRef.current) return;
     if (prevItemRef.current !== currentItem.id) {
       prevItemRef.current = currentItem.id;
       if (firstItemSkipRef.current) {
@@ -308,12 +390,14 @@ export default function Home() {
       // 完了コールとの重複回避（2秒待機）
       setTimeout(() => {
         if (state.completedIds.has(currentItem.id)) return;
+        if (workPausedRef.current) return;
         announceItem(currentItem, state.items);
       }, 2000);
     }
   }, [currentItem, state.autoAnnounce, announceItem, state.items, state.completedIds]);
 
-  // コンテナ読み込み時の概要アナウンス（初回のみ）
+  // コンテナ読み込み時の概要コールは廃止（「荷降ろしを開始します」「内容案内」は読み上げない）。
+  // 読み込み時は最初の品目コールだけが鳴る。
   useEffect(() => {
     if (state.containers.length === 0 || state.items.length === 0) return;
     const container = state.containers[state.selectedContainerIdx];
@@ -322,46 +406,89 @@ export default function Home() {
     if (loadedContainerRef.current === key) return;
     loadedContainerRef.current = key;
     announcedThresholdsRef.current = new Set();
-    firstItemSkipRef.current = true; // 概要コール中は品目コールをスキップ
-    // 少し遅延して概要アナウンス
-    const timer = setTimeout(() => {
-      announceContainerSummary(state.items, container.containerNo);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
+    // 概要コールが無くなったので、読み込み直後の品目コールはスキップしない
+    firstItemSkipRef.current = false;
+  }, [state.containers, state.selectedContainerIdx, state.items]);
 
   // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
 
+  // 音声コールで使う SwitchBot 実測値。コール時点の状態を参照するため ref に保持する。
+  const sbLiveRef = useRef<{ reading: SwitchBotReading | null; status: SwitchBotStatus }>({ reading: null, status: 'idle' });
+  sbLiveRef.current = { reading: switchbot, status: sbStatus };
+
+  /**
+   * コールに使う SwitchBot の実測値を返す。
+   * 接続中（スキャンを動かしている）かつ受信から10分以内のときだけ有効。
+   * それ以外は気象庁データを使う。
+   *
+   * 接続の判定に sbStopRef（スキャンを止める関数）も見るのは、受信は続いているのに
+   * 一時的なエラー通知で status が 'error' に振れることがあるため。
+   */
+  const getSbClimate = useCallback((): SwitchBotReading | null => {
+    const { reading, status } = sbLiveRef.current;
+    const connected = status === 'scanning' || sbStopRef.current !== null;
+    if (!connected || !reading) return null;
+    if (Date.now() - reading.updatedAt > 10 * 60 * 1000) return null;
+    return reading;
+  }, []);
+
   // 10分ごとの定期進捗コール（作業中のみ）
-  // 「10分経過しました」+ ランダム応援フレーズ。毎回応援フレーズが変わる。
+  // 「10分経過しました」+ 気温 + ランダム応援フレーズ。毎回応援フレーズが変わる。
   const periodicStateRef = useRef({ items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode });
   periodicStateRef.current = { items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode };
-  // deps は workStartTime のみ。items.length を入れると品目完了のたびに
-  // インターバルが張り直されて 10 分カウントがリセットされ、コールが永久に発火しない。
+
+  /**
+   * 「◯分経過しました」＋気温のコール。
+   * SwitchBot 接続中は、その場の実測値（気温・湿度・暑さ指数＋警戒レベル）をコールする。
+   * 実測値があるときは気象庁の取得を待たない（通信が遅い・つながらない場合でも実測を読む）。
+   */
+  const announceElapsedCall = useCallback((minutes: number) => {
+    const say = (text: string) => {
+      // 応援コールは設定がオンのときだけ、応援リストから取ってそのまま（別発話で）続ける
+      if (isTenMinCheerEnabled()) speakThenCheer(text, getRandomCallPhrase());
+      else speak(text);
+    };
+
+    // 気温・湿度は既定ではコールしない（設定でオンにしたときだけ付ける）
+    if (!isTenMinClimateEnabled()) {
+      say(`${minutes}分経過しました。`);
+      // 画面のバーに出す気象庁データだけは裏で更新しておく
+      void fetchWeather().then((w) => { if (w) setBarWeather(w); });
+      return;
+    }
+
+    const sb = getSbClimate();
+    if (sb) {
+      say(`${minutes}分経過しました。${climateToSpeech(sb, true)}`);
+      // コールした数値がそのまま見えるよう、SwitchBot のポップアップを出す
+      setSbPopupOpen(true);
+      void fetchWeather().then((w) => { if (w) setBarWeather(w); });
+      return;
+    }
+    void fetchWeather().then((w) => {
+      say(`${minutes}分経過しました。${currentTempToSpeech(w, null)}`);
+      if (w) { setWeatherPopup(w); setBarWeather(w); }
+    });
+  }, [getSbClimate, speak, speakThenCheer]);
+
+  /*
+   * 何回めの 10 分までコールしたか。
+   * 経過時間そのもの（workRawSeconds）で数えるので、一時停止して止めている間は進まない。
+   * setInterval で数えていたころのように、止めた時間ぶんコールがずれることもない。
+   */
+  const tenMinStepRef = useRef(0);
   useEffect(() => {
-    if (!state.workStartTime) return;
-    const startedAt = state.workStartTime;
-    const interval = setInterval(() => {
-      const { items, completedIds, autoAnnounce, viewMode: vm } = periodicStateRef.current;
-      if (!autoAnnounce || vm !== 'work') return;
-      const remaining = items.filter((it) => !completedIds.has(it.id));
-      if (remaining.length === 0) return;
-      // 実際の経過時間を 10 分単位でコール（10分、20分、30分…）
-      const minutes = Math.max(10, Math.round((Date.now() - startedAt) / 600000) * 10);
-      // 経過アナウンス＋現在気温を先に読み上げ。応援コールは設定がオンの時のみ
-      // 応援リストから取得してそのまま（別発話で）コールする。温湿度ポップアップも表示。
-      fetchWeather().then(w => {
-        const pre = `${minutes}分経過しました。${w ? currentTempToSpeech(w) : ''}`;
-        if (isTenMinCheerEnabled()) {
-          speakThenCheer(pre, getRandomCallPhrase());
-        } else {
-          speak(pre);
-        }
-        if (w) { setWeatherPopup(w); setBarWeather(w); }
-      });
-    }, 10 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [state.workStartTime, speakThenCheer, speak]);
+    const step = Math.floor(workRawSeconds / 600);
+    // リセットや読み直しで時間が戻ったら数え直す
+    if (step < tenMinStepRef.current) tenMinStepRef.current = step;
+    if (step === 0 || step === tenMinStepRef.current) return;
+    tenMinStepRef.current = step;
+    const { items, completedIds, autoAnnounce, viewMode: vm } = periodicStateRef.current;
+    if (!autoAnnounce || vm !== 'work') return;
+    const remaining = items.filter((it) => !completedIds.has(it.id));
+    if (remaining.length === 0) return;
+    announceElapsedCall(step * 10);
+  }, [workRawSeconds, announceElapsedCall]);
 
   // 温湿度バー: 気象庁データを起動時＋10分ごとに取得
   useEffect(() => {
@@ -446,6 +573,14 @@ export default function Home() {
     }
   }, [handleSbReading]);
 
+  /**
+   * 読込の進み具合。Googleドライブから取ってくる分と、そのあとの解析とで
+   * 別々に数えているため、あとの段階が小さい値を出しても戻さない。
+   */
+  const advanceProgress = useCallback((p: number) => {
+    setLoadingProgress((prev) => (p > prev ? p : prev));
+  }, []);
+
   // 読込完了→100%表示1秒→フェードアウト
   const closeLoading = useCallback(() => {
     setLoadingProgress(100);
@@ -459,12 +594,23 @@ export default function Home() {
     }, 1000); // 100%表示1秒
   }, []);
 
+  /**
+   * Googleドライブから取ってくる間のローディング表示。
+   * 取得が終わるとそのまま各ファイルの読込処理が続きを受け持つので、
+   * 選んでから作業ページに着くまで画面が途切れない。
+   */
+  const handleDriveLoading = useCallback((msg: string | null, progress?: number) => {
+    setLoadingMsg(msg);
+    setLoadingProgress(progress ?? 0);
+    if (msg === null) setLoadingClosing(false);
+  }, []);
+
   const handleFileLoaded = useCallback(
     async (file: File) => {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('Excelファイルを読み込み中...');
-      setLoadingProgress(10);
+      advanceProgress(10);
       try {
         // 1. 作業ファイルをパース
         const result = await parseExcelFile(file);
@@ -474,20 +620,20 @@ export default function Home() {
           await new Promise((r) => setTimeout(r, 2500));
           return;
         }
-        setLoadingProgress(25);
+        advanceProgress(25);
 
         // 2. GitHubから最新マスタを確実に取得（Meas.等の最新データ反映）
         setLoadingMsg('GitHubから最新の品目一覧を取得中...');
-        setLoadingProgress(35);
+        advanceProgress(35);
         const masterItems = await fetchMasterData();
         if (masterItems.length > 0) {
           loadMaster(masterItems);
         }
-        setLoadingProgress(60);
+        advanceProgress(60);
 
         // 3. マスタと紐付（気高コード＋新建高コード両方で検索）
         setLoadingMsg(`マスタデータと紐付中... (マスタ${masterItems.length}件)`);
-        setLoadingProgress(70);
+        advanceProgress(70);
         const allItems = result.containers.flatMap(c => c.items);
         const { linkedItems, linked, total } = linkItemsWithMaster(allItems, masterItems);
 
@@ -500,7 +646,7 @@ export default function Home() {
         }
 
         setLoadingMsg(`紐付完了: ${linked}/${total}件  データを表示中...`);
-        setLoadingProgress(90);
+        advanceProgress(90);
 
         // 5. データをロード（紐付済みの状態で表示）
         loadData(result.containers);
@@ -519,7 +665,7 @@ export default function Home() {
         closeLoading();
       }
     },
-    [loadData, loadMaster, closeLoading]
+    [loadData, loadMaster, closeLoading, advanceProgress]
   );
 
   const handleAqssLoaded = useCallback(
@@ -640,10 +786,10 @@ export default function Home() {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('写真を解析中...');
-      setLoadingProgress(5);
+      advanceProgress(5);
       try {
         const { container, errors } = await parsePhotoFile(file, (p, msg) => {
-          setLoadingProgress(p);
+          advanceProgress(p);
           setLoadingMsg(msg);
         });
         if (!container || container.items.length === 0) {
@@ -677,7 +823,7 @@ export default function Home() {
         closeLoading();
       }
     },
-    [loadData, loadMaster, closeLoading],
+    [loadData, loadMaster, closeLoading, advanceProgress],
   );
 
   const handleJkpLoaded = useCallback(
@@ -686,7 +832,7 @@ export default function Home() {
       loadedContainerRef.current = null;
       linkedRef.current = null;
       setLoadingMsg('JKPファイルを読み込み中...');
-      setLoadingProgress(5);
+      advanceProgress(5);
       // UIの更新を待つ
       await new Promise(r => setTimeout(r, 50));
       try {
@@ -767,7 +913,21 @@ export default function Home() {
         closeLoading();
       }
     },
-    [loadData, loadMaster, closeLoading]
+    [loadData, loadMaster, closeLoading, advanceProgress]
+  );
+
+  /** 履歴（最近のファイル）から選ばれたファイルを種類ごとに読み込む */
+  const handleRecentFileSelected = useCallback(
+    (file: File, fileType: FileType) => {
+      if (fileType === 'jkp') {
+        handleJkpLoaded(file);
+      } else if (fileType === 'aqss') {
+        handleAqssContainerLoaded(file);
+      } else {
+        handleFileLoaded(file);
+      }
+    },
+    [handleFileLoaded, handleJkpLoaded, handleAqssContainerLoaded]
   );
 
   const handleAnnounce = useCallback(() => {
@@ -793,11 +953,13 @@ export default function Home() {
   const handleWeatherCall = useCallback(() => {
     // 「天気を取得中」は音声ではなく文字表示のみ。結果は音声コール＋ポップアップ表示。
     showToast('天気を取得中...');
+    const sb = getSbClimate();
     fetchWeather().then(w => {
-      if (w) { speak(weatherToSpeech(w)); setWeatherPopup(w); }
+      if (w) { speak(weatherToSpeech(w, sb)); setWeatherPopup(w); }
+      else if (sb) speak(climateToSpeech(sb, true));
       else speak('天気情報を取得できませんでした。');
     });
-  }, [speak, showToast]);
+  }, [speak, showToast, getSbClimate]);
 
   const handleProgress = useCallback(() => {
     // 進捗コールは種類数のみ（進捗率は廃止）
@@ -821,23 +983,17 @@ export default function Home() {
     okCooldownRef.current = Date.now();
 
     const pl = item.palletCount;
-    const rawFrac = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-    const isNabeType = item.type === '鍋';
-    const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
 
     if (pl > 0) {
       decreaseQty();
-      const newPl = pl - 1;
-      if (newPl <= 0 && frac <= 0) {
+      // 残数のコールは画面の PL / CT と同じ値（検査で抜く分を差し引いた数）にする
+      const rest = quantityToSpeech(quantitiesAfterPalletRemoved(item));
+      if (!rest) {
         speak('完了。');
         suppressAnnounceRef.current = true;
         setTimeout(() => completeItem(item.id), 300);
-      } else if (newPl > 0 && frac > 0) {
-        speak(`残り${newPl}パレットと${frac}ケース。`);
-      } else if (newPl > 0) {
-        speak(`残り${newPl}パレット。`);
       } else {
-        speak(`残り${frac}ケース。`);
+        speak(`残り${rest}。`);
       }
     } else {
       speak('完了。');
@@ -851,16 +1007,10 @@ export default function Home() {
     }
   }, [decreaseQty, completeItem, speak, state.itemStartTime]);
 
+  // パレット数を戻したときはコールしない（画面の数字を見れば分かるため）
   const handleIncrease = useCallback(() => {
     increaseQty();
-    setTimeout(() => {
-      const el = document.querySelector('[data-pallet-count]');
-      if (el) {
-        const p = Number(el.getAttribute('data-pallet-count'));
-        announcePalletChange(p);
-      }
-    }, 50);
-  }, [increaseQty, announcePalletChange]);
+  }, [increaseQty]);
 
   const handleDecrease = useCallback(() => {
     const item = currentItemRef.current;
@@ -874,17 +1024,10 @@ export default function Home() {
     }
 
     decreaseQty();
-    const newPl = item.palletCount - 1;
-    const rawFrac = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-    const isNabeType = item.type === '鍋';
-    const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
-
-    if (newPl > 0 && frac > 0) {
-      speak(`残り${newPl}パレットと${frac}ケース。`);
-    } else if (newPl > 0) {
-      speak(`残り${newPl}パレット。`);
-    } else if (frac > 0) {
-      speak(`残り${frac}ケース。`);
+    // 残数のコールは画面の PL / CT と同じ値（検査で抜く分を差し引いた数）にする
+    const rest = quantityToSpeech(quantitiesAfterPalletRemoved(item));
+    if (rest) {
+      speak(`残り${rest}。`);
     } else {
       speak('完了。');
       suppressAnnounceRef.current = true;
@@ -894,14 +1037,13 @@ export default function Home() {
 
   const handleComplete = useCallback(() => {
     if (!currentItem) return;
-    const name = currentItem.itemName;
     const remaining = state.items.length - 1;
     deleteCurrent();
-    announceComplete(name);
+    // 品目ごとの完了コールは行わない（作業テンポを優先）。全品目完了時のみコールする。
     if (remaining === 0) {
       setTimeout(() => announceAllComplete(), 1500);
     }
-  }, [currentItem, state.items.length, deleteCurrent, announceComplete, announceAllComplete]);
+  }, [currentItem, state.items.length, deleteCurrent, announceAllComplete]);
 
   const handleSelectItem = useCallback(
     (idx: number) => {
@@ -924,6 +1066,19 @@ export default function Home() {
     setMenuOpen(false);
   }, []);
 
+  // コンテナ未読込のときは常に読込画面。読み込み済みならメニューで行き来できる。
+  const hasData = state.containers.length > 0;
+  const view: ViewMode = hasData ? viewMode : 'load';
+
+  // 画面を切り替えたときにドキュメントが少しでもスクロールしていると
+  // ヘッダーが上に隠れてしまうので、念のため先頭に戻しておく
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [view]);
+
   const handleVoiceCommand = useCallback(
     (action: VoiceAction) => {
       switch (action) {
@@ -941,17 +1096,9 @@ export default function Home() {
           handleDecrease(); break;
         case 'QUERY_CURRENT_QTY':
           if (currentItem) {
-            let qText = '';
-            if (currentItem.palletCount > 0 && currentItem.fraction > 0) {
-              qText = `${currentItem.palletCount}パレットと${currentItem.fraction}ケース`;
-            } else if (currentItem.palletCount > 0) {
-              qText = `${currentItem.palletCount}パレット`;
-            } else if (currentItem.fraction > 0) {
-              qText = `${currentItem.fraction}ケース`;
-            } else {
-              qText = `${currentItem.totalQty}個`;
-            }
-            speak(`${itemNameForSpeech(currentItem.itemName)}、${qText}。`);
+            const q = displayQuantities(currentItem);
+            const qText = quantityToSpeech(q) || `${q.pcs}個`;
+            speak(`${itemNameForCall(currentItem)}、${qText}。`);
           }
           break;
         case 'QUERY_REMAINING': {
@@ -964,10 +1111,10 @@ export default function Home() {
           break;
         }
         case 'QUERY_PALLET':
-          if (currentItem) speak(`パレット${currentItem.palletCount}枚です。`);
+          if (currentItem) speak(`パレット${displayQuantities(currentItem).pallets}枚です。`);
           break;
         case 'QUERY_FRACTION':
-          if (currentItem) speak(`端数${currentItem.fraction}ケースです。`);
+          if (currentItem) speak(`端数${displayQuantities(currentItem).cartons}ケースです。`);
           break;
         case 'CONFIRM_OK':
           handleConfirmOk();
@@ -979,8 +1126,9 @@ export default function Home() {
           handleProgress();
           break;
         case 'UNDO_DECREASE':
+          // 戻したことはコールしない。画面表示だけで知らせる
           handleIncrease();
-          speak('パレットを1つ戻しました。');
+          showToast('パレットを1つ戻しました');
           break;
         case 'QUERY_TYPE_COUNT': {
           const counts: Record<string, number> = {};
@@ -998,8 +1146,10 @@ export default function Home() {
         case 'WEATHER': {
           // 「取得中」は文字表示のみ（音声なし）。結果は音声コール＋ポップアップ表示。
           showToast('天気を取得中...');
+          const sb = getSbClimate();
           fetchWeather().then(w => {
-            if (w) { speak(weatherToSpeech(w)); setWeatherPopup(w); }
+            if (w) { speak(weatherToSpeech(w, sb)); setWeatherPopup(w); }
+            else if (sb) speak(climateToSpeech(sb, true));
             else speak('天気情報を取得できませんでした。');
           });
           break;
@@ -1007,8 +1157,11 @@ export default function Home() {
         case 'TEMPERATURE': {
           // 「取得中」は文字表示のみ（音声なし）
           showToast('気温を取得中...');
+          // SwitchBot 接続中は実測値でコール（湿度・暑さ指数・警戒レベル付き）
+          const sb = getSbClimate();
           fetchWeather().then(w => {
-            if (w) speak(temperatureToSpeech(w));
+            if (w) speak(temperatureToSpeech(w, sb));
+            else if (sb) speak(climateToSpeech(sb, true));
             else speak('気温情報を取得できませんでした。');
           });
           break;
@@ -1029,132 +1182,86 @@ export default function Home() {
         }
       }
     },
-    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, speakCheer, showToast, handleConfirmOk, handleContainerSummary, handleProgress]
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, speakCheer, showToast, handleConfirmOk, handleContainerSummary, handleProgress, getSbClimate]
   );
 
   const { isListening, isSpeaking, isPreparingSpeech, speakingText, isSupported, lastTranscript, toggleListening } =
     useSpeechRecognition({ onCommand: handleVoiceCommand });
 
-  // 音声種類選択メニュー（マイクボタン長押しで開く）
-  const [voiceMenuOpen, setVoiceMenuOpen] = useState(false);
-  const [currentVoice, setCurrentVoice] = useState<string>('Kore');
-  const [geminiTtsOn, setGeminiTtsOn] = useState<boolean>(false);
-  const [hasGeminiKey, setHasGeminiKey] = useState<boolean>(false);
-  const [ttsModelName, setTtsModelName] = useState<string>(DEFAULT_GEMINI_TTS_MODEL);
-  const [ttsError, setTtsError] = useState<string | null>(null);
+  // 作業用BGM（水の流れる音）
+  const { playing: waterPlaying, toggle: toggleWater } = useWaterSound();
+
+  /** 一時停止のときにこちらで水の音BGMを止めたか（再開で戻すための目印） */
+  const pausedWaterRef = useRef(false);
+
+  /**
+   * 経過時間の一時停止・再開。
+   * 休憩に入ったら時計を止めるだけでなく、いま鳴っている音声コールも切り、
+   * 水の音BGMも止める（せせらぎモード中なら川の映像と音が止まる）。
+   * 再開したら、こちらで止めた水の音だけを元に戻す。
+   */
+  const toggleWorkPause = useCallback(() => {
+    if (workPaused) {
+      resumeWork();
+      if (pausedWaterRef.current) {
+        pausedWaterRef.current = false;
+        if (!waterPlaying) toggleWater();
+      }
+      return;
+    }
+    if (!state.workStartTime) return;
+    cancelSpeech();
+    if (waterPlaying) { pausedWaterRef.current = true; toggleWater(); }
+    else pausedWaterRef.current = false;
+    pauseWork();
+  }, [workPaused, resumeWork, pauseWork, state.workStartTime, waterPlaying, toggleWater]);
+
+  /**
+   * せせらぎモードを開く。
+   * 中では動画に入っている川の音を使うので、流れている水の音BGMはいったん止める
+   * （二重に川の音が鳴らないように）。戻ったら元に戻す。
+   */
+  const openRiver = useCallback(() => {
+    if (waterPlaying) { riverPausedWaterRef.current = true; toggleWater(); }
+    else riverPausedWaterRef.current = false;
+    setRiverOpen(true);
+  }, [waterPlaying, toggleWater]);
+
+  /**
+   * せせらぎモードを閉じる（入るときに止めた水の音BGMは元に戻す）。
+   * 閉じた時点では画面が靄で真っ白なので、その靄を引き継いで晴れさせる。
+   */
+  const closeRiver = useCallback(() => {
+    setRiverOpen(false);
+    setRiverTail(true);
+    if (riverPausedWaterRef.current && !waterPlaying) toggleWater();
+    riverPausedWaterRef.current = false;
+  }, [waterPlaying, toggleWater]);
+
+  // 残した靄は晴れきったら片付ける
   useEffect(() => {
-    setCurrentVoice(getSelectedVoice());
-    setGeminiTtsOn(isGeminiTtsEnabled());
-    setHasGeminiKey(!!getGeminiKey());
-    setTtsModelName(getGeminiTtsModel());
-    setTtsError(getLastTtsError());
-    return subscribeTtsError(setTtsError);
-  }, []);
+    if (!riverTail) return;
+    const t = setTimeout(() => setRiverTail(false), RIVER_TAIL_MS);
+    return () => clearTimeout(t);
+  }, [riverTail]);
 
-  const toggleGeminiTts = useCallback((enabled: boolean) => {
-    setGeminiTtsEnabled(enabled);
-    setGeminiTtsOn(enabled);
-  }, []);
 
-  const handleModelNameChange = useCallback((name: string) => {
-    setTtsModelName(name);
-    setGeminiTtsModel(name);
-  }, []);
+  // 前回の再生状態を自動再開（ブラウザ制限のため最初の操作を待って再生）
+  useEffect(() => setupWaterAutoResume(), []);
 
-  // 各音声のサンプル試聴
-  const [sampleLoadingId, setSampleLoadingId] = useState<string | null>(null);
-  const [samplePlayingId, setSamplePlayingId] = useState<string | null>(null);
-  const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
-  const sampleUrlRef = useRef<string | null>(null);
+  // 音声コール中はBGMを下げる（ダッキング）。音声認識は常時ONのため対象外。
+  useEffect(() => {
+    getWaterSoundEngine().setDucked(isSpeaking || isPreparingSpeech);
+  }, [isSpeaking, isPreparingSpeech]);
 
-  const stopSample = useCallback(() => {
-    if (sampleAudioRef.current) {
-      try { sampleAudioRef.current.pause(); } catch { /* ignore */ }
-      sampleAudioRef.current = null;
-    }
-    if (sampleUrlRef.current) {
-      try { URL.revokeObjectURL(sampleUrlRef.current); } catch { /* ignore */ }
-      sampleUrlRef.current = null;
-    }
-    setSampleLoadingId(null);
-    setSamplePlayingId(null);
-  }, []);
-
-  const playSample = useCallback(async (voiceId: string) => {
-    stopSample();
-    setSampleLoadingId(voiceId);
-    try {
-      const blob = await geminiGenerateSpeech('こんにちは、サンプル音声です。', { voice: voiceId });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      sampleAudioRef.current = audio;
-      sampleUrlRef.current = url;
-      audio.onplay = () => {
-        setSampleLoadingId(null);
-        setSamplePlayingId(voiceId);
-      };
-      const cleanup = () => {
-        if (sampleUrlRef.current === url) {
-          URL.revokeObjectURL(url);
-          sampleUrlRef.current = null;
-        }
-        if (sampleAudioRef.current === audio) sampleAudioRef.current = null;
-        setSamplePlayingId((cur) => (cur === voiceId ? null : cur));
-      };
-      audio.onended = cleanup;
-      audio.onerror = cleanup;
-      await audio.play();
-    } catch (err) {
-      console.error('サンプル再生失敗:', err);
-      setSampleLoadingId(null);
-      setSamplePlayingId(null);
-    }
-  }, [stopSample]);
-  const longPressTimerRef = useRef<number | null>(null);
-  const longPressFiredRef = useRef(false);
-
-  const handleMicPressStart = useCallback(() => {
-    longPressFiredRef.current = false;
-    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = window.setTimeout(() => {
-      longPressFiredRef.current = true;
-      setCurrentVoice(getSelectedVoice());
-      setGeminiTtsOn(isGeminiTtsEnabled());
-      setHasGeminiKey(!!getGeminiKey());
-      setTtsModelName(getGeminiTtsModel());
-      setTtsError(getLastTtsError());
-      setVoiceMenuOpen(true);
-    }, 500);
-  }, []);
-
-  const handleMicPressEnd = useCallback(() => {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    if (longPressFiredRef.current) {
-      longPressFiredRef.current = false;
-      return; // 長押しの場合は通常クリックを発火しない
-    }
+  /** マイクボタン: タップで録音の開始/停止（コール中はコール停止） */
+  const handleMicTap = useCallback(() => {
     if (isSpeaking) {
       cancelSpeech();
       return;
     }
     toggleListening();
   }, [isSpeaking, toggleListening]);
-
-  const handleMicPressCancel = useCallback(() => {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    longPressFiredRef.current = false;
-  }, []);
-
-  const handleSelectVoice = useCallback((voiceId: string) => {
-    setSelectedVoice(voiceId);
-    setCurrentVoice(voiceId);
-  }, []);
 
   // 初期ロード中はスプラッシュ画面
   if (!appReady) {
@@ -1210,41 +1317,6 @@ export default function Home() {
     );
   }
 
-  if (state.containers.length === 0) {
-    return (
-      <>
-        <FileDropZone onFileLoaded={handleFileLoaded} onAqssLoaded={handleAqssLoaded} onAqssContainerLoaded={handleAqssContainerLoaded} onJkpLoaded={handleJkpLoaded} onMasterLoaded={handleMasterLoaded} onPhotoLoaded={handlePhotoLoaded} />
-        {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
-      </>
-    );
-  }
-
-  if (state.items.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-screen w-screen" style={{ background: 'var(--bg-primary)' }}>
-        <div className="text-center">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(34,197,94,0.1)', border: '2px solid rgba(34,197,94,0.2)' }}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-          </div>
-          <p className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>全品目完了</p>
-          <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>お疲れ様でした</p>
-          <button onClick={() => {
-            const input = document.createElement('input');
-            input.type = 'file'; input.accept = '.xlsx,.xls';
-            input.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) handleFileLoaded(f); };
-            input.click();
-          }} className="action-btn px-5 py-2.5 text-sm"
-            style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa' }}>
-            新しいファイルを読み込む
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
       {manualOpen && <ManualPage onClose={() => setManualOpen(false)} />}
@@ -1292,99 +1364,120 @@ export default function Home() {
           </div>
         </div>
       )}
-      {callSettingsOpen && (
-        <CallPhraseSettings
-          onClose={() => setCallSettingsOpen(false)}
-          onTest={(p) => speakCheer(p)}
+      {settingsTab && (
+        <SettingsPage
+          initialTab={settingsTab}
+          onClose={() => setSettingsTab(null)}
+          onTestCall={(p, onDone) => speakCheer(p, onDone)}
         />
       )}
       {weatherPopup && (
         <WeatherPopup weather={weatherPopup} onClose={closeWeatherPopup} isSpeaking={isSpeaking} />
       )}
+      {historyOpen && (
+        <HistoryModal
+          onClose={() => setHistoryOpen(false)}
+          onSelectRecent={handleRecentFileSelected}
+        />
+      )}
       {loadingMsg && <LoadingOverlay message={loadingMsg} progress={loadingProgress} closing={loadingClosing} />}
+      {/* 戻った直後は画面が煙で覆われているので、その続きから晴らす */}
+      {riverTail && (
+        <div className="river-tail-mist" style={{ animationDuration: `${MIST_CLEAR_MS}ms` }} aria-hidden>
+          <MistVideo from={MIST_PEAK} />
+        </div>
+      )}
+
+      {riverOpen && (
+        <RiverMode
+          onClose={closeRiver}
+          item={currentItem}
+          onDecreasePallet={handleDecrease}
+          onIncreasePallet={handleIncrease}
+          onNextItem={moveNext}
+          onPrevItem={movePrev}
+          workElapsed={workElapsed}
+          climate={switchbot || barWeather}
+          paused={workPaused}
+          onTogglePause={state.workStartTime ? toggleWorkPause : undefined}
+        />
+      )}
 
       {/* メニューオーバーレイ */}
       {menuOpen && (
         <div className="menu-overlay" onClick={() => setMenuOpen(false)}>
           <div className="menu-panel" onClick={(e) => e.stopPropagation()}>
-            <button className={`menu-item ${viewMode === 'work' ? 'active' : ''}`} onClick={() => switchView('work')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/>
-              </svg>
+            <div className="menu-title">
+              <MenuIcon size={20} strokeWidth={2} />
+              <span>
+                メニュー
+                <small>Container Navigation System</small>
+              </span>
+            </div>
+            <button className={`menu-item ${view === 'load' ? 'active' : ''}`} onClick={() => switchView('load')}>
+              <UploadIcon size={20} />
+              読込
+            </button>
+            <button className={`menu-item ${view === 'work' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('work')}>
+              <WorkIcon size={20} />
               作業
             </button>
             {/* 一覧ページ削除 */}
-            <button className={`menu-item ${viewMode === 'edit' ? 'active' : ''}`} onClick={() => switchView('edit')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-              </svg>
+            <button className={`menu-item ${view === 'edit' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('edit')}>
+              <EditIcon size={20} />
               管理
             </button>
             <div className="menu-divider" />
-            <button className={`menu-item ${viewMode === 'analytics' ? 'active' : ''}`} onClick={() => switchView('analytics')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-              </svg>
+            <button className={`menu-item ${view === 'analytics' ? 'active' : ''}`} disabled={!hasData} onClick={() => switchView('analytics')}>
+              <ChartIcon size={20} />
               分析
             </button>
-            <button className={`menu-item ${viewMode === 'history' ? 'active' : ''}`} onClick={() => switchView('history')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
+            <button className="menu-item" onClick={() => { setHistoryOpen(true); setMenuOpen(false); }}>
+              <ClockIcon size={20} />
               履歴
             </button>
             <div className="menu-divider" />
             <button className="menu-item" onClick={() => { setManualOpen(true); setMenuOpen(false); }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
+              <HelpIcon size={20} />
               マニュアル
             </button>
-            <button className="menu-item" onClick={() => { setCallSettingsOpen(true); setMenuOpen(false); }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>
-              </svg>
-              コール設定
+            <button className="menu-item" onClick={() => { setSettingsTab('voice'); setMenuOpen(false); }}>
+              <SettingsIcon size={20} />
+              設定
             </button>
-            <div className="menu-divider" />
+
+            {/* バージョン + 更新日時（読込画面から移動） */}
+            <div className="menu-spacer" />
             <div className="menu-version">
-              CNS Ver 3.6
+              <span className="menu-version-name">CNS</span>
+              <span>Ver.{APP_VERSION}</span>
+              <span className="menu-version-sub">{APP_UPDATED}</span>
             </div>
           </div>
         </div>
       )}
 
       <div className="app-layout" style={{ background: 'var(--bg-primary)' }}>
-        {/* ヘッダー */}
+        {/* ヘッダー（1行: メニュー / 経過時間 / 気温） */}
         <HeaderBar
-          containers={state.containers}
-          selectedIdx={state.selectedContainerIdx}
-          onSelectContainer={selectContainer}
-          onFileReload={handleFileLoaded}
           workElapsed={workElapsed}
           workRawSeconds={workRawSeconds}
           onMenuToggle={() => setMenuOpen(!menuOpen)}
-          onResetWorkTimer={() => { resetWorkTimer(); setItemTimeLogs([]); }}
+          onResetWorkTimer={() => { resetWorkTimer(); setItemTimeLogs([]); tenMinStepRef.current = 0; }}
+          workPaused={workPaused}
+          onToggleWorkPause={state.workStartTime ? toggleWorkPause : undefined}
           itemTimeLogs={itemTimeLogs}
           completionLog={state.completionLog}
-          onContainerAnnounce={handleContainerSummary}
-          hasItems={state.items.length > 0}
-          onWeather={viewMode === 'work' ? handleWeatherCall : undefined}
-          onCheer={viewMode === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
+          weather={barWeather}
+          switchbot={switchbot}
+          hasLoadedData={hasData}
+          onSwipeToRiver={view === 'work' ? openRiver : undefined}
+          onOpenClimate={() => {
+            if (switchbot) setSbPopupOpen(true);
+            else if (barWeather) setWeatherPopup(barWeather);
+          }}
         />
 
-        {/* 温湿度バー（ヘッダー下・作業ページのみ） */}
-        {viewMode === 'work' && (
-          <ClimateBar
-            weather={barWeather}
-            switchbot={switchbot}
-            sbStatus={sbStatus}
-            sbError={sbError}
-            onToggleSwitchBot={toggleSwitchBot}
-            onOpenWeather={() => { if (barWeather) setWeatherPopup(barWeather); }}
-            onOpenSwitchBot={() => setSbPopupOpen(true)}
-          />
-        )}
         {sbPopupOpen && switchbot && (
           <SwitchBotPopup
             reading={switchbot}
@@ -1394,9 +1487,62 @@ export default function Home() {
           />
         )}
 
+        {/* 右下の展開メニュー（コンテナ選択・応援/天気コール・水の音・SwitchBot） */}
+        <QuickActions
+          containers={state.containers}
+          selectedIdx={state.selectedContainerIdx}
+          onSelectContainer={selectContainer}
+          onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
+          onWeather={view === 'work' ? handleWeatherCall : undefined}
+          waterPlaying={waterPlaying}
+          onWater={toggleWater}
+          onWaterSettings={() => setSettingsTab('water')}
+          switchbot={switchbot}
+          sbStatus={sbStatus}
+          sbError={sbError}
+          onToggleSwitchBot={toggleSwitchBot}
+          onOpenSwitchBot={() => setSbPopupOpen(true)}
+          onOpenRiver={openRiver}
+          hidden={menuOpen || manualOpen || settingsTab !== null || historyOpen || riverOpen}
+        />
+
         {/* メインエリア */}
         <div className="main-area">
-          {viewMode === 'work' && (
+          {view === 'load' && (
+            <div className="full-panel">
+              <FileDropZone
+                embedded
+                onFileLoaded={handleFileLoaded}
+                onAqssLoaded={handleAqssLoaded}
+                onAqssContainerLoaded={handleAqssContainerLoaded}
+                onJkpLoaded={handleJkpLoaded}
+                onMasterLoaded={handleMasterLoaded}
+                onPhotoLoaded={handlePhotoLoaded}
+                onLoadingChange={handleDriveLoading}
+              />
+            </div>
+          )}
+
+          {view === 'work' && state.items.length === 0 && (
+            <div className="full-panel flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(34,197,94,0.1)', border: '2px solid rgba(34,197,94,0.2)' }}>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                </div>
+                <p className="text-xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>全品目完了</p>
+                <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>お疲れ様でした</p>
+                <button onClick={() => switchView('load')} className="action-btn px-5 py-2.5 text-sm"
+                  style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa' }}>
+                  新しいファイルを読み込む
+                </button>
+              </div>
+            </div>
+          )}
+
+          {view === 'work' && state.items.length > 0 && (
             <>
               {/* 横: 左60%詳細+右40%一覧, 縦: 詳細のみフル */}
               <div className="detail-panel"
@@ -1410,14 +1556,12 @@ export default function Home() {
                     completedIds={state.completedIds}
                     onSelectItem={handleSelectItem}
                     onCompleteItem={(id: string) => {
-                      const item = state.items.find(it => it.id === id);
+                      // 完了コールは行わない
                       completeItem(id);
-                      if (item) {
-                        announceComplete(item.itemName);
-                      }
                     }}
                     onUncompleteItem={uncompleteItem}
                     onDecrementPallet={handleDecrease}
+                    onIncrementPallet={handleIncrease}
                   />
                 )}
               </div>
@@ -1427,13 +1571,13 @@ export default function Home() {
             </>
           )}
 
-          {viewMode === 'list' && (
+          {view === 'list' && (
             <div className="full-panel">
               <ItemListPanel items={state.items} currentIdx={state.currentItemIdx} onSelect={handleSelectItem} />
             </div>
           )}
 
-          {viewMode === 'analytics' && (
+          {view === 'analytics' && (
             <div className="full-panel">
               <ContainerAnalyticsPage
                 items={state.items}
@@ -1443,19 +1587,13 @@ export default function Home() {
             </div>
           )}
 
-          {viewMode === 'jkp' && (
+          {view === 'jkp' && (
             <div className="full-panel">
               <JkpSchedulePage shipments={jkpShipments} />
             </div>
           )}
 
-          {viewMode === 'history' && (
-            <div className="full-panel" style={{ padding: 16, overflowY: 'auto' }}>
-              <HistoryPanel />
-            </div>
-          )}
-
-          {viewMode === 'edit' && (
+          {view === 'edit' && (
             <div className="full-panel">
               <ItemEditPage
                 items={(() => {
@@ -1540,8 +1678,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* フローティングマイクボタン（右下固定） */}
-        {viewMode === 'work' && isSupported && (
+        {/* フローティングマイクボタン（メニュー展開中は隠す） */}
+        {view === 'work' && isSupported && !menuOpen && (
           <>
             {(isSpeaking || isPreparingSpeech) && (
               <style>{`
@@ -1557,10 +1695,7 @@ export default function Home() {
               `}</style>
             )}
             <button
-              onPointerDown={handleMicPressStart}
-              onPointerUp={handleMicPressEnd}
-              onPointerLeave={handleMicPressCancel}
-              onPointerCancel={handleMicPressCancel}
+              onClick={handleMicTap}
               onContextMenu={(e) => e.preventDefault()}
               className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
               style={{
@@ -1635,250 +1770,6 @@ export default function Home() {
               )}
             </button>
 
-            {/* 音声種類選択メニュー（マイクボタン長押しで表示） */}
-            {voiceMenuOpen && (
-              <div
-                onClick={() => { stopSample(); setVoiceMenuOpen(false); }}
-                style={{
-                  position: 'fixed', inset: 0, zIndex: 150,
-                  background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
-                  display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-                  paddingBottom: 96, animation: 'fadeIn 0.18s ease both',
-                }}
-              >
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    background: 'linear-gradient(160deg, #0c0a1d 0%, #141028 50%, #0e1225 100%)',
-                    border: '1.5px solid rgba(255,255,255,0.15)',
-                    borderRadius: 20, padding: 16,
-                    boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
-                    width: '92%', maxWidth: 360,
-                    maxHeight: '70vh', overflowY: 'auto',
-                  }}
-                >
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    marginBottom: 12, paddingBottom: 8,
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                  }}>
-                    <div style={{ color: '#fff', fontSize: 15, fontWeight: 700 }}>声の種類</div>
-                    <div style={{ color: geminiTtsOn ? '#a78bfa' : '#facc15', fontSize: 11 }}>
-                      {!hasGeminiKey
-                        ? 'Gemini キー未設定'
-                        : geminiTtsOn ? 'Gemini 3.1 Flash TTS' : 'Web Speech API'}
-                    </div>
-                  </div>
-
-                  {/* 音声エンジン切り替えトグル */}
-                  {hasGeminiKey && (
-                    <div style={{
-                      display: 'flex', gap: 6, marginBottom: 12,
-                      padding: 4, borderRadius: 10,
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                    }}>
-                      <button
-                        onClick={() => toggleGeminiTts(true)}
-                        style={{
-                          flex: 1, padding: '8px 10px', borderRadius: 7,
-                          background: geminiTtsOn
-                            ? 'linear-gradient(135deg, rgba(139,92,246,0.4), rgba(74,110,247,0.3))'
-                            : 'transparent',
-                          border: geminiTtsOn ? '1px solid rgba(167,139,250,0.5)' : '1px solid transparent',
-                          color: geminiTtsOn ? '#fff' : '#888', fontSize: 12, fontWeight: 600,
-                          cursor: 'pointer', transition: 'all 0.15s ease',
-                        }}
-                      >
-                        Gemini 3.1 Flash
-                      </button>
-                      <button
-                        onClick={() => toggleGeminiTts(false)}
-                        style={{
-                          flex: 1, padding: '8px 10px', borderRadius: 7,
-                          background: !geminiTtsOn
-                            ? 'linear-gradient(135deg, rgba(74,110,247,0.35), rgba(99,102,241,0.25))'
-                            : 'transparent',
-                          border: !geminiTtsOn ? '1px solid rgba(74,110,247,0.5)' : '1px solid transparent',
-                          color: !geminiTtsOn ? '#fff' : '#888', fontSize: 12, fontWeight: 600,
-                          cursor: 'pointer', transition: 'all 0.15s ease',
-                        }}
-                      >
-                        Web Speech
-                      </button>
-                    </div>
-                  )}
-
-                  {!hasGeminiKey && (
-                    <div style={{
-                      color: '#facc15', fontSize: 11, lineHeight: 1.5,
-                      padding: '8px 10px', marginBottom: 10,
-                      background: 'rgba(250,204,21,0.08)',
-                      border: '1px solid rgba(250,204,21,0.2)',
-                      borderRadius: 8,
-                    }}>
-                      Gemini API キーを設定すると高品質な音声(声の種類選択)が使えます。
-                    </div>
-                  )}
-                  {hasGeminiKey && !geminiTtsOn && (
-                    <div style={{
-                      color: '#94a3b8', fontSize: 11, lineHeight: 1.5,
-                      padding: '8px 10px', marginBottom: 10,
-                      background: 'rgba(148,163,184,0.06)',
-                      border: '1px solid rgba(148,163,184,0.15)',
-                      borderRadius: 8,
-                    }}>
-                      Web Speech API 使用中。声の種類選択は Gemini に切り替え後に反映されます。
-                    </div>
-                  )}
-
-                  {/* Gemini TTS のエラー表示 */}
-                  {hasGeminiKey && geminiTtsOn && ttsError && (
-                    <div style={{
-                      color: '#fca5a5', fontSize: 11, lineHeight: 1.5,
-                      padding: '8px 10px', marginBottom: 10,
-                      background: 'rgba(239,68,68,0.08)',
-                      border: '1px solid rgba(239,68,68,0.25)',
-                      borderRadius: 8,
-                      wordBreak: 'break-all',
-                    }}>
-                      <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠ Gemini TTS エラー</div>
-                      <div>{ttsError}</div>
-                      <div style={{ marginTop: 4, color: '#fca5a5', opacity: 0.8 }}>
-                        モデル名を変更するか「Web Speech」に切り替えてください。
-                      </div>
-                    </div>
-                  )}
-
-                  {/* モデル名入力（Gemini 使用時のみ） */}
-                  {hasGeminiKey && geminiTtsOn && (
-                    <div style={{ marginBottom: 12 }}>
-                      <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>
-                        モデル名（他システムで動く名前があればここに）
-                      </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <input
-                          type="text"
-                          value={ttsModelName}
-                          onChange={(e) => handleModelNameChange(e.target.value)}
-                          placeholder={DEFAULT_GEMINI_TTS_MODEL}
-                          style={{
-                            flex: 1, padding: '8px 10px', borderRadius: 7,
-                            background: 'rgba(0,0,0,0.3)',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            color: '#fff', fontSize: 12,
-                            fontFamily: 'monospace',
-                            outline: 'none',
-                          }}
-                        />
-                        <button
-                          onClick={() => handleModelNameChange(DEFAULT_GEMINI_TTS_MODEL)}
-                          style={{
-                            padding: '8px 10px', borderRadius: 7,
-                            background: 'rgba(255,255,255,0.04)',
-                            border: '1px solid rgba(255,255,255,0.12)',
-                            color: '#aaa', fontSize: 11, cursor: 'pointer',
-                          }}
-                        >
-                          初期値
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ display: 'grid', gap: 6 }}>
-                    {GEMINI_VOICES.map((v) => {
-                      const selected = v.id === currentVoice;
-                      const sampleLoading = sampleLoadingId === v.id;
-                      const samplePlaying = samplePlayingId === v.id;
-                      const canSample = hasGeminiKey && geminiTtsOn;
-                      return (
-                        <div
-                          key={v.id}
-                          onClick={() => handleSelectVoice(v.id)}
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            gap: 8, padding: '10px 12px', borderRadius: 10,
-                            background: selected
-                              ? 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(74,110,247,0.25))'
-                              : 'rgba(255,255,255,0.04)',
-                            border: selected
-                              ? '1.5px solid rgba(167,139,250,0.6)'
-                              : '1px solid rgba(255,255,255,0.08)',
-                            color: '#fff', cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 14, fontWeight: 600 }}>{v.label}</div>
-                            <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{v.desc}</div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {/* サンプル試聴ボタン */}
-                            {canSample && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (samplePlaying || sampleLoading) {
-                                    stopSample();
-                                  } else {
-                                    void playSample(v.id);
-                                  }
-                                }}
-                                title="サンプル試聴"
-                                style={{
-                                  width: 32, height: 32, borderRadius: '50%',
-                                  background: samplePlaying
-                                    ? 'rgba(167,139,250,0.3)'
-                                    : 'rgba(255,255,255,0.08)',
-                                  border: '1px solid rgba(255,255,255,0.15)',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  cursor: 'pointer', flexShrink: 0,
-                                  color: '#fff',
-                                }}
-                              >
-                                {sampleLoading ? (
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                                    style={{ animation: 'ttsLoadSpin 0.9s linear infinite' }}>
-                                    <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.25)" strokeWidth="3" fill="none" />
-                                    <path d="M12 3 a9 9 0 0 1 9 9" stroke="#fff" strokeWidth="3" strokeLinecap="round" fill="none" />
-                                  </svg>
-                                ) : samplePlaying ? (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
-                                    <rect x="6" y="5" width="4" height="14" rx="1" />
-                                    <rect x="14" y="5" width="4" height="14" rx="1" />
-                                  </svg>
-                                ) : (
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
-                                    <path d="M8 5v14l11-7z" />
-                                  </svg>
-                                )}
-                              </button>
-                            )}
-                            {selected && (
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-                                stroke="#a78bfa" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button
-                    onClick={() => { stopSample(); setVoiceMenuOpen(false); }}
-                    style={{
-                      marginTop: 12, width: '100%', padding: '10px',
-                      borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.04)', color: '#ccc',
-                      fontSize: 13, cursor: 'pointer',
-                    }}
-                  >
-                    閉じる
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
         <UpdateNotification />

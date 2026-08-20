@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import OrientationGuard from "@/components/OrientationGuard";
 
 export const metadata: Metadata = {
   title: "Container Navigation System",
@@ -18,7 +19,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#141720",
+  themeColor: "#1a1d2e", // ヘッダー（--header-bg）と同色にして一体化させる
 };
 
 export default function RootLayout({
@@ -33,7 +34,10 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="32x32" href="/Container/icons/favicon-32.png" />
         <link rel="apple-touch-icon" sizes="180x180" href="/Container/icons/apple-touch-icon.png" />
       </head>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        {children}
+        <OrientationGuard />
+      </body>
     </html>
   );
 }
