@@ -253,8 +253,8 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     <strong style={{ color: '#60a5fa' }}>段数</strong>: 30・40サイズは5段目まで、50サイズは4段目まで。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#38bdf8' }}>中央の隙間</strong>: 玉の大きさの都合でパレットにぴったりは収まらないため、
-                    外側の辺に寄せて置き、中央が空きます。図もそのとおりに描いています。
+                    <strong style={{ color: '#38bdf8' }}>中央の隙間</strong>: 4つのブロックを風車状に組むので外側に隙間はできず、
+                    中央だけが空きます。図もそのとおりに描いています。
                   </div>
                   <div>
                     <strong style={{ color: '#94a3b8' }}>PDZ など他の機種</strong>: これまでどおり1段4個の積み方です。

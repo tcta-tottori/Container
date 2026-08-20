@@ -154,6 +154,54 @@ function laminateFilm(angle: number): React.ReactElement {
   );
 }
 
+/**
+ * ラミネートの中に入っている2箱を描く。
+ * @param dir  その面のなかで2箱に割れる向き（'h'=左右 / 'v'=上下）
+ * @param tape 箱ごとのテープを描く（上面用）
+ */
+function innerCartons(dir: 'h' | 'v', tape = false): React.ReactElement {
+  const boxStyle: React.CSSProperties = {
+    position: 'absolute',
+    border: '0.5px solid rgba(88,64,38,0.55)',
+    borderRadius: 1.5,
+    background: 'linear-gradient(150deg, rgba(255,255,255,0.07), rgba(0,0,0,0.06))',
+    boxShadow: 'inset 0 0 2px rgba(60,40,20,0.28)',
+    overflow: 'hidden',
+  };
+  const first: React.CSSProperties = dir === 'h'
+    ? { left: '1.5%', top: '2%', width: '46%', height: '96%' }
+    : { left: '2%', top: '1.5%', width: '96%', height: '46%' };
+  const second: React.CSSProperties = dir === 'h'
+    ? { left: '52.5%', top: '2%', width: '46%', height: '96%' }
+    : { left: '2%', top: '52.5%', width: '96%', height: '46%' };
+  // 2箱の合わせ目（フィルムの下でくぼんで見える）
+  const seam: React.CSSProperties = dir === 'h'
+    ? { left: '46%', top: 0, width: '8%', height: '100%' }
+    : { left: 0, top: '46%', width: '100%', height: '8%' };
+  const tapeStyle: React.CSSProperties = dir === 'h'
+    ? { left: '42%', top: 0, width: '16%', height: '100%' }
+    : { left: 0, top: '42%', width: '100%', height: '16%' };
+
+  const carton = (style: React.CSSProperties, key: string) => (
+    <div key={key} style={{ ...boxStyle, ...style }}>
+      {tape && <div style={{ position: 'absolute', ...tapeStyle, background: 'rgba(200,180,140,0.38)' }} />}
+    </div>
+  );
+
+  return (
+    <>
+      <div style={{
+        position: 'absolute', ...seam,
+        background: dir === 'h'
+          ? 'linear-gradient(90deg, rgba(50,34,18,0.05), rgba(50,34,18,0.35) 50%, rgba(50,34,18,0.05))'
+          : 'linear-gradient(180deg, rgba(50,34,18,0.05), rgba(50,34,18,0.35) 50%, rgba(50,34,18,0.05))',
+      }} />
+      {carton(first, 'a')}
+      {carton(second, 'b')}
+    </>
+  );
+}
+
 function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, split }: {
   x: number; y: number; w: number; d: number; h: number;
   topBase: number; palletDepth: number; wireframe?: boolean;
@@ -161,16 +209,10 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, split }: {
   split?: 'w' | 'd';
 }) {
   const zOffset = palletDepth / 2 - y - d / 2;
-  // 継ぎ目（縦線）。幅方向の分割なら正面・背面に、奥行方向の分割なら側面に出る。
-  // フィルム越しに見えるので、はっきりした線にはしない
-  const seamV = split ? (
-    <div style={{
-      position: 'absolute', left: '49%', top: 0, width: '2%', height: '100%',
-      background: 'rgba(90,70,45,0.35)',
-    }} />
-  ) : null;
-  const seamOnFront = split === 'w' ? seamV : null;
-  const seamOnSide = split === 'd' ? seamV : null;
+  // 2箱が並んで見える面にだけ、中身の箱を描く。
+  // 幅方向にまとめた玉なら正面・背面に、奥行方向なら側面に2箱が並ぶ
+  const cartonsOnFront = split === 'w' ? innerCartons('h') : null;
+  const cartonsOnSide = split === 'd' ? innerCartons('h') : null;
 
   if (wireframe) {
     return (
@@ -203,23 +245,25 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, split }: {
         transform: `translateZ(${d / 2}px)`,
         ...cardboardFace(0.55),
       }}>
-        <div style={{ position: 'absolute', left: '44%', top: 0, width: '12%', height: '28%', background: 'rgba(200,180,140,0.35)' }} />
-        {seamOnFront}
+        {!split && (
+          <div style={{ position: 'absolute', left: '44%', top: 0, width: '12%', height: '28%', background: 'rgba(200,180,140,0.35)' }} />
+        )}
+        {cartonsOnFront}
         {split && laminateFilm(115)}
       </div>
       {/* Back */}
       <div style={{ position: 'absolute', width: w, height: h, transform: `rotateY(180deg) translateZ(${d / 2}px)`, ...cardboardFace(0.3) }}>
-        {seamOnFront}
+        {cartonsOnFront}
         {split && laminateFilm(65)}
       </div>
       {/* Left */}
       <div style={{ position: 'absolute', width: d, height: h, left: (w - d) / 2, transform: `rotateY(-90deg) translateZ(${w / 2}px)`, ...cardboardFace(0.4) }}>
-        {seamOnSide}
+        {cartonsOnSide}
         {split && laminateFilm(70)}
       </div>
       {/* Right */}
       <div style={{ position: 'absolute', width: d, height: h, left: (w - d) / 2, transform: `rotateY(90deg) translateZ(${w / 2}px)`, ...cardboardFace(0.45) }}>
-        {seamOnSide}
+        {cartonsOnSide}
         {split && laminateFilm(110)}
       </div>
       {/* Top with tape cross */}
@@ -228,14 +272,15 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, split }: {
         transform: `rotateX(90deg) translateZ(${h / 2}px)`,
         ...cardboardFace(0.6),
       }}>
-        <div style={{ position: 'absolute', left: '44%', top: 0, width: '12%', height: '100%', background: 'rgba(200,180,140,0.4)' }} />
-        <div style={{ position: 'absolute', top: '44%', left: 0, width: '100%', height: '12%', background: 'rgba(200,180,140,0.35)' }} />
-        {split === 'w' && (
-          <div style={{ position: 'absolute', left: '49%', top: 0, width: '2%', height: '100%', background: 'rgba(90,70,45,0.45)' }} />
+        {!split && (
+          <>
+            <div style={{ position: 'absolute', left: '44%', top: 0, width: '12%', height: '100%', background: 'rgba(200,180,140,0.4)' }} />
+            <div style={{ position: 'absolute', top: '44%', left: 0, width: '100%', height: '12%', background: 'rgba(200,180,140,0.35)' }} />
+          </>
         )}
-        {split === 'd' && (
-          <div style={{ position: 'absolute', top: '49%', left: 0, width: '100%', height: '2%', background: 'rgba(90,70,45,0.35)' }} />
-        )}
+        {/* 上から見ると、幅方向の玉は左右に、奥行方向の玉は上下に2箱が並ぶ */}
+        {split === 'w' && innerCartons('h', true)}
+        {split === 'd' && innerCartons('v', true)}
         {split && (
           <>
             {laminateFilm(135)}
@@ -400,73 +445,68 @@ function buildJarPotSlots(
  * PDU ジャーポットの積み方
  *
  * PDU が付くポットは2箱がラミネート（シュリンク）で1つにまとまっている（＝1玉 = 2ケース）。
- * パレットの半面に「横長置き2玉 ＋ 縦長置き3玉」で5玉、
- * もう半面は互い違い（左右を入れ替えた向き）に5玉を置いて、1段 10玉（20ケース）。
+ * 半面に「横長置き2玉 ＋ 縦長置き3玉」で5玉、もう半面は互い違いに5玉で、1段 10玉（20ケース）。
  * 2段目からは段ごとに互い違いにして、荷崩れしないように積む。
  *
- * 玉の寸法（長辺 : 短辺 ＝ 1.6 : 1）はパレットにぴったりは収まらないので、
- * 各ブロックをパレットの外側の辺に寄せて置き、余りは中央に隙間として残す。
- * 実際の積み方も中央が空くため、図でもそのとおりに描く。
+ * 並べ方は風車（ピンホイール）状。4つのブロックが外周でぴったり接するので
+ * 外側には隙間ができず、中央だけが空く（実際の積み方と同じ）。
  *
- *   ┌─────┬──┬──┬──┐   奥（外側の辺に寄せる）
- *   │ 横長 │縦│縦│縦│
- *   │ 横長 ├──┴──┴──┤ ← 縦長は浅いぶん、内側が空く
- *   │      │         │
- *   ├──────┴─────────┤   ← 中央の隙間
- *   │         │ 横長 │
- *   ├──┬──┬──┤ 横長 │
- *   │縦│縦│縦│      │
- *   └──┴──┴──┴──────┘   手前（外側の辺に寄せる）
+ *   ┌──────┬────┬────┬────┐
+ *   │ 横長  │ 縦 │ 縦 │ 縦 │  A: 横長2玉（奥行きに2つ重ねる）
+ *   │ 横長  │    │    │    │  B: 縦長3玉
+ *   ├───┬──┴─┬──┴──┬─┴────┤
+ *   │縦 │ 縦 │ 縦  │ 横長  │  ← 中央の隙間は A と C のあいだ
+ *   │   │    │     │ 横長  │  C: 横長2玉  D: 縦長3玉
+ *   └───┴────┴─────┴──────┘
+ *
+ * 玉の 長辺 L・短辺 S は L + 3S（幅）× L + 2S（奥行き）が荷姿になる。
+ * 中央に残る隙間は (3S − L) × (2S − L)。
  */
 const PDU_CASES_PER_BUNDLE = 2;
 const PDU_BUNDLES_PER_LAYER = 10;
 /** 玉（2箱をラミネートしたかたまり）の 長辺 ÷ 短辺 */
-const PDU_BUNDLE_RATIO = 1.6;
+const PDU_BUNDLE_RATIO = 1.35;
 
 function buildPduJarPotSlots(
   bhPx: number, layers: number, pw: number, pd: number,
 ): BoxSlot[] {
-  // 横長ブロック(長辺) + 縦長3玉(短辺×3) が幅にほぼ収まるように短辺を決める。
-  // わずかに小さくして、中央に隙間が残るようにする。
-  const s = pw / (PDU_BUNDLE_RATIO + 3 + 0.2);  // 玉の短辺
-  const l = s * PDU_BUNDLE_RATIO;               // 玉の長辺（2箱ぶん）
-  const bandD = s * 2;                          // 半面の奥行き（横長2玉ぶん）
+  const r = PDU_BUNDLE_RATIO;
+  // 荷姿（L + 3S）×（L + 2S）がパレットに収まるように玉の大きさを決める
+  const sSize = Math.min(pw / (r + 3), pd / (r + 2));  // 玉の短辺
+  const lSize = sSize * r;                             // 玉の長辺（2箱ぶん）
+  const loadW = lSize + 3 * sSize;
+  const loadD = lSize + 2 * sSize;
+  // 荷姿はパレットの中央に置く
+  const ox = (pw - loadW) / 2;
+  const oy = (pd - loadD) / 2;
 
   /**
-   * 半面ぶんの並び。
-   * @param back true=奥側の半面（パレットの奥の辺に寄せる）
-   * @param landscapeLeft 横長2玉を左に置く（false なら左右反転）
+   * 1段ぶんの並び（風車状）。
+   * @param landscapeBackLeft 横長2玉を奥の左に置く（false なら左右反転）
    */
-  const halfSlots = (back: boolean, landscapeLeft: boolean): Omit<BoxSlot, 'z' | 'h'>[] => {
-    // 外側の辺に寄せる（奥の半面は上端、手前の半面は下端）
-    const outerY = back ? 0 : pd - bandD;
-    const landscapeX = landscapeLeft ? 0 : pw - l;
-    const portraitX = landscapeLeft ? pw - 3 * s : 0;
-    // 縦長は横長2玉より浅いので、外側の辺に合わせて内側（中央側）を空ける
-    const portraitY = back ? 0 : pd - l;
+  const layerSlots = (landscapeBackLeft: boolean): Omit<BoxSlot, 'z' | 'h'>[] => {
+    // 左右反転しても外周がぴったり合うよう、x は荷姿の中で折り返して求める
+    const mirrorX = (x: number, w: number) => (landscapeBackLeft ? x : loadW - x - w);
+    const put = (x: number, y: number, w: number, d: number, split: 'w' | 'd') =>
+      ({ x: ox + mirrorX(x, w), y: oy + y, w, d, split });
 
     const out: Omit<BoxSlot, 'z' | 'h'>[] = [];
-    // 横長置き2玉（奥行き方向に重ねる）
-    for (let i = 0; i < 2; i++) {
-      out.push({ x: landscapeX, y: outerY + i * s, w: l, d: s, split: 'w' });
-    }
-    // 縦長置き3玉（横に並べる）
-    for (let i = 0; i < 3; i++) {
-      out.push({ x: portraitX + i * s, y: portraitY, w: s, d: l, split: 'd' });
-    }
+    // A: 奥の左 — 横長2玉（奥行き方向に重ねる）
+    for (let i = 0; i < 2; i++) out.push(put(0, i * sSize, lSize, sSize, 'w'));
+    // B: 奥の右 — 縦長3玉
+    for (let i = 0; i < 3; i++) out.push(put(lSize + i * sSize, 0, sSize, lSize, 'd'));
+    // C: 手前の右 — 横長2玉
+    for (let i = 0; i < 2; i++) out.push(put(3 * sSize, lSize + i * sSize, lSize, sSize, 'w'));
+    // D: 手前の左 — 縦長3玉
+    for (let i = 0; i < 3; i++) out.push(put(i * sSize, 2 * sSize, sSize, lSize, 'd'));
     return out;
   };
 
   const slots: BoxSlot[] = [];
   for (let layer = 0; layer < layers; layer++) {
-    // 段ごとに互い違い（奥半分と手前半分の向きを入れ替える）
-    const flip = layer % 2 === 1;
+    // 段ごとに互い違い（左右を入れ替える）
     const z = PALLET_H_PX + layer * bhPx;
-    const layerSlots = [
-      ...halfSlots(true, !flip),   // 奥半分
-      ...halfSlots(false, flip),   // 手前半分（半面ごとに互い違い）
-    ];
-    for (const b of layerSlots) {
+    for (const b of layerSlots(layer % 2 === 0)) {
       slots.push({ ...b, z, h: bhPx });
     }
   }
