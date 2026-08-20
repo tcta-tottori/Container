@@ -499,8 +499,9 @@ function buildPduJarPotSlots(
   const layerSlots = (landscapeBackLeft: boolean): Omit<BoxSlot, 'z' | 'h'>[] => {
     // 左右反転しても外周がぴったり合うよう、x は荷姿の中で折り返して求める
     const mirrorX = (x: number, w: number) => (landscapeBackLeft ? x : loadW - x - w);
+    // y は 0 が手前なので、組み立てた並び（0 を奥として書いている）を反転して置く
     const put = (x: number, y: number, w: number, d: number, split: 'w' | 'd') =>
-      ({ x: ox + mirrorX(x, w), y: oy + y, w, d, split });
+      ({ x: ox + mirrorX(x, w), y: oy + (loadD - y - d), w, d, split });
 
     // 置く順番（seq）は実際の積み方に合わせる:
     //   ①奥の左に横向き1つ ②その右へ縦向き3つ ③①の手前に横向き1つ
@@ -569,7 +570,8 @@ function buildStackOrder(slots: BoxSlot[], mode: 'backColumn' | 'layer'): number
   if (slots.length === 0) return [];
   const round = (v: number) => Math.round(v * 100) / 100;
   const layers = Array.from(new Set(slots.map((s) => round(s.z)))).sort((a, b) => a - b);
-  const rows = Array.from(new Set(slots.map((s) => round(s.y)))).sort((a, b) => a - b);
+  // y は 0 が手前（translateZ が + ＝手前）。奥から積むので y の大きいほうを先にする
+  const rows = Array.from(new Set(slots.map((s) => round(s.y)))).sort((a, b) => b - a);
   const minX = Math.min(...slots.map((s) => s.x));
   const maxX = Math.max(...slots.map((s) => s.x + s.w));
   const centerX = (minX + maxX) / 2;
@@ -586,7 +588,7 @@ function buildStackOrder(slots: BoxSlot[], mode: 'backColumn' | 'layer'): number
 
   ranked.sort((a, b) => {
     if (mode === 'backColumn') {
-      if (a.row !== b.row) return a.row - b.row;       // 奥の列から
+      if (a.row !== b.row) return a.row - b.row;       // 奥の列から（rows は奥→手前の順）
       if (a.layer !== b.layer) return a.layer - b.layer; // その列を上まで
     } else {
       if (a.layer !== b.layer) return a.layer - b.layer; // 1段ずつ
