@@ -1,7 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { loadCallPhrases, saveCallPhrases, DEFAULT_CALL_PHRASES, isTenMinCheerEnabled, setTenMinCheerEnabled } from '@/lib/callPhrases';
+import {
+  loadCallPhrases, saveCallPhrases, DEFAULT_CALL_PHRASES,
+  isTenMinCheerEnabled, setTenMinCheerEnabled,
+  isTenMinClimateEnabled, setTenMinClimateEnabled,
+} from '@/lib/callPhrases';
 
 interface CallPhraseSettingsProps {
   /** 試聴。読み終わったら onDone を呼んでもらい、読込表示を元に戻す */
@@ -27,6 +31,7 @@ export default function CallPhraseSettings({ onTest }: CallPhraseSettingsProps) 
   const [phrases, setPhrases] = useState<string[]>(() => loadCallPhrases());
   const [newPhrase, setNewPhrase] = useState('');
   const [tenMinCheer, setTenMinCheer] = useState<boolean>(() => isTenMinCheerEnabled());
+  const [tenMinClimate, setTenMinClimate] = useState<boolean>(() => isTenMinClimateEnabled());
   /** いま試聴している行。ここだけ読込表示にする */
   const [playingIdx, setPlayingIdx] = useState<number | null>(null);
   /** 試聴のたびに増やす番号。古い試聴の終了通知で表示を消さないための目印 */
@@ -66,6 +71,12 @@ export default function CallPhraseSettings({ onTest }: CallPhraseSettingsProps) 
     const next = !tenMinCheer;
     setTenMinCheer(next);
     setTenMinCheerEnabled(next);
+  };
+
+  const toggleTenMinClimate = () => {
+    const next = !tenMinClimate;
+    setTenMinClimate(next);
+    setTenMinClimateEnabled(next);
   };
 
   const persist = (next: string[]) => {
@@ -119,7 +130,7 @@ export default function CallPhraseSettings({ onTest }: CallPhraseSettingsProps) 
         <div style={{ flex: 1 }}>
           <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>10分ごとのコールで応援する</div>
           <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 3 }}>
-            オフの場合は経過時間・気温のみをコールします
+            オフの場合は経過時間だけをコールします
           </div>
         </div>
         {/* トグルスイッチ */}
@@ -131,6 +142,35 @@ export default function CallPhraseSettings({ onTest }: CallPhraseSettingsProps) 
         }}>
           <div style={{
             position: 'absolute', top: 2, left: tenMinCheer ? 22 : 2,
+            width: 22, height: 22, borderRadius: '50%', background: '#fff',
+            transition: 'left 0.15s ease',
+          }} />
+        </div>
+      </div>
+
+      {/* 10分ごとのコールの気温・湿度 ON/OFF（既定はオフ） */}
+      <div
+        onClick={toggleTenMinClimate}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+          padding: '12px 14px', marginBottom: 16, borderRadius: 12,
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>10分ごとのコールで気温・湿度も伝える</div>
+          <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 3 }}>
+            既定はオフ。気温・湿度は天気ボタン・気温コールで確認できます
+          </div>
+        </div>
+        <div style={{
+          width: 48, height: 28, borderRadius: 999, flexShrink: 0,
+          background: tenMinClimate ? 'linear-gradient(135deg, #8b5cf6, #4a6ef7)' : 'rgba(255,255,255,0.15)',
+          border: '1px solid rgba(255,255,255,0.15)', position: 'relative',
+          transition: 'background 0.15s ease',
+        }}>
+          <div style={{
+            position: 'absolute', top: 2, left: tenMinClimate ? 22 : 2,
             width: 22, height: 22, borderRadius: '50%', background: '#fff',
             transition: 'left 0.15s ease',
           }} />

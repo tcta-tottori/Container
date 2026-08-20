@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { itemNameForSpeech, areSimilarItems } from '@/lib/typeDetector';
+import { itemNameForCall } from '@/lib/partTranslations';
+import { displayQuantities, quantityToSpeech } from '@/lib/itemQuantity';
 import { geminiGenerateSpeech } from '@/lib/geminiTts';
+import { sherpaGenerateSpeech } from '@/lib/sherpaTts';
 import { getGeminiKey } from '@/lib/geminiApi';
-import { getVoiceSettings, styleInstruction, webSpeechVolume, VoiceProfile } from '@/lib/voiceSettings';
+import { getVoiceSettings, styleInstruction, webSpeechVolume, VoiceEngine, VoiceProfile } from '@/lib/voiceSettings';
 import { applyVolume } from '@/lib/audioBoost';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
@@ -92,7 +95,18 @@ function speakWebSpeech(text: string, onDone?: () => void, profile?: VoiceProfil
   window.speechSynthesis.speak(u);
 }
 
-async function speakGemini(text: string, stylePrefix?: string, voice?: string, onDone?: () => void): Promise<void> {
+/**
+ * 音声データを作って鳴らす共通処理（Gemini TTS / sherpa-onnx）。
+ * 生成に時間がかかるため、先にコール開始を通知して録音を止める。
+ * @param makeBlob 音声（WAV）を作る処理。中断は signal で伝える。
+ * @param onFail   生成・再生に失敗したときの逃げ道（sherpa-onnx は端末の音声に切り替える）
+ */
+async function speakBlob(
+  text: string,
+  makeBlob: (signal: AbortSignal) => Promise<Blob>,
+  onDone?: () => void,
+  onFail?: (finish: () => void) => void,
+): Promise<void> {
   const abort = new AbortController();
   _currentAbort = abort;
   // 生成前にコール開始を通知（録音をすぐ止めてフィードバック防止）
@@ -100,7 +114,7 @@ async function speakGemini(text: string, stylePrefix?: string, voice?: string, o
   let finished = false;
   const finish = () => { if (finished) return; finished = true; _onSpeakEnd?.(); onDone?.(); };
   try {
-    const blob = await geminiGenerateSpeech(text, { signal: abort.signal, stylePrefix, voice });
+    const blob = await makeBlob(abort.signal);
     if (abort.signal.aborted) return;
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
@@ -122,13 +136,31 @@ async function speakGemini(text: string, stylePrefix?: string, voice?: string, o
     await audio.play();
   } catch (err) {
     if (abort.signal.aborted) return;
-    console.error('Gemini TTS 失敗:', err);
-    // ユーザーが Gemini を明示選択しているため自動フォールバックしない。
-    // 録音再開のため _onSpeakEnd を呼んで状態を解放する。
-    finish();
+    console.error('音声コールに失敗:', err);
+    if (onFail) onFail(finish);
+    else finish();
   } finally {
     if (_currentAbort === abort) _currentAbort = null;
   }
+}
+
+/** Gemini TTS で読み上げる。失敗しても自動フォールバックしない（ユーザーが明示選択しているため） */
+function speakGemini(text: string, stylePrefix?: string, voice?: string, onDone?: () => void): Promise<void> {
+  return speakBlob(text, (signal) => geminiGenerateSpeech(text, { signal, stylePrefix, voice }), onDone);
+}
+
+/**
+ * sherpa-onnx（端末内 TTS）で読み上げる。
+ * モデルが未配置・読み込み失敗のときはコールが無音にならないよう端末の音声に切り替える。
+ */
+function speakSherpa(text: string, profile: VoiceProfile, onDone?: () => void): Promise<void> {
+  return speakBlob(
+    text,
+    (signal) => sherpaGenerateSpeech(text, { sid: profile.sid, speed: profile.rate, signal }),
+    onDone,
+    // 生成に失敗 → 端末の音声で読み上げ直す
+    (finish) => speakWebSpeech(text, finish, profile),
+  );
 }
 
 /** 進行中のコールを停止（onEnd は呼ばない。新しい発話側で管理する） */
@@ -144,9 +176,14 @@ function stopCurrentPlayback(): void {
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
 }
 
-/** Gemini TTS を使うか（設定が gemini で、かつ API キーがある） */
-function isGeminiEngineReady(): boolean {
-  return getVoiceSettings().engine === 'gemini' && !!getGeminiKey();
+/**
+ * 実際に使うエンジンを決める。
+ * Gemini は API キーが無いと鳴らせないため、その場合は端末の音声に落とす。
+ */
+function activeEngine(): VoiceEngine {
+  const engine = getVoiceSettings().engine;
+  if (engine === 'gemini') return getGeminiKey() ? 'gemini' : 'web';
+  return engine;
 }
 
 /** 指定プロファイルで読み上げる（エンジンの切り替えとフォールバックをまとめる） */
@@ -167,8 +204,11 @@ function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): vo
   };
   _currentDone = done;
 
-  if (isGeminiEngineReady()) {
+  const engine = activeEngine();
+  if (engine === 'gemini') {
     void speakGemini(text, styleInstruction(profile), profile.voice, done);
+  } else if (engine === 'sherpa') {
+    void speakSherpa(text, profile, done);
   } else {
     speakWebSpeech(text, done, profile);
   }
@@ -221,40 +261,15 @@ export function useSpeech() {
   }, []);
 
   const announceItem = useCallback((item: ContainerItem, allItems?: ContainerItem[]) => {
-    const spokenName = itemNameForSpeech(item.itemName);
-    const isPolycover = item.type === 'ポリカバー';
+    // 品名は画面の表示名をそのまま読む（部品の詳しい型式までは読まない）
+    const spokenName = itemNameForCall(item);
 
-    // パレットと端数の読み上げ（小数点がある場合は切り上げ）
-    const fractionCeil = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-    let qtyText = '';
-    if (item.palletCount > 0 && fractionCeil > 0) {
-      qtyText = `${item.palletCount}パレットと${fractionCeil}ケース`;
-    } else if (item.palletCount > 0) {
-      qtyText = `${item.palletCount}パレット`;
-    } else if (fractionCeil > 0) {
-      qtyText = `${fractionCeil}ケース`;
-    } else {
-      qtyText = `${item.totalQty}個`;
-    }
+    // 数量は画面の PL / CT と同じ値を読む。
+    // ポリカバー等の検査で1ケース抜く品目は、抜いた後の数をコールする。
+    const q = displayQuantities(item);
+    const qtyText = quantityToSpeech(q) || `${q.pcs}個`;
 
     let text = `${spokenName}。${qtyText}。`;
-
-    // ポリカバーは検査で1ケース抜く（端数から1引く）。鍋は検査なし。
-    // 端数=0でパレットぴったりの場合は1パレットを崩して検査分を抜く。
-    if (isPolycover) {
-      if (fractionCeil > 0) {
-        const afterInspection = fractionCeil - 1;
-        text += `検査を抜いて${afterInspection}ケース。`;
-      } else if (item.palletCount > 0 && item.qtyPerPallet > 0) {
-        const remainingCases = item.qtyPerPallet - 1;
-        const remainingPallets = item.palletCount - 1;
-        if (remainingPallets > 0) {
-          text += `検査を抜いて${remainingPallets}パレットと${remainingCases}ケース。`;
-        } else {
-          text += `検査を抜いて${remainingCases}ケース。`;
-        }
-      }
-    }
 
     // 鍋: 類似品・サイズ違いアナウンスは不要
     const isNabe = item.type === '鍋';
@@ -269,7 +284,6 @@ export function useSpeech() {
         text += '注意、類似品があります。';
       }
     }
-
 
     speak(text);
   }, []);
@@ -293,8 +307,12 @@ export function useSpeech() {
     speak(`残り${count}品目です。`);
   }, []);
 
-  /** コンテナ概要アナウンス（読み込み時・手動コール用）
-   *  completedIds / elapsedSeconds を渡すと進捗情報も読み上げる */
+  /**
+   * コンテナ概要アナウンス（手動コール用）。
+   *
+   * 挨拶・内容案内（「◯◯が N 種類」）は読み上げない。
+   * 残り品数と、注意が必要な類似品だけを短く伝える。
+   */
   const announceContainerSummary = useCallback((
     items: ContainerItem[],
     ...rest: [string, Set<string>?, number?]
@@ -304,94 +322,20 @@ export function useSpeech() {
 
     const done = completedIds ? items.filter((it) => completedIds.has(it.id)).length : 0;
     const remaining = items.length - done;
-    const pct = items.length > 0 ? Math.round(done / items.length * 100) : 0;
 
-    // 種類別カウント（残りのみ）
-    const typeCounts: Record<string, number> = {};
-    const totalTypeCounts: Record<string, number> = {};
-    const similarPairs: string[] = [];
+    let text = remaining === 0 ? '全品目完了です。' : `残り${remaining}品。`;
 
-    for (const it of items) {
-      totalTypeCounts[it.type] = (totalTypeCounts[it.type] || 0) + 1;
-      if (!completedIds || !completedIds.has(it.id)) {
-        typeCounts[it.type] = (typeCounts[it.type] || 0) + 1;
-      }
-    }
-
-    // 類似品チェック
-    const checked = new Set<string>();
+    // 類似品がある種類だけ短く注意する
+    const warnedTypes = new Set<string>();
     for (const a of items) {
       for (const b of items) {
         if (a.id >= b.id) continue;
-        const key = `${a.id}:${b.id}`;
-        if (checked.has(key)) continue;
-        checked.add(key);
-        if (areSimilarItems(a.itemName, b.itemName)) {
-          const nameA = itemNameForSpeech(a.itemName);
-          const nameB = itemNameForSpeech(b.itemName);
-          similarPairs.push(`${nameA}と${nameB}`);
-        }
+        if (areSimilarItems(a.itemName, b.itemName)) warnedTypes.add(a.type);
       }
     }
-
-    // === 開始コール（挨拶なし、コンテナ番号なし） ===
-    const isResume = completedIds && done > 0;
-    let text = isResume
-      ? '続きです。'
-      : '荷降ろしを開始します。';
-
-    // === 内容物コール: 「〇〇がN種類」形式 ===
-    // 鍋コンテナ: サイズ別にコール
-    if (totalTypeCounts['鍋'] > 0) {
-      let count100 = 0, count180 = 0;
-      for (const it of items) {
-        if (it.type !== '鍋') continue;
-        if (it.itemName.includes('180') || /18[RWCS]/.test(it.itemName)) count180++;
-        else count100++;
-      }
-      if (count100 > 0) text += `100サイズが${count100}種類。`;
-      if (count180 > 0) text += `180サイズが${count180}種類。`;
+    for (const t of Array.from(warnedTypes)) {
+      text += `${t}に類似品があります。`;
     }
-    const typeLabels: [string, string][] = [
-      ['ポリカバー', 'ポリカバー'],
-      ['ジャーポット', 'ジャーポット'],
-      ['箱', '箱'],
-      ['部品', '部品'],
-      ['ヤーマン部品', 'ヤーマン部品'],
-      ['その他', 'その他'],
-    ];
-    for (const [typeKey, label] of typeLabels) {
-      const count = totalTypeCounts[typeKey];
-      if (count) text += `${label}が${count}種類。`;
-    }
-
-    // === 進捗情報（再開時） ===
-    if (isResume) {
-      text += `進捗${pct}パーセント、残り${remaining}品。`;
-    }
-
-    // === 類似品警告: 種類単位で短くコール ===
-    if (similarPairs.length > 0) {
-      // 類似品がある種類を収集
-      const warnedTypes = new Set<string>();
-      for (const a of items) {
-        for (const b of items) {
-          if (a.id >= b.id) continue;
-          if (areSimilarItems(a.itemName, b.itemName)) {
-            warnedTypes.add(a.type);
-          }
-        }
-      }
-      for (const t of Array.from(warnedTypes)) {
-        text += `${t}に類似品があります。`;
-      }
-    }
-
-    if (completedIds && remaining === 0) {
-      text += '全品目完了です。';
-    }
-
-    text += 'よろしくお願いします。';
 
     speak(text);
   }, []);
@@ -423,15 +367,8 @@ export function useSpeech() {
 
   /** OK確認アナウンス（残りパレット+端数のみ） */
   const announceOk = useCallback((_itemName: string, remainingPallets: number, fractionCases?: number) => {
-    if (remainingPallets <= 0 && (!fractionCases || fractionCases <= 0)) {
-      speak('完了。');
-    } else if (remainingPallets > 0 && fractionCases && fractionCases > 0) {
-      speak(`残り${remainingPallets}パレットと${fractionCases}ケース。`);
-    } else if (remainingPallets > 0) {
-      speak(`残り${remainingPallets}パレット。`);
-    } else if (fractionCases && fractionCases > 0) {
-      speak(`残り${fractionCases}ケース。`);
-    }
+    const qty = quantityToSpeech({ pallets: remainingPallets, cartons: fractionCases || 0 });
+    speak(qty ? `残り${qty}。` : '完了。');
   }, []);
 
   return {

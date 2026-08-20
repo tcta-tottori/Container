@@ -310,20 +310,28 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#60a5fa' }}>品目切替時</strong>: 品名・パレット数・ケース数を読み上げ。ポリカバーは検査分も計算。類似品がある場合は「類似品があります」とだけコール（品名・数量は読み上げません）。
+                    <strong style={{ color: '#60a5fa' }}>品目切替時</strong>: 品名・パレット数・ケース数を読み上げ。品名は画面の表示名だけ（部品の詳しい型式までは読みません）。
+                    数量は画面の PL / CT と同じ値で、ポリカバーなど検査を抜く品目は<strong style={{ color: '#fbbf24' }}>抜いた後の数</strong>をコールします。
+                    類似品がある場合は「類似品があります」とだけコール（品名・数量は読み上げません）。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#22c55e' }}>コンテナ読み込み時</strong>: 種類別品目数、類似品の有無をアナウンス。鍋は100/180サイズ別にコール。
+                    <strong style={{ color: '#22c55e' }}>コンテナ読み込み時</strong>: コールなし（「荷降ろしを開始します」や内容案内は読み上げません）。最初の品目コールだけ鳴ります。
+                    メニューの概要コールを押したときは「残り○品」と類似品の注意だけを伝えます。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#ef4444' }}>OKコマンド後</strong>: 「残り○パレットと○ケース。」のみコール（次の品目コールはなし）。
+                    パレット数を戻したときはコールしません（画面表示のみ）。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#f59e0b' }}>10分ごとのコール</strong>: 経過時間＋気温・湿度・暑さ指数と警戒レベル（危険／厳重警戒／警戒／注意）をコール。
-                    SwitchBot 接続中は、その場の実測値（「実測の気温…」）をコールし、コールした数値のポップアップも出ます。一時停止中は数えません。
+                    <strong style={{ color: '#f59e0b' }}>10分ごとのコール</strong>: 「○分経過しました」のみ。
+                    気温・湿度は既定ではコールしません（設定 →「音声・コール」の「コールの内容」でオンにすると、暑さ指数と警戒レベルまで付きます）。一時停止中は数えません。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#38bdf8' }}>気温・天気コール</strong>: 気温・湿度・暑さ指数と警戒レベルの数値のみ。「休憩してください」等のアドバイスはコールしません。
                   </div>
                   <div>
-                    <strong style={{ color: '#a78bfa' }}>声・トーンの設定</strong>: メニュー →「設定」→「音声」で、使う音声API・話す人・トーン・速さ・音量を変更できます（通常コールと応援コールで別々に設定）。
+                    <strong style={{ color: '#a78bfa' }}>声・トーンの設定</strong>: メニュー →「設定」→「音声・コール」で、使う音声API・話す人・トーン・速さ・音量を変更できます（通常コールと応援コールで別々に設定）。
+                    音声 API は <strong>Gemini TTS</strong>（高品質・通信あり）、<strong>sherpa-onnx</strong>（端末内で高音質・通信なし）、<strong>端末の音声</strong>から選べます。
                   </div>
                 </div>
               </InfoCard>
@@ -461,7 +469,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     { icon: '🔍', title: '検査なし', desc: '鍋は検査を抜かない（端数＝元の端数のまま）。' },
                     { icon: '📋', title: 'リスト順', desc: '①100サイズ→②180サイズ→③機種名アルファベット順で自動ソート。' },
                     { icon: '🔗', title: '関連品', desc: '類似品表示なし。同じサイズの品目を「関連」として表示。' },
-                    { icon: '🔊', title: 'アナウンス', desc: '初回コール: 「100サイズがN種類、180サイズがN種類」。品目コールでのサイズ違い警告はなし。' },
+                    { icon: '🔊', title: 'アナウンス', desc: '読み込み時の概要コールは廃止。品目コールでのサイズ違い警告もなし。' },
                     { icon: '🎨', title: '背景色', desc: '機種別のカラーマッピング（nabeColors）に基づく独自の背景グラデーション。' },
                   ].map((r, i) => (
                     <div key={i} style={{

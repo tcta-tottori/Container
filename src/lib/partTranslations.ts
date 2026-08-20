@@ -10,6 +10,7 @@
  */
 
 import { ContainerItem } from './types';
+import { itemNameForSpeech } from './typeDetector';
 
 /** 英語 DESCRIPTION → 日本語 */
 const EN_DESCRIPTION_JP: Record<string, string> = {
@@ -181,4 +182,20 @@ export function buildJapanesePartName(item: ContainerItem): string | null {
 
   if (parts.length === 0) return null;
   return parts.join(' ／ ');
+}
+
+/**
+ * コール（読み上げ）に使う品名。
+ *
+ * 画面に出している表示名をそのまま読む。部品の表示名が
+ * 「日本語名 ／ 型式など」の形になっている場合は、先頭の表示名だけを読み、
+ * 詳しい型式までは読み上げない（コールを短くするため）。
+ */
+export function itemNameForCall(item: ContainerItem): string {
+  const jp = buildJapanesePartName(item);
+  if (jp) {
+    const head = jp.split('／')[0].trim() || jp;
+    return itemNameForSpeech(head);
+  }
+  return itemNameForSpeech(item.itemName);
 }

@@ -131,22 +131,15 @@ export interface ClimateReading {
   wbgt: number;
 }
 
-/** 暑さ指数に応じた注意喚起（警戒以上のみ読み上げる） */
-export function wbgtAdviceToSpeech(wbgt: number): string {
-  if (wbgt >= 31) return '作業を中断して休憩してください。';
-  if (wbgt >= 28) return 'こまめに休憩と水分補給をしてください。';
-  if (wbgt >= 25) return '水分補給をしてください。';
-  return '';
-}
-
 /**
  * 気温・湿度・暑さ指数＋警戒レベル（危険/厳重警戒/警戒/注意）のコール文。
+ * 「休憩してください」等のアドバイスは読み上げない（数値と警戒レベルのみ）。
  * @param fromSwitchBot SwitchBot の実測値の場合は true（読み上げで実測と区別する）
  */
 export function climateToSpeech(r: ClimateReading, fromSwitchBot = false): string {
   const lv = wbgtLevel(r.wbgt).label;
   const head = fromSwitchBot ? '実測の気温' : '現在の気温';
-  return `${head}${r.temperature}度、湿度${Math.round(r.humidity)}%、暑さ指数${r.wbgt}、${lv}です。${wbgtAdviceToSpeech(r.wbgt)}`;
+  return `${head}${r.temperature}度、湿度${Math.round(r.humidity)}%、暑さ指数${r.wbgt}、${lv}です。`;
 }
 
 /** 本日の予報（最高気温・1日を通した降水確率）のコール文 */

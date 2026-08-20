@@ -10,13 +10,16 @@ import { useWorkTimer } from '@/hooks/useTimer';
 import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
-import { itemNameForSpeech } from '@/lib/typeDetector';
+import { itemNameForCall } from '@/lib/partTranslations';
+import { displayQuantities, quantitiesAfterPalletRemoved, quantityToSpeech } from '@/lib/itemQuantity';
 import { saveRecentFile, FileType } from '@/lib/recentFiles';
 import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, climateToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
-import { getRandomCallPhrase, isTenMinCheerEnabled } from '@/lib/callPhrases';
+import { getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled } from '@/lib/callPhrases';
+import { getVoiceSettings, subscribeVoiceSettings, VoiceSettings } from '@/lib/voiceSettings';
+import { prepareSherpaTts } from '@/lib/sherpaTts';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
@@ -236,8 +239,21 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime, state.workPausedAt);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, speakCheer, speakThenCheer, announceItem, announcePalletChange, announceAllComplete, announceContainerSummary } =
+  const { speak, speakCheer, speakThenCheer, announceItem, announceAllComplete, announceContainerSummary } =
     useSpeech();
+
+  /**
+   * sherpa-onnx（端末内 TTS）を選んでいるときは、最初のコールで待たされないよう
+   * 先にモデルを読み込んでおく。設定を切り替えたときも読み込む。
+   */
+  useEffect(() => {
+    const preload = (s: VoiceSettings) => {
+      if (s.engine !== 'sherpa' || !s.sherpa.preload) return;
+      void prepareSherpaTts().catch(() => { /* 失敗しても端末の音声で鳴る */ });
+    };
+    preload(getVoiceSettings());
+    return subscribeVoiceSettings(preload);
+  }, []);
 
   const prevItemRef = useRef<string | null>(null);
   const currentItemRef = useRef(currentItem);
@@ -352,8 +368,8 @@ export default function Home() {
     });
   }, [state.items, state.masterItems, state.containers, state.selectedContainerIdx, updateItem]);
 
-  // 品目切替時の自動アナウンス（コンテナ読込直後の最初の品目はスキップ — 概要コールと混ざるため）
-  const firstItemSkipRef = useRef(true);
+  // 品目切替時の自動アナウンス
+  const firstItemSkipRef = useRef(false);
   useEffect(() => {
     if (!currentItem || !state.autoAnnounce) return;
     // 一時停止中（休憩中）はコールしない
@@ -380,7 +396,8 @@ export default function Home() {
     }
   }, [currentItem, state.autoAnnounce, announceItem, state.items, state.completedIds]);
 
-  // コンテナ読み込み時の概要アナウンス（初回のみ）
+  // コンテナ読み込み時の概要コールは廃止（「荷降ろしを開始します」「内容案内」は読み上げない）。
+  // 読み込み時は最初の品目コールだけが鳴る。
   useEffect(() => {
     if (state.containers.length === 0 || state.items.length === 0) return;
     const container = state.containers[state.selectedContainerIdx];
@@ -389,13 +406,9 @@ export default function Home() {
     if (loadedContainerRef.current === key) return;
     loadedContainerRef.current = key;
     announcedThresholdsRef.current = new Set();
-    firstItemSkipRef.current = true; // 概要コール中は品目コールをスキップ
-    // 少し遅延して概要アナウンス
-    const timer = setTimeout(() => {
-      announceContainerSummary(state.items, container.containerNo);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [state.containers, state.selectedContainerIdx, state.items, announceContainerSummary]);
+    // 概要コールが無くなったので、読み込み直後の品目コールはスキップしない
+    firstItemSkipRef.current = false;
+  }, [state.containers, state.selectedContainerIdx, state.items]);
 
   // 進捗マイルストーンアナウンス — 廃止（実際の内容と異なることが多いため）
 
@@ -430,17 +443,25 @@ export default function Home() {
    * 実測値があるときは気象庁の取得を待たない（通信が遅い・つながらない場合でも実測を読む）。
    */
   const announceElapsedCall = useCallback((minutes: number) => {
-    const sb = getSbClimate();
     const say = (text: string) => {
       // 応援コールは設定がオンのときだけ、応援リストから取ってそのまま（別発話で）続ける
       if (isTenMinCheerEnabled()) speakThenCheer(text, getRandomCallPhrase());
       else speak(text);
     };
+
+    // 気温・湿度は既定ではコールしない（設定でオンにしたときだけ付ける）
+    if (!isTenMinClimateEnabled()) {
+      say(`${minutes}分経過しました。`);
+      // 画面のバーに出す気象庁データだけは裏で更新しておく
+      void fetchWeather().then((w) => { if (w) setBarWeather(w); });
+      return;
+    }
+
+    const sb = getSbClimate();
     if (sb) {
       say(`${minutes}分経過しました。${climateToSpeech(sb, true)}`);
       // コールした数値がそのまま見えるよう、SwitchBot のポップアップを出す
       setSbPopupOpen(true);
-      // バーの気象庁データだけは裏で更新しておく
       void fetchWeather().then((w) => { if (w) setBarWeather(w); });
       return;
     }
@@ -962,23 +983,17 @@ export default function Home() {
     okCooldownRef.current = Date.now();
 
     const pl = item.palletCount;
-    const rawFrac = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-    const isNabeType = item.type === '鍋';
-    const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
 
     if (pl > 0) {
       decreaseQty();
-      const newPl = pl - 1;
-      if (newPl <= 0 && frac <= 0) {
+      // 残数のコールは画面の PL / CT と同じ値（検査で抜く分を差し引いた数）にする
+      const rest = quantityToSpeech(quantitiesAfterPalletRemoved(item));
+      if (!rest) {
         speak('完了。');
         suppressAnnounceRef.current = true;
         setTimeout(() => completeItem(item.id), 300);
-      } else if (newPl > 0 && frac > 0) {
-        speak(`残り${newPl}パレットと${frac}ケース。`);
-      } else if (newPl > 0) {
-        speak(`残り${newPl}パレット。`);
       } else {
-        speak(`残り${frac}ケース。`);
+        speak(`残り${rest}。`);
       }
     } else {
       speak('完了。');
@@ -992,16 +1007,10 @@ export default function Home() {
     }
   }, [decreaseQty, completeItem, speak, state.itemStartTime]);
 
+  // パレット数を戻したときはコールしない（画面の数字を見れば分かるため）
   const handleIncrease = useCallback(() => {
     increaseQty();
-    setTimeout(() => {
-      const el = document.querySelector('[data-pallet-count]');
-      if (el) {
-        const p = Number(el.getAttribute('data-pallet-count'));
-        announcePalletChange(p);
-      }
-    }, 50);
-  }, [increaseQty, announcePalletChange]);
+  }, [increaseQty]);
 
   const handleDecrease = useCallback(() => {
     const item = currentItemRef.current;
@@ -1015,17 +1024,10 @@ export default function Home() {
     }
 
     decreaseQty();
-    const newPl = item.palletCount - 1;
-    const rawFrac = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
-    const isNabeType = item.type === '鍋';
-    const frac = isNabeType ? rawFrac : (rawFrac > 0 ? rawFrac - 1 : 0);
-
-    if (newPl > 0 && frac > 0) {
-      speak(`残り${newPl}パレットと${frac}ケース。`);
-    } else if (newPl > 0) {
-      speak(`残り${newPl}パレット。`);
-    } else if (frac > 0) {
-      speak(`残り${frac}ケース。`);
+    // 残数のコールは画面の PL / CT と同じ値（検査で抜く分を差し引いた数）にする
+    const rest = quantityToSpeech(quantitiesAfterPalletRemoved(item));
+    if (rest) {
+      speak(`残り${rest}。`);
     } else {
       speak('完了。');
       suppressAnnounceRef.current = true;
@@ -1094,17 +1096,9 @@ export default function Home() {
           handleDecrease(); break;
         case 'QUERY_CURRENT_QTY':
           if (currentItem) {
-            let qText = '';
-            if (currentItem.palletCount > 0 && currentItem.fraction > 0) {
-              qText = `${currentItem.palletCount}パレットと${currentItem.fraction}ケース`;
-            } else if (currentItem.palletCount > 0) {
-              qText = `${currentItem.palletCount}パレット`;
-            } else if (currentItem.fraction > 0) {
-              qText = `${currentItem.fraction}ケース`;
-            } else {
-              qText = `${currentItem.totalQty}個`;
-            }
-            speak(`${itemNameForSpeech(currentItem.itemName)}、${qText}。`);
+            const q = displayQuantities(currentItem);
+            const qText = quantityToSpeech(q) || `${q.pcs}個`;
+            speak(`${itemNameForCall(currentItem)}、${qText}。`);
           }
           break;
         case 'QUERY_REMAINING': {
@@ -1117,10 +1111,10 @@ export default function Home() {
           break;
         }
         case 'QUERY_PALLET':
-          if (currentItem) speak(`パレット${currentItem.palletCount}枚です。`);
+          if (currentItem) speak(`パレット${displayQuantities(currentItem).pallets}枚です。`);
           break;
         case 'QUERY_FRACTION':
-          if (currentItem) speak(`端数${currentItem.fraction}ケースです。`);
+          if (currentItem) speak(`端数${displayQuantities(currentItem).cartons}ケースです。`);
           break;
         case 'CONFIRM_OK':
           handleConfirmOk();
@@ -1132,8 +1126,9 @@ export default function Home() {
           handleProgress();
           break;
         case 'UNDO_DECREASE':
+          // 戻したことはコールしない。画面表示だけで知らせる
           handleIncrease();
-          speak('パレットを1つ戻しました。');
+          showToast('パレットを1つ戻しました');
           break;
         case 'QUERY_TYPE_COUNT': {
           const counts: Record<string, number> = {};

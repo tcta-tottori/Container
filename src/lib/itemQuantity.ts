@@ -30,3 +30,22 @@ export function displayQuantities(item: ContainerItem): DisplayQuantities {
 
   return { pallets, cartons, pcs: Math.ceil(item.totalQty) };
 }
+
+/**
+ * パレットを1つ下ろした後に画面に出る PL / CT を求める。
+ * 「残り◯パレットと◯ケース」のコールを、画面の数字と必ず一致させるために使う。
+ */
+export function quantitiesAfterPalletRemoved(item: ContainerItem): DisplayQuantities {
+  return displayQuantities({ ...item, palletCount: Math.max(0, item.palletCount - 1) });
+}
+
+/**
+ * PL / CT を読み上げ文にする（例: 「3パレットと2ケース」）。
+ * どちらも 0 のときは空文字を返す。
+ */
+export function quantityToSpeech(q: { pallets: number; cartons: number }): string {
+  if (q.pallets > 0 && q.cartons > 0) return `${q.pallets}パレットと${q.cartons}ケース`;
+  if (q.pallets > 0) return `${q.pallets}パレット`;
+  if (q.cartons > 0) return `${q.cartons}ケース`;
+  return '';
+}
