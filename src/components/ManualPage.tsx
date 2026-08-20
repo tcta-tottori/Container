@@ -240,6 +240,27 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               </InfoCard>
             </Section>
 
+            <Section title="パレット図の積み方アニメーション" color="#38bdf8">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#38bdf8' }}>タップで全画面</strong>: 作業画面のパレット図をタップすると全画面になり、
+                    まずパレットだけが出て、そのあと箱が<strong style={{ color: '#fbbf24' }}>積む順番どおりに上から降りてきます</strong>。
+                    スライドで回転、タップで戻ります。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#22c55e' }}>ポリカバー等</strong>: 奥の列から積みます。1列を上（4〜5段目）まで積み終えてから手前の列へ。
+                    列のなかは 中央 → 左 → 右 の順です。
+                  </div>
+                  <div>
+                    <strong style={{ color: '#c084fc' }}>PDU の段ボール</strong>: 1段ずつ仕上げます。
+                    奥の左に横向き1つ → その右へ縦向き3つ → 最初の手前に横向き1つ →
+                    右端の縦向きにつけて横向きを手前へ2つ → 最後に縦向きを右から3つ。2段目からは互い違いの位置で同じ順番です。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
             <Section title="ジャーポットの積み方" color="#c084fc">
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>

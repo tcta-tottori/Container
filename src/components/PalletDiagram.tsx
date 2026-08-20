@@ -15,6 +15,12 @@ interface PalletDiagramProps {
   wireframe?: boolean;
   /** 出現時のフェードインを省く（全画面表示のように最初から見せたいとき） */
   noIntro?: boolean;
+  /**
+   * 積み方のアニメーション。
+   * まずパレットだけが出て、そのあと箱が積む順番どおりに上から落ちてくる。
+   * 全画面のパレット図で使う。
+   */
+  stackAnim?: boolean;
 }
 
 /* ===== Constants ===== */
@@ -202,11 +208,13 @@ function innerCartons(dir: 'h' | 'v', tape = false): React.ReactElement {
   );
 }
 
-function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, split }: {
+function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, split, dropAnim }: {
   x: number; y: number; w: number; d: number; h: number;
   topBase: number; palletDepth: number; wireframe?: boolean;
   /** ラミネートで2箱をまとめた玉。継ぎ目とフィルムのてかりを描いて「2箱で1玉」と分かるようにする */
   split?: 'w' | 'd';
+  /** 積み方アニメーションで上から落ちてくる指定（animation プロパティの値） */
+  dropAnim?: string;
 }) {
   const zOffset = palletDepth / 2 - y - d / 2;
   // 2箱が並んで見える面にだけ、中身の箱を描く。
@@ -221,6 +229,7 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, split }: {
         width: w, height: h,
         transformStyle: 'preserve-3d',
         transform: `translateZ(${zOffset}px)`,
+        animation: dropAnim,
       }}>
         <div style={{ position: 'absolute', width: w, height: h, transform: `translateZ(${d / 2}px)`, ...wireframeFace(0.7) }} />
         <div style={{ position: 'absolute', width: w, height: h, transform: `rotateY(180deg) translateZ(${d / 2}px)`, ...wireframeFace(0.4) }} />
@@ -238,6 +247,7 @@ function Box3D({ x, y, w, d, h, topBase, palletDepth, wireframe, split }: {
       width: w, height: h,
       transformStyle: 'preserve-3d',
       transform: `translateZ(${zOffset}px)`,
+      animation: dropAnim,
     }}>
       {/* Front */}
       <div style={{
@@ -306,6 +316,8 @@ interface BoxSlot {
   w: number; d: number; h: number;
   /** 2箱をシュリンクで1玉にしている場合の継ぎ目の向き（'w'=幅方向で2分割 / 'd'=奥行方向） */
   split?: 'w' | 'd';
+  /** 1段のなかで積む順番（アニメーション用。決まった順があるときだけ設定する） */
+  seq?: number;
 }
 
 /**
@@ -490,15 +502,18 @@ function buildPduJarPotSlots(
     const put = (x: number, y: number, w: number, d: number, split: 'w' | 'd') =>
       ({ x: ox + mirrorX(x, w), y: oy + y, w, d, split });
 
+    // 置く順番（seq）は実際の積み方に合わせる:
+    //   ①奥の左に横向き1つ ②その右へ縦向き3つ ③①の手前に横向き1つ
+    //   ④右端の縦向きにつけて横向きを手前へ2つ ⑤最後に縦向きを右から順に3つ
     const out: Omit<BoxSlot, 'z' | 'h'>[] = [];
     // A: 奥の左 — 横長2玉（奥行き方向に重ねる）
-    for (let i = 0; i < 2; i++) out.push(put(0, i * sSize, lSize, sSize, 'w'));
-    // B: 奥の右 — 縦長3玉
-    for (let i = 0; i < 3; i++) out.push(put(lSize + i * sSize, 0, sSize, lSize, 'd'));
-    // C: 手前の右 — 横長2玉
-    for (let i = 0; i < 2; i++) out.push(put(3 * sSize, lSize + i * sSize, lSize, sSize, 'w'));
-    // D: 手前の左 — 縦長3玉
-    for (let i = 0; i < 3; i++) out.push(put(i * sSize, 2 * sSize, sSize, lSize, 'd'));
+    for (let i = 0; i < 2; i++) out.push({ ...put(0, i * sSize, lSize, sSize, 'w'), seq: i === 0 ? 0 : 4 });
+    // B: 奥の右 — 縦長3玉（左から右へ）
+    for (let i = 0; i < 3; i++) out.push({ ...put(lSize + i * sSize, 0, sSize, lSize, 'd'), seq: 1 + i });
+    // C: 手前の右 — 横長2玉（奥から手前へ）
+    for (let i = 0; i < 2; i++) out.push({ ...put(3 * sSize, lSize + i * sSize, lSize, sSize, 'w'), seq: 5 + i });
+    // D: 手前の左 — 縦長3玉（右から左へ）
+    for (let i = 0; i < 3; i++) out.push({ ...put(i * sSize, 2 * sSize, sSize, lSize, 'd'), seq: 9 - i });
     return out;
   };
 
@@ -538,6 +553,53 @@ function buildGenericSlots(
     }
   }
   return slots;
+}
+
+/**
+ * 箱を積む順番（アニメーション用）。renderSlots の添字を、積む順に並べて返す。
+ *
+ * mode 'backColumn'（ポリカバー・鍋など）:
+ *   奥の列から積む。1列ぶんを上（4〜5段目）まで積み終えてから手前の列に移る。
+ *   列のなかは 中央 → 左 → 右 の順。
+ * mode 'layer'（PDU の段ボールなど）:
+ *   1段ずつ仕上げていく。1段のなかの順番は seq（積み方で決まっている順）に従い、
+ *   seq が無ければ 奥→手前・中央→左→右 の順にする。
+ */
+function buildStackOrder(slots: BoxSlot[], mode: 'backColumn' | 'layer'): number[] {
+  if (slots.length === 0) return [];
+  const round = (v: number) => Math.round(v * 100) / 100;
+  const layers = Array.from(new Set(slots.map((s) => round(s.z)))).sort((a, b) => a - b);
+  const rows = Array.from(new Set(slots.map((s) => round(s.y)))).sort((a, b) => a - b);
+  const minX = Math.min(...slots.map((s) => s.x));
+  const maxX = Math.max(...slots.map((s) => s.x + s.w));
+  const centerX = (minX + maxX) / 2;
+
+  const ranked = slots.map((s, i) => ({
+    i,
+    seq: s.seq,
+    layer: layers.indexOf(round(s.z)),
+    row: rows.indexOf(round(s.y)),
+    // 中央からの距離（小さいほど中央）
+    fromCenter: round(Math.abs(s.x + s.w / 2 - centerX)),
+    left: s.x,
+  }));
+
+  ranked.sort((a, b) => {
+    if (mode === 'backColumn') {
+      if (a.row !== b.row) return a.row - b.row;       // 奥の列から
+      if (a.layer !== b.layer) return a.layer - b.layer; // その列を上まで
+    } else {
+      if (a.layer !== b.layer) return a.layer - b.layer; // 1段ずつ
+      if (a.seq !== undefined && b.seq !== undefined && a.seq !== b.seq) return a.seq - b.seq;
+      if (a.row !== b.row) return a.row - b.row;
+    }
+    if (a.fromCenter !== b.fromCenter) return a.fromCenter - b.fromCenter; // 中央から
+    return a.left - b.left;                                                // 同距離なら左から
+  });
+
+  const order = new Array<number>(slots.length);
+  ranked.forEach((r, pos) => { order[r.i] = pos; });
+  return order;
 }
 
 /**
@@ -663,7 +725,7 @@ export function isPduJarPot(itemName?: string): boolean {
 
 /* ===== Main Component ===== */
 export default function PalletDiagram({
-  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe, noIntro,
+  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe, noIntro, stackAnim,
 }: PalletDiagramProps) {
   const isFull = palletCount > 0;
   const isFraction = !isFull && fraction > 0;
@@ -797,6 +859,37 @@ export default function PalletDiagram({
   const animName = `spinPl${uid}`;
   const rotate = isFraction;
 
+  /* ===== 積み方アニメーション =====
+   * パレットが出たあと、箱が積む順番どおりに上から落ちてくる。
+   * 3D の重なり順を崩さないよう、箱ごとの入れ物は増やさず、
+   * 箱の translateZ をそのまま持つキーフレームを奥行きごとに作って当てる。 */
+  const stackOrder = stackAnim ? buildStackOrder(renderSlots, isPdu ? 'layer' : 'backColumn') : null;
+  /** パレットが出てから最初の箱が落ちてくるまで（秒） */
+  const PALLET_DELAY = 0.5;
+  /** 箱1つが落ちてくる時間（秒） */
+  const DROP_SEC = 0.5;
+  // 箱が多いときは間隔を詰めて、全体で 4.5 秒くらいに収める
+  const dropGap = stackOrder ? Math.min(0.13, 4.5 / Math.max(1, renderSlots.length)) : 0;
+  // 奥行き位置（translateZ）ごとにキーフレームを作る
+  const dropKeyframes: string[] = [];
+  const dropNameByZ = new Map<number, string>();
+  if (stackOrder) {
+    for (const slot of renderSlots) {
+      const zOff = Math.round((pd / 2 - slot.y - slot.d / 2) * 100) / 100;
+      if (dropNameByZ.has(zOff)) continue;
+      const name = `drop${uid}z${String(zOff).replace(/[^0-9]/g, '_')}`;
+      dropNameByZ.set(zOff, name);
+      // 透明度は使わない。opacity を動かすと preserve-3d が効かなくなり、
+      // 箱が板のように平たく描かれてしまうため、visibility で出し入れする
+      dropKeyframes.push(`@keyframes ${name} {
+        0%   { visibility: hidden; transform: translateZ(${zOff}px) translateY(-42px); }
+        1%   { visibility: visible; transform: translateZ(${zOff}px) translateY(-41px); }
+        80%  { transform: translateZ(${zOff}px) translateY(2px); }
+        100% { visibility: visible; transform: translateZ(${zOff}px) translateY(0); }
+      }`);
+    }
+  }
+
   return (
     <div style={{
       width: '100%', height: '100%',
@@ -818,7 +911,17 @@ export default function PalletDiagram({
         `}</style>
       )}
       {/* 出現アニメーション用ラッパー（opacityのみ。3D変換なし） */}
-      <div style={noIntro ? undefined : { animation: 'palletFadeUp 1.5s ease 0.5s both' }}>
+      {stackOrder && (
+        <style>{`
+          @keyframes palletAppear${uid} {
+            0%   { visibility: hidden; transform: translateY(7px); }
+            1%   { visibility: visible; transform: translateY(7px); }
+            100% { visibility: visible; transform: translateY(0); }
+          }
+          ${dropKeyframes.join('\n')}
+        `}</style>
+      )}
+      <div style={noIntro || stackOrder ? undefined : { animation: 'palletFadeUp 1.5s ease 0.5s both' }}>
         <div data-pallet-body style={{
           width: pw, height: totalHeight,
           position: 'relative',
@@ -830,13 +933,26 @@ export default function PalletDiagram({
               : { transform: 'rotateX(-25deg) rotateY(-35deg)' }
           ),
         }}>
-        {/* Pallet base */}
-        <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
+        {/* Pallet base — 積み方アニメーションでは、まずパレットだけが出る */}
+        {stackOrder ? (
+          <div style={{
+            position: 'absolute', inset: 0, transformStyle: 'preserve-3d',
+            animation: `palletAppear${uid} 0.45s ease both`,
+          }}>
+            <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
+          </div>
+        ) : (
+          <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
+        )}
 
         {/* Stacked boxes — 3D空間内に配置 */}
         {renderSlots.map((slot, i) => {
           if (i >= filled) return null;
           const boxTop = totalHeight - PALLET_H_PX - (slot.z - PALLET_H_PX) - slot.h;
+          const zOff = Math.round((pd / 2 - slot.y - slot.d / 2) * 100) / 100;
+          const dropAnim = stackOrder
+            ? `${dropNameByZ.get(zOff)} ${DROP_SEC}s cubic-bezier(0.3,0.8,0.4,1.15) ${(PALLET_DELAY + stackOrder[i] * dropGap).toFixed(2)}s both`
+            : undefined;
           return (
             <Box3D key={i}
               x={slot.x} y={slot.y}
@@ -845,6 +961,7 @@ export default function PalletDiagram({
               palletDepth={pd}
               wireframe={wireframe}
               split={slot.split}
+              dropAnim={dropAnim}
             />
           );
         })}

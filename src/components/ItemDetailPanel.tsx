@@ -943,7 +943,9 @@ export default function ItemDetailPanel({
           </div>
           <div style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
             {displayPallets > 0 && item.qtyPerPallet > 0 && (
-              <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0 }}>
+              /* タップで全画面表示（積む順番どおりに箱が降りてくる） */
+              <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
+                onClick={(e) => { e.stopPropagation(); setFullscreenPallet('full'); }}>
                 <PalletDiagram palletCount={displayPallets} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false} />
               </div>
             )}
@@ -1261,6 +1263,8 @@ export default function ItemDetailPanel({
               fraction={fullscreenPallet === 'fraction' ? inspectionDeducted : 0}
               qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
               measurements={item.measurements} wireframe={false}
+              // パレットの図はまずパレットだけを出し、積む順番どおりに箱を降ろす
+              stackAnim={fullscreenPallet === 'full'}
             />
           </div>
           <div style={{ position: 'absolute', bottom: 32, color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
