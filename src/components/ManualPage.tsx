@@ -244,13 +244,17 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#c084fc' }}>PDU の機種</strong>: 2箱がシュリンクでひとかたまり（1玉＝2ケース）になっています。
+                    <strong style={{ color: '#c084fc' }}>PDU の機種</strong>: 2箱がラミネート（シュリンク）でひとかたまり（1玉＝2ケース）になっています。
                     パレットの半面に<strong style={{ color: '#fbbf24' }}>横長置き2玉＋縦長置き3玉</strong>、
                     もう半面は互い違いに置いて、<strong style={{ color: '#fbbf24' }}>1段10玉（20ケース）</strong>。
                     2段目からは段ごとに互い違いに積みます。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#60a5fa' }}>段数</strong>: 30・40サイズは5段目まで、50サイズは4段目まで。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#38bdf8' }}>中央の隙間</strong>: 玉の大きさの都合でパレットにぴったりは収まらないため、
+                    外側の辺に寄せて置き、中央が空きます。図もそのとおりに描いています。
                   </div>
                   <div>
                     <strong style={{ color: '#94a3b8' }}>PDZ など他の機種</strong>: これまでどおり1段4個の積み方です。
