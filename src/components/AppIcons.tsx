@@ -42,6 +42,17 @@ export function MegaphoneIcon(p: IconProps) {
   return <Svg {...p}><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z" /><path d="M16 9a3.5 3.5 0 0 1 0 6" /><path d="M18.5 6.5a7 7 0 0 1 0 11" /></Svg>;
 }
 
+/** お願いしますコール（手のひら） */
+export function HandIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M9 11.5V5.5a1.5 1.5 0 0 1 3 0v6" />
+      <path d="M12 11.5V4.5a1.5 1.5 0 0 1 3 0v7" />
+      <path d="M15 11.5V6.5a1.5 1.5 0 0 1 3 0V14c0 3.9-2.7 6.5-6 6.5S6 18.4 6 14.5V11a1.5 1.5 0 0 1 3 0v1.5" />
+    </Svg>
+  );
+}
+
 /** 水の音（しずく） */
 export function DropletIcon(p: IconProps) {
   return <Svg {...p}><path d="M12 3.2 6.9 9.4a6.5 6.5 0 1 0 10.2 0L12 3.2z" /><path d="M9 14.5a3 3 0 0 0 2.4 2.4" /></Svg>;

@@ -7,7 +7,7 @@ import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExce
 import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
-import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
+import { useSpeech, cancelSpeech, setEngineFallbackNotice } from '@/hooks/useSpeech';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForCall } from '@/lib/partTranslations';
@@ -206,6 +206,9 @@ function UpdateNotification() {
     </div>
   );
 }
+
+/** 「お願いします！」ボタンで読み上げる言葉 */
+const REQUEST_CALL_TEXT = 'お願いします！';
 
 export default function Home() {
   const {
@@ -948,6 +951,12 @@ export default function Home() {
     toastTimerRef.current = setTimeout(() => setToast(null), ms);
   }, []);
 
+  // Gemini が鳴らせなくなって端末の音声に切り替わったら、その旨を画面に出す
+  useEffect(() => {
+    setEngineFallbackNotice((msg) => showToast(msg, 5000));
+    return () => setEngineFallbackNotice(null);
+  }, [showToast]);
+
   const closeWeatherPopup = useCallback(() => setWeatherPopup(null), []);
 
   const handleWeatherCall = useCallback(() => {
@@ -1493,6 +1502,7 @@ export default function Home() {
           selectedIdx={state.selectedContainerIdx}
           onSelectContainer={selectContainer}
           onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
+          onRequestCall={view === 'work' ? () => speakCheer(REQUEST_CALL_TEXT) : undefined}
           onWeather={view === 'work' ? handleWeatherCall : undefined}
           waterPlaying={waterPlaying}
           onWater={toggleWater}

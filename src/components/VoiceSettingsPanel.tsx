@@ -5,7 +5,7 @@ import {
   VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS,
   DEFAULT_SHERPA_BASE_URL,
   VoiceSettings, VoiceProfile, VoiceEngine,
-  getVoiceSettings, saveVoiceSettings, styleInstruction, webSpeechVolume,
+  getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, styleInstruction, webSpeechVolume,
 } from '@/lib/voiceSettings';
 import {
   prepareSherpaTts, sherpaGenerateSpeech, clearSherpaCache,
@@ -263,6 +263,9 @@ export default function VoiceSettingsPanel() {
     setTtsError(getLastTtsError());
     return subscribeTtsError(setTtsError);
   }, []);
+
+  // コール側で端末の音声に切り替わったときなど、外からの変更に表示を合わせる
+  useEffect(() => subscribeVoiceSettings(setSettings), []);
 
   // パネルを閉じたら試聴を止める
   useEffect(() => () => {

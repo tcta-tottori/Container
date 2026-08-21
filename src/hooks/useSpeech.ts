@@ -8,7 +8,9 @@ import { displayQuantities, quantityToSpeech } from '@/lib/itemQuantity';
 import { geminiGenerateSpeech } from '@/lib/geminiTts';
 import { sherpaGenerateSpeech } from '@/lib/sherpaTts';
 import { getGeminiKey } from '@/lib/geminiApi';
-import { getVoiceSettings, styleInstruction, webSpeechVolume, VoiceEngine, VoiceProfile } from '@/lib/voiceSettings';
+import {
+  getVoiceSettings, saveVoiceSettings, styleInstruction, webSpeechVolume, VoiceEngine, VoiceProfile,
+} from '@/lib/voiceSettings';
 import { applyVolume } from '@/lib/audioBoost';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
@@ -16,6 +18,31 @@ let _onSpeakStart: ((text: string) => void) | null = null;
 let _onSpeakEnd: (() => void) | null = null;
 // Gemini TTS 等で「リクエスト送信完了 → 音声再生開始」の通知（読込スピナー解除用）
 let _onSpeakPlay: (() => void) | null = null;
+
+/* ===== Gemini が鳴らせなくなったときの自動切り替え =====
+ * 圏外・APIエラーなどで音声が返ってこない状態が続くと、コールのたびに
+ * 待たされたうえで無音になる。続けて失敗したら端末の音声に切り替える。 */
+/** 何回続けて失敗したら端末の音声に切り替えるか */
+const GEMINI_FAIL_LIMIT = 2;
+let _geminiFails = 0;
+/** 切り替えたことを画面に知らせる処理（page.tsx がトーストを出す） */
+let _onEngineFallback: ((message: string) => void) | null = null;
+
+/** 端末の音声に切り替えたときの通知先を登録する */
+export function setEngineFallbackNotice(fn: ((message: string) => void) | null): void {
+  _onEngineFallback = fn;
+}
+
+/** Gemini のコールが失敗したときの後始末。続けて失敗していたら端末の音声に切り替える */
+function noteGeminiFailure(): void {
+  _geminiFails += 1;
+  if (_geminiFails < GEMINI_FAIL_LIMIT) return;
+  const settings = getVoiceSettings();
+  if (settings.engine !== 'gemini') return;
+  saveVoiceSettings({ ...settings, engine: 'web' });
+  _geminiFails = 0;
+  _onEngineFallback?.('Gemini の音声が出ないため、端末の音声に切り替えました');
+}
 
 export function setSpeakCallbacks(
   onStart: (text: string) => void,
@@ -144,9 +171,27 @@ async function speakBlob(
   }
 }
 
-/** Gemini TTS で読み上げる。失敗しても自動フォールバックしない（ユーザーが明示選択しているため） */
-function speakGemini(text: string, stylePrefix?: string, voice?: string, onDone?: () => void): Promise<void> {
-  return speakBlob(text, (signal) => geminiGenerateSpeech(text, { signal, stylePrefix, voice }), onDone);
+/**
+ * Gemini TTS で読み上げる。
+ * 失敗したときはコールが無音にならないよう端末の音声で読み上げ直し、
+ * それが続くようなら設定そのものを端末の音声に切り替える。
+ */
+function speakGemini(text: string, profile: VoiceProfile, onDone?: () => void): Promise<void> {
+  return speakBlob(
+    text,
+    async (signal) => {
+      const blob = await geminiGenerateSpeech(text, {
+        signal, stylePrefix: styleInstruction(profile), voice: profile.voice,
+      });
+      _geminiFails = 0; // 鳴ったら数え直す
+      return blob;
+    },
+    onDone,
+    (finish) => {
+      noteGeminiFailure();
+      speakWebSpeech(text, finish, profile);
+    },
+  );
 }
 
 /**
@@ -206,7 +251,7 @@ function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): vo
 
   const engine = activeEngine();
   if (engine === 'gemini') {
-    void speakGemini(text, styleInstruction(profile), profile.voice, done);
+    void speakGemini(text, profile, done);
   } else if (engine === 'sherpa') {
     void speakSherpa(text, profile, done);
   } else {

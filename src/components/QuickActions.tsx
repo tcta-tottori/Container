@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Container } from '@/lib/types';
 import { SwitchBotReading, SwitchBotStatus } from '@/lib/switchbot';
-import { MegaphoneIcon, WeatherIcon, DropletIcon, CloseIcon, SettingsIcon, RiverIcon } from '@/components/AppIcons';
+import { MegaphoneIcon, WeatherIcon, DropletIcon, CloseIcon, SettingsIcon, RiverIcon, HandIcon } from '@/components/AppIcons';
 
 interface QuickActionsProps {
   /** コンテナ選択（読込済みのときだけ表示） */
@@ -13,6 +13,8 @@ interface QuickActionsProps {
   /** 応援コール・天気コール（作業ページでのみ有効） */
   onCheer?: () => void;
   onWeather?: () => void;
+  /** 「お願いします！」のコール（作業ページでのみ有効） */
+  onRequestCall?: () => void;
   /** 水の音 */
   waterPlaying: boolean;
   onWater: () => void;
@@ -94,7 +96,7 @@ function Row({
  */
 export default function QuickActions({
   containers, selectedIdx, onSelectContainer,
-  onCheer, onWeather,
+  onCheer, onWeather, onRequestCall,
   waterPlaying, onWater, onWaterSettings,
   switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, hidden,
 }: QuickActionsProps) {
@@ -176,6 +178,15 @@ export default function QuickActions({
                 title="応援コール"
                 sub="登録したフレーズをランダムで読み上げ"
                 onClick={() => { onCheer(); setOpen(false); }}
+              />
+            )}
+
+            {onRequestCall && (
+              <Row
+                icon={<HandIcon size={22} />}
+                title="お願いします！"
+                sub="合図のコール"
+                onClick={() => { onRequestCall(); setOpen(false); }}
               />
             )}
 
