@@ -761,6 +761,27 @@ export default function ItemDetailPanel({
     return () => cancelAnimationFrame(raf);
   }, [autoFs, item.id, inspectionDeducted]);
 
+  // 全画面のパレット図も、端数の全画面と同じように枠いっぱいの大きさに合わせる
+  const fsBoxRef = useRef<HTMLDivElement | null>(null);
+  const [fsScale, setFsScale] = useState(1);
+  useEffect(() => {
+    if (!fullscreenPallet) { setFsScale(1); return; }
+    const host = fsBoxRef.current;
+    if (!host) return;
+    const fit = () => {
+      const body = host.querySelector('[data-pallet-body]') as HTMLElement | null;
+      if (!body) return;
+      const w = body.offsetWidth;
+      const h = body.offsetHeight;
+      if (!w || !h) return;
+      // 回転(rotateX/rotateY)で見かけの幅・高さが増えるぶんの余裕を持たせる
+      const scale = Math.min(host.clientWidth / (w * 1.45), host.clientHeight / (h * 1.2));
+      setFsScale(Math.max(1, Math.min(scale, 10)));
+    };
+    const raf = requestAnimationFrame(fit);
+    return () => cancelAnimationFrame(raf);
+  }, [fullscreenPallet, item.id, item.palletCount, inspectionDeducted]);
+
   return (
     <div className="detail-root" style={{ background: '#1a1d2e' }}>
       {/* === 上半分（アニメーショングラデーション） === */}
@@ -1257,15 +1278,23 @@ export default function ItemDetailPanel({
             animation: 'fadeIn 0.3s ease both',
           }}
         >
-          <div style={{ width: '75vmin', height: '75vmin', pointerEvents: 'none' }}>
-            <PalletDiagram
-              palletCount={fullscreenPallet === 'full' ? item.palletCount : 0}
-              fraction={fullscreenPallet === 'fraction' ? inspectionDeducted : 0}
-              qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-              measurements={item.measurements} wireframe={false}
-              // パレットの図はまずパレットだけを出し、積む順番どおりに箱を降ろす
-              stackAnim={fullscreenPallet === 'full'}
-            />
+          <div ref={fsBoxRef} style={{ width: '92vw', height: '78vh', pointerEvents: 'none' }}>
+            <div style={{
+              width: '100%', height: '100%',
+              transform: `scale(${fsScale})`, transformOrigin: 'center center',
+              willChange: 'transform',
+            }}>
+              <PalletDiagram
+                palletCount={fullscreenPallet === 'full' ? item.palletCount : 0}
+                fraction={fullscreenPallet === 'fraction' ? inspectionDeducted : 0}
+                qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
+                measurements={item.measurements} wireframe={false}
+                overrideRotateY={fsRotateY}
+                noIntro
+                // パレットの図はまずパレットだけを出し、積む順番どおりに箱を降ろす
+                stackAnim={fullscreenPallet === 'full'}
+              />
+            </div>
           </div>
           <div style={{ position: 'absolute', bottom: 32, color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
             スライドで回転 / タップで閉じる
