@@ -21,6 +21,8 @@ interface PalletDiagramProps {
    * 全画面のパレット図で使う。
    */
   stackAnim?: boolean;
+  /** 積み方アニメーションの速さ（1 = 標準、0.5 = ゆっくり、2 = 倍速） */
+  stackSpeed?: number;
 }
 
 /* ===== Constants ===== */
@@ -727,7 +729,8 @@ export function isPduJarPot(itemName?: string): boolean {
 
 /* ===== Main Component ===== */
 export default function PalletDiagram({
-  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe, noIntro, stackAnim,
+  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe, noIntro,
+  stackAnim, stackSpeed = 1,
 }: PalletDiagramProps) {
   const isFull = palletCount > 0;
   const isFraction = !isFull && fraction > 0;
@@ -866,12 +869,16 @@ export default function PalletDiagram({
    * 3D の重なり順を崩さないよう、箱ごとの入れ物は増やさず、
    * 箱の translateZ をそのまま持つキーフレームを奥行きごとに作って当てる。 */
   const stackOrder = stackAnim ? buildStackOrder(renderSlots, isPdu ? 'layer' : 'backColumn') : null;
+  // 速さ（1 = 標準）。大きいほど速い
+  const speed = Math.min(4, Math.max(0.25, stackSpeed || 1));
   /** パレットが出てから最初の箱が落ちてくるまで（秒） */
-  const PALLET_DELAY = 0.5;
+  const PALLET_DELAY = 0.6 / speed;
   /** 箱1つが落ちてくる時間（秒） */
-  const DROP_SEC = 0.5;
-  // 箱が多いときは間隔を詰めて、全体で 4.5 秒くらいに収める
-  const dropGap = stackOrder ? Math.min(0.13, 4.5 / Math.max(1, renderSlots.length)) : 0;
+  const DROP_SEC = 0.7 / speed;
+  /** パレットが出てくる時間（秒） */
+  const PALLET_SEC = 0.5 / speed;
+  // 箱が多いときは間隔を詰めて、全体で 7 秒くらいに収める
+  const dropGap = stackOrder ? Math.min(0.2, 6.5 / Math.max(1, renderSlots.length)) / speed : 0;
   // 奥行き位置（translateZ）ごとにキーフレームを作る
   const dropKeyframes: string[] = [];
   const dropNameByZ = new Map<number, string>();
@@ -939,7 +946,7 @@ export default function PalletDiagram({
         {stackOrder ? (
           <div style={{
             position: 'absolute', inset: 0, transformStyle: 'preserve-3d',
-            animation: `palletAppear${uid} 0.45s ease both`,
+            animation: `palletAppear${uid} ${PALLET_SEC.toFixed(2)}s ease both`,
           }}>
             <PalletBase3D pw={pw} pd={pd} ph={PALLET_H_PX} topOffset={totalHeight - PALLET_H_PX} />
           </div>
@@ -953,7 +960,7 @@ export default function PalletDiagram({
           const boxTop = totalHeight - PALLET_H_PX - (slot.z - PALLET_H_PX) - slot.h;
           const zOff = Math.round((pd / 2 - slot.y - slot.d / 2) * 100) / 100;
           const dropAnim = stackOrder
-            ? `${dropNameByZ.get(zOff)} ${DROP_SEC}s cubic-bezier(0.3,0.8,0.4,1.15) ${(PALLET_DELAY + stackOrder[i] * dropGap).toFixed(2)}s both`
+            ? `${dropNameByZ.get(zOff)} ${DROP_SEC.toFixed(2)}s cubic-bezier(0.3,0.8,0.4,1.15) ${(PALLET_DELAY + stackOrder[i] * dropGap).toFixed(2)}s both`
             : undefined;
           return (
             <Box3D key={i}

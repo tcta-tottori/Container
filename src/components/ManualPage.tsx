@@ -246,7 +246,9 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#38bdf8' }}>タップで全画面</strong>: 作業画面のパレット図をタップすると全画面になり、
                     まずパレットだけが出て、そのあと箱が<strong style={{ color: '#fbbf24' }}>積む順番どおりに上から降りてきます</strong>。
-                    スライドで回転、タップで戻ります。
+                    スライドで回転、図をタップで戻ります。<br />
+                    画面の下で<strong style={{ color: '#a78bfa' }}>「もう一度」</strong>を押すと最初から流し直せます。
+                    速さは 0.5x〜2x から選べ（既定 1x・約7秒）、選んだ速さは次回も残ります。
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#22c55e' }}>ポリカバー等</strong>: 奥の列から積みます。1列を上（4〜5段目）まで積み終えてから手前の列へ。

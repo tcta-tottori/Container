@@ -12,6 +12,28 @@ import { useCountUp } from '@/hooks/useCountUp';
 import PalletDiagram from './PalletDiagram';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
+/** パレット図の積み方アニメーションの速さ（1 = 標準）。端末に覚えさせる */
+const ANIM_SPEED_KEY = 'cns_pallet_anim_speed';
+/** 選べる速さ */
+const ANIM_SPEEDS: { v: number; label: string }[] = [
+  { v: 0.5, label: '0.5x' },
+  { v: 0.75, label: '0.75x' },
+  { v: 1, label: '1x' },
+  { v: 1.5, label: '1.5x' },
+  { v: 2, label: '2x' },
+];
+
+function loadPalletAnimSpeed(): number {
+  if (typeof window === 'undefined') return 1;
+  const v = Number(localStorage.getItem(ANIM_SPEED_KEY));
+  return ANIM_SPEEDS.some((s) => s.v === v) ? v : 1;
+}
+
+function savePalletAnimSpeed(v: number): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(ANIM_SPEED_KEY, String(v)); } catch { /* ignore */ }
+}
+
 /* ===== 端数パレット全画面表示（残りが端数だけになった時に一時表示） =====
  * measure: 実寸を測る（非表示）→ start: 元のパレット位置に縮小配置（アニメなし）
  * → in: 全画面へゆっくり移動 → show: 操作受付 → out: 元の位置へ戻る
@@ -761,6 +783,18 @@ export default function ItemDetailPanel({
     return () => cancelAnimationFrame(raf);
   }, [autoFs, item.id, inspectionDeducted]);
 
+  /* ===== 全画面パレットの積み方アニメーション（速さ・もう一度） ===== */
+  const [animSpeed, setAnimSpeed] = useState<number>(() => loadPalletAnimSpeed());
+  /** 「もう一度」を押すたびに増やす。図を作り直してアニメーションを最初から流す */
+  const [replayKey, setReplayKey] = useState(0);
+  const changeAnimSpeed = useCallback((v: number) => {
+    setAnimSpeed(v);
+    savePalletAnimSpeed(v);
+    setReplayKey((k) => k + 1); // 速さを変えたらその場で流し直す
+  }, []);
+  // 開くたびに最初から流す
+  useEffect(() => { if (fullscreenPallet) setReplayKey((k) => k + 1); }, [fullscreenPallet]);
+
   // 全画面のパレット図も、端数の全画面と同じように枠いっぱいの大きさに合わせる
   const fsBoxRef = useRef<HTMLDivElement | null>(null);
   const [fsScale, setFsScale] = useState(1);
@@ -1276,15 +1310,20 @@ export default function ItemDetailPanel({
             background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(16px)',
             cursor: 'grab', touchAction: 'none',
             animation: 'fadeIn 0.3s ease both',
+            // 下部の操作バーのぶんを空けて、図はその上で中央に置く
+            paddingBottom: fullscreenPallet === 'full' ? 132 : 0,
+            paddingTop: fullscreenPallet === 'full' ? 12 : 0,
+            boxSizing: 'border-box',
           }}
         >
-          <div ref={fsBoxRef} style={{ width: '92vw', height: '78vh', pointerEvents: 'none' }}>
+          <div ref={fsBoxRef} style={{ width: '92vw', height: '100%', maxHeight: '100%', pointerEvents: 'none' }}>
             <div style={{
               width: '100%', height: '100%',
               transform: `scale(${fsScale})`, transformOrigin: 'center center',
               willChange: 'transform',
             }}>
               <PalletDiagram
+                key={`fs-${replayKey}`}
                 palletCount={fullscreenPallet === 'full' ? item.palletCount : 0}
                 fraction={fullscreenPallet === 'fraction' ? inspectionDeducted : 0}
                 qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
@@ -1293,12 +1332,79 @@ export default function ItemDetailPanel({
                 noIntro
                 // パレットの図はまずパレットだけを出し、積む順番どおりに箱を降ろす
                 stackAnim={fullscreenPallet === 'full'}
+                stackSpeed={animSpeed}
               />
             </div>
           </div>
-          <div style={{ position: 'absolute', bottom: 32, color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
-            スライドで回転 / タップで閉じる
-          </div>
+
+          {/* 下部の操作バー: もう一度 / 速さ。ここを触っても閉じない */}
+          {fullscreenPallet === 'full' && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute', left: 0, right: 0, bottom: 18,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                padding: '0 14px', touchAction: 'auto',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  onClick={() => setReplayKey((k) => k + 1)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 7,
+                    padding: '11px 18px', borderRadius: 999,
+                    background: 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(74,110,247,0.3))',
+                    border: '1px solid rgba(167,139,250,0.55)',
+                    color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 12a9 9 0 1 0 3-6.7" />
+                    <path d="M3 4v5h5" />
+                  </svg>
+                  もう一度
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'center' }}>
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>ゆっくり</span>
+                {ANIM_SPEEDS.map(({ v, label }) => {
+                  const active = animSpeed === v;
+                  return (
+                    <button
+                      key={v}
+                      onClick={() => changeAnimSpeed(v)}
+                      style={{
+                        minWidth: 44, padding: '9px 6px', borderRadius: 10,
+                        background: active ? 'rgba(96,165,250,0.3)' : 'rgba(255,255,255,0.06)',
+                        border: `1px solid ${active ? 'rgba(96,165,250,0.7)' : 'rgba(255,255,255,0.14)'}`,
+                        color: active ? '#fff' : 'rgba(255,255,255,0.6)',
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>はやい</span>
+              </div>
+
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
+                スライドで回転 / 図をタップで閉じる
+              </div>
+            </div>
+          )}
+          {fullscreenPallet !== 'full' && (
+            <div style={{ position: 'absolute', bottom: 32, color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
+              スライドで回転 / タップで閉じる
+            </div>
+          )}
         </div>
       )}
     </div>
