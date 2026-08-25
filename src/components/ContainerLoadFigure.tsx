@@ -50,17 +50,18 @@ export function buildLoadFigureData(items: ContainerItem[], completedIds: Set<st
   }
   const stats = TYPE_ORDER.map((t) => map.get(t)!).filter((s) => s.total > 0);
 
-  // 体積が分かっていれば体積で、分からなければ品目数で長さを割り振る
-  const capacity = summary.spec.cbm;
+  // 長さ方向はコンテナいっぱいに使い、種類ごとの割り当てだけを決める。
+  // 積んだ量そのものは高さ（fillRatio）で表す。
+  // 体積が分かっていれば体積で、分からなければ品目数で割り振る
   const totalCount = items.length || 1;
   const segments: TruckSegment[] = stats.map((s) => ({
     key: s.type,
     color: s.color,
-    ratio: summary.hasCbm
-      ? (capacity > 0 ? s.cbm / capacity : 0)
+    ratio: summary.hasCbm && summary.totalCbm > 0
+      ? s.cbm / summary.totalCbm
       : (s.total / totalCount),
-    doneRatio: summary.hasCbm
-      ? (s.cbm > 0 ? s.doneCbm / s.cbm : (s.total > 0 ? s.done / s.total : 0))
+    doneRatio: summary.hasCbm && s.cbm > 0
+      ? s.doneCbm / s.cbm
       : (s.total > 0 ? s.done / s.total : 0),
   })).filter((s) => s.ratio > 0);
 
@@ -220,6 +221,7 @@ export default function ContainerLoadFigure({
         <ContainerTruck3D
           containerType={summary.containerType}
           segments={segments}
+          fillRatio={summary.hasCbm ? summary.loadRatio : 1}
           width={width}
           aspect={aspect}
           rotateX={rotateX}

@@ -362,70 +362,65 @@ function buildNabeSlots(
   return slots;
 }
 
-/** JPI 7-per-layer alternating stacking
- * 参考画像の配置:
- * 奇数段: 手前3個(幅=small, 奥行=large) + 奥4個(幅=large, 奥行=small)を2列×2行
- * 偶数段: 180°回転（手前4個回転2×2 + 奥3個通常）
- * パレット: 幅=3×small, 奥行=large+2×small
+/**
+ * JPI など「1段7個」の積み方。
+ *
+ * 1段目: 横3個 ＋ 縦4個
+ *   - 右側に「横」（長い辺が左右）を奥から手前へ3個ならべる
+ *   - 左側に「縦」（長い辺が奥行き）を2×2で4個置く（手前は縦2個になる）
+ * 2段目: 縦3個 ＋ 横4個（1段目を90度まわした形。段どうしが噛み合う）
+ *   - 奥に「縦」を左右に3個ならべる
+ *   - 手前に「横」を2×2で4個置く
+ * 以降はこの2種類をくり返す。
+ *
+ * 置く順（seq）は「右奥の横から」。1段目は 横3個 → 縦4個、
+ * 2段目は 縦3個 → 横4個 の順。
+ * ※ y は 0 が手前。奥ほど y が大きい
  */
 function buildJPI7Slots(
   bwCm: number, bdCm: number, bhPx: number, layers: number,
   pw: number, pd: number, cm2px: number,
 ): BoxSlot[] {
-  const smallCm = Math.min(bwCm, bdCm);
-  const largeCm = Math.max(bwCm, bdCm);
-  const bSmall = smallCm * cm2px;
-  const bLarge = largeCm * cm2px;
+  const S = Math.min(bwCm, bdCm) * cm2px;  // 短い辺
+  const L = Math.max(bwCm, bdCm) * cm2px;  // 長い辺
   const slots: BoxSlot[] = [];
 
   for (let layer = 0; layer < layers; layer++) {
-    const isOdd = layer % 2 === 0;
-    if (isOdd) {
-      // 手前: 3個 (幅=bSmall, 奥行=bLarge) を横に3列
-      const frontGap = (pw - 3 * bSmall) / 4;
-      for (let c = 0; c < 3; c++) {
-        slots.push({
-          x: frontGap + c * (bSmall + frontGap),
-          y: 0,
-          z: PALLET_H_PX + layer * bhPx,
-          w: bSmall, d: bLarge, h: bhPx,
-        });
+    const z = PALLET_H_PX + layer * bhPx;
+    const put = (x: number, y: number, w: number, d: number, seq: number): BoxSlot =>
+      ({ x, y, z, w, d, h: bhPx, seq });
+
+    if (layer % 2 === 0) {
+      /* 横3個（右）＋ 縦4個（左） */
+      // 右の「横」3個。幅 L・奥行 S を奥から手前へ
+      const colX = pw - L;
+      const colY0 = (pd - 3 * S) / 2;
+      for (let i = 0; i < 3; i++) {
+        // i=0 が奥（右奥）。そこから手前へ
+        slots.push(put(colX, colY0 + (2 - i) * S, L, S, i));
       }
-      // 奥: 4個 (幅=bLarge, 奥行=bSmall) を2列×2行
-      const backY = bLarge;
-      const backGapX = (pw - 2 * bLarge) / 3;
-      for (let r = 0; r < 2; r++) {
-        for (let c = 0; c < 2; c++) {
-          slots.push({
-            x: backGapX + c * (bLarge + backGapX),
-            y: backY + r * bSmall,
-            z: PALLET_H_PX + layer * bhPx,
-            w: bLarge, d: bSmall, h: bhPx,
-          });
+      // 左の「縦」2×2。幅 S・奥行 L
+      const blkY0 = (pd - 2 * L) / 2;
+      for (let r = 0; r < 2; r++) {          // r=0 が奥
+        for (let c = 0; c < 2; c++) {        // c=0 が左
+          slots.push(put(c * S, blkY0 + (1 - r) * L, S, L, 3 + r * 2 + c));
         }
       }
     } else {
-      // 偶数段: ミラー — 手前4個(回転2×2) + 奥3個(通常)
-      const frontGapX = (pw - 2 * bLarge) / 3;
-      for (let r = 0; r < 2; r++) {
-        for (let c = 0; c < 2; c++) {
-          slots.push({
-            x: frontGapX + c * (bLarge + frontGapX),
-            y: r * bSmall,
-            z: PALLET_H_PX + layer * bhPx,
-            w: bLarge, d: bSmall, h: bhPx,
-          });
-        }
+      /* 縦3個（奥）＋ 横4個（手前） */
+      // 奥の「縦」3個。幅 S・奥行 L を右から左へ
+      const rowY = pd - L;
+      const rowX0 = (pw - 3 * S) / 2;
+      for (let i = 0; i < 3; i++) {
+        // i=0 が右
+        slots.push(put(rowX0 + (2 - i) * S, rowY, S, L, i));
       }
-      const backY = 2 * bSmall;
-      const backGap = (pw - 3 * bSmall) / 4;
-      for (let c = 0; c < 3; c++) {
-        slots.push({
-          x: backGap + c * (bSmall + backGap),
-          y: backY,
-          z: PALLET_H_PX + layer * bhPx,
-          w: bSmall, d: bLarge, h: bhPx,
-        });
+      // 手前の「横」2×2。幅 L・奥行 S
+      const blkX0 = (pw - 2 * L) / 2;
+      for (let r = 0; r < 2; r++) {          // r=0 が奥
+        for (let c = 0; c < 2; c++) {        // c=0 が左
+          slots.push(put(blkX0 + c * L, (1 - r) * S, L, S, 3 + r * 2 + c));
+        }
       }
     }
   }
@@ -564,7 +559,7 @@ function buildGenericSlots(
  * mode 'backColumn'（ポリカバー・鍋など）:
  *   奥の列から積む。1列ぶんを上（4〜5段目）まで積み終えてから手前の列に移る。
  *   列のなかは 中央 → 左 → 右 の順。
- * mode 'layer'（PDU の段ボールなど）:
+ * mode 'layer'（PDU の段ボール・1段7個の JPI など）:
  *   1段ずつ仕上げていく。1段のなかの順番は seq（積み方で決まっている順）に従い、
  *   seq が無ければ 奥→手前・中央→左→右 の順にする。
  */
@@ -754,10 +749,12 @@ export default function PalletDiagram({
     palletWcm = 110;
     palletDcm = 110;
   } else if (isJPI) {
+    // 1段ごとに90度まわして積むので、どちらの向きでも収まる正方形にする
     const smallDim = Math.min(bwCm, bdCm);
     const largeDim = Math.max(bwCm, bdCm);
-    palletWcm = smallDim * 3;
-    palletDcm = largeDim + smallDim * 2;
+    const side = largeDim + smallDim * 2;
+    palletWcm = side;
+    palletDcm = side;
   } else {
     palletWcm = 110;
     palletDcm = 110;
@@ -868,7 +865,7 @@ export default function PalletDiagram({
    * パレットが出たあと、箱が積む順番どおりに上から落ちてくる。
    * 3D の重なり順を崩さないよう、箱ごとの入れ物は増やさず、
    * 箱の translateZ をそのまま持つキーフレームを奥行きごとに作って当てる。 */
-  const stackOrder = stackAnim ? buildStackOrder(renderSlots, isPdu ? 'layer' : 'backColumn') : null;
+  const stackOrder = stackAnim ? buildStackOrder(renderSlots, (isPdu || isJPI) ? 'layer' : 'backColumn') : null;
   // 速さ（1 = 標準）。大きいほど速い
   const speed = Math.min(4, Math.max(0.25, stackSpeed || 1));
   /** パレットが出てから最初の箱が落ちてくるまで（秒） */

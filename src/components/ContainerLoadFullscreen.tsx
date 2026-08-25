@@ -169,6 +169,7 @@ export default function ContainerLoadFullscreen({ items, completedIds, container
         <ContainerTruck3D
           containerType={summary.containerType}
           segments={segments}
+          fillRatio={summary.hasCbm ? summary.loadRatio : 1}
           width={layout.figW}
           aspect={layout.aspect}
           rotateX={ROT_X0}

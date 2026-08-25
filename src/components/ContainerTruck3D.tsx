@@ -16,7 +16,7 @@ import { CONTAINER_SPECS, ContainerTypeKey } from '@/lib/containerLoad';
 export interface TruckSegment {
   /** 種類名 */
   key: string;
-  /** コンテナの長さに対する割合 0〜1 */
+  /** 積んだ物ぜんぶに対する長さの割り当て 0〜1（全種類の合計が 1） */
   ratio: number;
   /** そのうち終わったぶんの割合 0〜1 */
   doneRatio: number;
@@ -26,8 +26,14 @@ export interface TruckSegment {
 
 interface ContainerTruck3DProps {
   containerType: ContainerTypeKey;
-  /** 積んだ物の内訳。ratio の合計が積載率になる */
+  /** 積んだ物の内訳。ratio の合計は 1（コンテナの長さいっぱいに割り当てる） */
   segments: TruckSegment[];
+  /**
+   * 積載率 0〜1。
+   * 荷物は長さ方向にはいっぱいに積まれている前提で、高さで量を表す。
+   * （実際、荷物は床いっぱいに広げて上に積み上げていくため）
+   */
+  fillRatio?: number;
   /** 図の横幅(px)。省略すると親の幅にあわせる */
   width?: number;
   /** 図の高さ。横幅に対する比。省略すると模型の形にあわせて決める */
@@ -233,7 +239,7 @@ function fitScale(g: Geometry, rotY: number, rotX: number): number {
 }
 
 export default function ContainerTruck3D({
-  containerType, segments, width, aspect,
+  containerType, segments, width, aspect, fillRatio = 1,
   rotateX = DEFAULT_ROT_X, rotateY = DEFAULT_ROT_Y,
   intro = false, controllerRef,
 }: ContainerTruck3DProps) {
@@ -351,10 +357,14 @@ export default function ContainerTruck3D({
   const innerH = conH - wall * 2;
   const innerD = conD - wall * 2;
 
-  const loadRatio = segments.reduce((s, seg) => s + Math.max(0, seg.ratio), 0);
-  const drawRatio = Math.min(loadRatio, 1);
-  // 100% を超えたぶんは描けないので、描く幅だけ縮める
-  const shrink = loadRatio > 0 ? drawRatio / loadRatio : 0;
+  // 積んだ量は高さで表す。長さ方向はいっぱいまで使う
+  const fill = Math.min(1, Math.max(0, fillRatio));
+  // 少しでも積んでいれば見えるように、最低限の高さは残す
+  const cargoH = fill > 0 ? Math.max(innerH * fill, Math.min(innerH, px(150))) : 0;
+  const cargoY = innerY + innerH - cargoH;
+  const ratioSum = segments.reduce((s, seg) => s + Math.max(0, seg.ratio), 0) || 1;
+  // 量の少ない種類も細い板として見えるように、最低限の長さを与える
+  const MIN_SEG = 0.012;
 
   // 格子は大きく見える面（手前・奥・天面）だけに入れる。
   // グラデーションは描くのに手間がかかるので、細い面は無地にする
@@ -362,10 +372,11 @@ export default function ContainerTruck3D({
   const cargoGrid = `
       repeating-linear-gradient(90deg, rgba(0,0,0,0.16) 0 0.5px, transparent 0.5px ${gridPitch}px),
       repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 0.5px, transparent 0.5px ${gridPitch}px),`;
+  // 終わったぶん（dim）は透かさずに暗い同系色で描く。
+  // 暗い背景で opacity を下げると、空のコンテナと見分けが付かなくなるため
   const cargoFace = (color: string, dim: boolean, bright: number, grid: boolean): React.CSSProperties => ({
-    background: `${grid ? cargoGrid : ''} ${shade(color, bright)}`,
-    opacity: dim ? 0.3 : 1,
-    border: `0.5px solid rgba(255,255,255,${dim ? 0.1 : 0.25})`,
+    background: `${grid ? cargoGrid : ''} ${shade(color, bright * (dim ? 0.34 : 1))}`,
+    border: `0.5px solid rgba(255,255,255,${dim ? 0.14 : 0.25})`,
     backfaceVisibility: 'hidden',
   });
 
@@ -375,8 +386,9 @@ export default function ContainerTruck3D({
     top: cargoFace(color, dim, 1.3, true),
     back: cargoFace(color, dim, 0.62, true),
     bottom: cargoFace(color, dim, 0.45, false),
-    left: cargoFace(color, dim, 0.82, false),
-    right: cargoFace(color, dim, 0.95, false),
+    // 細い板になったとき端の面が目立ちすぎないよう、暗めにしておく
+    left: cargoFace(color, dim, 0.55, false),
+    right: cargoFace(color, dim, 0.62, false),
   });
 
   const growStyle: React.CSSProperties = {
@@ -385,36 +397,41 @@ export default function ContainerTruck3D({
   };
 
   const cargoBoxes: React.ReactNode[] = [];
-  let cum = 0;
-  for (const seg of segments) {
-    const segW = Math.max(0, seg.ratio) * shrink * innerW;
-    if (segW <= 0) continue;
-    const doneW = segW * Math.min(1, Math.max(0, seg.doneRatio));
-    const restW = segW - doneW;
-    // 残りを鼻側に、終わったぶんを扉側に置く（扉から降ろすので扉側から減っていく）
-    if (restW > 0.4) {
-      cargoBoxes.push(
-        <Box3D key={`${seg.key}-rest`} x={innerX + cum} y={innerY}
-          w={restW} h={innerH} d={innerD}
-          styles={cargoStyles(seg.color, false)}
-          hide={['bottom']}
-          extraTransform={`scaleX(${revealed ? 1 : 0.001})`}
-          wrapStyle={growStyle}
-        />
-      );
-    }
-    if (doneW > 0.4) {
-      cargoBoxes.push(
-        <Box3D key={`${seg.key}-done`} x={innerX + cum + restW} y={innerY}
-          w={doneW} h={innerH} d={innerD}
-          styles={cargoStyles(seg.color, true)}
-          hide={['bottom']}
-          extraTransform={`scaleX(${revealed ? 1 : 0.001})`}
-          wrapStyle={growStyle}
-        />
-      );
-    }
-    cum += segW;
+  if (cargoH > 0) {
+    // 最低限の長さを配ったうえで、残りを量に応じて割り振る
+    const shares = segments.map((seg) => Math.max(0, seg.ratio) / ratioSum);
+    const spare = Math.max(0, 1 - MIN_SEG * shares.length);
+    let cum = 0;
+    segments.forEach((seg, i) => {
+      const segW = (MIN_SEG + shares[i] * spare) * innerW;
+      if (segW <= 0) return;
+      const doneW = segW * Math.min(1, Math.max(0, seg.doneRatio));
+      const restW = segW - doneW;
+      // 残りを鼻側に、終わったぶんを扉側に置く（扉から降ろすので扉側から減っていく）
+      if (restW > 0.3) {
+        cargoBoxes.push(
+          <Box3D key={`${seg.key}-rest`} x={innerX + cum} y={cargoY}
+            w={restW} h={cargoH} d={innerD}
+            styles={cargoStyles(seg.color, false)}
+            hide={['bottom']}
+            extraTransform={`scaleX(${revealed ? 1 : 0.001})`}
+            wrapStyle={growStyle}
+          />
+        );
+      }
+      if (doneW > 0.3) {
+        cargoBoxes.push(
+          <Box3D key={`${seg.key}-done`} x={innerX + cum + restW} y={cargoY}
+            w={doneW} h={cargoH} d={innerD}
+            styles={cargoStyles(seg.color, true)}
+            hide={['bottom']}
+            extraTransform={`scaleX(${revealed ? 1 : 0.001})`}
+            wrapStyle={growStyle}
+          />
+        );
+      }
+      cum += segW;
+    });
   }
 
   /* ===== コンテナ（透ける箱） ===== */
