@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ContainerItem } from '@/lib/types';
 import { COLOR_MAP } from '@/data/colorMap';
 import { getNabeModelColor } from '@/lib/nabeColors';
+import { itemCbm } from '@/lib/containerLoad';
+import ContainerLoadFigure, { buildLoadFigureData, LoadFigureData } from './ContainerLoadFigure';
+import ContainerLoadFullscreen from './ContainerLoadFullscreen';
 
 interface ContainerAnalyticsPageProps {
   items: ContainerItem[];
@@ -11,19 +14,6 @@ interface ContainerAnalyticsPageProps {
   containerNo: string;
 }
 
-/* ===== コンテナスペック ===== */
-const CONTAINERS: Record<string, { name: string; cbm: number; maxKg: number; heightRatio: number }> = {
-  '20FT': { name: "20' DRY", cbm: 33.2, maxKg: 21770, heightRatio: 0.72 },
-  '40FT': { name: "40' DRY", cbm: 67.7, maxKg: 26680, heightRatio: 0.82 },
-  '40HQ': { name: "40' HIGH CUBE", cbm: 76.3, maxKg: 26460, heightRatio: 1.0 },
-};
-
-/* ===== 寸法パース ===== */
-function parseMeas(meas: string): [number, number, number] | null {
-  const m = meas.match(/(\d+(?:\.\d+)?)\s*[*×xX]\s*(\d+(?:\.\d+)?)\s*[*×xX]\s*(\d+(?:\.\d+)?)/);
-  if (!m) return null;
-  return [Number(m[1]), Number(m[2]), Number(m[3])];
-}
 
 /* ===== アニメーション付きカウント ===== */
 function AnimatedNumber({ value, color, size = 36, delay = 0 }: {
@@ -122,18 +112,12 @@ function ProgressRing({ done, total, color }: { done: number; total: number; col
 }
 
 /* ===== コンテナトラック + 種類分布 ===== */
-function ContainerTruckDistribution({ items, completedIds, containerType }: {
-  items: ContainerItem[]; completedIds: Set<string>; containerType: string;
+function ContainerTruckDistribution({ items, completedIds, data, onOpen }: {
+  items: ContainerItem[];
+  completedIds: Set<string>;
+  data: LoadFigureData;
+  onOpen: () => void;
 }) {
-  const [phase, setPhase] = useState<'offscreen' | 'sliding' | 'revealing' | 'shown'>('offscreen');
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase('sliding'), 500);
-    const t2 = setTimeout(() => setPhase('revealing'), 2200);
-    const t3 = setTimeout(() => setPhase('shown'), 3200);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, []);
-
   const types = ['ポリカバー', 'ジャーポット', '箱', '部品', '鍋', 'ヤーマン部品', 'その他'] as const;
   const counts: Record<string, { total: number; done: number }> = {};
   for (const t of types) counts[t] = { total: 0, done: 0 };
@@ -142,179 +126,33 @@ function ContainerTruckDistribution({ items, completedIds, containerType }: {
     counts[key].total++;
     if (completedIds.has(it.id)) counts[key].done++;
   }
-  const total = items.length || 1;
-
-  const spec = CONTAINERS[containerType] || CONTAINERS['40HQ'];
-  const containerHeight = Math.round(70 * spec.heightRatio);
   const orderedTypes = types.filter(t => counts[t].total > 0);
-  const segments = orderedTypes.map(t => ({
-    type: t, pct: counts[t].total / total * 100,
-    count: counts[t].total, done: counts[t].done, color: COLOR_MAP[t].accent,
-  }));
-
-  // Container opacity for reveal animation
-  const containerOpacity = phase === 'revealing' || phase === 'shown' ? 0.35 : 1;
-  const distOpacity = phase === 'shown' ? 1 : phase === 'revealing' ? 0.6 : 0;
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#60a5fa', textShadow: '0 0 12px rgba(96,165,250,0.3)' }}>
-          {spec.name}
-        </span>
-        <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 4, background: 'rgba(59,130,246,0.15)', color: '#60a5fa', fontWeight: 700 }}>推定</span>
-      </div>
-
-      <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
-{/* Animations defined in globals.css */}
-        <svg viewBox="0 0 400 165" style={{ width: '100%', height: 'auto' }}>
-          <defs>
-            <pattern id="ds" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,255,255,0.4)" strokeWidth="2" />
-            </pattern>
-            <linearGradient id="tCab" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#e8e8e8" /><stop offset="50%" stopColor="#d0d0d0" /><stop offset="100%" stopColor="#b8b8b8" />
-            </linearGradient>
-            <linearGradient id="tWin" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="rgba(160,200,255,0.7)" /><stop offset="100%" stopColor="rgba(100,150,220,0.3)" />
-            </linearGradient>
-            <linearGradient id="cBox" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#e0e4ea" /><stop offset="100%" stopColor="#c8ccd5" />
-            </linearGradient>
-            <linearGradient id="cSide" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#bcc0ca" /><stop offset="100%" stopColor="#a0a4b0" />
-            </linearGradient>
-            <linearGradient id="rdSurf" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#3a3d4e" /><stop offset="100%" stopColor="#2a2d3e" />
-            </linearGradient>
-          </defs>
-
-          {/* 道路 */}
-          <rect x="0" y="138" width="400" height="27" fill="url(#rdSurf)" />
-          <line x1="0" y1="152" x2="400" y2="152" stroke="rgba(255,255,255,0.08)" strokeWidth="1.5"
-            strokeDasharray="14 10" style={{ animation: phase !== 'offscreen' ? 'roadDash 0.8s linear infinite' : 'none' }} />
-
-          {/* === トラック全体（スライドイン） === */}
-          <g style={{
-            transform: phase === 'offscreen' ? 'translateX(120%)' : 'translateX(0)',
-            transition: phase === 'sliding' ? 'transform 1.5s cubic-bezier(0.22,1,0.36,1)' : undefined,
-          }}>
-            {/* バウンスグループ */}
-            <g style={{ animation: phase !== 'offscreen' ? 'truckBounce 1.2s ease-in-out infinite' : 'none' }}>
-
-              {/* シャーシ・フレーム */}
-              <rect x="15" y="126" width="370" height="5" rx="1" fill="#3a3e48" />
-              <rect x="15" y="131" width="370" height="3" rx="1" fill="#2e323c" />
-
-              {/* === キャビン（白いトラック） === */}
-              <rect x="18" y="72" width="62" height="54" rx="6" fill="url(#tCab)" />
-              <rect x="18" y="72" width="62" height="54" rx="6" fill="none" stroke="#999" strokeWidth="0.5" />
-              {/* キャビン下部 */}
-              <rect x="18" y="118" width="62" height="8" rx="2" fill="#c0c4cc" />
-              {/* フロントグリル */}
-              <rect x="12" y="106" width="6" height="18" rx="2" fill="#d0d4dc" stroke="#aaa" strokeWidth="0.5" />
-              {Array.from({length: 5}, (_, i) => (
-                <line key={i} x1="13" y1={108 + i * 3} x2="17" y2={108 + i * 3} stroke="#999" strokeWidth="0.5" />
-              ))}
-              {/* ウインドシールド */}
-              <path d="M22,76 L68,76 Q72,76 72,80 L72,98 L22,98 Z" fill="url(#tWin)" />
-              <path d="M22,76 L68,76 Q72,76 72,80 L72,98 L22,98 Z" fill="none" stroke="rgba(0,0,0,0.15)" strokeWidth="0.5" />
-              {/* ワイパー */}
-              <line x1="36" y1="97" x2="50" y2="82" stroke="rgba(0,0,0,0.12)" strokeWidth="0.5" />
-              <line x1="52" y1="97" x2="64" y2="84" stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
-              {/* ヘッドライト */}
-              <rect x="12" y="106" width="5" height="5" rx="1.5" fill="#f8e830" opacity="0.85" />
-              <rect x="12" y="113" width="5" height="3" rx="1" fill="#f97316" opacity="0.6" />
-              {/* サイドミラー */}
-              <rect x="10" y="78" width="7" height="11" rx="2" fill="#c8ccd5" stroke="#999" strokeWidth="0.3" />
-              <rect x="11" y="79.5" width="5" height="7" rx="1" fill="rgba(160,200,255,0.25)" />
-              {/* バンパー */}
-              <rect x="10" y="124" width="10" height="5" rx="2" fill="#d5d8e0" stroke="#aaa" strokeWidth="0.3" />
-              {/* テールランプ */}
-              <rect x="78" y="108" width="3" height="6" rx="1" fill="#ef4444" opacity="0.6" />
-              <rect x="78" y="116" width="3" height="4" rx="1" fill="#f97316" opacity="0.4" />
-
-              {/* === コンテナ === */}
-              <g style={{ opacity: containerOpacity, transition: 'opacity 1s ease' }}>
-                {/* コンテナ上面 */}
-                <rect x="88" y={128 - containerHeight - 5} width="280" height="5" rx="1" fill="url(#cBox)" stroke="#bbb" strokeWidth="0.3" />
-                {/* コンテナ本体 */}
-                <rect x="88" y={128 - containerHeight} width="280" height={containerHeight} rx="1.5" fill="url(#cSide)" stroke="#aaa" strokeWidth="0.5" />
-                {/* 波板リブ */}
-                {Array.from({length: 20}, (_, i) => (
-                  <line key={i} x1={88 + 14 * (i + 1)} y1={128 - containerHeight + 1} x2={88 + 14 * (i + 1)} y2={127}
-                    stroke="rgba(0,0,0,0.06)" strokeWidth="0.8" />
-                ))}
-                {/* 扉（右端） */}
-                <line x1="368" y1={128 - containerHeight + 2} x2="368" y2={126} stroke="rgba(0,0,0,0.2)" strokeWidth="1.5" />
-                <line x1="365" y1={128 - containerHeight + 2} x2="365" y2={126} stroke="rgba(0,0,0,0.12)" strokeWidth="0.5" />
-                <rect x="366" y={128 - containerHeight / 2 - 4} width="2" height="8" rx="0.5" fill="rgba(0,0,0,0.15)" />
-              </g>
-
-              {/* === 種類分布（コンテナ内、フェードイン） === */}
-              <g style={{ opacity: distOpacity, transition: 'opacity 0.8s ease' }}>
-                {(() => {
-                  let x = 88 + 278;
-                  const cTop = 128 - containerHeight + 1;
-                  const cH = containerHeight - 2;
-                  return segments.map((seg, i) => {
-                    const w = (seg.pct / 100) * 276;
-                    x -= w;
-                    const showInside = w > 28;
-                    const donePct = seg.count > 0 ? seg.done / seg.count : 0;
-                    const doneW = Math.max((w - 1) * donePct, 0);
-                    const remainW = Math.max(w - 1 - doneW, 0);
-                    return (
-                      <g key={seg.type}>
-                        {doneW > 0 && <rect x={x + 1} y={cTop} width={doneW} height={cH} fill={seg.color} opacity={0.3} rx={i === 0 ? 1 : 0} />}
-                        {remainW > 0 && <rect x={x + 1 + doneW} y={cTop} width={remainW} height={cH} fill={seg.color} opacity={0.9} rx={i === segments.length - 1 ? 1 : 0} />}
-                        {seg.done === seg.count && seg.count > 0 && (
-                          <rect x={x + 1} y={cTop} width={Math.max(w - 1, 1)} height={cH} fill="url(#ds)" opacity={0.3} />
-                        )}
-                        {showInside && (
-                          <text x={x + w / 2} y={cTop + cH / 2 + 1} textAnchor="middle" dominantBaseline="middle"
-                            fontSize="10" fontWeight="800" fill="#fff" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
-                            {seg.pct.toFixed(0)}%
-                          </text>
-                        )}
-                      </g>
-                    );
-                  });
-                })()}
-              </g>
-
-            </g>
-
-            {/* 前輪（バウンス外で回転） */}
-            {[42, 66].map((cx, i) => (
-              <g key={`fw${i}`}>
-                <circle cx={cx} cy="138" r="12" fill="#222" stroke="#555" strokeWidth="2.5" />
-                <circle cx={cx} cy="138" r="8" fill="#333" stroke="#555" strokeWidth="0.5" />
-                <circle cx={cx} cy="138" r="3.5" fill="#666" />
-                <circle cx={cx} cy="138" r="1.5" fill="#888" />
-                {[0, 72, 144, 216, 288].map(a => (
-                  <line key={a} x1={cx + 4 * Math.cos(a * Math.PI / 180)} y1={138 + 4 * Math.sin(a * Math.PI / 180)}
-                    x2={cx + 7.5 * Math.cos(a * Math.PI / 180)} y2={138 + 7.5 * Math.sin(a * Math.PI / 180)}
-                    stroke="#555" strokeWidth="1" style={{ transformOrigin: `${cx}px 138px`, animation: phase !== 'offscreen' ? 'wheelSpin 0.8s linear infinite' : 'none' }} />
-                ))}
-              </g>
-            ))}
-            {/* 後輪 */}
-            {[305, 328, 352].map((cx, i) => (
-              <g key={`rw${i}`}>
-                <circle cx={cx} cy="138" r="12" fill="#222" stroke="#555" strokeWidth="2.5" />
-                <circle cx={cx} cy="138" r="8" fill="#333" stroke="#555" strokeWidth="0.5" />
-                <circle cx={cx} cy="138" r="3.5" fill="#666" />
-                <circle cx={cx} cy="138" r="1.5" fill="#888" />
-                {[0, 72, 144, 216, 288].map(a => (
-                  <line key={a} x1={cx + 4 * Math.cos(a * Math.PI / 180)} y1={138 + 4 * Math.sin(a * Math.PI / 180)}
-                    x2={cx + 7.5 * Math.cos(a * Math.PI / 180)} y2={138 + 7.5 * Math.sin(a * Math.PI / 180)}
-                    stroke="#555" strokeWidth="1" style={{ transformOrigin: `${cx}px 138px`, animation: phase !== 'offscreen' ? 'wheelSpin 0.8s linear infinite' : 'none' }} />
-                ))}
-              </g>
-            ))}
-          </g>
-        </svg>
+      {/* 立体のトラック図（タップで全画面） */}
+      <div
+        onClick={onOpen}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpen(); }}
+        style={{ cursor: 'pointer', position: 'relative', outline: 'none' }}
+      >
+        <ContainerLoadFigure
+          items={items}
+          completedIds={completedIds}
+          data={data}
+          compact
+          showLegend={false}
+          showDims={false}
+          intro
+        />
+        <div style={{
+          position: 'absolute', right: 0, bottom: 2,
+          fontSize: 10, color: 'rgba(255,255,255,0.35)', pointerEvents: 'none',
+        }}>
+          タップで全画面・回転
+        </div>
       </div>
 
       {/* 種類別 完了/残り 詳細バー */}
@@ -460,40 +298,16 @@ export default function ContainerAnalyticsPage({
 }: ContainerAnalyticsPageProps) {
   const activeItems = items.filter((it) => !completedIds.has(it.id));
   const doneItems = items.filter((it) => completedIds.has(it.id));
+  const [fullscreen, setFullscreen] = useState(false);
 
-  // アイテムのCBM取得（cbmフィールド優先、なければmeasurements(cm)から計算）
-  const getItemCbm = (it: ContainerItem): number => {
-    if (it.cbm && it.cbm > 0) return it.cbm;
-    // measurements は cm 単位 (例: "55*38*38") → m³ に変換
-    if (it.measurements) {
-      const dims = parseMeas(it.measurements);
-      if (dims) return (dims[0] * dims[1] * dims[2]) / 1000000;
-    }
-    return 0;
-  };
-
-  // CBM / 重量集計
-  let totalCbm = 0, totalWeight = 0, hasCbm = false;
-  for (const it of items) {
-    const cbm = getItemCbm(it);
-    if (cbm > 0) { totalCbm += cbm * (it.caseCount || 1); hasCbm = true; }
-    if (it.grossWeight) totalWeight += it.grossWeight * (it.caseCount || 1);
-  }
-  let doneCbm = 0, doneWeight = 0;
-  for (const it of doneItems) {
-    const cbm = getItemCbm(it);
-    if (cbm > 0) doneCbm += cbm * (it.caseCount || 1);
-    if (it.grossWeight) doneWeight += it.grossWeight * (it.caseCount || 1);
-  }
-  const remainCbm = totalCbm - doneCbm;
-  const remainWeight = totalWeight - doneWeight;
-
-  // 寸法分布
-  const sizeItems = items.filter((it) => it.measurements && parseMeas(it.measurements));
-
-  // コンテナタイプ自動推定
-  const bestContainer = totalCbm <= 33 ? '20FT' : totalCbm <= 67 ? '40FT' : '40HQ';
-  const bestSpec = CONTAINERS[bestContainer];
+  // 積載量は共通の決まり（containerLoad）で出す。
+  // Meas.（1ケースの外寸 cm）から1ケースの体積を出し、ケース数を掛ける。
+  const figure = buildLoadFigureData(items, completedIds);
+  const {
+    totalCbm, doneCbm, remainCbm, totalKg, remainKg, hasCbm, sizedCount, spec: bestSpec,
+  } = figure.summary;
+  const totalWeight = totalKg;
+  const remainWeight = remainKg;
 
   return (
     <div style={{
@@ -563,7 +377,12 @@ export default function ContainerAnalyticsPage({
           <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
             種類分布
           </div>
-          <ContainerTruckDistribution items={items} completedIds={completedIds} containerType={bestContainer} />
+          <ContainerTruckDistribution
+            items={items}
+            completedIds={completedIds}
+            data={figure}
+            onOpen={() => setFullscreen(true)}
+          />
         </div>
 
         {/* === コンテナ積載率（推定サイズのみ） === */}
@@ -628,7 +447,7 @@ export default function ContainerAnalyticsPage({
             <SummaryCard label="残 CBM" value={remainCbm.toFixed(2)} unit="m³" color="#f59e0b" />
             <SummaryCard label="残 重量" value={(remainWeight / 1000).toFixed(2)} unit="t" color="#f97316" />
             <SummaryCard label="品目数" value={String(items.length)} unit="品" color="#22c55e" />
-            <SummaryCard label="寸法あり" value={String(sizeItems.length)} unit={`/ ${items.length}`} color="#6b7280" />
+            <SummaryCard label="寸法あり" value={String(sizedCount)} unit={`/ ${items.length}`} color="#6b7280" />
           </div>
         </div>
 
@@ -642,14 +461,14 @@ export default function ContainerAnalyticsPage({
               品目別 CBM (降順)
             </div>
             {[...items]
-              .filter((it) => getItemCbm(it) > 0)
-              .sort((a, b) => (getItemCbm(b) * (b.caseCount || 1)) - (getItemCbm(a) * (a.caseCount || 1)))
+              .filter((it) => itemCbm(it) > 0)
+              .sort((a, b) => itemCbm(b) - itemCbm(a))
               .slice(0, 10)
               .map((it) => {
                 const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
                 const nabeColor = getNabeModelColor(it.itemName, it.type);
                 const dotColor = nabeColor || c.accent;
-                const itemCbm = getItemCbm(it) * (it.caseCount || 1);
+                const lineCbm = itemCbm(it);
                 const isDone = completedIds.has(it.id);
                 const name = it.itemName.replace(/ポリカバー/g, '').trim() || it.itemName;
                 return (
@@ -665,7 +484,7 @@ export default function ContainerAnalyticsPage({
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>{name}</span>
                     <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 800, color: dotColor }}>
-                      {itemCbm.toFixed(2)}
+                      {lineCbm.toFixed(2)}
                     </span>
                     <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)' }}>m³</span>
                   </div>
@@ -674,6 +493,16 @@ export default function ContainerAnalyticsPage({
           </div>
         )}
       </div>
+
+      {/* 積載状況の全画面表示（回転できる立体図） */}
+      {fullscreen && (
+        <ContainerLoadFullscreen
+          items={items}
+          completedIds={completedIds}
+          containerNo={containerNo}
+          onClose={() => setFullscreen(false)}
+        />
+      )}
     </div>
   );
 }

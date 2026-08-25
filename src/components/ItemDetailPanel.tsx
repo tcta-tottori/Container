@@ -10,6 +10,7 @@ import { displayQuantities } from '@/lib/itemQuantity';
 import { usePalletTap } from '@/hooks/usePalletTap';
 import { useCountUp } from '@/hooks/useCountUp';
 import PalletDiagram from './PalletDiagram';
+import ContainerLoadFullscreen from './ContainerLoadFullscreen';
 import SizeDiagram, { parseMeas } from './SizeDiagram';
 
 /** パレット図の積み方アニメーションの速さ（1 = 標準）。端末に覚えさせる */
@@ -363,6 +364,8 @@ export default function ItemDetailPanel({
   const accentColor = nabeColor || colors.accent;
   const [palletFlash, setPalletFlash] = useState(false);
   const [fullscreenPallet, setFullscreenPallet] = useState<'full' | 'fraction' | null>(null);
+  /** 積載分布ゲージをタップしたときに出す、コンテナ積載状況の全画面表示 */
+  const [showLoad3D, setShowLoad3D] = useState(false);
   const [fsRotateY, setFsRotateY] = useState(-35);
   const fsTouchRef = useRef<{ startX: number; startRotY: number } | null>(null);
   // 端数パレットのみになった時の全画面表示
@@ -840,12 +843,21 @@ export default function ItemDetailPanel({
           `,
         }} />
 
-        {/* 積載分布ゲージ + 種類数 + 進捗率（右上 — 常時表示、バッジ行と同じ高さ） */}
+        {/* 積載分布ゲージ + 種類数 + 進捗率（右上 — 常時表示、バッジ行と同じ高さ）
+            タップするとコンテナ積載状況の立体図が全画面で出る */}
         {allItems.length > 0 && (
-          <div style={{
-            position: 'absolute', top: 10, right: 10, zIndex: 5,
-            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0,
-          }}>
+          <div
+            onClick={(e) => { e.stopPropagation(); setShowLoad3D(true); }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowLoad3D(true); }}
+            style={{
+              position: 'absolute', top: 10, right: 10, zIndex: 5,
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0,
+              cursor: 'pointer', outline: 'none',
+              padding: 4, margin: -4, borderRadius: 12,
+              WebkitTapHighlightColor: 'transparent',
+            }}>
             {/* 棒ゲージ（右から収縮: row-reverse） */}
             <div style={{
               display: 'flex', flexDirection: 'row-reverse', width: 140, height: 22, borderRadius: 20,
@@ -1267,6 +1279,15 @@ export default function ItemDetailPanel({
             </div>
           </div>
         </div>
+      )}
+
+      {/* 積載状況の全画面表示（スワイプで回る立体図） */}
+      {showLoad3D && (
+        <ContainerLoadFullscreen
+          items={allItems}
+          completedIds={completedIds}
+          onClose={() => setShowLoad3D(false)}
+        />
       )}
 
       {fullscreenPallet && (
