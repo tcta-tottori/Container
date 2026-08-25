@@ -3,7 +3,7 @@
 import { useReducer, useCallback } from 'react';
 import { Container, ContainerItem } from '@/lib/types';
 
-interface OriginalValues {
+export interface OriginalValues {
   totalQty: number;
   palletCount: number;
   caseCount: number;

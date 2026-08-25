@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { ContainerItem } from '@/lib/types';
+import type { OriginalValues } from '@/hooks/useContainerData';
 import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 import { buildJapanesePartName } from '@/lib/partTranslations';
@@ -69,6 +70,8 @@ interface ItemDetailPanelProps {
   relatedItems: ContainerItem[];
   allItems: ContainerItem[];
   completedIds: Set<string>;
+  /** 読み込んだときのパレット数・数量。減らしたぶんを進捗に映すのに使う */
+  originalValues?: Map<string, OriginalValues>;
   onSelectItem?: (idx: number) => void;
   onCompleteItem?: (id: string) => void;
   onUncompleteItem?: (id: string) => void;
@@ -357,7 +360,7 @@ function UndoSwipeRow({ children, onSwipe, style, className, onClick }: {
 }
 
 export default function ItemDetailPanel({
-  item, relatedItems, allItems, completedIds, onSelectItem, onCompleteItem, onUncompleteItem,
+  item, relatedItems, allItems, completedIds, originalValues, onSelectItem, onCompleteItem, onUncompleteItem,
   onDecrementPallet, onIncrementPallet,
 }: ItemDetailPanelProps) {
   const colors = COLOR_MAP[item.type] || COLOR_MAP['その他'];
@@ -483,7 +486,23 @@ export default function ItemDetailPanel({
   // 現在のアイテムの寸法
   const currentDims = item.measurements ? parseMeas(item.measurements) : null;
 
+  /**
+   * その品目がまだどれだけ残っているか（0〜1）。
+   * パレットを1枚減らすとその枚数ぶんだけ減り、完了で0になる。
+   * 読み込み時の値が分からないときは丸ごと残っている扱い。
+   */
+  const remainingRatioOf = (it: ContainerItem): number => {
+    if (completedIds.has(it.id)) return 0;
+    const org = originalValues?.get(it.id);
+    if (!org) return 1;
+    if (org.palletCount > 0) return Math.max(0, Math.min(1, it.palletCount / org.palletCount));
+    if (org.totalQty > 0) return Math.max(0, Math.min(1, it.totalQty / org.totalQty));
+    return 1;
+  };
+
   const typeCounts = new Map<string, number>();
+  /** 種類ごとの「残っている品目数」。パレットを減らすと小数で減る */
+  const typeRemaining = new Map<string, number>();
   // 鍋コンテナ: サイズ別に分離（100→180の順で表示）
   if (isNabeContainer) {
     // 100を先に登録して順序を保証
@@ -491,16 +510,19 @@ export default function ItemDetailPanel({
     typeCounts.set('鍋180', 0);
   }
   for (const it of allItems) {
+    let key = it.type as string;
     if (it.type === '鍋' && isNabeContainer) {
       const is180 = it.itemName.includes('180') || /18[RWCS]/.test(it.itemName);
-      const sizeKey = is180 ? '鍋180' : '鍋100';
-      typeCounts.set(sizeKey, (typeCounts.get(sizeKey) || 0) + 1);
-    } else {
-      typeCounts.set(it.type, (typeCounts.get(it.type) || 0) + 1);
+      key = is180 ? '鍋180' : '鍋100';
     }
+    typeCounts.set(key, (typeCounts.get(key) || 0) + 1);
+    typeRemaining.set(key, (typeRemaining.get(key) || 0) + remainingRatioOf(it));
   }
   // 0件のエントリを除去
   typeCounts.forEach((v, k) => { if (v === 0) typeCounts.delete(k); });
+
+  /** 残っている品目数の合計（小数）。進捗率とゲージの長さはこれで決める */
+  const remainingTotal = allItems.reduce((sum, it) => sum + remainingRatioOf(it), 0);
 
   // リスト行の背景色（メニューカラーと統一・ダーク系）
   const TYPE_ROW_BG: Record<string, string> = {
@@ -868,15 +890,11 @@ export default function ItemDetailPanel({
               border: '1.5px solid rgba(255,255,255,0.7)',
               boxShadow: '0 0 12px rgba(255,255,255,0.25), 0 0 24px rgba(255,255,255,0.1), inset 0 0 4px rgba(255,255,255,0.1)',
             }}>
-              {Array.from(typeCounts.entries()).reverse().map(([typeKey, count]) => {
+              {Array.from(typeCounts.keys()).reverse().map((typeKey) => {
                 const nabeBarColor = typeKey === '鍋100' ? '#22c55e' : typeKey === '鍋180' ? '#3b82f6' : null;
                 const tc = nabeBarColor ? { accent: nabeBarColor } : (COLOR_MAP[typeKey as keyof typeof COLOR_MAP] || COLOR_MAP['その他']);
-                const completedOfType = typeKey === '鍋100'
-                  ? allItems.filter(it => it.type === '鍋' && !(it.itemName.includes('180') || /18[RWCS]/.test(it.itemName)) && completedIds.has(it.id)).length
-                  : typeKey === '鍋180'
-                  ? allItems.filter(it => it.type === '鍋' && (it.itemName.includes('180') || /18[RWCS]/.test(it.itemName)) && completedIds.has(it.id)).length
-                  : allItems.filter(it => it.type === typeKey && completedIds.has(it.id)).length;
-                const remainingOfType = count - completedOfType;
+                // 完了だけでなく、パレットを減らしたぶんも縮める
+                const remainingOfType = typeRemaining.get(typeKey) || 0;
                 const pct = (remainingOfType / allItems.length) * 100;
                 return pct > 0 ? (
                   <div key={typeKey} style={{
@@ -913,7 +931,7 @@ export default function ItemDetailPanel({
               color: '#fff', letterSpacing: 0.5,
               textShadow: '0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.4), 0 0 40px rgba(255,255,255,0.2)',
             }}>
-              {Math.round((completedIds.size / allItems.length) * 100)}%
+              {Math.round(Math.max(0, Math.min(1, 1 - remainingTotal / allItems.length)) * 100)}%
             </span>
           </div>
         )}

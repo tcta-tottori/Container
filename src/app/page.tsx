@@ -1564,6 +1564,7 @@ export default function Home() {
                     relatedItems={relatedItems}
                     allItems={state.items}
                     completedIds={state.completedIds}
+                    originalValues={state.originalValues}
                     onSelectItem={handleSelectItem}
                     onCompleteItem={(id: string) => {
                       // 完了コールは行わない
