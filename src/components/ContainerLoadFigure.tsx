@@ -178,8 +178,6 @@ interface ContainerLoadFigureProps {
   showLegend?: boolean;
   /** 図の高さ。横幅に対する比 */
   aspect?: number;
-  /** 寸法線を出す */
-  showDims?: boolean;
   /** 出てくるときのアニメーション */
   intro?: boolean;
   /** 事前に計算した内訳（親で使い回すとき） */
@@ -189,7 +187,7 @@ interface ContainerLoadFigureProps {
 export default function ContainerLoadFigure({
   items, completedIds, width, rotateX, rotateY, aspect,
   compact = false, showTitle = true, showStats = true, showLegend = true,
-  showDims = true, intro = false, data,
+  intro = false, data,
 }: ContainerLoadFigureProps) {
   const { summary, stats, segments } = data || buildLoadFigureData(items, completedIds);
 
@@ -224,10 +222,9 @@ export default function ContainerLoadFigure({
           containerType={summary.containerType}
           segments={segments}
           width={width}
-          aspect={aspect ?? (compact ? 0.44 : 0.5)}
+          aspect={aspect}
           rotateX={rotateX}
           rotateY={rotateY}
-          showDims={showDims}
           intro={intro}
         />
       </div>

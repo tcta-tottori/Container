@@ -30,12 +30,10 @@ interface ContainerTruck3DProps {
   segments: TruckSegment[];
   /** 図の横幅(px)。省略すると親の幅にあわせる */
   width?: number;
-  /** 図の高さ。横幅に対する比。省略時 0.5 */
+  /** 図の高さ。横幅に対する比。省略すると模型の形にあわせて決める */
   aspect?: number;
   rotateX?: number;
   rotateY?: number;
-  /** 寸法線を描く */
-  showDims?: boolean;
   /** 出てくるときのアニメーション（中身が伸びて現れる） */
   intro?: boolean;
 }
@@ -55,12 +53,10 @@ const CAB_LEN_MM = 2450;
 const CAB_TOP_MM = 3450;
 /** キャビンとコンテナの隙間 */
 const CAB_GAP_MM = 350;
-/** 図の左の余白 */
-const PAD_LEFT_MM = 700;
-/** 図の右の余白（高さの寸法線と文字ぶん） */
-const PAD_RIGHT_MM = 2600;
+/** 図の左右の余白 */
+const PAD_X_MM = 400;
 /** 図の上下の余白 */
-const PAD_TOP_MM = 1300;
+const PAD_TOP_MM = 300;
 const PAD_BOTTOM_MM = 250;
 
 /** mm → px（模型を組む時の倍率。最後に scale で合わせるので固定でよい） */
@@ -168,76 +164,12 @@ function Wheel3D({ cx, cy, z, r, tw, segs = 12 }: {
   return <>{strips}{disc(1)}{disc(-1)}</>;
 }
 
-/* ===== 寸法線 ===== */
-function DimLine({ horizontal, length, label, thickness, font, place = 'center', textRotate = 0, mirror = false }: {
-  horizontal: boolean; length: number; label: string; thickness: number; font: number;
-  /** 文字の置き方。center=線の真ん中、after=線の外側（横線なら下、縦線なら右） */
-  place?: 'center' | 'after';
-  /** 文字だけ回す */
-  textRotate?: number;
-  /** 裏から見ているとき、文字が鏡文字にならないよう反転する */
-  mirror?: boolean;
-}) {
-  const flip = mirror ? ' scaleX(-1)' : '';
-  const head = thickness * 3.5;
-  const arrow = (rot: number): React.CSSProperties => ({
-    position: 'absolute',
-    width: 0, height: 0,
-    borderStyle: 'solid',
-    borderWidth: `${head}px ${head * 1.7}px ${head}px 0`,
-    borderColor: 'transparent rgba(255,255,255,0.9) transparent transparent',
-    transform: `rotate(${rot}deg)`,
-  });
-  const textBase: React.CSSProperties = {
-    position: 'absolute',
-    fontSize: font, fontWeight: 700, whiteSpace: 'nowrap',
-    color: '#fff', letterSpacing: 0.2, lineHeight: 1.1,
-    textShadow: '0 1px 5px rgba(0,0,0,0.95), 0 0 3px rgba(0,0,0,0.95)',
-  };
-
-  if (horizontal) {
-    const text: React.CSSProperties = place === 'center'
-      ? { ...textBase, left: '50%', top: '50%', transform: `translate(-50%,-50%) rotate(${textRotate}deg)${flip}`, padding: `${thickness}px ${thickness * 3}px` }
-      : { ...textBase, left: '50%', top: '100%', transform: `translate(-50%, ${thickness}px) rotate(${textRotate}deg)${flip}` };
-    return (
-      <div style={{ position: 'absolute', left: 0, top: 0, width: length, height: head * 2 }}>
-        <div style={{
-          position: 'absolute', left: 0, right: 0, top: '50%',
-          height: thickness, background: 'rgba(255,255,255,0.8)', transform: 'translateY(-50%)',
-        }} />
-        <div style={{ ...arrow(0), left: 0, top: '50%', marginTop: -head }} />
-        <div style={{ ...arrow(180), right: 0, top: '50%', marginTop: -head }} />
-        <span style={text}>{label}</span>
-      </div>
-    );
-  }
-  const text: React.CSSProperties = place === 'center'
-    ? { ...textBase, left: '50%', top: '50%', transform: `translate(-50%,-50%) rotate(${textRotate}deg)${flip}`, padding: `${thickness * 2}px ${thickness * 2}px` }
-    : { ...textBase, left: '100%', top: '50%', transform: `translate(${thickness * 3}px, -50%) rotate(${textRotate}deg)${flip}`, transformOrigin: 'left center' };
-  return (
-    <div style={{ position: 'absolute', left: 0, top: 0, width: head * 2, height: length }}>
-      <div style={{
-        position: 'absolute', top: 0, bottom: 0, left: '50%',
-        width: thickness, background: 'rgba(255,255,255,0.8)', transform: 'translateX(-50%)',
-      }} />
-      <div style={{ ...arrow(90), top: 0, left: '50%', marginLeft: -head }} />
-      <div style={{ ...arrow(-90), bottom: 0, left: '50%', marginLeft: -head }} />
-      <span style={text}>{label}</span>
-    </div>
-  );
-}
-
-/** 桁区切りつきの mm 表記 */
-function mmLabel(v: number): string {
-  return `${v.toLocaleString('en-US')}mm`;
-}
-
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 export default function ContainerTruck3D({
-  containerType, segments, width, aspect = 0.5,
+  containerType, segments, width, aspect,
   rotateX = DEFAULT_ROT_X, rotateY = DEFAULT_ROT_Y,
-  showDims = true, intro = false,
+  intro = false,
 }: ContainerTruck3DProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [autoW, setAutoW] = useState(width || 320);
@@ -265,32 +197,39 @@ export default function ContainerTruck3D({
   const spec = CONTAINER_SPECS[containerType] || CONTAINER_SPECS['40HQ'];
   const px = (v: number) => v * MM2PX;
 
-  /* ===== 模型の大きさ（固定倍率） =====
-   * 寸法線を描かないときは余白を詰めて、図を大きく見せる */
-  const padLeft = showDims ? PAD_LEFT_MM : 400;
-  const padRight = showDims ? PAD_RIGHT_MM : 400;
-  const padTop = showDims ? PAD_TOP_MM : 300;
-  const modelWmm = padLeft + CAB_LEN_MM + CAB_GAP_MM + spec.lengthMm + padRight;
-  const modelHmm = padTop + Math.max(CAB_TOP_MM, FLOOR_MM + spec.heightMm) + PAD_BOTTOM_MM;
+  /* ===== 模型の大きさ（固定倍率） ===== */
+  const modelWmm = PAD_X_MM + CAB_LEN_MM + CAB_GAP_MM + spec.lengthMm + PAD_X_MM;
+  const modelHmm = PAD_TOP_MM + Math.max(CAB_TOP_MM, FLOOR_MM + spec.heightMm) + PAD_BOTTOM_MM;
   const modelW = px(modelWmm);
   const modelH = px(modelHmm);
   const modelD = px(spec.widthMm);
 
   /* ===== いまの角度での見かけの大きさから、枠に収まる倍率を出す ===== */
-  const stageH = autoW * aspect;
-  const cy = Math.abs(Math.cos(rad(rotateY)));
-  const sy = Math.abs(Math.sin(rad(rotateY)));
-  const cx = Math.abs(Math.cos(rad(rotateX)));
-  const sx = Math.abs(Math.sin(rad(rotateX)));
-  const projW = modelW * cy + modelD * sy;
-  const projH = modelH * cx + modelW * sy * sx + modelD * cy * sx;
+  // 回した角度での見かけの幅・高さ
+  const proj = (rotY: number, rotX: number) => {
+    const cy = Math.abs(Math.cos(rad(rotY)));
+    const sy = Math.abs(Math.sin(rad(rotY)));
+    const cx = Math.abs(Math.cos(rad(rotX)));
+    const sx = Math.abs(Math.sin(rad(rotX)));
+    return {
+      w: modelW * cy + modelD * sy,
+      h: modelH * cx + modelW * sy * sx + modelD * cy * sx,
+    };
+  };
+  const { w: projW, h: projH } = proj(rotateY, rotateX);
+  // 高さの指定がなければ、はじめの角度での形にあわせる。
+  // 20ft のような短いコンテナでも枠の横幅いっぱいに描ける。
+  // 回している間に枠の高さが変わらないよう、既定の角度で決め打ちする
+  const base = proj(DEFAULT_ROT_Y, DEFAULT_ROT_X);
+  const autoAspect = Math.min(0.9, Math.max(0.3, base.h / base.w));
+  const stageH = autoW * (aspect ?? autoAspect);
   // 遠近法で手前がふくらむぶんの余裕
   const MARGIN = 1.06;
   const fit = Math.min(autoW / (projW * MARGIN), stageH / (projH * MARGIN));
 
   /* ===== 各部の位置(px) ===== */
   const groundY = modelH - px(PAD_BOTTOM_MM);
-  const cabX = px(padLeft);
+  const cabX = px(PAD_X_MM);
   const cabW = px(CAB_LEN_MM);
   const cabTopY = groundY - px(CAB_TOP_MM);
   const cabH = px(CAB_TOP_MM - 640);
@@ -307,21 +246,15 @@ export default function ContainerTruck3D({
   const tireW = px(TIRE_W_MM);
   const axleY = groundY - tireR;
 
-  // 車軸（キャビン2軸＋シャーシ3軸）
+  // 車軸。キャビン2軸＋シャーシ側は 40ft が3軸、20ft の短いシャーシは2軸
+  const trailerAxles = spec.lengthMm >= 8000 ? 3 : 2;
   const axles = [
     cabX + px(950),
     cabX + cabW + px(200),
-    conX + conW - px(1150),
-    conX + conW - px(2500),
-    conX + conW - px(3850),
+    ...Array.from({ length: trailerAxles }, (_, i) => conX + conW - px(1150 + i * 1350)),
   ];
 
-  // 縮めたあとに読める太さ・文字の大きさにする
-  const dimT = Math.max(0.6, 1.1 / Math.max(fit, 0.05));
-  const dimFont = Math.max(6, 12 / Math.max(fit, 0.05));
   const ribPitch = Math.max(3, px(305));
-  // 裏側から見ているときは寸法の文字が鏡文字になるので反転させる
-  const dimMirror = Math.cos(rad(rotateY)) < 0;
   const lineW = Math.max(0.5, 0.7 / Math.max(fit, 0.05));
 
   /* ===== 積んだぶんの塊 ===== */
@@ -403,15 +336,6 @@ export default function ContainerTruck3D({
     border: `${lineW * 1.4}px solid rgba(255,255,255,0.55)`,
     backfaceVisibility: 'visible',
   });
-
-  /* 天面に寸法線（長さ・幅）を乗せる。回しても模型と一緒に動く */
-  const roofDims: React.ReactNode = showDims ? (
-    /* 幅 — 天面の扉側の外に出す */
-    <div style={{ position: 'absolute', left: conW + px(450), top: 0, height: conD }}>
-      <DimLine horizontal={false} length={conD} label={mmLabel(spec.widthMm)}
-        thickness={dimT} font={dimFont} place="after" mirror={dimMirror} />
-    </div>
-  ) : null;
 
   return (
     <div ref={hostRef} style={{ width: width ? width : '100%' }}>
@@ -525,7 +449,6 @@ export default function ContainerTruck3D({
                 right: glassFace(0.09),
                 left: glassFace(0.07),
               }}
-              faces={{ top: roofDims }}
             />
 
             {/* コンテナの角柱（骨組みを目立たせる） */}
@@ -541,27 +464,6 @@ export default function ContainerTruck3D({
               </React.Fragment>
             ))}
 
-            {/* 長さの寸法線（手前の面と平行に、屋根の上へ置く） */}
-            {showDims && (
-              <div style={{
-                position: 'absolute', left: conX, top: conY - px(1150), width: conW,
-                transform: `translateZ(${conD / 2}px)`,
-              }}>
-                <DimLine horizontal length={conW} label={mmLabel(spec.lengthMm)}
-                  thickness={dimT} font={dimFont} mirror={dimMirror} />
-              </div>
-            )}
-
-            {/* 高さの寸法線（手前の面と平行に、扉のうしろへ置く） */}
-            {showDims && (
-              <div style={{
-                position: 'absolute', left: conX + conW + px(600), top: conY, height: conH,
-                transform: `translateZ(${conD / 2}px)`,
-              }}>
-                <DimLine horizontal={false} length={conH} label={mmLabel(spec.heightMm)}
-                  thickness={dimT} font={dimFont} place="after" mirror={dimMirror} />
-              </div>
-            )}
           </div>
         </div>
       </div>

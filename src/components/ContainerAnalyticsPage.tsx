@@ -144,7 +144,6 @@ function ContainerTruckDistribution({ items, completedIds, data, onOpen }: {
           data={data}
           compact
           showLegend={false}
-          showDims={false}
           intro
         />
         <div style={{
