@@ -1450,3 +1450,10 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .gdrive-sheet { animation-duration: 0.01s; }
 }
+
+/* コンテナ積載状況の立体図を全画面で出している間は、後ろの画面の動きを止める。
+   全画面の層は body 直下（ポータル）に出しているので、それ以外の兄弟が対象。
+   図は不透明で全面を覆うので描画は省かれるが、アニメーションは止めないと動き続けるため */
+body.load3d-open > *:not(.load3d-layer) * {
+  animation-play-state: paused !important;
+}

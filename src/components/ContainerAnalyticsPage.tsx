@@ -112,11 +112,13 @@ function ProgressRing({ done, total, color }: { done: number; total: number; col
 }
 
 /* ===== コンテナトラック + 種類分布 ===== */
-function ContainerTruckDistribution({ items, completedIds, data, onOpen }: {
+function ContainerTruckDistribution({ items, completedIds, data, onOpen, hideFigure }: {
   items: ContainerItem[];
   completedIds: Set<string>;
   data: LoadFigureData;
   onOpen: () => void;
+  /** 全画面表示を開いている間は、裏で同じ図を描かない（重くなるため） */
+  hideFigure: boolean;
 }) {
   const types = ['ポリカバー', 'ジャーポット', '箱', '部品', '鍋', 'ヤーマン部品', 'その他'] as const;
   const counts: Record<string, { total: number; done: number }> = {};
@@ -138,14 +140,18 @@ function ContainerTruckDistribution({ items, completedIds, data, onOpen }: {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpen(); }}
         style={{ cursor: 'pointer', position: 'relative', outline: 'none' }}
       >
-        <ContainerLoadFigure
-          items={items}
-          completedIds={completedIds}
-          data={data}
-          compact
-          showLegend={false}
-          intro
-        />
+        {hideFigure ? (
+          <div style={{ height: 150 }} />
+        ) : (
+          <ContainerLoadFigure
+            items={items}
+            completedIds={completedIds}
+            data={data}
+            compact
+            showLegend={false}
+            intro
+          />
+        )}
         <div style={{
           position: 'absolute', right: 0, bottom: 2,
           fontSize: 10, color: 'rgba(255,255,255,0.35)', pointerEvents: 'none',
@@ -381,6 +387,7 @@ export default function ContainerAnalyticsPage({
             completedIds={completedIds}
             data={figure}
             onOpen={() => setFullscreen(true)}
+            hideFigure={fullscreen}
           />
         </div>
 

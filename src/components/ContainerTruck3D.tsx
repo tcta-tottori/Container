@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CONTAINER_SPECS, ContainerTypeKey } from '@/lib/containerLoad';
 
 /**
@@ -36,6 +36,18 @@ interface ContainerTruck3DProps {
   rotateY?: number;
   /** 出てくるときのアニメーション（中身が伸びて現れる） */
   intro?: boolean;
+  /**
+   * 回転を React を通さずに当てるための取っ手。
+   * ここに入る setAngles を毎フレーム呼べば、描き直しなしで transform だけを
+   * 書き換えるので、指の動きに追いつく速さで回せる。
+   */
+  controllerRef?: React.MutableRefObject<TruckViewController | null>;
+}
+
+/** 回転を直接当てるための取っ手 */
+export interface TruckViewController {
+  /** 見る角度を当てる（React の描き直しは起きない） */
+  setAngles(rotX: number, rotY: number): void;
 }
 
 /* ===== トラックの各部の実寸(mm) ===== */
@@ -120,7 +132,7 @@ function Box3D({ x, y, z = 0, w, h, d, styles, faces, hide, extraTransform, wrap
 }
 
 /* ===== タイヤ（何枚かの板を輪にして円筒に見せる） ===== */
-function Wheel3D({ cx, cy, z, r, tw, segs = 12 }: {
+function Wheel3D({ cx, cy, z, r, tw, segs = 8 }: {
   cx: number; cy: number; z: number; r: number; tw: number; segs?: number;
 }) {
   // トレッドの1枚。円周方向の長さ = 2πr/segs、軸方向の幅 = タイヤ幅
@@ -166,12 +178,73 @@ function Wheel3D({ cx, cy, z, r, tw, segs = 12 }: {
 
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
+/**
+ * 色に明るさを掛けた色を返す。
+ * CSS の filter: brightness() は面ごとに別の描画面を作らせてしまい、
+ * 回している間ずっと描き直しが起きるので、色そのものを先に作っておく。
+ */
+function shade(color: string, mul: number): string {
+  const m = color.match(/^#([0-9a-f]{6})$/i);
+  if (!m) return color;
+  const n = parseInt(m[1], 16);
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(v * mul)));
+  return `rgb(${ch((n >> 16) & 255)},${ch((n >> 8) & 255)},${ch(n & 255)})`;
+}
+
+/** ぎりぎりに詰めすぎないための余裕 */
+const MARGIN = 1.02;
+/** 遠近の強さ（模型の横幅に対する視点までの距離） */
+const PERSPECTIVE_RATIO = 2.6;
+
+interface Geometry { modelW: number; modelH: number; modelD: number; stageW: number; stageH: number }
+
+/**
+ * その角度で模型が画面上どれだけの幅・高さになるかを、
+ * 箱の8つの角を実際に投影して求める。
+ * 遠近法で手前の端がふくらむぶんも入るので、横向きにしても枠からはみ出さない。
+ */
+function projectSize(g: Geometry, rotY: number, rotX: number) {
+  const cb = Math.cos(rad(rotY)), sb = Math.sin(rad(rotY));
+  const ca = Math.cos(rad(rotX)), sa = Math.sin(rad(rotX));
+  const d = g.modelW * PERSPECTIVE_RATIO;
+  let maxX = 0, maxY = 0;
+  for (const hx of [-g.modelW / 2, g.modelW / 2]) {
+    for (const hy of [-g.modelH / 2, g.modelH / 2]) {
+      for (const hz of [-g.modelD / 2, g.modelD / 2]) {
+        // CSS の rotateX(rotX) rotateY(rotY) と同じ順で回す
+        const x1 = hx * cb + hz * sb;
+        const z1 = -hx * sb + hz * cb;
+        const y2 = hy * ca - z1 * sa;
+        const z2 = hy * sa + z1 * ca;
+        // 遠近法（手前ほど大きく）。視点に近づきすぎたときは頭打ちにする
+        const k = d / Math.max(d - z2, d * 0.25);
+        maxX = Math.max(maxX, Math.abs(x1 * k));
+        maxY = Math.max(maxY, Math.abs(y2 * k));
+      }
+    }
+  }
+  return { w: maxX * 2, h: maxY * 2 };
+}
+
+/** 枠に収まる倍率 */
+function fitScale(g: Geometry, rotY: number, rotX: number): number {
+  const p = projectSize(g, rotY, rotX);
+  return Math.min(g.stageW / (p.w * MARGIN), g.stageH / (p.h * MARGIN));
+}
+
 export default function ContainerTruck3D({
   containerType, segments, width, aspect,
   rotateX = DEFAULT_ROT_X, rotateY = DEFAULT_ROT_Y,
-  intro = false,
+  intro = false, controllerRef,
 }: ContainerTruck3DProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  /** 倍率をかけている入れ物と、回している入れ物。transform を直接書き換える */
+  const scaleElRef = useRef<HTMLDivElement | null>(null);
+  const sceneElRef = useRef<HTMLDivElement | null>(null);
+  /** 模型の寸法。setAngles から読む */
+  const geomRef = useRef<Geometry>({ modelW: 0, modelH: 0, modelD: 0, stageW: 0, stageH: 0 });
+  /** 直接当てている角度。描き直しのあとに当て直すために覚えておく */
+  const liveAnglesRef = useRef<{ x: number; y: number } | null>(null);
   const [autoW, setAutoW] = useState(width || 320);
   const [revealed, setRevealed] = useState(!intro);
 
@@ -194,6 +267,28 @@ export default function ContainerTruck3D({
     return () => clearTimeout(t);
   }, [intro, containerType]);
 
+  /* 回転を直接当てる取っ手を親に渡す */
+  const applyAngles = useCallback((rx: number, ry: number) => {
+    liveAnglesRef.current = { x: rx, y: ry };
+    const g = geomRef.current;
+    if (g.stageW <= 0 || g.stageH <= 0) return;
+    const f = fitScale(g, ry, rx);
+    if (scaleElRef.current) scaleElRef.current.style.transform = `scale(${f})`;
+    if (sceneElRef.current) sceneElRef.current.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
+  }, []);
+
+  useEffect(() => {
+    if (!controllerRef) return;
+    controllerRef.current = { setAngles: applyAngles };
+    return () => { controllerRef.current = null; };
+  }, [controllerRef, applyAngles]);
+
+  // 描き直しが入ると props の角度に戻ってしまうので、直接当てていた角度をかけ直す
+  useEffect(() => {
+    const a = liveAnglesRef.current;
+    if (a) applyAngles(a.x, a.y);
+  });
+
   const spec = CONTAINER_SPECS[containerType] || CONTAINER_SPECS['40HQ'];
   const px = (v: number) => v * MM2PX;
 
@@ -205,27 +300,18 @@ export default function ContainerTruck3D({
   const modelD = px(spec.widthMm);
 
   /* ===== いまの角度での見かけの大きさから、枠に収まる倍率を出す ===== */
-  // 回した角度での見かけの幅・高さ
-  const proj = (rotY: number, rotX: number) => {
-    const cy = Math.abs(Math.cos(rad(rotY)));
-    const sy = Math.abs(Math.sin(rad(rotY)));
-    const cx = Math.abs(Math.cos(rad(rotX)));
-    const sx = Math.abs(Math.sin(rad(rotX)));
-    return {
-      w: modelW * cy + modelD * sy,
-      h: modelH * cx + modelW * sy * sx + modelD * cy * sx,
-    };
-  };
-  const { w: projW, h: projH } = proj(rotateY, rotateX);
   // 高さの指定がなければ、はじめの角度での形にあわせる。
   // 20ft のような短いコンテナでも枠の横幅いっぱいに描ける。
   // 回している間に枠の高さが変わらないよう、既定の角度で決め打ちする
-  const base = proj(DEFAULT_ROT_Y, DEFAULT_ROT_X);
+  const sizeOnly: Geometry = { modelW, modelH, modelD, stageW: autoW, stageH: 0 };
+  const base = projectSize(sizeOnly, DEFAULT_ROT_Y, DEFAULT_ROT_X);
   const autoAspect = Math.min(0.9, Math.max(0.3, base.h / base.w));
   const stageH = autoW * (aspect ?? autoAspect);
-  // 遠近法で手前がふくらむぶんの余裕
-  const MARGIN = 1.06;
-  const fit = Math.min(autoW / (projW * MARGIN), stageH / (projH * MARGIN));
+  const geom: Geometry = { modelW, modelH, modelD, stageW: autoW, stageH };
+  geomRef.current = geom;
+  const fit = fitScale(geom, rotateY, rotateX);
+  // 線の太さは倍率が変わるたびに変えると描き直しになるので、既定の角度で決める
+  const baseFit = fitScale(geom, DEFAULT_ROT_Y, DEFAULT_ROT_X);
 
   /* ===== 各部の位置(px) ===== */
   const groundY = modelH - px(PAD_BOTTOM_MM);
@@ -255,7 +341,7 @@ export default function ContainerTruck3D({
   ];
 
   const ribPitch = Math.max(3, px(305));
-  const lineW = Math.max(0.5, 0.7 / Math.max(fit, 0.05));
+  const lineW = Math.max(0.5, 0.7 / Math.max(baseFit, 0.05));
 
   /* ===== 積んだぶんの塊 ===== */
   const wall = px(70);
@@ -270,25 +356,27 @@ export default function ContainerTruck3D({
   // 100% を超えたぶんは描けないので、描く幅だけ縮める
   const shrink = loadRatio > 0 ? drawRatio / loadRatio : 0;
 
-  const cargoFace = (color: string, dim: boolean, bright: number): React.CSSProperties => ({
-    background: `
-      repeating-linear-gradient(90deg, rgba(0,0,0,0.16) 0 0.5px, transparent 0.5px ${Math.max(5, px(360))}px),
-      repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 0.5px, transparent 0.5px ${Math.max(5, px(360))}px),
-      ${color}`,
-    filter: `brightness(${bright})`,
+  // 格子は大きく見える面（手前・奥・天面）だけに入れる。
+  // グラデーションは描くのに手間がかかるので、細い面は無地にする
+  const gridPitch = Math.max(5, px(360));
+  const cargoGrid = `
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.16) 0 0.5px, transparent 0.5px ${gridPitch}px),
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 0.5px, transparent 0.5px ${gridPitch}px),`;
+  const cargoFace = (color: string, dim: boolean, bright: number, grid: boolean): React.CSSProperties => ({
+    background: `${grid ? cargoGrid : ''} ${shade(color, bright)}`,
     opacity: dim ? 0.3 : 1,
     border: `0.5px solid rgba(255,255,255,${dim ? 0.1 : 0.25})`,
     backfaceVisibility: 'hidden',
   });
 
   const cargoStyles = (color: string, dim: boolean): FaceStyles => ({
-    base: cargoFace(color, dim, 1),
-    front: cargoFace(color, dim, 1),
-    top: cargoFace(color, dim, 1.3),
-    back: cargoFace(color, dim, 0.62),
-    bottom: cargoFace(color, dim, 0.45),
-    left: cargoFace(color, dim, 0.82),
-    right: cargoFace(color, dim, 0.95),
+    base: cargoFace(color, dim, 1, false),
+    front: cargoFace(color, dim, 1, true),
+    top: cargoFace(color, dim, 1.3, true),
+    back: cargoFace(color, dim, 0.62, true),
+    bottom: cargoFace(color, dim, 0.45, false),
+    left: cargoFace(color, dim, 0.82, false),
+    right: cargoFace(color, dim, 0.95, false),
   });
 
   const growStyle: React.CSSProperties = {
@@ -309,6 +397,7 @@ export default function ContainerTruck3D({
         <Box3D key={`${seg.key}-rest`} x={innerX + cum} y={innerY}
           w={restW} h={innerH} d={innerD}
           styles={cargoStyles(seg.color, false)}
+          hide={['bottom']}
           extraTransform={`scaleX(${revealed ? 1 : 0.001})`}
           wrapStyle={growStyle}
         />
@@ -319,6 +408,7 @@ export default function ContainerTruck3D({
         <Box3D key={`${seg.key}-done`} x={innerX + cum + restW} y={innerY}
           w={doneW} h={innerH} d={innerD}
           styles={cargoStyles(seg.color, true)}
+          hide={['bottom']}
           extraTransform={`scaleX(${revealed ? 1 : 0.001})`}
           wrapStyle={growStyle}
         />
@@ -328,11 +418,9 @@ export default function ContainerTruck3D({
   }
 
   /* ===== コンテナ（透ける箱） ===== */
-  const glassFace = (alpha: number): React.CSSProperties => ({
-    background: `
-      repeating-linear-gradient(90deg, rgba(255,255,255,0.10) 0 ${lineW}px, transparent ${lineW}px ${ribPitch}px),
-      repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0 ${lineW}px, transparent ${lineW}px ${ribPitch * 1.8}px),
-      rgba(186,202,225,${alpha})`,
+  const glassRib = `repeating-linear-gradient(90deg, rgba(255,255,255,0.10) 0 ${lineW}px, transparent ${lineW}px ${ribPitch}px),`;
+  const glassFace = (alpha: number, rib = true): React.CSSProperties => ({
+    background: `${rib ? glassRib : ''} rgba(186,202,225,${alpha})`,
     border: `${lineW * 1.4}px solid rgba(255,255,255,0.55)`,
     backfaceVisibility: 'visible',
   });
@@ -342,17 +430,19 @@ export default function ContainerTruck3D({
       <div style={{
         position: 'relative', width: '100%', height: stageH, overflow: 'visible',
       }}>
-        <div style={{
+        <div ref={scaleElRef} style={{
           position: 'absolute', left: '50%', top: '50%',
           width: modelW, height: modelH, marginLeft: -modelW / 2, marginTop: -modelH / 2,
           transform: `scale(${fit})`,
-          perspective: `${modelW * 2.6}px`,
+          perspective: `${modelW * PERSPECTIVE_RATIO}px`,
+          willChange: 'transform',
         }}>
-          <div style={{
+          <div ref={sceneElRef} style={{
             position: 'absolute', inset: 0,
             transformStyle: 'preserve-3d',
             transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
             transformOrigin: '50% 50%',
+            willChange: 'transform',
           }}>
             {/* 地面の影 */}
             <div style={{
@@ -366,6 +456,7 @@ export default function ContainerTruck3D({
             {/* シャーシ */}
             <Box3D x={cabX + px(500)} y={chassisY}
               w={conX + conW - cabX - px(500)} h={chassisH} d={conD * 0.6}
+              hide={['bottom']}
               styles={{
                 base: { background: '#20232b', border: '0.5px solid rgba(255,255,255,0.07)' },
                 top: { background: '#2c3039' },
@@ -378,6 +469,7 @@ export default function ContainerTruck3D({
               <React.Fragment key={`axle-${i}`}>
                 <Box3D x={ax - px(160)} y={axleY - px(120)}
                   w={px(320)} h={px(240)} d={conD * 0.86}
+                  hide={['bottom', 'left', 'right']}
                   styles={{ base: { background: '#191c22' }, top: { background: '#23262e' } }} />
                 <Wheel3D cx={ax} cy={axleY} z={conD / 2 - tireW / 2} r={tireR} tw={tireW} />
                 <Wheel3D cx={ax} cy={axleY} z={-conD / 2 + tireW / 2} r={tireR} tw={tireW} />
@@ -386,6 +478,7 @@ export default function ContainerTruck3D({
 
             {/* キャビン */}
             <Box3D x={cabX} y={cabTopY} w={cabW} h={cabH} d={conD * 0.94}
+              hide={['bottom']}
               styles={{
                 base: { background: '#1f222a', border: '0.5px solid rgba(255,255,255,0.10)' },
                 front: { background: 'linear-gradient(180deg,#2f333d 0%,#1e2128 60%,#171a20 100%)' },
@@ -444,10 +537,10 @@ export default function ContainerTruck3D({
               styles={{
                 base: glassFace(0.05),
                 top: glassFace(0.04),
-                bottom: { ...glassFace(0.05), background: 'rgba(120,132,150,0.2)' },
+                bottom: { ...glassFace(0.05, false), background: 'rgba(120,132,150,0.2)' },
                 back: glassFace(0.035),
-                right: glassFace(0.09),
-                left: glassFace(0.07),
+                right: glassFace(0.09, false),
+                left: glassFace(0.07, false),
               }}
             />
 

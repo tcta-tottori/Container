@@ -83,7 +83,6 @@ export function LoadStatCard({ summary, compact }: { summary: LoadSummary; compa
       border: '1px solid rgba(255,255,255,0.12)',
       borderRadius: compact ? 10 : 14,
       padding: compact ? '8px 12px' : '12px 18px',
-      backdropFilter: 'blur(8px)',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: compact ? 14 : 22 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
