@@ -61,7 +61,7 @@ const AUTO_FS_SPIN_EASE_SEC = 1.8;
 const AUTO_FS_SWIPE_DEG = 180;
 /** 既定の見る角度 */
 const FS_ROT_Y0 = -35;
-/** 部品の品目で、その場のパレット図に流す積み方アニメーションの速さ */
+/** その場のパレット図に流す積み方アニメーションの速さ（どの種類でも流す） */
 const INLINE_STACK_SPEED = 2;
 
 interface ItemDetailPanelProps {
@@ -1016,8 +1016,8 @@ export default function ItemDetailPanel({
               <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
                 onClick={(e) => { e.stopPropagation(); setFullscreenPallet('full'); }}>
                 <PalletDiagram palletCount={displayPallets} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false}
-                  /* 部品は全画面にしなくても、その場で積み方が分かるように流す */
-                  stackAnim={item.type === '部品'} stackSpeed={INLINE_STACK_SPEED} />
+                  /* 全画面にしなくても、その場で積み方が分かるように流す */
+                  stackAnim stackSpeed={INLINE_STACK_SPEED} />
               </div>
             )}
             {inspectionDeducted > 0 && (
