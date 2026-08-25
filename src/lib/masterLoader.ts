@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { ContainerItem, ItemType } from './types';
-import { detectItemType } from './typeDetector';
+import { detectItemType, isPartLikeName } from './typeDetector';
 import { getStoredToken } from './githubSave';
 
 const REPO_OWNER = 'tcta-tottori';
@@ -435,9 +435,14 @@ export function linkItemsWithMaster(
     if (master.cbm !== undefined) updated.cbm = master.cbm;
     if (master.measurements) updated.measurements = master.measurements;
 
-    // 種類をマスタから反映（マスタのD列が正）
+    // 種類はマスタのD列を正とする。
+    // ただし、コンテナ日程の品名が明らかに品物の名前になっているとき
+    // （例: ｶﾝｾｲｿﾄﾌﾞﾀｶﾊﾞｰ(KK)）は部品として扱う。
+    // マスタは機種名（SR-JW057(KK)）で登録されていて、種類が実態と合わないことがあるため
     if (master.type) {
-      updated.type = master.type;
+      const looksLikePart =
+        (master.type === 'ポリカバー' || master.type === 'ジャーポット') && isPartLikeName(item.itemName);
+      updated.type = looksLikePart ? '部品' : master.type;
     }
     // 品名をマスタから補完（AQSS等で中国語名の場合にマスタの品名で上書き）
     if (master.itemName && /[\u4e00-\u9fff]/.test(updated.itemName) && !/ポリカバー|ジャーポット/.test(updated.itemName)) {

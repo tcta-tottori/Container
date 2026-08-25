@@ -19,11 +19,35 @@ import { ItemType } from './types';
 const KATAKANA = /[\u30A0-\u30FF\uFF66-\uFF9F]/g;
 /** 漢字 */
 const KANJI = /[\u4E00-\u9FFF]/g;
-/** 種類そのものを指す言葉。カタカナ判定の前に取り除く */
-const TYPE_WORDS = [
-  'ポリカバー', 'ﾎﾟﾘｶﾊﾞｰ', 'ポリカバ', 'ﾎﾟﾘｶﾊﾞ', 'ポリカ', 'ﾎﾟﾘｶ',
-  'ジャーポット', 'ｼﾞｬｰﾎﾟｯﾄ', 'カバー', 'ｶﾊﾞｰ',
+/**
+ * 品名のなかで「自分はポリカバー／ジャーポットだ」と名乗っている言葉。
+ * コンテナ日程では品名が途中で切れていることがあるので、短いかたちも入れる。
+ */
+const SELF_DECLARING_WORDS = [
+  'ポリカバー', 'ﾎﾟﾘｶﾊﾞｰ', 'ポリカバ', 'ﾎﾟﾘｶﾊﾞ', 'ポリカ', 'ﾎﾟﾘｶ', 'ポリ', 'ﾎﾟﾘ',
+  'ジャーポット', 'ｼﾞｬｰﾎﾟｯﾄ',
 ];
+/** 種類を絞り込めない一般的な言葉。カタカナを数える前に取り除くだけ */
+const GENERIC_WORDS = ['カバー', 'ｶﾊﾞｰ'];
+
+/**
+ * 品名が「品物の名前」になっているか（＝機種名だけではないか）を見る。
+ *
+ * 機種名のあとや代わりに品物の名前が書いてあれば、それは本体ではなく部品。
+ *   例) JPV-Lレバーメッキ / JRICﾎｳﾈﾂｲﾀC / ｶﾝｾｲｿﾄﾌﾞﾀｶﾊﾞｰ(KK) / SR-VSX180绝缘胶片
+ * ただし品名じたいが「ポリカバー」と名乗っていれば、それは本体とみなす。
+ */
+export function isPartLikeName(itemName: string): boolean {
+  const name = (itemName || '').trim();
+  if (!name) return false;
+  // 自分でポリカバー／ジャーポットと名乗っているものは本体
+  if (SELF_DECLARING_WORDS.some((w) => name.includes(w))) return false;
+  let rest = name;
+  for (const w of GENERIC_WORDS) rest = rest.split(w).join('');
+  const kata = rest.match(KATAKANA)?.length ?? 0;
+  const kanji = rest.match(KANJI)?.length ?? 0;
+  return kata >= 2 || kanji >= 2;
+}
 
 /**
  * ルール① 気高コードの並びで判定
@@ -84,17 +108,8 @@ export function detectTypeByItemName(itemName: string): ItemType {
   // ジャーポット: PDR*, PDU*, PVW*, PDZ*, WMS* で始まる
   else if (/^(PDR|PDU|PVW|PDZ|WMS)/.test(name)) type = 'ジャーポット';
 
-  if (type) {
-    // 機種名のあとに品物の名前が続いていたら、それは本体ではなく部品。
-    //   例) JPV-Lレバーメッキ / JRICﾎｳﾈﾂｲﾀC / SR-VSX180绝缘胶片
-    // 「ポリカバー」のように種類そのものを指す言葉は数えない
-    let rest = name;
-    for (const w of TYPE_WORDS) rest = rest.split(w).join('');
-    const kata = rest.match(KATAKANA)?.length ?? 0;
-    const kanji = rest.match(KANJI)?.length ?? 0;
-    if (kata >= 2 || kanji >= 2) return '部品';
-    return type;
-  }
+  // 機種名のあとに品物の名前が続いていたら、それは本体ではなく部品
+  if (type) return isPartLikeName(name) ? '部品' : type;
 
   // それ以外 → 部品
   return '部品';
