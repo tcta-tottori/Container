@@ -73,16 +73,6 @@ const CAB_TOP_MM = 3450;
 const CAB_GAP_MM = 350;
 /** 図の左右の余白 */
 const PAD_X_MM = 400;
-/** 扉側の余白。満載のとき人が扉の外に立つので広めに取る */
-const PAD_RIGHT_MM = 1500;
-/** 立っている人の背丈 */
-const PERSON_H_MM = 1700;
-/** 荷物の境目から人までの間隔。満載のときはこのぶんだけ扉の外に立つ */
-const PERSON_GAP_MM = 800;
-/** 人が立つ位置（コンテナの手前側へどれだけ出るか） */
-const PERSON_Z_MM = 700;
-/** これだけ空けば、人はコンテナの中に入って立つ */
-const PERSON_SPACE_MM = 900;
 /** 図の上下の余白 */
 const PAD_TOP_MM = 300;
 const PAD_BOTTOM_MM = 250;
@@ -195,16 +185,6 @@ function Wheel3D({ cx, cy, z, r, tw, segs = 8 }: {
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /**
- * その角度でコンテナの「手前側」がどれだけこちらを向いているか 0〜1。
- * 人は板1枚なので、裏に回るとトラックに隠れてしまう。
- * 手前側と奥側の2人を用意しておいて、これで入れ替える（境目では重なって溶ける）。
- */
-function faceMix(rotY: number): number {
-  const c = Math.cos(rad(rotY));
-  return Math.min(1, Math.max(0, (c + 0.18) / 0.36));
-}
-
-/**
  * 色に明るさを掛けた色を返す。
  * CSS の filter: brightness() は面ごとに別の描画面を作らせてしまい、
  * 回している間ずっと描き直しが起きるので、色そのものを先に作っておく。
@@ -267,9 +247,6 @@ export default function ContainerTruck3D({
   /** 倍率をかけている入れ物と、回している入れ物。transform を直接書き換える */
   const scaleElRef = useRef<HTMLDivElement | null>(null);
   const sceneElRef = useRef<HTMLDivElement | null>(null);
-  /** 人の絵（手前側・奥側の2つ）。どの角度でも正面を向くように、毎フレーム逆向きに回す */
-  const personFrontRef = useRef<HTMLDivElement | null>(null);
-  const personBackRef = useRef<HTMLDivElement | null>(null);
 
   /** 模型の寸法。setAngles から読む */
   const geomRef = useRef<Geometry>({ modelW: 0, modelH: 0, modelD: 0, stageW: 0, stageH: 0 });
@@ -305,16 +282,6 @@ export default function ContainerTruck3D({
     const f = fitScale(g, ry, rx);
     if (scaleElRef.current) scaleElRef.current.style.transform = `scale(${f})`;
     if (sceneElRef.current) sceneElRef.current.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
-    // 人は板1枚なので、場面の回転をそのまま打ち消してこちらを向かせる。
-    // 裏側に回ったときはトラックに隠れてしまうので、手前側の人と入れ替える
-    const bb = `rotateY(${-ry}deg) rotateX(${-rx}deg)`;
-    const mix = faceMix(ry);
-    for (const [el, o] of [[personFrontRef.current, mix], [personBackRef.current, 1 - mix]] as const) {
-      if (!el) continue;
-      el.style.opacity = String(o);
-      const art = el.firstElementChild as HTMLElement | null;
-      if (art) art.style.transform = bb;
-    }
   }, []);
 
   useEffect(() => {
@@ -333,7 +300,7 @@ export default function ContainerTruck3D({
   const px = (v: number) => v * MM2PX;
 
   /* ===== 模型の大きさ（固定倍率） ===== */
-  const modelWmm = PAD_X_MM + CAB_LEN_MM + CAB_GAP_MM + spec.lengthMm + PAD_RIGHT_MM;
+  const modelWmm = PAD_X_MM + CAB_LEN_MM + CAB_GAP_MM + spec.lengthMm + PAD_X_MM;
   const modelHmm = PAD_TOP_MM + Math.max(CAB_TOP_MM, FLOOR_MM + spec.heightMm) + PAD_BOTTOM_MM;
   const modelW = px(modelWmm);
   const modelH = px(modelHmm);
@@ -390,8 +357,6 @@ export default function ContainerTruck3D({
   const innerW = conW - wall * 2;
   const innerH = conH - wall * 2;
   const innerD = conD - wall * 2;
-  /** 荷物の奥行き。壁との間に少し隙間を作り、人が入れるようにする */
-  const cargoD = innerD - px(360);
 
   // 積んだ量は高さで表す。長さ方向はいっぱいまで使う
   const fill = Math.min(1, Math.max(0, fillRatio));
@@ -433,8 +398,6 @@ export default function ContainerTruck3D({
   };
 
   const cargoBoxes: React.ReactNode[] = [];
-  // 積んである荷物と、降ろし終えた空きとの境目(px)。人はここに立つ
-  let boundaryX = cargoH > 0 ? innerX + innerW : innerX;
   if (cargoH > 0) {
     // 最低限の長さを配ったうえで、残りを量に応じて割り振る
     const shares = segments.map((seg) => Math.max(0, seg.ratio) / ratioSum);
@@ -453,7 +416,7 @@ export default function ContainerTruck3D({
     const box = (seg: TruckSegment, x: number, w: number, dim: boolean) => (
       <Box3D key={`${seg.key}-${dim ? 'done' : 'rest'}`}
         x={x} y={dim ? cargoY + cargoH - doneH : cargoY}
-        w={w} h={dim ? doneH : cargoH} d={cargoD}
+        w={w} h={dim ? doneH : cargoH} d={innerD}
         styles={cargoStyles(seg.color, dim)}
         hide={['bottom']}
         extraTransform={`scaleX(${revealed ? 1 : 0.001})`}
@@ -466,164 +429,11 @@ export default function ContainerTruck3D({
       if (p.restW > 0.3) cargoBoxes.push(box(p.seg, innerX + cum, p.restW, false));
       cum += p.restW;
     }
-    boundaryX = innerX + cum;
     for (const p of parts) {
       if (p.doneW > 0.3) cargoBoxes.push(box(p.seg, innerX + cum, p.doneW, true));
       cum += p.doneW;
     }
   }
-
-  /* ===== 立っている人 =====
-     荷降ろしは扉側（右）から進むので、まだ積んである荷物との境目も右から左へ動く。
-     人はその境目のすぐ手前に立つ。満載のときは境目が扉なので、扉の外に立つことになる。 */
-  const personH = px(PERSON_H_MM);
-  const personW = personH * 0.3;
-  /** 扉から境目までの空き。ここに立てるだけの広さがあれば中に入る */
-  const emptyMm = ((innerX + innerW) - boundaryX) / MM2PX;
-  const personInside = emptyMm >= PERSON_SPACE_MM;
-  // 中では床の上、外では地面の上に立つ
-  const personX = personInside
-    ? Math.min(boundaryX + px(550), innerX + innerW - px(450))
-    : boundaryX + px(PERSON_GAP_MM);
-  const personY = (personInside ? innerY + innerH : groundY) - personH;
-  // 中に入ったときは荷物と壁の隙間に立つ。荷物の面より手前でないと隠れてしまう
-  const personZ = personInside ? conD / 2 - px(40) : conD / 2 + px(PERSON_Z_MM);
-  /** 影の大きさ */
-  const shadowR = personW * 0.62;
-  const personMove = 'transform 0.9s cubic-bezier(0.22,1,0.36,1)';
-
-  /**
-   * 人の絵。板1枚に SVG で描く。色は付けず、コンテナと同じ透けたガラスの立ち姿にする。
-   *
-   * 平べったく見えないように、部位ごとに塗り分けて丸みを出している。
-   *   - 腕・脚・首は円柱の塗り（手前の縁が明るく、少し内側に光の筋、反対側が陰、端に照り返し）
-   *   - 胴は左上からの光で、胸が明るく脇が陰、輪郭に照り返し
-   *   - 頭は球の塗り。あごの下と胸元に落ちる影も入れる
-   * 塗りは部位ごとの箱に合わせて掛かるので、左右の手足でも光の向きがそろう。
-   * 割合は実物どおり（頭＝身長の1/8、肩幅＝身長の0.19、指先はももの中ほど、脚＝身長の半分）。
-   * まとめて opacity を掛けるので、腕と胴が重なっても色が濃くならない。
-   */
-  const personArt = (
-    <svg viewBox="0 0 120 400" width="100%" height="100%"
-      preserveAspectRatio="xMidYMax meet" style={{ display: 'block' }}>
-      <defs>
-        {/* 胴。胸が明るく、脇に陰、輪郭に照り返し */}
-        <linearGradient id="cnsPsTorso" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#e8f3ff" />
-          <stop offset="0.09" stopColor="#8fb0cd" />
-          <stop offset="0.34" stopColor="#f6fcff" />
-          <stop offset="0.62" stopColor="#7794b1" />
-          <stop offset="0.88" stopColor="#6f8da9" />
-          <stop offset="1" stopColor="#dbeaf9" />
-        </linearGradient>
-        {/* 腕・脚・首（円柱） */}
-        <linearGradient id="cnsPsLimb" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#dcecfb" />
-          <stop offset="0.16" stopColor="#83a2bf" />
-          <stop offset="0.42" stopColor="#f4fbff" />
-          <stop offset="0.74" stopColor="#6d8ba9" />
-          <stop offset="1" stopColor="#cfe3f6" />
-        </linearGradient>
-        {/* 足（上から見るので、縦に光を回す） */}
-        <linearGradient id="cnsPsFoot" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0" stopColor="#eaf4ff" />
-          <stop offset="0.55" stopColor="#8aa8c5" />
-          <stop offset="1" stopColor="#5f7d9b" />
-        </linearGradient>
-        {/* 影。ふちに向かって消えるので、境目が出ない */}
-        <radialGradient id="cnsPsShade" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#12283c" stopOpacity="0.42" />
-          <stop offset="0.55" stopColor="#12283c" stopOpacity="0.22" />
-          <stop offset="1" stopColor="#12283c" stopOpacity="0" />
-        </radialGradient>
-        {/* 頭（球） */}
-        <radialGradient id="cnsPsHead" cx="0.33" cy="0.26" r="0.86">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.34" stopColor="#d3e3f2" />
-          <stop offset="0.76" stopColor="#7893b0" />
-          <stop offset="1" stopColor="#dcebfa" />
-        </radialGradient>
-      </defs>
-
-      <g stroke="rgba(255,255,255,0.62)" strokeWidth="1.8" strokeLinejoin="round"
-        strokeLinecap="round" opacity="0.62">
-        {/* 脚 */}
-        <path fill="url(#cnsPsLimb)" d="M32 204 C32 222 34 240 36 258 C38 276 39 292 39 306
-          C40 326 39 346 38 362 C37 376 37 384 37 390 L52 390 C53 376 54 360 55 344
-          C56 320 57 296 57 272 C57 248 58 226 58 204 Z" />
-        <path fill="url(#cnsPsLimb)" d="M88 204 C88 222 86 240 84 258 C82 276 81 292 81 306
-          C80 326 81 346 82 362 C83 376 83 384 83 390 L68 390 C67 376 66 360 65 344
-          C64 320 63 296 63 272 C63 248 62 226 62 204 Z" />
-        {/* 足 */}
-        <path fill="url(#cnsPsFoot)" d="M37 384 C36 391 32 395 27 396 C24 397 24 400 27 400
-          L52 400 C54 400 55 397 54 392 L53 384 Z" />
-        <path fill="url(#cnsPsFoot)" d="M83 384 C84 391 88 395 93 396 C96 397 96 400 93 400
-          L68 400 C66 400 65 397 66 392 L67 384 Z" />
-        {/* 首 */}
-        <path fill="url(#cnsPsLimb)" d="M51 40 C51 50 50 55 47 60 L73 60 C70 55 69 50 69 40 Z" />
-        {/* 胴 */}
-        <path fill="url(#cnsPsTorso)" d="M49 58 C40 60 30 65 24 76 C22 88 24 100 26 112
-          C29 128 34 140 35 152 C36 164 33 176 32 188 C31 196 32 202 34 207
-          C45 212 75 212 86 207 C88 202 89 196 88 188 C87 176 84 164 85 152
-          C86 140 91 128 94 112 C96 100 98 88 96 76 C90 65 80 60 71 58 Z" />
-        {/* 胸元に落ちるあごの影 */}
-        <ellipse fill="url(#cnsPsShade)" stroke="none" cx="60" cy="66" rx="17" ry="11" />
-        {/* 胸の中心の稜線（丸みを出す） */}
-        <path fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5"
-          d="M60 80 C61 106 61 134 60 160 C59 176 58 190 58 202" />
-        {/* 頭 */}
-        <ellipse fill="url(#cnsPsHead)" cx="60" cy="24" rx="17" ry="25" />
-        {/* あごの下の影 */}
-        <ellipse fill="url(#cnsPsShade)" stroke="none" cx="60" cy="46" rx="12" ry="6" />
-        {/* 腕（胴より手前。脇に影を落とす） */}
-        <ellipse fill="url(#cnsPsShade)" stroke="none" cx="36" cy="132" rx="10" ry="58" />
-        <ellipse fill="url(#cnsPsShade)" stroke="none" cx="84" cy="132" rx="10" ry="58" />
-        <path fill="url(#cnsPsLimb)" d="M25 74 C18 82 15 94 15 106 C14 122 15 138 16 152
-          C17 168 19 184 21 200 C22 214 24 228 25 240 C26 250 34 250 35 240
-          C35 228 34 214 33 200 C31 184 29 168 28 152 C27 138 27 122 29 106
-          C30 94 33 82 37 74 Z" />
-        <path fill="url(#cnsPsLimb)" d="M95 74 C102 82 105 94 105 106 C106 122 105 138 104 152
-          C103 168 101 184 99 200 C98 214 96 228 95 240 C94 250 86 250 85 240
-          C85 228 86 214 87 200 C89 184 91 168 92 152 C93 138 93 122 91 106
-          C90 94 87 82 83 74 Z" />
-      </g>
-    </svg>
-  );
-
-  const personMix = faceMix(rotateY);
-  // トラックや荷物の裏に隠れないよう、手前側と奥側に1人ずつ置いて
-  // こちらを向いている側だけを見せる（境目では溶け合う）
-  const personZs = [personZ, -personZ];
-  const personSides = personZs.map((z, i) => (
-    <div key={`person-${i}`}
-      ref={i === 0 ? personFrontRef : personBackRef}
-      style={{
-        position: 'absolute', left: 0, top: 0, width: personW, height: personH,
-        transformStyle: 'preserve-3d',
-        transform: `translate3d(${personX - personW / 2}px, ${personY}px, ${z}px)`,
-        transition: personMove,
-        opacity: i === 0 ? personMix : 1 - personMix,
-        pointerEvents: 'none',
-      }}>
-      <div style={{
-        position: 'absolute', inset: 0,
-        transform: `rotateY(${-rotateY}deg) rotateX(${-rotateX}deg)`,
-        transformOrigin: '50% 100%',
-      }}>
-        {personArt}
-      </div>
-      {/* 足元の影（地面に立っているときだけ） */}
-      {!personInside && (
-        <div style={{
-          position: 'absolute',
-          left: personW / 2 - shadowR, top: personH - shadowR * 0.6,
-          width: shadowR * 2, height: shadowR * 1.2,
-          transform: 'rotateX(90deg)',
-          background: 'radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.35), rgba(0,0,0,0) 70%)',
-        }} />
-      )}
-    </div>
-  ));
 
   /* ===== コンテナ（透ける箱） ===== */
   const glassRib = `repeating-linear-gradient(90deg, rgba(255,255,255,0.10) 0 ${lineW}px, transparent ${lineW}px ${ribPitch}px),`;
@@ -751,10 +561,6 @@ export default function ContainerTruck3D({
                 left: glassFace(0.07, false),
               }}
             />
-
-            {/* 立っている人（大きさの目安。荷物の境目にあわせて動く）。
-                手前側と奥側に1人ずつ置いて、こちらを向いている側だけを見せる */}
-            {personSides}
 
             {/* コンテナの角柱（骨組みを目立たせる） */}
             {[conX, conX + conW - px(100)].map((bx, i) => (
