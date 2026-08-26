@@ -73,14 +73,6 @@ const CAB_TOP_MM = 3450;
 const CAB_GAP_MM = 350;
 /** 図の左右の余白 */
 const PAD_X_MM = 400;
-/** 扉側の余白。満載のとき人が扉の外に立つので広めに取る */
-const PAD_RIGHT_MM = 1500;
-/** 立っている人の背丈 */
-const PERSON_H_MM = 1700;
-/** 荷物の境目から人までの間隔。満載のときはこのぶんだけ扉の外に立つ */
-const PERSON_GAP_MM = 800;
-/** 人が立つ位置（コンテナの手前側へどれだけ出るか） */
-const PERSON_Z_MM = 700;
 /** 図の上下の余白 */
 const PAD_TOP_MM = 300;
 const PAD_BOTTOM_MM = 250;
@@ -193,16 +185,6 @@ function Wheel3D({ cx, cy, z, r, tw, segs = 8 }: {
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /**
- * その角度でコンテナの「手前側」がどれだけこちらを向いているか 0〜1。
- * 人は板1枚なので、裏に回るとトラックに隠れてしまう。
- * 手前側と奥側の2人を用意しておいて、これで入れ替える（境目では重なって溶ける）。
- */
-function faceMix(rotY: number): number {
-  const c = Math.cos(rad(rotY));
-  return Math.min(1, Math.max(0, (c + 0.18) / 0.36));
-}
-
-/**
  * 色に明るさを掛けた色を返す。
  * CSS の filter: brightness() は面ごとに別の描画面を作らせてしまい、
  * 回している間ずっと描き直しが起きるので、色そのものを先に作っておく。
@@ -265,9 +247,7 @@ export default function ContainerTruck3D({
   /** 倍率をかけている入れ物と、回している入れ物。transform を直接書き換える */
   const scaleElRef = useRef<HTMLDivElement | null>(null);
   const sceneElRef = useRef<HTMLDivElement | null>(null);
-  /** 人の絵（手前側・奥側の2つ）。どの角度でも正面を向くように、毎フレーム逆向きに回す */
-  const personFrontRef = useRef<HTMLDivElement | null>(null);
-  const personBackRef = useRef<HTMLDivElement | null>(null);
+
   /** 模型の寸法。setAngles から読む */
   const geomRef = useRef<Geometry>({ modelW: 0, modelH: 0, modelD: 0, stageW: 0, stageH: 0 });
   /** 直接当てている角度。描き直しのあとに当て直すために覚えておく */
@@ -302,16 +282,6 @@ export default function ContainerTruck3D({
     const f = fitScale(g, ry, rx);
     if (scaleElRef.current) scaleElRef.current.style.transform = `scale(${f})`;
     if (sceneElRef.current) sceneElRef.current.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`;
-    // 人は板1枚なので、場面の回転をそのまま打ち消してこちらを向かせる。
-    // 裏側に回ったときはトラックに隠れてしまうので、手前側の人と入れ替える
-    const bb = `rotateY(${-ry}deg) rotateX(${-rx}deg)`;
-    const mix = faceMix(ry);
-    for (const [el, o] of [[personFrontRef.current, mix], [personBackRef.current, 1 - mix]] as const) {
-      if (!el) continue;
-      el.style.opacity = String(o);
-      const art = el.firstElementChild as HTMLElement | null;
-      if (art) art.style.transform = bb;
-    }
   }, []);
 
   useEffect(() => {
@@ -330,7 +300,7 @@ export default function ContainerTruck3D({
   const px = (v: number) => v * MM2PX;
 
   /* ===== 模型の大きさ（固定倍率） ===== */
-  const modelWmm = PAD_X_MM + CAB_LEN_MM + CAB_GAP_MM + spec.lengthMm + PAD_RIGHT_MM;
+  const modelWmm = PAD_X_MM + CAB_LEN_MM + CAB_GAP_MM + spec.lengthMm + PAD_X_MM;
   const modelHmm = PAD_TOP_MM + Math.max(CAB_TOP_MM, FLOOR_MM + spec.heightMm) + PAD_BOTTOM_MM;
   const modelW = px(modelWmm);
   const modelH = px(modelHmm);
@@ -428,8 +398,6 @@ export default function ContainerTruck3D({
   };
 
   const cargoBoxes: React.ReactNode[] = [];
-  // 積んである荷物と、降ろし終えた空きとの境目(px)。人はここに立つ
-  let boundaryX = innerX + innerW;
   if (cargoH > 0) {
     // 最低限の長さを配ったうえで、残りを量に応じて割り振る
     const shares = segments.map((seg) => Math.max(0, seg.ratio) / ratioSum);
@@ -442,9 +410,13 @@ export default function ContainerTruck3D({
 
     // 扉（右）から降ろしていくので、まだ残っているぶんを鼻側にまとめ、
     // 終わったぶんを扉側にまとめる。こうすると境目が1本になり、人の立ち位置と合う
+    // 降ろし終えたぶんは低く敷くだけにする。上が空くので、
+    // どこまで降ろせたかが見えたまま、人が入れる空間ができる
+    const doneH = Math.min(cargoH, Math.max(px(250), cargoH * 0.2));
     const box = (seg: TruckSegment, x: number, w: number, dim: boolean) => (
-      <Box3D key={`${seg.key}-${dim ? 'done' : 'rest'}`} x={x} y={cargoY}
-        w={w} h={cargoH} d={innerD}
+      <Box3D key={`${seg.key}-${dim ? 'done' : 'rest'}`}
+        x={x} y={dim ? cargoY + cargoH - doneH : cargoY}
+        w={w} h={dim ? doneH : cargoH} d={innerD}
         styles={cargoStyles(seg.color, dim)}
         hide={['bottom']}
         extraTransform={`scaleX(${revealed ? 1 : 0.001})`}
@@ -457,98 +429,11 @@ export default function ContainerTruck3D({
       if (p.restW > 0.3) cargoBoxes.push(box(p.seg, innerX + cum, p.restW, false));
       cum += p.restW;
     }
-    boundaryX = innerX + cum;
     for (const p of parts) {
       if (p.doneW > 0.3) cargoBoxes.push(box(p.seg, innerX + cum, p.doneW, true));
       cum += p.doneW;
     }
   }
-
-  /* ===== 立っている人 =====
-     荷降ろしは扉側（右）から進むので、まだ積んである荷物との境目も右から左へ動く。
-     人はその境目のすぐ手前に立つ。満載のときは境目が扉なので、扉の外に立つことになる。 */
-  const personH = px(PERSON_H_MM);
-  const personW = personH * 0.36;
-  const personX = boundaryX + px(PERSON_GAP_MM);
-  const personY = groundY - personH;
-  const personZ = conD / 2 + px(PERSON_Z_MM);
-  /** 影の大きさ */
-  const shadowR = personW * 0.62;
-  const personMove = 'transform 0.9s cubic-bezier(0.22,1,0.36,1)';
-
-  /** 人の絵（板1枚に描く）。細かくしても小さくて見えないので形だけ */
-  const personArt = (
-    <>
-      {/* ヘルメット */}
-      <div style={{
-        position: 'absolute', left: '25%', top: 0, width: '50%', height: '10%',
-        background: '#fbbf24', borderRadius: '50% 50% 35% 35%',
-      }} />
-      {/* 顔 */}
-      <div style={{
-        position: 'absolute', left: '31%', top: '8.5%', width: '38%', height: '8%',
-        background: '#e8c39e', borderRadius: '32%',
-      }} />
-      {/* 上半身（作業着） */}
-      <div style={{
-        position: 'absolute', left: '20%', top: '16%', width: '60%', height: '30%',
-        background: '#38bdf8', borderRadius: '28% 28% 14% 14%',
-      }} />
-      {/* 反射ベルト */}
-      <div style={{
-        position: 'absolute', left: '20%', top: '31%', width: '60%', height: '5%',
-        background: '#fde047',
-      }} />
-      {/* 腕 */}
-      <div style={{
-        position: 'absolute', left: '9%', top: '17%', width: '13%', height: '28%',
-        background: '#0ea5e9', borderRadius: '40%',
-      }} />
-      <div style={{
-        position: 'absolute', right: '9%', top: '17%', width: '13%', height: '28%',
-        background: '#0ea5e9', borderRadius: '40%',
-      }} />
-      {/* 脚 */}
-      <div style={{
-        position: 'absolute', left: '24%', top: '45%', width: '22%', height: '55%',
-        background: '#1e293b', borderRadius: '18% 18% 30% 30%',
-      }} />
-      <div style={{
-        position: 'absolute', right: '24%', top: '45%', width: '22%', height: '55%',
-        background: '#1e293b', borderRadius: '18% 18% 30% 30%',
-      }} />
-    </>
-  );
-
-  const personMix = faceMix(rotateY);
-  const personSides = ([1, -1] as const).map((side) => (
-    <div key={`person-${side}`}
-      ref={side === 1 ? personFrontRef : personBackRef}
-      style={{
-        position: 'absolute', left: 0, top: 0, width: personW, height: personH,
-        transformStyle: 'preserve-3d',
-        transform: `translate3d(${personX - personW / 2}px, ${personY}px, ${side * personZ}px)`,
-        transition: personMove,
-        opacity: side === 1 ? personMix : 1 - personMix,
-        pointerEvents: 'none',
-      }}>
-      <div style={{
-        position: 'absolute', inset: 0,
-        transform: `rotateY(${-rotateY}deg) rotateX(${-rotateX}deg)`,
-        transformOrigin: '50% 100%',
-      }}>
-        {personArt}
-      </div>
-      {/* 足元の影 */}
-      <div style={{
-        position: 'absolute',
-        left: personW / 2 - shadowR, top: personH - shadowR * 0.6,
-        width: shadowR * 2, height: shadowR * 1.2,
-        transform: 'rotateX(90deg)',
-        background: 'radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.5), rgba(0,0,0,0) 70%)',
-      }} />
-    </div>
-  ));
 
   /* ===== コンテナ（透ける箱） ===== */
   const glassRib = `repeating-linear-gradient(90deg, rgba(255,255,255,0.10) 0 ${lineW}px, transparent ${lineW}px ${ribPitch}px),`;
@@ -676,10 +561,6 @@ export default function ContainerTruck3D({
                 left: glassFace(0.07, false),
               }}
             />
-
-            {/* 立っている人（大きさの目安。荷物の境目にあわせて動く）。
-                手前側と奥側に1人ずつ置いて、こちらを向いている側だけを見せる */}
-            {personSides}
 
             {/* コンテナの角柱（骨組みを目立たせる） */}
             {[conX, conX + conW - px(100)].map((bx, i) => (
