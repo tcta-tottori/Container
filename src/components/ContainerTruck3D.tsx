@@ -477,7 +477,7 @@ export default function ContainerTruck3D({
      荷降ろしは扉側（右）から進むので、まだ積んである荷物との境目も右から左へ動く。
      人はその境目のすぐ手前に立つ。満載のときは境目が扉なので、扉の外に立つことになる。 */
   const personH = px(PERSON_H_MM);
-  const personW = personH * 0.36;
+  const personW = personH * 0.3;
   /** 扉から境目までの空き。ここに立てるだけの広さがあれば中に入る */
   const emptyMm = ((innerX + innerW) - boundaryX) / MM2PX;
   const personInside = emptyMm >= PERSON_SPACE_MM;
@@ -492,51 +492,65 @@ export default function ContainerTruck3D({
   const shadowR = personW * 0.62;
   const personMove = 'transform 0.9s cubic-bezier(0.22,1,0.36,1)';
 
-  /** 人の絵（板1枚に描く）。色は付けず、コンテナと同じ透けたガラスのように見せる */
-  const glass = (bright: number): React.CSSProperties => ({
-    background: `linear-gradient(118deg,
-      rgba(232,244,255,${0.5 * bright}) 0%,
-      rgba(150,186,222,${0.14 * bright}) 46%,
-      rgba(214,234,255,${0.4 * bright}) 100%)`,
-    border: `${lineW}px solid rgba(255,255,255,${0.55 * bright})`,
-  });
-
-  const personArt = (
+  /**
+   * 人の絵。板1枚に SVG で描く。色は付けず、コンテナと同じ透けたガラスのように見せる。
+   * 頭は身長の1/8、肩幅は身長の0.19、指先はももの中ほど…と人の割合に合わせてあるので、
+   * 小さく描いても人に見える。片側の手足を描いて、もう片方は左右反転で置く。
+   * まとめて opacity を掛けるので、腕と胴が重なっても色が濃くならない。
+   */
+  const LIMBS = (
     <>
-      {/* 頭 */}
-      <div style={{
-        position: 'absolute', left: '30%', top: 0, width: '40%', height: '12%',
-        borderRadius: '46% 46% 40% 40%', ...glass(1.1),
-      }} />
-      {/* 首 */}
-      <div style={{
-        position: 'absolute', left: '43%', top: '11%', width: '14%', height: '5%',
-        ...glass(0.9),
-      }} />
-      {/* 上半身 */}
-      <div style={{
-        position: 'absolute', left: '21%', top: '15%', width: '58%', height: '31%',
-        borderRadius: '30% 30% 16% 16%', ...glass(1),
-      }} />
-      {/* 腕 */}
-      <div style={{
-        position: 'absolute', left: '9%', top: '17%', width: '13%', height: '29%',
-        borderRadius: '40%', ...glass(0.85),
-      }} />
-      <div style={{
-        position: 'absolute', right: '9%', top: '17%', width: '13%', height: '29%',
-        borderRadius: '40%', ...glass(0.85),
-      }} />
-      {/* 脚 */}
-      <div style={{
-        position: 'absolute', left: '24%', top: '45%', width: '22%', height: '55%',
-        borderRadius: '18% 18% 32% 32%', ...glass(0.95),
-      }} />
-      <div style={{
-        position: 'absolute', right: '24%', top: '45%', width: '22%', height: '55%',
-        borderRadius: '18% 18% 32% 32%', ...glass(0.95),
-      }} />
+      {/* 腕（肩の丸み → 二の腕 → ひじ → 前腕 → 手）。指先はももの中ほどまで */}
+      <path d="M25 74 C18 82 15 94 15 106 C14 122 15 138 16 152
+               C17 168 19 184 21 200 C22 214 24 228 25 240
+               C26 250 34 250 35 240 C35 228 34 214 33 200
+               C31 184 29 168 28 152 C27 138 27 122 29 106
+               C30 94 33 82 37 74 Z" />
+      {/* 脚（もも → ひざ → ふくらはぎ → 足首） */}
+      <path d="M32 204 C32 222 34 240 36 258 C38 276 39 292 39 306
+               C40 326 39 346 38 362 C37 376 37 384 37 390
+               L52 390 C53 376 54 360 55 344 C56 320 57 296 57 272
+               C57 248 58 226 58 204 Z" />
+      {/* 足 */}
+      <path d="M37 384 C36 391 32 395 27 396 C24 397 24 400 27 400
+               L52 400 C54 400 55 397 54 392 L53 384 Z" />
     </>
+  );
+
+  /**
+   * 人の絵。板1枚に SVG で描く。
+   * 色は付けず、コンテナと同じ透けたガラスのように見せる。
+   * 頭は身長の1/8、肩幅は身長の0.19、腕を入れた幅は0.23…と
+   * 人の割合に合わせてあるので、小さく描いても人に見える。
+   * まとめて opacity を掛けるので、腕と胴が重なっても色が濃くならない。
+   */
+  const personArt = (
+    <svg viewBox="0 0 120 400" width="100%" height="100%"
+      preserveAspectRatio="xMidYMax meet" style={{ display: 'block' }}>
+      <defs>
+        <linearGradient id="cnsPersonGlass" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#f4faff" />
+          <stop offset="46%" stopColor="#8fb0cf" />
+          <stop offset="100%" stopColor="#dcebff" />
+        </linearGradient>
+      </defs>
+      <g fill="url(#cnsPersonGlass)" stroke="rgba(255,255,255,0.75)" strokeWidth="2.2"
+        strokeLinejoin="round" strokeLinecap="round" opacity="0.52">
+        {/* 頭 */}
+        <ellipse cx="60" cy="24" rx="17" ry="25" />
+        {/* 首から肩へ */}
+        <path d="M51 40 C51 50 50 55 47 60 L73 60 C70 55 69 50 69 40 Z" />
+        {/* 胴（肩 → 胸 → 腰 → 尻） */}
+        <path d="M49 58 C40 60 30 65 24 76 C22 88 24 100 26 112
+                 C29 128 34 140 35 152 C36 164 33 176 32 188
+                 C31 196 32 202 34 207 C45 212 75 212 86 207
+                 C88 202 89 196 88 188 C87 176 84 164 85 152
+                 C86 140 91 128 94 112 C96 100 98 88 96 76
+                 C90 65 80 60 71 58 Z" />
+        {LIMBS}
+        <g transform="translate(120,0) scale(-1,1)">{LIMBS}</g>
+      </g>
+    </svg>
   );
 
   const personMix = faceMix(rotateY);
