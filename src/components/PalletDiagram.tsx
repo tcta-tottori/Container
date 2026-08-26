@@ -713,8 +713,9 @@ function getBoxDimsCm(measurements?: string, itemName?: string): [number, number
   return [55, 38, 38];
 }
 
-function isJPIType(itemName?: string): boolean {
-  return !!itemName && /JPI[+\-]?[A-Z]/.test(itemName.replace(/\s/g, ''));
+/** 名前から「1段7個」で積む機種か見る（JPI・JPD のポリカバー） */
+function isLayer7Name(itemName?: string): boolean {
+  return !!itemName && /JP[ID][+\-]?[A-Z]/.test(itemName.replace(/\s/g, ''));
 }
 
 /** PDU が付くジャーポット（2箱シュリンクで1玉の積み方）。PDZ など他の機種は従来どおり */
@@ -733,7 +734,11 @@ export default function PalletDiagram({
 
   const [bwCm, bdCm, bhCm] = getBoxDimsCm(measurements, itemName);
   const isNabe = type === '鍋';
-  const isJPI = isJPIType(itemName);
+  let layers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements) || 3;
+  // 1段7個で積む種類。JPI・JPD は名前で、それ以外のポリカバーも
+  // 「1パレット＝7×段数」（例: 35個で5段）なら7個積みとみなす
+  const isJPI = isLayer7Name(itemName)
+    || (type === 'ポリカバー' && qtyPerPallet > 0 && qtyPerPallet === layers * 7);
   const isJarPot = type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName || '');
   const isPdu = isJarPot && isPduJarPot(itemName);
   // PDU は2箱で1玉のため、図に描く1個 = 2ケース
@@ -766,8 +771,6 @@ export default function PalletDiagram({
   const pw = palletWcm * cm2px; // = VISUAL_PX
   const pd = palletDcm * cm2px;
   const bh = bhCm * cm2px;
-
-  let layers = calculateStackLayers(type, itemName || '', qtyPerPallet, measurements) || 3;
 
   // Build slots
   let allSlots: BoxSlot[];
