@@ -8,6 +8,7 @@ import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDe
 import { buildJapanesePartName } from '@/lib/partTranslations';
 import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
 import { displayQuantities } from '@/lib/itemQuantity';
+import { buildVolumeWeights } from '@/lib/containerLoad';
 import { usePalletTap } from '@/hooks/usePalletTap';
 import { useCountUp } from '@/hooks/useCountUp';
 import PalletDiagram from './PalletDiagram';
@@ -500,8 +501,12 @@ export default function ItemDetailPanel({
     return 1;
   };
 
+  /** 品目ごとの物量（体積）。進捗の割合はこれで数える */
+  const volumeWeights = buildVolumeWeights(allItems);
+  const weightOf = (it: ContainerItem): number => volumeWeights.get(it.id) ?? 1;
+
   const typeCounts = new Map<string, number>();
-  /** 種類ごとの「残っている品目数」。パレットを減らすと小数で減る */
+  /** 種類ごとの「残っている物量」。パレットを減らすとそのぶんだけ減る */
   const typeRemaining = new Map<string, number>();
   // 鍋コンテナ: サイズ別に分離（100→180の順で表示）
   if (isNabeContainer) {
@@ -516,13 +521,15 @@ export default function ItemDetailPanel({
       key = is180 ? '鍋180' : '鍋100';
     }
     typeCounts.set(key, (typeCounts.get(key) || 0) + 1);
-    typeRemaining.set(key, (typeRemaining.get(key) || 0) + remainingRatioOf(it));
+    typeRemaining.set(key, (typeRemaining.get(key) || 0) + weightOf(it) * remainingRatioOf(it));
   }
   // 0件のエントリを除去
   typeCounts.forEach((v, k) => { if (v === 0) typeCounts.delete(k); });
 
-  /** 残っている品目数の合計（小数）。進捗率とゲージの長さはこれで決める */
-  const remainingTotal = allItems.reduce((sum, it) => sum + remainingRatioOf(it), 0);
+  /** 残っている物量の合計。進捗率とゲージの長さはこれで決める */
+  const remainingTotal = allItems.reduce((sum, it) => sum + weightOf(it) * remainingRatioOf(it), 0);
+  /** 全部の物量。0 で割らないように最低 1 */
+  const weightTotal = allItems.reduce((sum, it) => sum + weightOf(it), 0) || 1;
 
   // リスト行の背景色（メニューカラーと統一・ダーク系）
   const TYPE_ROW_BG: Record<string, string> = {
@@ -895,7 +902,7 @@ export default function ItemDetailPanel({
                 const tc = nabeBarColor ? { accent: nabeBarColor } : (COLOR_MAP[typeKey as keyof typeof COLOR_MAP] || COLOR_MAP['その他']);
                 // 完了だけでなく、パレットを減らしたぶんも縮める
                 const remainingOfType = typeRemaining.get(typeKey) || 0;
-                const pct = (remainingOfType / allItems.length) * 100;
+                const pct = (remainingOfType / weightTotal) * 100;
                 return pct > 0 ? (
                   <div key={typeKey} style={{
                     width: `${pct}%`, height: '100%',
@@ -931,7 +938,7 @@ export default function ItemDetailPanel({
               color: '#fff', letterSpacing: 0.5,
               textShadow: '0 0 10px rgba(255,255,255,0.8), 0 0 20px rgba(255,255,255,0.4), 0 0 40px rgba(255,255,255,0.2)',
             }}>
-              {Math.round(Math.max(0, Math.min(1, 1 - remainingTotal / allItems.length)) * 100)}%
+              {Math.round(Math.max(0, Math.min(1, 1 - remainingTotal / weightTotal)) * 100)}%
             </span>
           </div>
         )}

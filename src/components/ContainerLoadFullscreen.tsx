@@ -16,12 +16,9 @@ import ContainerTruck3D, { TruckViewController } from './ContainerTruck3D';
  * 図の transform を直接書き換える（描き直しが起きないので指に追いつく）。
  */
 
-/** はじめの見る角度 */
+/** はじめの見る角度。パレット図と同じで、見下ろす角度は変えない */
 const ROT_Y0 = 30;
 const ROT_X0 = -20;
-/** 見下ろす角度の限界 */
-const ROT_X_MIN = -75;
-const ROT_X_MAX = 12;
 /** 触っていない間はゆっくり回る（度/秒） */
 const AUTO_SPIN_DPS = 8;
 /** 触るのをやめてから自動回転に戻るまで(ms) */
@@ -30,7 +27,6 @@ const AUTO_SPIN_DELAY_MS = 1600;
 const CHROME_PX = 176;
 /** スワイプの効き。画面の横幅いっぱいで約1回転 */
 const SWIPE_DEG_PER_PX = 0.5;
-const TILT_DEG_PER_PX = 0.3;
 
 interface Props {
   items: ContainerItem[];
@@ -65,7 +61,7 @@ export default function ContainerLoadFullscreen({ items, completedIds, container
   /** いま当てている角度 */
   const angleRef = useRef({ x: ROT_X0, y: ROT_Y0 });
   /** 指を下ろした位置と、そのときの角度 */
-  const dragRef = useRef<{ x: number; y: number; rotX: number; rotY: number; moved: boolean } | null>(null);
+  const dragRef = useRef<{ x: number; y: number; rotY: number; moved: boolean } | null>(null);
   /** まだ角度に反映していない指の位置 */
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
   /** 最後に触った時刻。これを過ぎると自動回転を再開する */
@@ -104,9 +100,10 @@ export default function ContainerLoadFullscreen({ items, completedIds, container
       const drag = dragRef.current;
       const pointer = pointerRef.current;
       if (drag && pointer) {
+        // パレット図と同じく、横方向（水平回転）だけを動かす
         angleRef.current = {
           y: drag.rotY + (pointer.x - drag.x) * SWIPE_DEG_PER_PX,
-          x: Math.max(ROT_X_MIN, Math.min(ROT_X_MAX, drag.rotX + (pointer.y - drag.y) * TILT_DEG_PER_PX)),
+          x: ROT_X0,
         };
       } else if (now - lastActRef.current > AUTO_SPIN_DELAY_MS) {
         angleRef.current = { x: angleRef.current.x, y: angleRef.current.y + AUTO_SPIN_DPS * dt };
@@ -119,7 +116,7 @@ export default function ContainerLoadFullscreen({ items, completedIds, container
   }, []);
 
   const start = useCallback((x: number, y: number) => {
-    dragRef.current = { x, y, rotX: angleRef.current.x, rotY: angleRef.current.y, moved: false };
+    dragRef.current = { x, y, rotY: angleRef.current.y, moved: false };
     pointerRef.current = { x, y };
     lastActRef.current = performance.now();
   }, []);
@@ -207,7 +204,7 @@ export default function ContainerLoadFullscreen({ items, completedIds, container
       }}>
         <LoadLegend stats={stats} summary={summary} compact />
         <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>
-          スワイプで回転（上下で見下ろす角度）／タップで閉じる
+          スワイプで回転／タップで閉じる
         </span>
       </div>
     </div>,

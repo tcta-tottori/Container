@@ -98,6 +98,38 @@ export function itemWeightKg(item: ContainerItem): number {
 }
 
 /**
+ * 品目ごとの「物量」の重み。進捗の割合をこれで出す。
+ *
+ * 品目数で割ると、3,080個の品目も40個の品目も同じ1件になってしまい、
+ * 小さい品目を1つ終えただけで進捗が半分になる。実際に降ろす量で数えるために、
+ *   1) 寸法が分かるもの … 体積(m³)
+ *   2) 分からないもの   … 同じコンテナの1ケースあたり平均体積 × ケース数
+ *   3) どれも分からない … ケース数（無ければ 1）
+ * の順で重みを決める。
+ */
+export function buildVolumeWeights(items: ContainerItem[]): Map<string, number> {
+  let sizedCbm = 0;
+  let sizedCartons = 0;
+  for (const it of items) {
+    const cbm = itemCbm(it);
+    if (cbm > 0) {
+      sizedCbm += cbm;
+      sizedCartons += cartonCount(it);
+    }
+  }
+  const avgCartonCbm = sizedCartons > 0 ? sizedCbm / sizedCartons : 0;
+
+  const map = new Map<string, number>();
+  for (const it of items) {
+    const cbm = itemCbm(it);
+    if (cbm > 0) { map.set(it.id, cbm); continue; }
+    const cartons = Math.max(1, cartonCount(it));
+    map.set(it.id, avgCartonCbm > 0 ? cartons * avgCartonCbm : cartons);
+  }
+  return map;
+}
+
+/**
  * 積んだ量からコンテナの種類を推定する。
  * 隙間があるので内容積いっぱいには積めない前提（STUFFING_RATE）で、
  * 収まる一番小さいコンテナを選ぶ。
