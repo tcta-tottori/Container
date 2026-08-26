@@ -81,6 +81,8 @@ const PERSON_H_MM = 1700;
 const PERSON_GAP_MM = 800;
 /** 人が立つ位置（コンテナの手前側へどれだけ出るか） */
 const PERSON_Z_MM = 700;
+/** これだけ空けば、人はコンテナの中に入って立つ */
+const PERSON_SPACE_MM = 900;
 /** 図の上下の余白 */
 const PAD_TOP_MM = 300;
 const PAD_BOTTOM_MM = 250;
@@ -268,6 +270,7 @@ export default function ContainerTruck3D({
   /** 人の絵（手前側・奥側の2つ）。どの角度でも正面を向くように、毎フレーム逆向きに回す */
   const personFrontRef = useRef<HTMLDivElement | null>(null);
   const personBackRef = useRef<HTMLDivElement | null>(null);
+
   /** 模型の寸法。setAngles から読む */
   const geomRef = useRef<Geometry>({ modelW: 0, modelH: 0, modelD: 0, stageW: 0, stageH: 0 });
   /** 直接当てている角度。描き直しのあとに当て直すために覚えておく */
@@ -387,6 +390,8 @@ export default function ContainerTruck3D({
   const innerW = conW - wall * 2;
   const innerH = conH - wall * 2;
   const innerD = conD - wall * 2;
+  /** 荷物の奥行き。壁との間に少し隙間を作り、人が入れるようにする */
+  const cargoD = innerD - px(360);
 
   // 積んだ量は高さで表す。長さ方向はいっぱいまで使う
   const fill = Math.min(1, Math.max(0, fillRatio));
@@ -429,7 +434,7 @@ export default function ContainerTruck3D({
 
   const cargoBoxes: React.ReactNode[] = [];
   // 積んである荷物と、降ろし終えた空きとの境目(px)。人はここに立つ
-  let boundaryX = innerX + innerW;
+  let boundaryX = cargoH > 0 ? innerX + innerW : innerX;
   if (cargoH > 0) {
     // 最低限の長さを配ったうえで、残りを量に応じて割り振る
     const shares = segments.map((seg) => Math.max(0, seg.ratio) / ratioSum);
@@ -442,9 +447,13 @@ export default function ContainerTruck3D({
 
     // 扉（右）から降ろしていくので、まだ残っているぶんを鼻側にまとめ、
     // 終わったぶんを扉側にまとめる。こうすると境目が1本になり、人の立ち位置と合う
+    // 降ろし終えたぶんは低く敷くだけにする。上が空くので、
+    // どこまで降ろせたかが見えたまま、人が入れる空間ができる
+    const doneH = Math.min(cargoH, Math.max(px(250), cargoH * 0.2));
     const box = (seg: TruckSegment, x: number, w: number, dim: boolean) => (
-      <Box3D key={`${seg.key}-${dim ? 'done' : 'rest'}`} x={x} y={cargoY}
-        w={w} h={cargoH} d={innerD}
+      <Box3D key={`${seg.key}-${dim ? 'done' : 'rest'}`}
+        x={x} y={dim ? cargoY + cargoH - doneH : cargoY}
+        w={w} h={dim ? doneH : cargoH} d={cargoD}
         styles={cargoStyles(seg.color, dim)}
         hide={['bottom']}
         extraTransform={`scaleX(${revealed ? 1 : 0.001})`}
@@ -469,67 +478,80 @@ export default function ContainerTruck3D({
      人はその境目のすぐ手前に立つ。満載のときは境目が扉なので、扉の外に立つことになる。 */
   const personH = px(PERSON_H_MM);
   const personW = personH * 0.36;
-  const personX = boundaryX + px(PERSON_GAP_MM);
-  const personY = groundY - personH;
-  const personZ = conD / 2 + px(PERSON_Z_MM);
+  /** 扉から境目までの空き。ここに立てるだけの広さがあれば中に入る */
+  const emptyMm = ((innerX + innerW) - boundaryX) / MM2PX;
+  const personInside = emptyMm >= PERSON_SPACE_MM;
+  // 中では床の上、外では地面の上に立つ
+  const personX = personInside
+    ? Math.min(boundaryX + px(550), innerX + innerW - px(450))
+    : boundaryX + px(PERSON_GAP_MM);
+  const personY = (personInside ? innerY + innerH : groundY) - personH;
+  // 中に入ったときは荷物と壁の隙間に立つ。荷物の面より手前でないと隠れてしまう
+  const personZ = personInside ? conD / 2 - px(40) : conD / 2 + px(PERSON_Z_MM);
   /** 影の大きさ */
   const shadowR = personW * 0.62;
   const personMove = 'transform 0.9s cubic-bezier(0.22,1,0.36,1)';
 
-  /** 人の絵（板1枚に描く）。細かくしても小さくて見えないので形だけ */
+  /** 人の絵（板1枚に描く）。色は付けず、コンテナと同じ透けたガラスのように見せる */
+  const glass = (bright: number): React.CSSProperties => ({
+    background: `linear-gradient(118deg,
+      rgba(232,244,255,${0.5 * bright}) 0%,
+      rgba(150,186,222,${0.14 * bright}) 46%,
+      rgba(214,234,255,${0.4 * bright}) 100%)`,
+    border: `${lineW}px solid rgba(255,255,255,${0.55 * bright})`,
+  });
+
   const personArt = (
     <>
-      {/* ヘルメット */}
+      {/* 頭 */}
       <div style={{
-        position: 'absolute', left: '25%', top: 0, width: '50%', height: '10%',
-        background: '#fbbf24', borderRadius: '50% 50% 35% 35%',
+        position: 'absolute', left: '30%', top: 0, width: '40%', height: '12%',
+        borderRadius: '46% 46% 40% 40%', ...glass(1.1),
       }} />
-      {/* 顔 */}
+      {/* 首 */}
       <div style={{
-        position: 'absolute', left: '31%', top: '8.5%', width: '38%', height: '8%',
-        background: '#e8c39e', borderRadius: '32%',
+        position: 'absolute', left: '43%', top: '11%', width: '14%', height: '5%',
+        ...glass(0.9),
       }} />
-      {/* 上半身（作業着） */}
+      {/* 上半身 */}
       <div style={{
-        position: 'absolute', left: '20%', top: '16%', width: '60%', height: '30%',
-        background: '#38bdf8', borderRadius: '28% 28% 14% 14%',
-      }} />
-      {/* 反射ベルト */}
-      <div style={{
-        position: 'absolute', left: '20%', top: '31%', width: '60%', height: '5%',
-        background: '#fde047',
+        position: 'absolute', left: '21%', top: '15%', width: '58%', height: '31%',
+        borderRadius: '30% 30% 16% 16%', ...glass(1),
       }} />
       {/* 腕 */}
       <div style={{
-        position: 'absolute', left: '9%', top: '17%', width: '13%', height: '28%',
-        background: '#0ea5e9', borderRadius: '40%',
+        position: 'absolute', left: '9%', top: '17%', width: '13%', height: '29%',
+        borderRadius: '40%', ...glass(0.85),
       }} />
       <div style={{
-        position: 'absolute', right: '9%', top: '17%', width: '13%', height: '28%',
-        background: '#0ea5e9', borderRadius: '40%',
+        position: 'absolute', right: '9%', top: '17%', width: '13%', height: '29%',
+        borderRadius: '40%', ...glass(0.85),
       }} />
       {/* 脚 */}
       <div style={{
         position: 'absolute', left: '24%', top: '45%', width: '22%', height: '55%',
-        background: '#1e293b', borderRadius: '18% 18% 30% 30%',
+        borderRadius: '18% 18% 32% 32%', ...glass(0.95),
       }} />
       <div style={{
         position: 'absolute', right: '24%', top: '45%', width: '22%', height: '55%',
-        background: '#1e293b', borderRadius: '18% 18% 30% 30%',
+        borderRadius: '18% 18% 32% 32%', ...glass(0.95),
       }} />
     </>
   );
 
   const personMix = faceMix(rotateY);
-  const personSides = ([1, -1] as const).map((side) => (
-    <div key={`person-${side}`}
-      ref={side === 1 ? personFrontRef : personBackRef}
+  // トラックや荷物の裏に隠れないよう、手前側と奥側に1人ずつ置いて
+  // こちらを向いている側だけを見せる（境目では溶け合う）
+  const personZs = [personZ, -personZ];
+  const personSides = personZs.map((z, i) => (
+    <div key={`person-${i}`}
+      ref={i === 0 ? personFrontRef : personBackRef}
       style={{
         position: 'absolute', left: 0, top: 0, width: personW, height: personH,
         transformStyle: 'preserve-3d',
-        transform: `translate3d(${personX - personW / 2}px, ${personY}px, ${side * personZ}px)`,
+        transform: `translate3d(${personX - personW / 2}px, ${personY}px, ${z}px)`,
         transition: personMove,
-        opacity: side === 1 ? personMix : 1 - personMix,
+        opacity: i === 0 ? personMix : 1 - personMix,
         pointerEvents: 'none',
       }}>
       <div style={{
@@ -539,14 +561,16 @@ export default function ContainerTruck3D({
       }}>
         {personArt}
       </div>
-      {/* 足元の影 */}
-      <div style={{
-        position: 'absolute',
-        left: personW / 2 - shadowR, top: personH - shadowR * 0.6,
-        width: shadowR * 2, height: shadowR * 1.2,
-        transform: 'rotateX(90deg)',
-        background: 'radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.5), rgba(0,0,0,0) 70%)',
-      }} />
+      {/* 足元の影（地面に立っているときだけ） */}
+      {!personInside && (
+        <div style={{
+          position: 'absolute',
+          left: personW / 2 - shadowR, top: personH - shadowR * 0.6,
+          width: shadowR * 2, height: shadowR * 1.2,
+          transform: 'rotateX(90deg)',
+          background: 'radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.35), rgba(0,0,0,0) 70%)',
+        }} />
+      )}
     </div>
   ));
 
