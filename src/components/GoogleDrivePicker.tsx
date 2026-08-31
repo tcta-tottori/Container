@@ -13,13 +13,46 @@ interface GoogleDrivePickerProps {
 
 /**
  * 一覧に出すファイルか。
- * 作業に使うのは「コンテナ」日程と「JKP」出荷スケジュールだけなので、
- * 名前にどちらかが入っているものに絞る。フォルダは中を見られるよう常に残す。
+ * 作業に使うのは「コンテナ」日程・「JKP」出荷スケジュール・「AQSS04L」インボイスなので、
+ * 名前にどれかが入っているものに絞る。フォルダは中を見られるよう常に残す。
+ *
+ * AQSS05L（パッキングリスト）は単体では作業を始められないため一覧には出さない。
+ * AQSS04L を選んだときに、同じ出荷ぶんがあれば裏で一緒に読み込む（findPackingFor）。
  */
 function isTargetFile(f: DriveFile): boolean {
   if (f.isFolder) return true;
   const name = f.name.toUpperCase();
-  return name.includes('コンテナ') || name.includes('JKP');
+  return name.includes('コンテナ') || name.includes('JKP') || name.includes('AQSS04L');
+}
+
+/** AQSS04L / AQSS05L のファイル名に続く連番（YYYYMMDDhhmmssSSS）を取り出す */
+function aqssSerial(name: string, kind: '04' | '05'): string | null {
+  const m = name.toUpperCase().match(new RegExp(`AQSS${kind}L[_-]?(\\d{8,})`));
+  return m ? m[1] : null;
+}
+
+/**
+ * AQSS04L（インボイス）と同じ出荷の AQSS05L（パッキングリスト）を同じフォルダから探す。
+ * 04L だけでも読み込めるが、05L があると寸法・重量・CBM まで入る。
+ *
+ * 連番は書き出した日時なので、頭から一致している桁が多いものほど同じ出荷。
+ * 少なくとも日付（先頭8桁）が合っていなければ別の出荷とみなす。
+ */
+function findPackingFor(invoiceName: string, files: DriveFile[]): DriveFile | undefined {
+  const inv = aqssSerial(invoiceName, '04');
+  if (!inv) return undefined;
+
+  let best: { file: DriveFile; matched: number } | undefined;
+  for (const f of files) {
+    if (f.isFolder) continue;
+    const pk = aqssSerial(f.name, '05');
+    if (!pk) continue;
+    let matched = 0;
+    while (matched < inv.length && matched < pk.length && inv[matched] === pk[matched]) matched++;
+    if (matched < 8) continue;
+    if (!best || matched > best.matched) best = { file: f, matched };
+  }
+  return best?.file;
 }
 
 /** 更新日を「8/6」「2025/8/6」のような短い形にする */
@@ -72,7 +105,7 @@ function PhotoGlyph() {
 
 /**
  * Googleドライブのファイルをアプリの中だけで選ぶ画面。
- * コンテナ・JKP のファイルだけを新しい順に並べ、タップしたらすぐ読み込みへ進む。
+ * コンテナ・JKP・AQSS04L のファイルだけを新しい順に並べ、タップしたらすぐ読み込みへ進む。
  */
 export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePickerProps) {
   /** いま開いているフォルダ。先頭が CNS フォルダ（id 未指定 = 既定のフォルダ） */
@@ -113,8 +146,10 @@ export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePick
       setPath((prev) => [...prev, { id: f.id, name: f.name }]);
       return;
     }
-    onSelect([f]);
-  }, [onSelect]);
+    // AQSS04L は、同じ出荷の AQSS05L があれば一緒に渡す（寸法・重量が入る）
+    const packing = findPackingFor(f.name, files);
+    onSelect(packing ? [f, packing] : [f]);
+  }, [onSelect, files]);
 
   // Esc で閉じる
   useEffect(() => {
@@ -170,7 +205,7 @@ export default function GoogleDrivePicker({ onSelect, onClose }: GoogleDrivePick
 
           {!loading && !error && shown.length === 0 && (
             <div className="gdrive-state">
-              <p>コンテナ・JKP のファイルがありません</p>
+              <p>コンテナ・JKP・AQSS04L のファイルがありません</p>
             </div>
           )}
 
