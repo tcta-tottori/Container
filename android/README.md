@@ -42,14 +42,83 @@ cd android
 
 GitHub Actions（`.github/workflows/android.yml`）でも同じビルドが走り、debug APK が成果物として残る。
 
-### 実機での確認
+### 実機での確認（Pixel Watch 4 への入れ方と動かし方）
 
-1. スマホに `mobile`、Pixel Watch に `wear` をインストールする
-   （**両方とも同じ applicationId `jp.tcta.cns.container` で、同じ鍵で署名されている必要がある**。
-   デバッグビルドは同じ PC の debug keystore で署名されるので、そのまま通る）。
-2. スマホアプリを開くと、サンプルデータを読み込んで自動的にウォッチへ送信する。
-3. ウォッチアプリを開くとコンテナ一覧が出る。Tile 一覧に「コンテナ状況」を追加すると、
-   選択中コンテナの積載率・残容量・ステータスが出る。Tile をタップすると詳細画面が開く。
+Pixel Watch には USB 端子が無いので、ウォッチへのインストールは **Wi-Fi 経由の ADB** で行う。
+PC・ウォッチを同じ Wi-Fi につないでおく。スマホは USB でつなぐ。
+
+#### 1. ウォッチ側の準備（初回のみ）
+
+1. ウォッチの **設定 → システム → デバイス情報 → バージョン** を開き、**ビルド番号を 7 回タップ**して開発者向けオプションを有効にする。
+2. **設定 → 開発者向けオプション** で **ADB デバッグ** と **ワイヤレス デバッグ** をオンにする。
+3. **ワイヤレス デバッグ → 新しいデバイスとペア設定** を開くと、ペア設定コードと `IP:ポート` が出る。
+
+#### 2. PC からウォッチへ接続
+
+Android Studio の場合: **Device Manager → 「Pair Devices Using Wi-Fi」→ Wear タブ** で、
+ウォッチに出ている 6 桁のコードを入力する。以後は端末一覧にウォッチが出る。
+
+コマンドラインの場合（`adb` は Android Studio の SDK に同梱。`~/Library/Android/sdk/platform-tools` や `%LOCALAPPDATA%\Android\Sdk\platform-tools`）:
+
+```bash
+adb pair 192.168.1.23:41234      # 「新しいデバイスとペア設定」に出た IP:ポート。続けてコードを入力
+adb connect 192.168.1.23:38765   # 「ワイヤレス デバッグ」画面の上のほうに出ている IP:ポート（ペア用とは別）
+adb devices                      # ウォッチとスマホの両方が出れば OK
+```
+
+ペア設定は初回だけでよく、2 回目以降は `adb connect` だけで済む（ウォッチを再起動するとポートが変わる）。
+
+#### 3. インストール
+
+Android Studio: run configuration で **`wear`** を選び、対象デバイスにウォッチを選んで ▶ Run。
+同様に **`mobile`** を選び、対象にスマホを選んで ▶ Run。
+
+コマンドライン:
+
+```bash
+cd android
+./gradlew :wear:installDebug     # ウォッチだけがつながっているとき。複数台なら下の adb -s を使う
+./gradlew :mobile:installDebug
+
+# 端末を指定する場合
+adb devices                                   # シリアル（Wi-Fi の場合は IP:ポート）を確認
+adb -s 192.168.1.23:38765 install -r wear/build/outputs/apk/debug/wear-debug.apk
+adb -s <スマホのシリアル>     install -r mobile/build/outputs/apk/debug/mobile-debug.apk
+```
+
+GitHub Actions の成果物 `debug-apks`（zip）を落として `adb install -r` してもよい。
+
+> **署名の注意**: Data Layer API は、スマホ側とウォッチ側のアプリが **同じ applicationId かつ同じ鍵で署名されている**ときだけ通信できる。
+> 同じ PC でビルドした 2 つの APK（同じ debug keystore）か、**同じ CI 実行**の成果物 2 つを組で使うこと。
+> PC でビルドしたものと CI のものを混ぜると鍵が違うため、データが届かない。
+
+#### 4. 動かし方
+
+1. スマホと Pixel Watch が **Pixel Watch アプリでペアリング済み**で、Bluetooth がオンになっていることを確認する（Data Layer はこのペアリング経路で通信する）。
+2. スマホで「コンテナ ウォッチ同期」を開く。起動時にサンプルデータを読み込み、自動でウォッチへ送信する。
+   画面上部に「送信済み hh:mm（n バイト）」「接続中のウォッチ: Pixel Watch」と出れば送れている。
+   コンテナのラジオボタンを切り替えると、そのコンテナが Tile の表示対象になり、切り替えのたびに再送する。
+3. ウォッチで（リューズを押してアプリ一覧から）**「コンテナ」** を開く。
+   一覧 → カードをタップで詳細 → 「荷物一覧」ボタンで荷物一覧。右へスワイプで戻る。
+   何も届いていなければ「データ未受信」と出るので、スマホ側で送信してから「再読み込み」を押す。
+4. Tile を追加する: ウォッチの文字盤で **Tile を長押し**（または文字盤から左右にスワイプして Tile の端まで行き）→ **「＋」** → **「コンテナ状況」** を選ぶ。
+   スマホの Pixel Watch アプリ → **タイル** からも追加できる。Tile をタップすると詳細画面が開く。
+
+#### 5. うまく動かないとき
+
+```bash
+adb -s <ウォッチ> logcat -s ContainerDataListener ContainerRepository   # 受信ログ
+adb -s <ウォッチ> shell pm list packages | grep jp.tcta.cns.container     # インストール確認
+```
+
+- **送信は成功しているのにウォッチに届かない**: 署名が違う（上の注意）か、スマホとウォッチがペアリングされていない。
+  両方をいったんアンインストールし、同じ PC / 同じ CI 実行の APK を入れ直す。
+- **「送信できませんでした」になる**: スマホに Google Play 開発者サービスが無い（一部のエミュレータ）。実機を使う。
+- **ウォッチが `adb devices` に出ない / offline**: 同じ Wi-Fi か確認し、ウォッチ側で「ワイヤレス デバッグ」を一度オフ→オンして `adb connect` し直す。
+- **Tile が更新されない**: ウォッチのアプリを一度開くと Data Layer を読み直して Tile も更新される。
+  Tile は新しいデータを保存したときに更新要求を出しているので、通常は数秒で反映される。
+- **エミュレータで試す場合**: Android Studio の Device Manager で Wear OS 用と Phone 用の仮想デバイス（どちらも Google Play 入り）を作り、
+  Device Manager の **Pair Wearable** でペアリングする。物理端末と同じ手順で動く。
 
 ## 同期のしくみ
 
