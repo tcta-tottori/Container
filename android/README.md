@@ -184,18 +184,26 @@ ContainerDataSource ──▶ ContainerSyncPayload ──▶ DataClient.putDataI
       "loadPercentage": 68.0,
       "remainingPercentage": 32.0,
       "totalQuantity": 1860,
-      "itemCount": 6,
+      "totalPallets": 15,
+      "totalCartons": 37,
+      "itemCount": 7,
       "status": "荷降ろし中",
       "updatedAt": 1756900000000
     }
   ],
   "cargo": {
     "TCLU4021378": [
-      { "id": "1", "name": "ポリカバー 30cm 白", "quantity": 480, "location": "前方 パレット1-3", "status": "完了" }
+      { "id": "1", "name": "ポリカバー 30cm 白", "quantity": 500,
+        "palletCount": 4, "cartonCount": 5, "itemType": "ポリカバー",
+        "location": "前方 パレット1-4", "status": "完了" }
     ]
   }
 }
 ```
+
+- 数量の表示は **パレットと端数カートンだけ**（例: `1PL 5CT`）。`quantity` / `totalQuantity`（個数）は同期するが画面には出さない。
+- `itemType` は元のコンテナアプリの種類（ポリカバー / ジャーポット / 箱 / 部品 / 鍋 / ヤーマン部品 / その他）。
+  色は `shared/.../ItemTypes.kt` にあり、Web アプリの `src/data/colorMap.ts` と同じ値。未知の値と null は「その他」の色になる。
 
 `ContainerInfo` / `CargoItem` は `shared/src/main/kotlin/jp/tcta/cns/container/shared/` にある。
 未知のキーは無視するので、スマホ側で先に項目を増やしても古いウォッチアプリは壊れない。
@@ -213,7 +221,7 @@ ContainerDataSource ──▶ ContainerSyncPayload ──▶ DataClient.putDataI
 | --- | --- |
 | 一覧 | カードごとにコンテナ名・積載率バー・残容量・ステータス。タップで詳細へ |
 | 詳細 | 円形ゲージ（積載率）、コンテナ番号・形態・積載率・残容量・荷物数・SKU 数・状態・更新時刻、荷物一覧ボタン |
-| 荷物一覧 | 品名・数量・位置・状態 |
+| 荷物一覧 | 種類バッジ（種類ごとの色）・品名・数量（1PL 5CT）・位置・状態 |
 
 右スワイプで前の画面に戻る（`SwipeDismissableNavHost`）。
 `ScreenScaffold` + `ScalingLazyColumn` で丸型ディスプレイの上下に余白を取り、
@@ -232,5 +240,5 @@ Tile のどこをタップしても、コンテナ ID を Intent extra に付け
 
 - ウォッチからの操作（パレット数の減算、品目の切り替え）を `MessageClient` でスマホへ送り、
   スマホ側の表示も追従させる（双方向同期）
-- 経過時間（作業タイマー）や機種名、残り箱数・端数など CNS 作業画面の項目を `ContainerInfo` / `CargoItem` に追加する
+- 経過時間（作業タイマー）や機種名など CNS 作業画面の残りの項目を `ContainerInfo` / `CargoItem` に追加する
 - 100 KB を超える大きなデータの Asset 分割

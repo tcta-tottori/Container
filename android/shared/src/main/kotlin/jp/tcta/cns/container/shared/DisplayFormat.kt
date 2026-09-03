@@ -19,6 +19,10 @@ object DisplayFormat {
     /** 桁区切り付きの整数 "1,860" */
     fun quantity(value: Int): String = NumberFormat.getIntegerInstance(Locale.JAPAN).format(value)
 
+    /** パレットと端数カートンを "1PL 5CT" の形にする。どちらも常に出す */
+    fun palletCarton(pallets: Int, cartons: Int): String =
+        "${pallets.coerceAtLeast(0)}PL ${cartons.coerceAtLeast(0)}CT"
+
     /**
      * 時刻表示。今日なら "HH:mm"、それ以外は "M/d HH:mm"。
      * 0 以下（未設定）は "--:--"。

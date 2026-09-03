@@ -22,7 +22,6 @@
     <string name="detail_sku">SKU数</string>
     <string name="detail_updated">更新時刻</string>
     <string name="detail_status">状態</string>
-    <string name="quantity_unit">%1$s 個</string>
     <string name="count_unit">%1$d</string>
     <string name="not_found">コンテナが見つかりません</string>
 
@@ -32,5 +31,4 @@
     <string name="tile_no_data">スマホから\nデータ未受信</string>
     <string name="tile_open">開く</string>
     <string name="tile_detail">詳細</string>
-    <string name="tile_quantity">荷物 %1$s</string>
 </resources>

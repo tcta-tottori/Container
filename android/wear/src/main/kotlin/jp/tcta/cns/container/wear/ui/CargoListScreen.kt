@@ -1,5 +1,6 @@
 package jp.tcta.cns.container.wear.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -69,8 +70,15 @@ fun CargoListScreen(
 
 @Composable
 private fun CargoCard(item: CargoItem) {
-    // 読み取り専用なのでタップしても何もしない
-    Card(onClick = {}, modifier = Modifier.fillMaxWidth()) {
+    val accent = itemTypeAccent(item.itemType)
+    // 読み取り専用なのでタップしても何もしない。種類の色を枠に出す
+    Card(
+        onClick = {},
+        modifier = Modifier.fillMaxWidth(),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.55f)),
+    ) {
+        TypeBadge(itemType = item.itemType)
+        Spacer(Modifier.height(4.dp))
         Text(
             text = item.name,
             style = MaterialTheme.typography.titleSmall,
@@ -83,10 +91,12 @@ private fun CargoCard(item: CargoItem) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 数量はパレットと端数カートンだけ（例: 1PL 5CT）
             Text(
-                text = stringResource(R.string.quantity_unit, DisplayFormat.quantity(item.quantity)),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
+                text = DisplayFormat.palletCarton(item.palletCount, item.cartonCount),
+                style = MaterialTheme.typography.titleMedium,
+                color = accent,
+                maxLines = 1,
             )
             item.status?.let { status ->
                 Text(

@@ -14,11 +14,10 @@
     <string name="label_selected">Tile に表示</string>
     <string name="label_load">積載 %1$s</string>
     <string name="label_remaining">残 %1$s</string>
-    <string name="label_quantity">荷物 %1$s 個</string>
+    <string name="label_quantity">荷物 %1$s</string>
     <string name="label_sku">SKU %1$d</string>
     <string name="label_updated">更新 %1$s</string>
     <string name="label_location">位置: %1$s</string>
     <string name="label_status">状態: %1$s</string>
-    <string name="label_quantity_short">%1$s 個</string>
     <string name="note_source">データソース: %1$s</string>
 </resources>

@@ -77,7 +77,7 @@ fun ContainerDetailScreen(
             item {
                 KeyValueRow(
                     stringResource(R.string.detail_quantity),
-                    stringResource(R.string.quantity_unit, DisplayFormat.quantity(container.totalQuantity)),
+                    DisplayFormat.palletCarton(container.totalPallets, container.totalCartons),
                 )
             }
             item { KeyValueRow(stringResource(R.string.detail_sku), stringResource(R.string.count_unit, container.itemCount)) }

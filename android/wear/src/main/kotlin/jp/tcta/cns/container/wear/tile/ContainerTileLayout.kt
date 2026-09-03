@@ -38,10 +38,10 @@ object ContainerTileLayout {
 
     private fun MaterialScope.containerLayout(context: Context, container: ContainerInfo): LayoutElement {
         val open = openDetailClickable(context, container.id)
-        // 例: "残 32% ・ 荷物 1,860"
+        // 例: "残 32% ・ 12PL 23CT"
         val subtitle = context.getString(R.string.label_remaining) + " " +
             DisplayFormat.percent(container.remainingPercentage) + " ・ " +
-            context.getString(R.string.tile_quantity, DisplayFormat.quantity(container.totalQuantity))
+            DisplayFormat.palletCarton(container.totalPallets, container.totalCartons)
         return primaryLayout(
             onClick = open,
             titleSlot = {

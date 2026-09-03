@@ -1,6 +1,7 @@
 package jp.tcta.cns.container.wear.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,6 +26,7 @@ import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.DisplayFormat
+import jp.tcta.cns.container.shared.ItemTypes
 
 /** ステータス文字列に応じた色。完了は控えめ、作業中は強調 */
 @Composable
@@ -101,6 +104,40 @@ fun KeyValueRow(label: String, value: String, valueColor: Color = MaterialTheme.
             textAlign = TextAlign.End,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** 種類の強調色（濃い画面向け）。元のコンテナアプリの accent と同じ値 */
+fun itemTypeAccent(itemType: String?): Color = Color(ItemTypes.colorOf(itemType).accent)
+
+/**
+ * 種類バッジ。元のコンテナアプリの type-badge と同じ見た目
+ * （accent 25% の背景・accent 44% の枠・accent の点・白文字）。
+ */
+@Composable
+fun TypeBadge(itemType: String?, modifier: Modifier = Modifier) {
+    val accent = itemTypeAccent(itemType)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(accent.copy(alpha = 0.25f))
+            .border(1.dp, accent.copy(alpha = 0.44f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(accent),
+        )
+        Text(
+            text = ItemTypes.labelOf(itemType),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            maxLines = 1,
+            modifier = Modifier.padding(start = 4.dp),
         )
     }
 }

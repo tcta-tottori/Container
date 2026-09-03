@@ -17,6 +17,8 @@ class ContainerSyncCodecTest {
         remainingPercentage = 32f,
         totalQuantity = 1860,
         itemCount = 2,
+        totalPallets = 13,
+        totalCartons = 7,
         status = "荷降ろし中",
         updatedAt = 1_756_900_000_000L,
     )
@@ -26,8 +28,8 @@ class ContainerSyncCodecTest {
         containers = listOf(container),
         cargo = mapOf(
             container.id to listOf(
-                CargoItem("1", "ポリカバー 30cm 白", 480, "前方 パレット1-3", "完了"),
-                CargoItem("2", "鍋 26cm IH", 300, location = null, status = null),
+                CargoItem("1", "ポリカバー 30cm 白", 480, palletCount = 8, cartonCount = 5, itemType = ItemTypes.POLY_COVER, location = "前方 パレット1-3", status = "完了"),
+                CargoItem("2", "鍋 26cm IH", 300, palletCount = 5, cartonCount = 2, itemType = ItemTypes.POT),
             ),
         ),
     )
@@ -60,6 +62,30 @@ class ContainerSyncCodecTest {
     }
 
     @Test
+    fun `old payload without pallet fields still decodes`() {
+        val json = """
+            {"generatedAt":10,"containers":[{"id":"A","name":"A","containerType":"20ft","loadPercentage":10.0,
+               "remainingPercentage":90.0,"totalQuantity":1,"itemCount":1,"status":"完了","updatedAt":1}],
+             "cargo":{"A":[{"id":"1","name":"x","quantity":3}]}}
+        """.trimIndent()
+        val decoded = ContainerSyncCodec.decode(json)
+        assertEquals(0, decoded.containers.single().totalPallets)
+        val item = decoded.cargoOf("A").single()
+        assertEquals(0, item.palletCount)
+        assertNull(item.itemType)
+    }
+
+    @Test
+    fun `item type colors match the web app`() {
+        assertEquals(0xFF22C55E, ItemTypes.colorOf("ポリカバー").accent)
+        assertEquals(0xFFEF4444, ItemTypes.colorOf("鍋").accent)
+        assertEquals(ItemTypes.colorOf("その他"), ItemTypes.colorOf(null))
+        assertEquals(ItemTypes.colorOf("その他"), ItemTypes.colorOf("不明な種類"))
+        assertEquals("その他", ItemTypes.labelOf(null))
+        assertEquals("箱", ItemTypes.labelOf("箱"))
+    }
+
+    @Test
     fun `broken json decodes to null`() {
         assertNull(ContainerSyncCodec.decodeOrNull("{not json"))
         assertNull(ContainerSyncCodec.decodeOrNull(null))
@@ -79,6 +105,8 @@ class ContainerSyncCodecTest {
         assertEquals("0%", DisplayFormat.percent(-3f))
         assertEquals("1,860", DisplayFormat.quantity(1860))
         assertEquals("--:--", DisplayFormat.time(0))
+        assertEquals("1PL 5CT", DisplayFormat.palletCarton(1, 5))
+        assertEquals("0PL 0CT", DisplayFormat.palletCarton(-1, 0))
         val zone = ZoneId.of("Asia/Tokyo")
         // 2025-09-03 09:00 JST
         val millis = 1_756_857_600_000L
