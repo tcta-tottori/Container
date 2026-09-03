@@ -546,7 +546,7 @@ export default function ItemEditPage({
               </div>
             )}
           </div>
-          <input ref={importRef} type="file" accept=".xlsx,.xls" onChange={handleImport} className="hidden" />
+          <input ref={importRef} type="file" accept=".xlsx,.xlsm,.xls" onChange={handleImport} className="hidden" />
         </div>
         {importMsg && (
           <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(76,175,80,0.15)', color: '#66bb6a', fontSize: 12, marginBottom: 8 }}>

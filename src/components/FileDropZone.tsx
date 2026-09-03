@@ -3,12 +3,12 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { fetchMasterFileLastUpdate } from '@/lib/masterLoader';
 import { DriveFile, downloadFromDrive, driveErrorMessage } from '@/lib/googleDrive';
-import { classifyFile, isImageFile, ClassifiedFile } from '@/lib/fileClassifier';
+import { classifyFile, isImageFile, isExcelFile, ClassifiedFile } from '@/lib/fileClassifier';
 import { FileIcon } from '@/components/AppIcons';
 import GoogleDrivePicker from '@/components/GoogleDrivePicker';
 
 export type { FileRole, ClassifiedFile } from '@/lib/fileClassifier';
-export { classifyFile, isImageFile } from '@/lib/fileClassifier';
+export { classifyFile, isImageFile, isExcelFile } from '@/lib/fileClassifier';
 
 interface FileDropZoneProps {
   onFileLoaded: (file: File) => void;
@@ -93,8 +93,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
       let started = false;
 
       for (const f of Array.from(files)) {
-        const lowerName = f.name.toLowerCase();
-        const isExcel = lowerName.endsWith('.xlsx') || lowerName.endsWith('.xls');
+        const isExcel = isExcelFile(f.name);
         const isImage = isImageFile(f.name);
         if (!isExcel && !isImage) continue;
         const { role, label } = classifyFile(f.name);
@@ -253,7 +252,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                 Excel / 写真をドラッグ＆ドロップ
               </p>
               <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, margin: 0 }}>
-                またはタップして選択（.xlsx / .xls / .jpg / .png）
+                またはタップして選択（.xlsx / .xlsm / .xls / .jpg / .png）
               </p>
               {classifiedFiles.length > 0 && (
                 <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -274,7 +273,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                   ))}
                 </div>
               )}
-              <input ref={inputRef} type="file" accept=".xlsx,.xls,.jpg,.jpeg,.png,.webp,.heic,.heif,.bmp,image/*" multiple
+              <input ref={inputRef} type="file" accept=".xlsx,.xlsm,.xls,.jpg,.jpeg,.png,.webp,.heic,.heif,.bmp,image/*" multiple
                 onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
                 className="hidden" />
             </div>

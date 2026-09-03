@@ -11,10 +11,22 @@ export interface ClassifiedFile {
 
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.bmp'];
 
+/**
+ * Excel として読み込む拡張子。
+ * .xlsm はマクロ付きブックだが、中身の作りは .xlsx と同じなので同じように読める。
+ */
+export const EXCEL_EXTENSIONS = ['.xlsx', '.xlsm', '.xls'];
+
 /** ファイル名から画像かどうか判定 */
 export function isImageFile(name: string): boolean {
   const lower = name.toLowerCase();
   return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+/** ファイル名から Excel かどうか判定 */
+export function isExcelFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return EXCEL_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
 /** ファイル名からロールを自動判別 */

@@ -59,6 +59,11 @@ export function base64ToFile(entry: RecentFile): File {
   for (let i = 0; i < byteString.length; i++) {
     ia[i] = byteString.charCodeAt(i);
   }
-  const ext = entry.name.endsWith('.xlsx') ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/vnd.ms-excel';
-  return new File([ab], entry.name, { type: ext });
+  const lower = entry.name.toLowerCase();
+  const mime = lower.endsWith('.xlsx')
+    ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    : lower.endsWith('.xlsm')
+      ? 'application/vnd.ms-excel.sheet.macroEnabled.12'
+      : 'application/vnd.ms-excel';
+  return new File([ab], entry.name, { type: mime });
 }
