@@ -14,6 +14,9 @@ import kotlinx.serialization.Serializable
  * @property palletCount パレット枚数（PL）
  * @property cartonCount 端数カートン数（CT）
  * @property itemType 種類。[ItemTypes] の値（ポリカバー / ジャーポット / 箱 / 部品 / 鍋 / ヤーマン部品 / その他）。色分けに使う
+ * @property modelName 機種名（代表機種。例: JPV-H100）。作業画面で大きく出す。無ければ [name] を出す
+ * @property remainingPercentage 残り割合 (0..100)。100 = 未着手、0 = 完了。作業画面のリングに使う。不明なら null
+ * @property warning 注意書き（例: 類似品あり）。あれば作業画面に警告マークを出す
  * @property location 位置（例: 前方 パレット 1-3）。不明なら null
  * @property status 状態（例: 未着手 / 作業中 / 完了）。不明なら null
  */
@@ -25,6 +28,9 @@ data class CargoItem(
     val palletCount: Int = 0,
     val cartonCount: Int = 0,
     val itemType: String? = null,
+    val modelName: String? = null,
+    val remainingPercentage: Float? = null,
+    val warning: String? = null,
     val location: String? = null,
     val status: String? = null,
 )

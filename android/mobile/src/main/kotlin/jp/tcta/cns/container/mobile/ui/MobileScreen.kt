@@ -204,7 +204,7 @@ private fun CargoRow(item: CargoItem) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TypeBadge(itemType = item.itemType)
                 Text(
-                    item.name,
+                    text = if (item.modelName != null) "${item.modelName}　${item.name}" else item.name,
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color(typeColor.text),
                     modifier = Modifier.weight(1f),
@@ -221,6 +221,7 @@ private fun CargoRow(item: CargoItem) {
                 val details = listOfNotNull(
                     item.location?.let { stringResource(R.string.label_location, it) },
                     item.status?.let { stringResource(R.string.label_status, it) },
+                    item.warning?.let { "⚠ $it" },
                 )
                 if (details.isNotEmpty()) {
                     Text(

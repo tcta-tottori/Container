@@ -19,6 +19,19 @@ object DisplayFormat {
     /** 桁区切り付きの整数 "1,860" */
     fun quantity(value: Int): String = NumberFormat.getIntegerInstance(Locale.JAPAN).format(value)
 
+    /** 経過時間。1 時間未満は "mm:ss"、以上は "h:mm:ss"。負の値は 0 扱い */
+    fun elapsed(millis: Long): String {
+        val total = (millis / 1000L).coerceAtLeast(0L)
+        val h = total / 3600L
+        val m = (total % 3600L) / 60L
+        val sec = total % 60L
+        return if (h > 0) String.format(Locale.ROOT, "%d:%02d:%02d", h, m, sec)
+        else String.format(Locale.ROOT, "%02d:%02d", m, sec)
+    }
+
+    /** 気温 "24℃"。小数は四捨五入 */
+    fun temperature(celsius: Float): String = "${celsius.roundToInt()}℃"
+
     /** パレットと端数カートンを "1PL 5CT" の形にする。どちらも常に出す */
     fun palletCarton(pallets: Int, cartons: Int): String =
         "${pallets.coerceAtLeast(0)}PL ${cartons.coerceAtLeast(0)}CT"

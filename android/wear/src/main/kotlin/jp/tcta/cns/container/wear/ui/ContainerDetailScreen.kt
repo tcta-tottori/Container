@@ -1,29 +1,27 @@
 package jp.tcta.cns.container.wear.ui
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.ScreenScaffold
-import androidx.wear.compose.material3.ScreenScaffoldDefaults
 import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.DisplayFormat
 import jp.tcta.cns.container.wear.R
 
 /**
  * 画面 2: コンテナ詳細。
- * コンテナ番号・積載率・残容量・荷物数・SKU 数・更新時刻を出し、荷物一覧へ進める。
+ * 先頭にコンテナのダイヤル（積載率のリング・コンテナ番号・PL / CT 合計・気温湿度・経過時間）、
+ * 続けてコンテナ番号・形態・積載率・残容量・荷物数・SKU 数・状態・更新時刻、荷物一覧ボタン。
  */
 @Composable
 fun ContainerDetailScreen(
@@ -31,18 +29,19 @@ fun ContainerDetailScreen(
     containerId: String,
     onShowCargo: () -> Unit,
 ) {
-    val listState = rememberScalingLazyListState()
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0, initialCenterItemScrollOffset = 0)
     val container = state.payload?.container(containerId)
     val cargoCount = state.payload?.cargoOf(containerId)?.size ?: 0
 
     ScreenScaffold(
         scrollState = listState,
-        contentPadding = ScreenScaffoldDefaults.contentPadding,
-    ) { contentPadding ->
+        contentPadding = PaddingValues(0.dp),
+    ) { _ ->
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = contentPadding,
+            contentPadding = PaddingValues(top = 0.dp, bottom = 40.dp),
+            autoCentering = AutoCenteringParams(itemIndex = 0, itemOffset = 0),
         ) {
             if (container == null) {
                 item {
@@ -55,21 +54,21 @@ fun ContainerDetailScreen(
                 return@ScalingLazyColumn
             }
 
-            item {
-                ListHeader {
-                    Text(
-                        text = container.name,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                    )
-                }
+            item(key = "dial") {
+                Dial(
+                    accent = MaterialTheme.colorScheme.primary,
+                    progress = container.loadPercentage / 100f,
+                    badgeText = "${stringResource(R.string.label_load)} ${DisplayFormat.percent(container.loadPercentage)}",
+                    title = container.id,
+                    subtitle = container.name.takeIf { it != container.id },
+                    pallets = container.totalPallets,
+                    cartons = container.totalCartons,
+                    environment = state.payload?.environment,
+                    startedAt = container.startedAt,
+                    warning = null,
+                )
             }
-            item {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LoadGauge(loadPercentage = container.loadPercentage, size = 104.dp)
-                }
-            }
+
             item { KeyValueRow(stringResource(R.string.detail_container_no), container.id) }
             item { KeyValueRow(stringResource(R.string.detail_type), container.containerType) }
             item { KeyValueRow(stringResource(R.string.detail_load), DisplayFormat.percent(container.loadPercentage)) }

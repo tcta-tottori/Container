@@ -14,6 +14,7 @@ import kotlinx.serialization.Serializable
  * @property selectedContainerId 現在選択中のコンテナ ID。未選択なら null
  * @property containers コンテナ一覧
  * @property cargo コンテナ ID → 荷物一覧
+ * @property environment 現場の気温・湿度（スマホの天気機能から）。無ければ null
  */
 @Serializable
 data class ContainerSyncPayload(
@@ -22,6 +23,7 @@ data class ContainerSyncPayload(
     val selectedContainerId: String? = null,
     val containers: List<ContainerInfo> = emptyList(),
     val cargo: Map<String, List<CargoItem>> = emptyMap(),
+    val environment: Environment? = null,
 ) {
     /** ID からコンテナを引く。無ければ null */
     fun container(id: String?): ContainerInfo? =
@@ -41,3 +43,17 @@ data class ContainerSyncPayload(
         const val SCHEMA_VERSION = 1
     }
 }
+
+/**
+ * 現場の環境。作業画面の下段に出す。
+ *
+ * @property temperatureC 気温（℃）。不明なら null
+ * @property humidityPercent 湿度（%）。不明なら null
+ * @property measuredAt 計測時刻（epoch millis）
+ */
+@Serializable
+data class Environment(
+    val temperatureC: Float? = null,
+    val humidityPercent: Int? = null,
+    val measuredAt: Long = 0L,
+)

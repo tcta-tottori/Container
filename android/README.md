@@ -184,22 +184,30 @@ ContainerDataSource ──▶ ContainerSyncPayload ──▶ DataClient.putDataI
       "loadPercentage": 68.0,
       "remainingPercentage": 32.0,
       "totalQuantity": 1860,
-      "totalPallets": 15,
+      "totalPallets": 19,
       "totalCartons": 37,
       "itemCount": 7,
       "status": "荷降ろし中",
-      "updatedAt": 1756900000000
+      "updatedAt": 1756900000000,
+      "startedAt": 1756897360000
     }
   ],
   "cargo": {
     "TCLU4021378": [
-      { "id": "1", "name": "ポリカバー 30cm 白", "quantity": 500,
-        "palletCount": 4, "cartonCount": 5, "itemType": "ポリカバー",
-        "location": "前方 パレット1-4", "status": "完了" }
+      { "id": "2", "name": "ポリカバー 36cm 白", "quantity": 840,
+        "palletCount": 7, "cartonCount": 0, "itemType": "ポリカバー",
+        "modelName": "JPV-H100", "remainingPercentage": 40.0, "warning": "類似品あり（30cm 白）",
+        "location": "前方 パレット5-11", "status": "作業中" }
     ]
-  }
+  },
+  "environment": { "temperatureC": 24.0, "humidityPercent": 86, "measuredAt": 1756900050000 }
 }
 ```
+
+- `modelName`（機種名）は作業画面で大きく出す。無ければ `name` を出す。
+- `remainingPercentage`（残り割合）は作業画面のリングと「● 100%」バッジに使う。無ければ状態を出す。
+- `warning` があると作業画面の右上に警告マークが付く。
+- `startedAt`（作業開始時刻）があると経過時間を数える。`environment` があると気温・湿度を出す。
 
 - 数量の表示は **パレットと端数カートンだけ**（例: `1PL 5CT`）。`quantity` / `totalQuantity`（個数）は同期するが画面には出さない。
 - `itemType` は元のコンテナアプリの種類（ポリカバー / ジャーポット / 箱 / 部品 / 鍋 / ヤーマン部品 / その他）。
@@ -220,8 +228,12 @@ ContainerDataSource ──▶ ContainerSyncPayload ──▶ DataClient.putDataI
 | 画面 | 内容 |
 | --- | --- |
 | 一覧 | カードごとにコンテナ名・積載率バー・残容量・ステータス。タップで詳細へ |
-| 詳細 | 円形ゲージ（積載率）、コンテナ番号・形態・積載率・残容量・荷物数・SKU 数・状態・更新時刻、荷物一覧ボタン |
-| 荷物一覧 | 種類バッジ（種類ごとの色）・品名・数量（1PL 5CT）・位置・状態 |
+| 詳細 | 先頭にコンテナのダイヤル（積載率のリング・コンテナ番号・PL / CT 合計・気温湿度・経過時間）、続けてコンテナ番号・形態・積載率・残容量・荷物数・SKU 数・状態・更新時刻、荷物一覧ボタン |
+| 作業画面（荷物一覧） | 先頭に「いま見ている品目」のダイヤル: 種類の色のリング（残り割合）・「● 100%」バッジ・機種名（大）・品名・PL（種類の色）/ CT（白）の大きな数字・気温（橙）湿度（青）・経過時間・警告マーク。その下に品目切り替えチップ（選択中は種類の色）。タップでダイヤルが切り替わる |
+
+ダイヤルは `wear/.../ui/Components.kt` の `Dial`。リングは `Canvas` で描いた 300° の弧（下側は経過時間のために空ける）。
+経過時間は `ContainerInfo.startedAt` から 1 秒ごとに数え直す。気温・湿度は `ContainerSyncPayload.environment`。
+テーマ（黒地に緑）は `wear/.../ui/theme/Theme.kt`。
 
 右スワイプで前の画面に戻る（`SwipeDismissableNavHost`）。
 `ScreenScaffold` + `ScalingLazyColumn` で丸型ディスプレイの上下に余白を取り、
@@ -240,5 +252,5 @@ Tile のどこをタップしても、コンテナ ID を Intent extra に付け
 
 - ウォッチからの操作（パレット数の減算、品目の切り替え）を `MessageClient` でスマホへ送り、
   スマホ側の表示も追従させる（双方向同期）
-- 経過時間（作業タイマー）や機種名など CNS 作業画面の残りの項目を `ContainerInfo` / `CargoItem` に追加する
+- 気温・湿度・作業開始時刻を CNS の実データ（天気機能・タイマー）から取る
 - 100 KB を超える大きなデータの Asset 分割

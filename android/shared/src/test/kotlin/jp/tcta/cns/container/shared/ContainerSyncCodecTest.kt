@@ -19,6 +19,7 @@ class ContainerSyncCodecTest {
         itemCount = 2,
         totalPallets = 13,
         totalCartons = 7,
+        startedAt = 1_756_899_000_000L,
         status = "荷降ろし中",
         updatedAt = 1_756_900_000_000L,
     )
@@ -28,10 +29,11 @@ class ContainerSyncCodecTest {
         containers = listOf(container),
         cargo = mapOf(
             container.id to listOf(
-                CargoItem("1", "ポリカバー 30cm 白", 480, palletCount = 8, cartonCount = 5, itemType = ItemTypes.POLY_COVER, location = "前方 パレット1-3", status = "完了"),
+                CargoItem("1", "ポリカバー 30cm 白", 480, palletCount = 8, cartonCount = 5, itemType = ItemTypes.POLY_COVER, modelName = "JPV-H100", remainingPercentage = 0f, warning = "類似品あり", location = "前方 パレット1-3", status = "完了"),
                 CargoItem("2", "鍋 26cm IH", 300, palletCount = 5, cartonCount = 2, itemType = ItemTypes.POT),
             ),
         ),
+        environment = Environment(temperatureC = 24f, humidityPercent = 86, measuredAt = 1_756_900_050_000L),
     )
 
     @Test
@@ -73,6 +75,9 @@ class ContainerSyncCodecTest {
         val item = decoded.cargoOf("A").single()
         assertEquals(0, item.palletCount)
         assertNull(item.itemType)
+        assertNull(item.modelName)
+        assertNull(decoded.environment)
+        assertNull(decoded.containers.single().startedAt)
     }
 
     @Test
@@ -106,6 +111,11 @@ class ContainerSyncCodecTest {
         assertEquals("1,860", DisplayFormat.quantity(1860))
         assertEquals("--:--", DisplayFormat.time(0))
         assertEquals("1PL 5CT", DisplayFormat.palletCarton(1, 5))
+        assertEquals("00:44", DisplayFormat.elapsed(44_000L))
+        assertEquals("12:05", DisplayFormat.elapsed(725_000L))
+        assertEquals("1:02:03", DisplayFormat.elapsed(3_723_000L))
+        assertEquals("00:00", DisplayFormat.elapsed(-5_000L))
+        assertEquals("24℃", DisplayFormat.temperature(23.6f))
         assertEquals("0PL 0CT", DisplayFormat.palletCarton(-1, 0))
         val zone = ZoneId.of("Asia/Tokyo")
         // 2025-09-03 09:00 JST

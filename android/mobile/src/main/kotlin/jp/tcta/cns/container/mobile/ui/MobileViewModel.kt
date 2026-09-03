@@ -8,6 +8,7 @@ import jp.tcta.cns.container.mobile.data.ContainerRecord
 import jp.tcta.cns.container.mobile.data.SampleContainerDataSource
 import jp.tcta.cns.container.mobile.sync.WearSyncClient
 import jp.tcta.cns.container.shared.ContainerSyncPayload
+import jp.tcta.cns.container.shared.Environment
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -90,6 +91,8 @@ class MobileViewModel(application: Application) : AndroidViewModel(application) 
             selectedContainerId = state.selectedContainerId,
             containers = state.containers.map { it.info },
             cargo = state.containers.associate { it.info.id to it.cargo },
+            // 気温・湿度は CNS の天気機能から取る想定。いまはサンプル値
+            environment = Environment(temperatureC = 24f, humidityPercent = 86, measuredAt = System.currentTimeMillis()),
         )
     }
 
