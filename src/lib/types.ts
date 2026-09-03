@@ -25,6 +25,8 @@ export interface ContainerItem {
   fraction: number;
   /** 1パレットあたりケース数 — 「内容」シート K列 */
   qtyPerPallet: number;
+  /** 1段のケース数 — 「内容」シート L列（書いてあるときだけ） */
+  casesPerTier?: number;
   /** サイズ — J列 (100 or 180) */
   size?: string;
   // --- 以下はCNS品目一覧マスタデータ ---

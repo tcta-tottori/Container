@@ -43,7 +43,7 @@ const GOOGLE_SHEET_MIME = 'application/vnd.google-apps.spreadsheet';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /** 一覧に出すファイル（Excel と写真、それにフォルダ） */
-const PICKABLE_EXTENSIONS = ['.xlsx', '.xls', '.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.bmp'];
+const PICKABLE_EXTENSIONS = ['.xlsx', '.xlsm', '.xls', '.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif', '.bmp'];
 
 /** ドライブ上のファイル1件 */
 export interface DriveFile {
@@ -238,7 +238,7 @@ export async function listDriveFiles(folderId?: string): Promise<DriveFile[]> {
 /** Googleスプレッドシートは xlsx として受け取るので、名前にも拡張子を付ける */
 function downloadName(file: Pick<DriveFile, 'name' | 'mimeType'>): string {
   if (file.mimeType !== GOOGLE_SHEET_MIME) return file.name;
-  return /\.xlsx?$/i.test(file.name) ? file.name : `${file.name}.xlsx`;
+  return /\.xls[xm]?$/i.test(file.name) ? file.name : `${file.name}.xlsx`;
 }
 
 /**
