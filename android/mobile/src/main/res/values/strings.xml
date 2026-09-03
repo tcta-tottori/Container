@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">コンテナ ウォッチ同期</string>
+    <string name="title_containers">コンテナ一覧</string>
+    <string name="title_cargo">荷物一覧</string>
+    <string name="action_send">ウォッチへ送信</string>
+    <string name="action_reload">再読み込み</string>
+    <string name="sync_idle">まだ送信していません</string>
+    <string name="sync_sending">送信中…</string>
+    <string name="sync_sent">送信済み %1$s（%2$d バイト）</string>
+    <string name="sync_failed">送信できませんでした: %1$s</string>
+    <string name="watch_connected">接続中のウォッチ: %1$s</string>
+    <string name="watch_none">ウォッチが接続されていません（送信内容は Data Layer に保存され、接続時に届きます）</string>
+    <string name="label_selected">Tile に表示</string>
+    <string name="label_load">積載 %1$s</string>
+    <string name="label_remaining">残 %1$s</string>
+    <string name="label_quantity">荷物 %1$s 個</string>
+    <string name="label_sku">SKU %1$d</string>
+    <string name="label_updated">更新 %1$s</string>
+    <string name="label_location">位置: %1$s</string>
+    <string name="label_status">状態: %1$s</string>
+    <string name="label_quantity_short">%1$s 個</string>
+    <string name="note_source">データソース: %1$s</string>
+</resources>

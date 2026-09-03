@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- コンテナを模したアイコン（前景） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#F4A261"
+        android:pathData="M24,38 H84 V72 H24 Z" />
+    <path
+        android:fillColor="#C86F2A"
+        android:pathData="M30,38 H34 V72 H30 Z M42,38 H46 V72 H42 Z M54,38 H58 V72 H54 Z M66,38 H70 V72 H66 Z M78,38 H82 V72 H78 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,34 H88 V38 H20 Z M20,72 H88 V76 H20 Z" />
+</vector>

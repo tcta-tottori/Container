@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tile 一覧に出るプレビュー画像（丸型 384x384 想定） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="384dp"
+    android:height="384dp"
+    android:viewportWidth="384"
+    android:viewportHeight="384">
+    <path
+        android:fillColor="#000000"
+        android:pathData="M192,192 m-192,0 a192,192 0 1,0 384,0 a192,192 0 1,0 -384,0" />
+    <!-- 積載率の弧 -->
+    <path
+        android:strokeColor="#2B2B2B"
+        android:strokeWidth="18"
+        android:fillColor="#00000000"
+        android:pathData="M192,52 A140,140 0 1,1 191.9,52" />
+    <path
+        android:strokeColor="#F4A261"
+        android:strokeWidth="18"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M192,52 A140,140 0 1,1 76,272" />
+    <!-- 中央のコンテナ -->
+    <path
+        android:fillColor="#F4A261"
+        android:pathData="M132,160 H252 V224 H132 Z" />
+    <path
+        android:fillColor="#C86F2A"
+        android:pathData="M144,160 H152 V224 H144 Z M168,160 H176 V224 H168 Z M192,160 H200 V224 H192 Z M216,160 H224 V224 H216 Z M240,160 H248 V224 H240 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M124,152 H260 V160 H124 Z M124,224 H260 V232 H124 Z" />
+</vector>
