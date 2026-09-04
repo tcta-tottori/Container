@@ -50,6 +50,11 @@ android {
     }
 }
 
+// 出力ファイル名（例: cns-container-watch-debug.apk）。スマホ用と取り違えないように名前で区別する
+base {
+    archivesName.set("cns-container-watch")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)

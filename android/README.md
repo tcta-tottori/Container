@@ -82,8 +82,8 @@ cd android
 
 # 端末を指定する場合
 adb devices                                   # シリアル（Wi-Fi の場合は IP:ポート）を確認
-adb -s 192.168.1.23:38765 install -r wear/build/outputs/apk/debug/wear-debug.apk
-adb -s <スマホのシリアル>     install -r mobile/build/outputs/apk/debug/mobile-debug.apk
+adb -s 192.168.1.23:38765 install -r wear/build/outputs/apk/debug/cns-container-watch-debug.apk
+adb -s <スマホのシリアル>     install -r mobile/build/outputs/apk/debug/cns-container-phone-debug.apk
 ```
 
 GitHub Actions の成果物 `debug-apks`（zip）を落として `adb install -r` してもよい。
@@ -109,20 +109,20 @@ GitHub Actions の成果物 `debug-apks`（zip）を落として `adb install -r
 ウォッチへの書き込みは ADB が必要だが、ADB はスマホ上でも動かせる。流れは次のとおり。
 
 1. **APK を用意する**: スマホのブラウザで GitHub にログインし、Actions の実行結果から成果物 `debug-apks`（zip）をダウンロードして
-   Files アプリで展開する。`mobile-debug.apk` と `wear-debug.apk` は **同じ実行のもの**を組で使う（署名が揃う）。
-2. **スマホ側アプリ**: `mobile-debug.apk` をタップしてインストールする（「提供元不明のアプリ」を許可する）。
+   Files アプリで展開する。`cns-container-phone-debug.apk` と `cns-container-watch-debug.apk` は **同じ実行のもの**を組で使う（署名が揃う）。
+2. **スマホ側アプリ**: `cns-container-phone-debug.apk` をタップしてインストールする（「提供元不明のアプリ」を許可する）。
 3. **ウォッチ側の準備**: 上の「1. ウォッチ側の準備」と同じ（開発者向けオプション → ADB デバッグ / ワイヤレス デバッグ をオン）。
    スマホとウォッチは同じ Wi-Fi につなぐ。
 4. **スマホから ADB で書き込む**。どちらかを使う。
    - **Wear Installer 2**（Play ストア）: ウォッチの「新しいデバイスとペア設定」に出る IP・ポート・コードを入力してペアリングし、
-     `wear-debug.apk` を選んでインストールする。画面操作だけで済む。
+     `cns-container-watch-debug.apk` を選んでインストールする。画面操作だけで済む。
    - **Termux**（F-Droid または GitHub 版）: `pkg install android-tools` のあと、PC と同じコマンドを打つ。
 
      ```bash
      termux-setup-storage                    # Download フォルダを見えるようにする（初回）
      adb pair 192.168.1.23:41234             # ペア設定画面の IP:ポート → コードを入力
      adb connect 192.168.1.23:38765          # ワイヤレス デバッグ画面の IP:ポート
-     adb install -r ~/storage/downloads/wear-debug.apk
+     adb install -r ~/storage/downloads/cns-container-watch-debug.apk
      ```
 5. あとは「4. 動かし方」と同じ。
 
@@ -137,7 +137,7 @@ adb -s <ウォッチ> shell pm list packages | grep jp.tcta.cns.container     # 
 ```
 
 - **「アプリはインストールされていません」と出る**（APK をタップしたとき）
-  - `wear-debug.apk` はウォッチ専用（`android.hardware.type.watch` が必須）なので、スマホには入らない。スマホには `mobile-debug.apk` を入れる。
+  - `cns-container-watch-debug.apk` はウォッチ専用（`android.hardware.type.watch` が必須）なので、スマホには入らない。スマホには `cns-container-phone-debug.apk` を入れる。
   - すでに入っているアプリと署名が違う（古い CI 成果物や別 PC のビルド）と上書きできない。設定 → アプリ から「コンテナ ウォッチ同期」を
     アンインストールしてから入れ直す。ウォッチ側も同様（`adb uninstall jp.tcta.cns.container` か、ウォッチの設定 → アプリ から削除）。
   - ウォッチ側で `adb install` が `INSTALL_FAILED_UPDATE_INCOMPATIBLE` になるのも同じ原因。
