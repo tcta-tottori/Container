@@ -23,6 +23,16 @@ android {
         // ネイティブコードを含まないため、生成される APK / AAB はそのまま 64bit 対応になる。
     }
 
+    signingConfigs {
+        // PC でも CI でも同じ署名になるよう、リポジトリの debug 鍵を使う（keystore/README.md）
+        getByName("debug") {
+            storeFile = rootProject.file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

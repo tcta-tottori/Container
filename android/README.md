@@ -89,8 +89,8 @@ adb -s <スマホのシリアル>     install -r mobile/build/outputs/apk/debug/
 GitHub Actions の成果物 `debug-apks`（zip）を落として `adb install -r` してもよい。
 
 > **署名の注意**: Data Layer API は、スマホ側とウォッチ側のアプリが **同じ applicationId かつ同じ鍵で署名されている**ときだけ通信できる。
-> 同じ PC でビルドした 2 つの APK（同じ debug keystore）か、**同じ CI 実行**の成果物 2 つを組で使うこと。
-> PC でビルドしたものと CI のものを混ぜると鍵が違うため、データが届かない。
+> debug ビルドはリポジトリの `keystore/debug.keystore` で署名するので、PC でビルドしたものも GitHub Actions の成果物も同じ署名になる。
+> それより前（この鍵を入れる前）の APK は鍵が違うため、**一度アンインストールしてから**入れ直すこと。
 
 #### 4. 動かし方
 
@@ -136,8 +136,13 @@ adb -s <ウォッチ> logcat -s ContainerDataListener ContainerRepository   # �
 adb -s <ウォッチ> shell pm list packages | grep jp.tcta.cns.container     # インストール確認
 ```
 
+- **「アプリはインストールされていません」と出る**（APK をタップしたとき）
+  - `wear-debug.apk` はウォッチ専用（`android.hardware.type.watch` が必須）なので、スマホには入らない。スマホには `mobile-debug.apk` を入れる。
+  - すでに入っているアプリと署名が違う（古い CI 成果物や別 PC のビルド）と上書きできない。設定 → アプリ から「コンテナ ウォッチ同期」を
+    アンインストールしてから入れ直す。ウォッチ側も同様（`adb uninstall jp.tcta.cns.container` か、ウォッチの設定 → アプリ から削除）。
+  - ウォッチ側で `adb install` が `INSTALL_FAILED_UPDATE_INCOMPATIBLE` になるのも同じ原因。
 - **送信は成功しているのにウォッチに届かない**: 署名が違う（上の注意）か、スマホとウォッチがペアリングされていない。
-  両方をいったんアンインストールし、同じ PC / 同じ CI 実行の APK を入れ直す。
+  両方をいったんアンインストールして入れ直す。
 - **「送信できませんでした」になる**: スマホに Google Play 開発者サービスが無い（一部のエミュレータ）。実機を使う。
 - **ウォッチが `adb devices` に出ない / offline**: 同じ Wi-Fi か確認し、ウォッチ側で「ワイヤレス デバッグ」を一度オフ→オンして `adb connect` し直す。
 - **Tile が更新されない**: ウォッチのアプリを一度開くと Data Layer を読み直して Tile も更新される。
