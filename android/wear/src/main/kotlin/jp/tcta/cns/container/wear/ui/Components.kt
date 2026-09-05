@@ -1,6 +1,9 @@
 package jp.tcta.cns.container.wear.ui
 
 import android.text.format.DateFormat
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
@@ -35,6 +38,7 @@ import jp.tcta.cns.container.shared.DisplayFormat
 import jp.tcta.cns.container.shared.ItemTypes
 import kotlinx.coroutines.delay
 import java.util.Date
+import kotlin.math.roundToInt
 
 /** 画面の地の色 */
 val ScreenBlack = Color(0xFF000000)
@@ -72,6 +76,7 @@ fun MarqueeText(
     style: TextStyle,
     color: Color,
     modifier: Modifier = Modifier,
+    textAlign: TextAlign = TextAlign.Center,
 ) {
     Text(
         text = text,
@@ -79,7 +84,7 @@ fun MarqueeText(
         color = color,
         maxLines = 1,
         softWrap = false,
-        textAlign = TextAlign.Center,
+        textAlign = textAlign,
         modifier = modifier.basicMarquee(iterations = Int.MAX_VALUE),
     )
 }
@@ -164,4 +169,53 @@ fun ElapsedTimer(
         maxLines = 1,
         modifier = modifier,
     )
+}
+
+/* ===== 数字のカウント（スマホ版の useCountUp と同じ動き） ===== */
+
+/** 品目が変わったとき、数え始めるまでの待ち */
+private const val COUNT_START_DELAY_MS = 400L
+
+/** 0 から数え上げるのにかける時間 */
+private const val COUNT_UP_MS = 1000
+
+/** 値が変わったとき（パレットを減らしたときなど）になじませる時間 */
+private const val COUNT_CHANGE_MS = 500
+
+private val EaseInOutCubic = CubicBezierEasing(0.65f, 0f, 0.35f, 1f)
+private val EaseInOutQuad = CubicBezierEasing(0.45f, 0f, 0.55f, 1f)
+
+/**
+ * 数字を数えて見せる。
+ *
+ * [key] が変わったとき（品目が変わったとき）は、少し待ってから 0 から数え上げる。
+ * [target] だけが変わったとき（パレットを減らしたときなど）は、今の値からなじませる。
+ */
+@Composable
+fun countUp(target: Int, key: Any): Int {
+    val animated = remember(key) { Animatable(0f) }
+    var started by remember(key) { mutableStateOf(false) }
+    LaunchedEffect(key, target) {
+        if (!started) {
+            started = true
+            animated.snapTo(0f)
+            delay(COUNT_START_DELAY_MS)
+            animated.animateTo(target.toFloat(), tween(COUNT_UP_MS, easing = EaseInOutCubic))
+        } else {
+            animated.animateTo(target.toFloat(), tween(COUNT_CHANGE_MS, easing = EaseInOutQuad))
+        }
+    }
+    return animated.value.roundToInt()
+}
+
+/**
+ * 割合をなじませる。バーが減るときになめらかに動かすのに使う。
+ */
+@Composable
+fun smoothFraction(target: Float, key: Any): Float {
+    val animated = remember(key) { Animatable(target) }
+    LaunchedEffect(key, target) {
+        animated.animateTo(target, tween(COUNT_CHANGE_MS, easing = EaseInOutQuad))
+    }
+    return animated.value
 }

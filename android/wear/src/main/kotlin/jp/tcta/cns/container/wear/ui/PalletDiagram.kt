@@ -1,8 +1,5 @@
 package jp.tcta.cns.container.wear.ui
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -17,21 +14,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.BoxSlot
@@ -40,31 +38,48 @@ import jp.tcta.cns.container.shared.PALLET_BASE_HEIGHT
 import jp.tcta.cns.container.shared.PalletLayout
 import jp.tcta.cns.container.shared.PalletStack
 import jp.tcta.cns.container.wear.R
-import kotlinx.coroutines.delay
+import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.hypot
+import kotlin.math.sin
 
-/** 箱が 1 個落ちてくるのにかける時間 */
-private const val DROP_MS = 260
+/* ===== スマホ版（ItemDetailPanel）と同じ動きの値 ===== */
 
-/** 次の箱を落とすまでの間隔 */
-private const val DROP_INTERVAL_MS = 150L
+/** 中央から出てきて大きくなるまでの時間（秒） */
+private const val ENTER_SEC = 1.4f
 
-/** 落ちはじめの高さ（箱の高さの何倍ぶん上から落とすか） */
-private const val DROP_FROM = 3.2f
+/** 自動回転の初速（度/秒）。勢いよく回り始める */
+private const val SPIN_START_DPS = 260f
 
-/** 段ボールの色（上面・左面・右面）。上ほど明るくして立体に見せる */
-private val BoxTop = Color(0xFFD9B486)
-private val BoxLeft = Color(0xFF9C7549)
-private val BoxRight = Color(0xFFBE9464)
-private val BoxEdge = Color(0x33000000)
-private val PalletTop = Color(0xFF4A5568)
-private val PalletLeft = Color(0xFF2C3442)
-private val PalletRight = Color(0xFF3A4454)
+/** 落ち着いたあとの速さ（15 秒で 1 回転） */
+private const val SPIN_END_DPS = 360f / 15f
+
+/** 初速から終速へ近づく時定数（秒）。3 倍の時間でほぼ終速になる */
+private const val SPIN_EASE_SEC = 1.8f
+
+/** 既定の見る角度 */
+private const val START_ANGLE_DEG = -35f
+
+/** 見下ろす角度（58 度）。sin と cos を先に出しておく */
+private const val PITCH_SIN = 0.848f
+private const val PITCH_COS = 0.530f
+
+/** 段ボールの色。面の向きで明るさを変えて立体に見せる */
+private val CardboardBase = Color(0xFFD9B486)
+private val PalletBase = Color(0xFF4A5568)
+private val FaceEdge = Color(0x40000000)
+
+/** 面の明るさ（上 / 手前・奥 / 左右） */
+private const val SHADE_TOP = 1.0f
+private const val SHADE_DEPTH = 0.62f
+private const val SHADE_SIDE = 0.82f
 
 /**
  * 端数パレットの積み方の図。
  *
  * スマホ側（CNS）と同じ決まりで箱の置き場所を出し（`shared` の [PalletLayout]）、
- * 斜め上から見た形で描く。パレットが出たあと、箱が積む順番どおりに上から落ちてくる。
+ * 積み終わった状態で中央から回りながら大きくなって出てくる。
+ * そのあとは、勢いよく回り始めてだんだん落ち着く速さでくるくる回り続ける。
  * どこかをタップすると閉じる。
  */
 @Composable
@@ -83,14 +98,23 @@ fun PalletDiagramOverlay(
         )
     }
 
-    // 積む順に 1 個ずつ出していく
-    var placed by remember(stack) { mutableIntStateOf(0) }
+    // 回る角度と、出てくるときの大きさ
+    var angleDeg by remember(stack) { mutableFloatStateOf(START_ANGLE_DEG) }
+    var enter by remember(stack) { mutableFloatStateOf(0f) }
     LaunchedEffect(stack) {
-        placed = 0
-        delay(320L)
-        while (placed < stack.slots.size) {
-            placed += 1
-            delay(DROP_INTERVAL_MS)
+        angleDeg = START_ANGLE_DEG
+        enter = 0f
+        val t0 = withFrameNanos { it }
+        var last = t0
+        while (true) {
+            val now = withFrameNanos { it }
+            val dt = ((now - last).coerceAtLeast(0L)) / 1_000_000_000f
+            last = now
+            val elapsed = (now - t0) / 1_000_000_000f
+            // 初速から終速へ、なめらかに落ちていく
+            val dps = SPIN_END_DPS + (SPIN_START_DPS - SPIN_END_DPS) * exp(-elapsed / SPIN_EASE_SEC)
+            angleDeg += dps * dt
+            enter = (elapsed / ENTER_SEC).coerceIn(0f, 1f)
         }
     }
 
@@ -106,7 +130,7 @@ fun PalletDiagramOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = w * 0.10f, vertical = w * 0.13f),
+                    .padding(horizontal = w * 0.10f, vertical = w * 0.12f),
             ) {
                 Text(
                     text = item.modelName ?: item.name,
@@ -116,7 +140,7 @@ fun PalletDiagramOverlay(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Spacer(Modifier.height(w * 0.012f))
+                Spacer(Modifier.height(w * 0.01f))
                 if (stack.isEmpty) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -126,14 +150,13 @@ fun PalletDiagramOverlay(
                         )
                     }
                 } else {
-                    PalletCanvas(
-                        stack = stack,
-                        placed = placed,
-                        accent = accent,
+                    Canvas(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                    )
+                    ) {
+                        drawPallet(stack, angleDeg, enter)
+                    }
                     Text(
                         text = "${item.cartonCount}CT",
                         style = TextStyle(fontSize = (w.value * 0.062f).sp, fontWeight = FontWeight.Bold),
@@ -148,133 +171,149 @@ fun PalletDiagramOverlay(
     }
 }
 
-/** 斜め上から見たパレットと箱を描く */
-@Composable
-private fun PalletCanvas(
-    stack: PalletStack,
-    placed: Int,
-    accent: Color,
-    modifier: Modifier = Modifier,
+/** 図を描くのに要る、回した後の見え方 */
+private class View(
+    val scale: Float,
+    val centerX: Float,
+    val centerY: Float,
+    val palletCx: Float,
+    val palletCy: Float,
+    val cos: Float,
+    val sin: Float,
+    val vertShift: Float,
 ) {
-    // 何個目まで出したかが変わるたび、その箱を落として見せる
-    val progress by animateFloatAsState(
-        targetValue = placed.toFloat(),
-        animationSpec = tween(durationMillis = DROP_MS, easing = LinearEasing),
-        label = "drop",
-    )
+    /** 立体の座標を画面の座標に直す */
+    fun point(x: Float, y: Float, z: Float): Offset {
+        val dx = x - palletCx
+        val dy = y - palletCy
+        val rx = dx * cos - dy * sin
+        val ry = dx * sin + dy * cos
+        val up = ry * PITCH_SIN + z * PITCH_COS
+        return Offset(centerX + rx * scale, centerY - (up - vertShift) * scale)
+    }
 
-    Canvas(modifier = modifier) {
-        val projected = project(stack, size.width, size.height)
-        drawPalletBase(projected)
-
-        // 奥・下から順に描くと前後の重なりが正しく見える
-        val visible = stack.slots.indices
-            .filter { stack.order[it] < placed }
-            .sortedWith(
-                compareByDescending<Int> { stack.slots[it].y + stack.slots[it].d }
-                    .thenBy { stack.slots[it].z }
-                    .thenBy { stack.slots[it].x },
-            )
-
-        for (i in visible) {
-            val slot = stack.slots[i]
-            // いま落ちている最中の 1 個だけ、上から降りてくる途中を描く
-            val step = stack.order[i]
-            val fall = (1f - (progress - step)).coerceIn(0f, 1f)
-            val lift = fall * slot.h * DROP_FROM
-            val alpha = if (fall > 0f) (1f - fall * 0.6f) else 1f
-            drawBox(projected, slot, lift = lift, alpha = alpha, accent = accent)
-        }
+    /** 奥ゆき（大きいほど遠い）。描く順を決めるのに使う */
+    fun depth(x: Float, y: Float, z: Float): Float {
+        val dx = x - palletCx
+        val dy = y - palletCy
+        val ry = dx * sin + dy * cos
+        return ry * PITCH_COS - z * PITCH_SIN
     }
 }
 
-/** 図を画面に収めるための倍率と原点 */
-private data class Projection(
-    val scale: Float,
-    val originX: Float,
-    val originY: Float,
-    val palletWidth: Float,
-    val palletDepth: Float,
-    val totalHeight: Float,
-)
-
-/**
- * 斜め上から見た形にする。
- * 奥へ行くほど右上へずらし、高さはそのまま上へ積む。
- */
-private const val ISO_X = 0.52f
-private const val ISO_Y = -0.30f
-
-private fun DrawScope.project(stack: PalletStack, width: Float, height: Float): Projection {
+private fun DrawScope.drawPallet(stack: PalletStack, angleDeg: Float, enter: Float) {
     val pw = stack.palletWidth
     val pd = stack.palletDepth
     val ph = stack.totalHeight
-    // 図全体の外接する大きさ
-    val spanX = pw + pd * ISO_X
-    val spanY = ph + pd * -ISO_Y
-    val scale = minOf(width / spanX, height / spanY) * 0.92f
-    val originX = (width - spanX * scale) / 2
-    val originY = height - (height - spanY * scale) / 2
-    return Projection(scale, originX, originY, pw, pd, ph)
-}
+    val rad = Math.toRadians(angleDeg.toDouble())
+    val cos = cos(rad).toFloat()
+    val sin = sin(rad).toFloat()
 
-/** 立体の座標を画面の座標に直す */
-private fun Projection.point(x: Float, y: Float, z: Float): Offset = Offset(
-    x = originX + (x + y * ISO_X) * scale,
-    y = originY - (z - y * ISO_Y) * scale,
-)
+    // 回しても図の大きさが変わらないよう、外接する円で寸法を決める
+    val radius = hypot(pw / 2f, pd / 2f)
+    val spanX = radius * 2f
+    val spanUp = radius * 2f * PITCH_SIN + ph * PITCH_COS
+    val fit = minOf(size.width / spanX, size.height / spanUp) * 0.92f
+    // 中央から出てきて大きくなる（出はじめは小さく、だんだんゆるやかに）
+    val eased = 1f - (1f - enter) * (1f - enter) * (1f - enter)
+    val scale = fit * (0.28f + 0.72f * eased)
 
-private fun DrawScope.quad(p: Projection, pts: List<Triple<Float, Float, Float>>, color: Color, alpha: Float) {
-    val path = Path()
-    pts.forEachIndexed { i, (x, y, z) ->
-        val o = p.point(x, y, z)
-        if (i == 0) path.moveTo(o.x, o.y) else path.lineTo(o.x, o.y)
+    val view = View(
+        scale = scale,
+        centerX = size.width / 2f,
+        centerY = size.height / 2f,
+        palletCx = pw / 2f,
+        palletCy = pd / 2f,
+        cos = cos,
+        sin = sin,
+        vertShift = ph * PITCH_COS / 2f,
+    )
+    val alpha = (enter * 2.2f).coerceIn(0f, 1f)
+
+    // パレットの台と箱を、奥のものから順に描く
+    data class Piece(val depth: Float, val draw: DrawScope.() -> Unit)
+    val pieces = mutableListOf<Piece>()
+
+    pieces += Piece(
+        depth = view.depth(pw / 2f, pd / 2f, PALLET_BASE_HEIGHT / 2f) + 1_000f,
+        draw = { drawCuboid(view, 0f, pw, 0f, pd, 0f, PALLET_BASE_HEIGHT, PalletBase, alpha, cos, sin, null) },
+    )
+    for (slot in stack.slots) {
+        pieces += Piece(
+            depth = view.depth(slot.x + slot.w / 2f, slot.y + slot.d / 2f, slot.z + slot.h / 2f),
+            draw = { drawBoxSlot(view, slot, alpha, cos, sin) },
+        )
     }
-    path.close()
-    drawPath(path, color = color.copy(alpha = color.alpha * alpha))
-    drawPath(path, color = BoxEdge.copy(alpha = BoxEdge.alpha * alpha), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1f))
+    pieces.sortedByDescending { it.depth }.forEach { it.draw(this) }
 }
 
-/** パレットの台 */
-private fun DrawScope.drawPalletBase(p: Projection) {
-    val w = p.palletWidth
-    val d = p.palletDepth
-    val h = PALLET_BASE_HEIGHT
-    // 上面
-    quad(p, listOf(Triple(0f, 0f, h), Triple(w, 0f, h), Triple(w, d, h), Triple(0f, d, h)), PalletTop, 1f)
-    // 手前
-    quad(p, listOf(Triple(0f, 0f, h), Triple(w, 0f, h), Triple(w, 0f, 0f), Triple(0f, 0f, 0f)), PalletLeft, 1f)
-    // 右
-    quad(p, listOf(Triple(w, 0f, h), Triple(w, d, h), Triple(w, d, 0f), Triple(w, 0f, 0f)), PalletRight, 1f)
+private fun DrawScope.drawBoxSlot(view: View, slot: BoxSlot, alpha: Float, cos: Float, sin: Float) {
+    drawCuboid(
+        view,
+        slot.x, slot.x + slot.w,
+        slot.y, slot.y + slot.d,
+        slot.z, slot.z + slot.h,
+        CardboardBase, alpha, cos, sin, slot.split,
+    )
 }
 
-/** 箱ひとつ */
-private fun DrawScope.drawBox(p: Projection, slot: BoxSlot, lift: Float, alpha: Float, accent: Color) {
-    val x0 = slot.x
-    val x1 = slot.x + slot.w
-    val y0 = slot.y
-    val y1 = slot.y + slot.d
-    val z0 = slot.z + lift
-    val z1 = slot.z + slot.h + lift
+/**
+ * 直方体を描く。
+ * 見えている面（上・手前か奥・左か右）だけを、面の向きに応じた明るさで塗る。
+ */
+private fun DrawScope.drawCuboid(
+    view: View,
+    x0: Float, x1: Float,
+    y0: Float, y1: Float,
+    z0: Float, z1: Float,
+    base: Color,
+    alpha: Float,
+    cos: Float,
+    sin: Float,
+    split: String?,
+) {
+    fun face(pts: List<Triple<Float, Float, Float>>, shade: Float) {
+        val path = Path()
+        pts.forEachIndexed { i, (x, y, z) ->
+            val o = view.point(x, y, z)
+            if (i == 0) path.moveTo(o.x, o.y) else path.lineTo(o.x, o.y)
+        }
+        path.close()
+        drawPath(path, color = shaded(base, shade).copy(alpha = alpha))
+        drawPath(path, color = FaceEdge.copy(alpha = FaceEdge.alpha * alpha), style = Stroke(width = 1f))
+    }
 
-    // 上面 → 手前 → 右 の順に描く
-    quad(p, listOf(Triple(x0, y0, z1), Triple(x1, y0, z1), Triple(x1, y1, z1), Triple(x0, y1, z1)), BoxTop, alpha)
-    quad(p, listOf(Triple(x0, y0, z1), Triple(x1, y0, z1), Triple(x1, y0, z0), Triple(x0, y0, z0)), BoxLeft, alpha)
-    quad(p, listOf(Triple(x1, y0, z1), Triple(x1, y1, z1), Triple(x1, y1, z0), Triple(x1, y0, z0)), BoxRight, alpha)
+    // 手前（y0）が見えるのは cos > 0 のとき、奥（y1）が見えるのは cos < 0 のとき
+    if (cos > 0f) {
+        face(listOf(Triple(x0, y0, z1), Triple(x1, y0, z1), Triple(x1, y0, z0), Triple(x0, y0, z0)), SHADE_DEPTH)
+    } else {
+        face(listOf(Triple(x0, y1, z1), Triple(x1, y1, z1), Triple(x1, y1, z0), Triple(x0, y1, z0)), SHADE_DEPTH)
+    }
+    // 左（x0）が見えるのは sin > 0 のとき、右（x1）が見えるのは sin < 0 のとき
+    if (sin > 0f) {
+        face(listOf(Triple(x0, y0, z1), Triple(x0, y1, z1), Triple(x0, y1, z0), Triple(x0, y0, z0)), SHADE_SIDE)
+    } else {
+        face(listOf(Triple(x1, y0, z1), Triple(x1, y1, z1), Triple(x1, y1, z0), Triple(x1, y0, z0)), SHADE_SIDE)
+    }
+    // 上面は必ず見える
+    face(listOf(Triple(x0, y0, z1), Triple(x1, y0, z1), Triple(x1, y1, z1), Triple(x0, y1, z1)), SHADE_TOP)
 
-    // 2 箱をラミネートしている玉は、継ぎ目を上面に描く
-    when (slot.split) {
-        "w" -> {
+    // 2 箱をラミネートしている玉は、上面に継ぎ目を描く
+    if (split != null) {
+        val a: Offset
+        val b: Offset
+        if (split == "w") {
             val mx = (x0 + x1) / 2
-            val a = p.point(mx, y0, z1)
-            val b = p.point(mx, y1, z1)
-            drawLine(Color.White.copy(alpha = 0.35f * alpha), a, b, strokeWidth = 1f)
-        }
-        "d" -> {
+            a = view.point(mx, y0, z1)
+            b = view.point(mx, y1, z1)
+        } else {
             val my = (y0 + y1) / 2
-            val a = p.point(x0, my, z1)
-            val b = p.point(x1, my, z1)
-            drawLine(Color.White.copy(alpha = 0.35f * alpha), a, b, strokeWidth = 1f)
+            a = view.point(x0, my, z1)
+            b = view.point(x1, my, z1)
         }
+        drawLine(Color.White.copy(alpha = 0.32f * alpha), a, b, strokeWidth = 1f)
     }
 }
+
+private fun shaded(color: Color, amount: Float): Color =
+    Color(red = color.red * amount, green = color.green * amount, blue = color.blue * amount, alpha = 1f)

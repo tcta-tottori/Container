@@ -304,7 +304,8 @@ private fun ItemPage(
 
         ProgressRing(
             accent = accent,
-            progress = (item.remainingPercentage ?: 100f) / 100f,
+            // バーが減るときはなめらかに動かす
+            progress = smoothFraction((item.remainingPercentage ?: 100f) / 100f, item.id),
             strokeWidth = ringStroke,
             modifier = Modifier
                 .fillMaxSize()
@@ -339,29 +340,32 @@ private fun ItemPage(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 ValueWithUnit(
-                    value = item.palletCount.coerceAtLeast(0).toString(),
+                    value = countUp(item.palletCount.coerceAtLeast(0), item.id).toString(),
                     unit = "PL",
                     width = w,
+                    numberScale = 0.135f,
                     modifier = Modifier.weight(1f),
                 )
                 Box(
                     modifier = Modifier
                         .width(1.dp)
-                        .height(w * 0.10f)
+                        .height(w * 0.115f)
                         .background(Color.White.copy(alpha = 0.28f)),
                 )
                 ValueWithUnit(
-                    value = item.cartonCount.coerceAtLeast(0).toString(),
+                    value = countUp(item.cartonCount.coerceAtLeast(0), item.id).toString(),
                     unit = "CT",
                     width = w,
+                    numberScale = 0.135f,
                     modifier = Modifier.weight(1f),
                 )
             }
             HairLine(Modifier.padding(vertical = w * 0.014f))
             ValueWithUnit(
-                value = DisplayFormat.quantity(item.quantity.coerceAtLeast(0)),
+                value = DisplayFormat.quantity(countUp(item.quantity.coerceAtLeast(0), item.id)),
                 unit = "PCS",
                 width = w,
+                numberScale = 0.072f,
             )
         }
 
@@ -434,6 +438,7 @@ private fun ValueWithUnit(
     value: String,
     unit: String,
     width: Dp,
+    numberScale: Float,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -443,14 +448,14 @@ private fun ValueWithUnit(
     ) {
         Text(
             text = value,
-            style = TextStyle(fontSize = (width.value * 0.115f).sp, fontWeight = FontWeight.Black),
+            style = TextStyle(fontSize = (width.value * numberScale).sp, fontWeight = FontWeight.Black),
             color = Color.White,
             maxLines = 1,
         )
-        Spacer(Modifier.width(width * 0.012f))
+        Spacer(Modifier.width(width * 0.010f))
         Text(
             text = unit,
-            style = TextStyle(fontSize = (width.value * 0.042f).sp, fontWeight = FontWeight.Bold),
+            style = TextStyle(fontSize = (width.value * numberScale * 0.34f).sp, fontWeight = FontWeight.Bold),
             color = Color.White,
             maxLines = 1,
             modifier = Modifier.padding(bottom = width * 0.014f),
@@ -588,32 +593,64 @@ private fun ItemListPage(
 @Composable
 private fun ItemBar(item: CargoItem, selected: Boolean, onClick: () -> Unit) {
     val accent = itemTypeAccent(item.itemType)
-    Column(
-        verticalArrangement = Arrangement.Center,
+    BoxWithConstraints(
         modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(RoundedCornerShape(28.dp))
+            .fillMaxWidth(0.92f)
+            .height(46.dp)
+            .clip(RoundedCornerShape(23.dp))
             .background(darkened(accent, if (selected) 0.34f else 0.20f))
             .then(
-                if (selected) Modifier.border(2.dp, accent, RoundedCornerShape(28.dp)) else Modifier,
+                if (selected) Modifier.border(2.dp, accent, RoundedCornerShape(23.dp)) else Modifier,
             )
             .pointerInput(item.id) { detectTapGestures(onTap = { onClick() }) }
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 12.dp),
     ) {
+        val barWidth = maxWidth
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            // 左 3/5: 品名。収まらないときだけ横へ流す
+            MarqueeText(
+                text = item.modelName ?: item.name,
+                style = TextStyle(
+                    fontSize = (barWidth.value * 0.085f).sp,
+                    fontWeight = FontWeight.Bold,
+                ),
+                color = Color.White,
+                textAlign = TextAlign.Start,
+                modifier = Modifier.weight(3f),
+            )
+            // 右 2/5: PL / CT / PCS。数字は大きく、単位はごく小さく
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(barWidth * 0.022f, Alignment.End),
+                modifier = Modifier.weight(2f),
+            ) {
+                BarValue(item.palletCount, "PL", barWidth)
+                BarValue(item.cartonCount, "CT", barWidth)
+                BarValue(item.quantity, "PCS", barWidth)
+            }
+        }
+    }
+}
+
+/** 一覧のバーに出す 数字＋単位 */
+@Composable
+private fun BarValue(value: Int, unit: String, barWidth: Dp) {
+    Row(verticalAlignment = Alignment.Bottom) {
         Text(
-            text = item.modelName ?: item.name,
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            text = DisplayFormat.quantity(value.coerceAtLeast(0)),
+            style = TextStyle(fontSize = (barWidth.value * 0.098f).sp, fontWeight = FontWeight.Black),
             color = Color.White,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = "${item.palletCount}PL  ${item.cartonCount}CT  ${DisplayFormat.quantity(item.quantity)}PCS",
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.8f),
+            text = unit,
+            style = TextStyle(fontSize = (barWidth.value * 0.036f).sp, fontWeight = FontWeight.Bold),
+            color = Color.White.copy(alpha = 0.75f),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(bottom = barWidth * 0.008f),
         )
     }
 }
