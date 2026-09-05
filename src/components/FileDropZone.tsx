@@ -37,6 +37,35 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   );
 }
 
+/** ドロップゾーンを押したときに出す選び方のボタン */
+function PickButton({ label, hint, icon, onClick }: {
+  label: string; hint: string; icon: React.ReactNode; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="cns-action-btn"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+        padding: '14px 16px', borderRadius: 14, textAlign: 'left',
+        background: 'rgba(107,82,212,0.18)',
+        border: '1.5px solid rgba(155,69,201,0.35)',
+        color: '#fff', cursor: 'pointer', transition: 'background 0.2s ease',
+      }}
+    >
+      <span style={{
+        width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(155,69,201,0.22)', color: '#c4b5fd',
+      }}>{icon}</span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 15, fontWeight: 700 }}>{label}</span>
+        <span style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{hint}</span>
+      </span>
+    </button>
+  );
+}
+
 export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded, embedded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
@@ -45,6 +74,8 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
   const inputRef = useRef<HTMLInputElement>(null);
   /** その場で撮る用（アプリではカメラが開く） */
   const cameraRef = useRef<HTMLInputElement>(null);
+  /** 押したときに出す「ファイルを選ぶ / 写真を撮る」 */
+  const [pickOpen, setPickOpen] = useState(false);
 
   useEffect(() => {
     // マスタファイルの最終更新情報を取得
@@ -158,7 +189,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             </div>
           </div>{/* 左カラム閉じ */}
 
-          {/* 右カラム: ドロップゾーン + 写真を撮って読込 */}
+          {/* 右カラム: ドロップゾーン（押すとファイル選択か写真撮影かを選ぶ） */}
           <div className="drop-zone-right">
 
             {/* ドロップゾーン */}
@@ -166,7 +197,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               onDrop={onDrop}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
-              onClick={() => inputRef.current?.click()}
+              onClick={() => setPickOpen(true)}
               style={{
                 border: `2px dashed ${isDragging ? 'rgba(107,82,212,0.6)' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: 16, padding: '26px 16px', textAlign: 'center', cursor: 'pointer',
@@ -185,7 +216,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                 Excel / 写真をドラッグ＆ドロップ
               </p>
               <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, margin: 0 }}>
-                またはタップして選択（.xlsx / .xlsm / .xls / .jpg / .png）
+                またはタップして「ファイルを選ぶ / 写真を撮る」（.xlsx / .xlsm / .xls / .jpg / .png）
               </p>
               {classifiedFiles.length > 0 && (
                 <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -206,6 +237,46 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                   ))}
                 </div>
               )}
+              {/* 押したら出る選び方。枠の中にそのまま出す */}
+              {pickOpen && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}
+                >
+                  <PickButton
+                    label="ファイルを選ぶ"
+                    hint="Excel / 保存済みの写真"
+                    onClick={() => { setPickOpen(false); inputRef.current?.click(); }}
+                    icon={
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
+                      </svg>
+                    }
+                  />
+                  <PickButton
+                    label="写真を撮る"
+                    hint="コンテナ日程の紙をその場で撮る"
+                    onClick={() => { setPickOpen(false); cameraRef.current?.click(); }}
+                    icon={
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                        <circle cx="12" cy="13" r="4" />
+                      </svg>
+                    }
+                  />
+                  <button
+                    onClick={() => setPickOpen(false)}
+                    style={{
+                      padding: '8px', borderRadius: 10, background: 'transparent', border: 'none',
+                      color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer',
+                    }}
+                  >
+                    やめる
+                  </button>
+                </div>
+              )}
               <input ref={inputRef} type="file" accept=".xlsx,.xlsm,.xls,.jpg,.jpeg,.png,.webp,.heic,.heif,.bmp,image/*" multiple
                 onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
                 className="hidden" />
@@ -213,31 +284,6 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                 onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
                 className="hidden" />
             </div>
-
-            {/* ===== その場で撮って読み込む（コンテナ日程の紙をそのまま撮る） ===== */}
-            <button
-              onClick={() => cameraRef.current?.click()}
-              className="cns-action-btn"
-              style={{
-                marginTop: 14, width: '100%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                padding: '18px 20px', borderRadius: 16,
-                background: 'linear-gradient(135deg, rgba(107,82,212,0.25) 0%, rgba(155,69,201,0.25) 100%)',
-                border: '1.5px solid rgba(155,69,201,0.35)',
-                cursor: 'pointer', transition: 'all 0.3s ease',
-                color: '#fff', fontSize: 16, fontWeight: 700,
-                boxShadow: '0 0 16px rgba(107,82,212,0.15), 0 0 32px rgba(155,69,201,0.08)',
-                textShadow: '0 0 12px rgba(196,181,253,0.5)',
-                letterSpacing: 0.3,
-              }}
-            >
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                <circle cx="12" cy="13" r="4" />
-              </svg>
-              写真を撮って読込
-            </button>
 
           </div>{/* 右カラム閉じ */}
         </div>{/* columns閉じ */}
