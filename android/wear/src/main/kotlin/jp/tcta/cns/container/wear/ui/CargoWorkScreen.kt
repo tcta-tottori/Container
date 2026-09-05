@@ -13,6 +13,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -569,48 +571,98 @@ private fun ItemListPage(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(ScreenBlack),
     ) {
+        // バーの中身の幅は 1 度だけ出しておく。行ごとに測ると，
+        // スクロールのたびに測り直しが入ってカクつく
+        val barWidth = maxWidth * 0.92f - 24.dp
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .nestedScroll(edgePull),
-            contentPadding = PaddingValues(top = 34.dp, bottom = 34.dp, start = 12.dp, end = 12.dp),
+            contentPadding = PaddingValues(top = 34.dp, bottom = 34.dp, start = 12.dp, end = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             items(items, key = { it.id }) { item ->
-                ItemBar(item = item, selected = item.id == selectedId, onClick = { onSelect(item.id) })
+                ItemBar(
+                    item = item,
+                    selected = item.id == selectedId,
+                    barWidth = barWidth,
+                    onClick = { onSelect(item.id) },
+                )
             }
         }
         EdgeScrim()
+        ListScrollIndicator(
+            index = listState.centerItemIndex,
+            count = items.size,
+            modifier = Modifier.align(Alignment.CenterEnd),
+        )
+    }
+}
+
+/**
+ * 一覧のどのあたりを見ているかを示す，右端の細いバー。
+ * 丸い画面に沿うよう，中央を少しふくらませた位置に置く。
+ */
+@Composable
+private fun BoxWithConstraintsScope.ListScrollIndicator(
+    index: Int,
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
+    if (count <= 1) return
+    val trackHeight = maxHeight * 0.42f
+    // つまみの長さは項目数に応じて縮むが，短くなりすぎないようにする
+    val thumbRatio = (1f / count).coerceAtLeast(0.22f)
+    val position = (index.toFloat() / (count - 1).toFloat()).coerceIn(0f, 1f)
+    val animated by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = position,
+        label = "listScroll",
+    )
+    Box(
+        modifier = modifier
+            .padding(end = 4.dp)
+            .width(4.dp)
+            .height(trackHeight)
+            .clip(RoundedCornerShape(2.dp))
+            .background(Color.White.copy(alpha = 0.16f)),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(trackHeight * thumbRatio)
+                .offset(y = (trackHeight - trackHeight * thumbRatio) * animated)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.72f)),
+        )
     }
 }
 
 @Composable
-private fun ItemBar(item: CargoItem, selected: Boolean, onClick: () -> Unit) {
+private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: () -> Unit) {
     val accent = itemTypeAccent(item.itemType)
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
             .fillMaxWidth(0.92f)
             .height(46.dp)
             .clip(RoundedCornerShape(23.dp))
-            .background(darkened(accent, if (selected) 0.34f else 0.20f))
+            .background(darkened(accent, if (selected) 0.68f else 0.48f))
             .then(
                 if (selected) Modifier.border(2.dp, accent, RoundedCornerShape(23.dp)) else Modifier,
             )
             .pointerInput(item.id) { detectTapGestures(onTap = { onClick() }) }
             .padding(horizontal = 12.dp),
     ) {
-        val barWidth = maxWidth
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxSize(),
         ) {
-            // 左 3/5: 品名。収まらないときだけ横へ流す
+            // 左 3/5: 品名。選んでいる行だけ横へ流す（全行流すとスクロールがカクつく）
             MarqueeText(
                 text = item.modelName ?: item.name,
                 style = TextStyle(
@@ -619,16 +671,18 @@ private fun ItemBar(item: CargoItem, selected: Boolean, onClick: () -> Unit) {
                 ),
                 color = Color.White,
                 textAlign = TextAlign.Start,
+                marquee = selected,
                 modifier = Modifier.weight(3f),
             )
-            // 右 2/5: PL / CT / PCS。数字は大きく、単位はごく小さく
+            // 右 2/5: PL / CT / PCS。数字は大きく、単位はごく小さく。
+            // PL が 0 なら PL は出さず、CT も 0 なら PCS だけにする
             Row(
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.spacedBy(barWidth * 0.022f, Alignment.End),
                 modifier = Modifier.weight(2f),
             ) {
-                BarValue(item.palletCount, "PL", barWidth)
-                BarValue(item.cartonCount, "CT", barWidth)
+                if (item.palletCount > 0) BarValue(item.palletCount, "PL", barWidth)
+                if (item.cartonCount > 0) BarValue(item.cartonCount, "CT", barWidth)
                 BarValue(item.quantity, "PCS", barWidth)
             }
         }

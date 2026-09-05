@@ -3,6 +3,7 @@ package jp.tcta.cns.container.wear.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -60,9 +63,18 @@ private const val SPIN_EASE_SEC = 1.8f
 /** 既定の見る角度 */
 private const val START_ANGLE_DEG = -35f
 
-/** 見下ろす角度（58 度）。sin と cos を先に出しておく */
-private const val PITCH_SIN = 0.848f
-private const val PITCH_COS = 0.530f
+/**
+ * 見下ろす角度。スマホ版の `rotateX(-25deg)` と同じ 25 度。
+ * sin と cos を先に出しておく。
+ */
+private const val PITCH_SIN = 0.4226f
+private const val PITCH_COS = 0.9063f
+
+/** 画面幅いっぱいのスワイプで回る角度（スマホ版と同じ） */
+private const val SWIPE_DEG = 180f
+
+/** 触るのをやめてから自動回転に戻るまでの間（ミリ秒） */
+private const val SPIN_RESUME_DELAY_MS = 300L
 
 /** 段ボールの色。面の向きで明るさを変えて立体に見せる */
 private val CardboardBase = Color(0xFFD9B486)
@@ -98,23 +110,34 @@ fun PalletDiagramOverlay(
         )
     }
 
-    // 回る角度と、出てくるときの大きさ
+    // 回る角度と、出てくるときの大きさ。触っているあいだは自分で回せる
     var angleDeg by remember(stack) { mutableFloatStateOf(START_ANGLE_DEG) }
     var enter by remember(stack) { mutableFloatStateOf(0f) }
+    var zoom by remember(stack) { mutableFloatStateOf(1f) }
+    var paused by remember(stack) { mutableStateOf(false) }
+    var lastTouchAt by remember(stack) { mutableLongStateOf(0L) }
     LaunchedEffect(stack) {
         angleDeg = START_ANGLE_DEG
         enter = 0f
         val t0 = withFrameNanos { it }
         var last = t0
+        // 自動で回っているあいだだけ数える時間。触るたびに数え直すので、
+        // 手を離すとまた勢いよく回り始めてだんだん落ち着く
+        var spinSec = 0f
         while (true) {
             val now = withFrameNanos { it }
             val dt = ((now - last).coerceAtLeast(0L)) / 1_000_000_000f
             last = now
-            val elapsed = (now - t0) / 1_000_000_000f
-            // 初速から終速へ、なめらかに落ちていく
-            val dps = SPIN_END_DPS + (SPIN_START_DPS - SPIN_END_DPS) * exp(-elapsed / SPIN_EASE_SEC)
-            angleDeg += dps * dt
-            enter = (elapsed / ENTER_SEC).coerceIn(0f, 1f)
+            enter = ((now - t0) / 1_000_000_000f / ENTER_SEC).coerceIn(0f, 1f)
+            val idle = System.currentTimeMillis() - lastTouchAt > SPIN_RESUME_DELAY_MS
+            if (paused || !idle) {
+                spinSec = 0f
+            } else {
+                spinSec += dt
+                // 初速から終速へ、なめらかに落ちていく
+                val dps = SPIN_END_DPS + (SPIN_START_DPS - SPIN_END_DPS) * exp(-spinSec / SPIN_EASE_SEC)
+                angleDeg += dps * dt
+            }
         }
     }
 
@@ -153,9 +176,25 @@ fun PalletDiagramOverlay(
                     Canvas(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(1f),
+                            .weight(1f)
+                            // 図をタップすると止まる / また回り出す
+                            .pointerInput(stack) {
+                                detectTapGestures(onTap = { paused = !paused })
+                            }
+                            // 横になぞると自分で回せる。つまむと大きさが変わる
+                            .pointerInput(stack) {
+                                detectTransformGestures { _, pan, gestureZoom, _ ->
+                                    if (gestureZoom != 1f) {
+                                        zoom = (zoom * gestureZoom).coerceIn(0.5f, 3f)
+                                    }
+                                    if (pan.x != 0f && size.width > 0) {
+                                        angleDeg += pan.x / size.width * SWIPE_DEG
+                                    }
+                                    lastTouchAt = System.currentTimeMillis()
+                                }
+                            },
                     ) {
-                        drawPallet(stack, angleDeg, enter)
+                        drawPallet(stack, angleDeg, enter, zoom)
                     }
                     Text(
                         text = "${item.cartonCount}CT",
@@ -201,7 +240,7 @@ private class View(
     }
 }
 
-private fun DrawScope.drawPallet(stack: PalletStack, angleDeg: Float, enter: Float) {
+private fun DrawScope.drawPallet(stack: PalletStack, angleDeg: Float, enter: Float, zoom: Float) {
     val pw = stack.palletWidth
     val pd = stack.palletDepth
     val ph = stack.totalHeight
@@ -216,7 +255,7 @@ private fun DrawScope.drawPallet(stack: PalletStack, angleDeg: Float, enter: Flo
     val fit = minOf(size.width / spanX, size.height / spanUp) * 0.92f
     // 中央から出てきて大きくなる（出はじめは小さく、だんだんゆるやかに）
     val eased = 1f - (1f - enter) * (1f - enter) * (1f - enter)
-    val scale = fit * (0.28f + 0.72f * eased)
+    val scale = fit * (0.28f + 0.72f * eased) * zoom
 
     val view = View(
         scale = scale,

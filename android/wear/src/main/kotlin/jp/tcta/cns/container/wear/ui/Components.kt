@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -77,6 +78,7 @@ fun MarqueeText(
     color: Color,
     modifier: Modifier = Modifier,
     textAlign: TextAlign = TextAlign.Center,
+    marquee: Boolean = true,
 ) {
     Text(
         text = text,
@@ -85,7 +87,8 @@ fun MarqueeText(
         maxLines = 1,
         softWrap = false,
         textAlign = textAlign,
-        modifier = modifier.basicMarquee(iterations = Int.MAX_VALUE),
+        overflow = if (marquee) TextOverflow.Clip else TextOverflow.Ellipsis,
+        modifier = if (marquee) modifier.basicMarquee(iterations = Int.MAX_VALUE) else modifier,
     )
 }
 
@@ -182,8 +185,14 @@ private const val COUNT_UP_MS = 1000
 /** 値が変わったとき（パレットを減らしたときなど）になじませる時間 */
 private const val COUNT_CHANGE_MS = 500
 
+/** バーが減るときにかける時間。動き始めが速いぶん、少し長めにとる */
+private const val BAR_CHANGE_MS = 700
+
 private val EaseInOutCubic = CubicBezierEasing(0.65f, 0f, 0.35f, 1f)
 private val EaseInOutQuad = CubicBezierEasing(0.45f, 0f, 0.55f, 1f)
+
+/** 動き始めが速く、止まる位置に近づくにつれてゆっくりになる曲線 */
+private val EaseOutQuint = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
 
 /**
  * 数字を数えて見せる。
@@ -210,12 +219,13 @@ fun countUp(target: Int, key: Any): Int {
 
 /**
  * 割合をなじませる。バーが減るときになめらかに動かすのに使う。
+ * 動き始めは速く、止まる位置に近づくにつれてゆっくりになる。
  */
 @Composable
 fun smoothFraction(target: Float, key: Any): Float {
     val animated = remember(key) { Animatable(target) }
     LaunchedEffect(key, target) {
-        animated.animateTo(target, tween(COUNT_CHANGE_MS, easing = EaseInOutQuad))
+        animated.animateTo(target, tween(BAR_CHANGE_MS, easing = EaseOutQuint))
     }
     return animated.value
 }
