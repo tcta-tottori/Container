@@ -10,7 +10,6 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.wear.compose.material3.AppScaffold
-import androidx.wear.compose.material3.TimeText
 import jp.tcta.cns.container.shared.ContainerInfo
 import jp.tcta.cns.container.wear.ui.theme.ContainerWearTheme
 
@@ -52,8 +51,8 @@ fun WearApp(
     }
 
     ContainerWearTheme {
-        // 現在時刻は常に画面上部へ出す
-        AppScaffold(timeText = { TimeText() }) {
+        // 現在時刻は各画面が自前で（黒い丸枠に入れて）出すので、既定の時刻表示は使わない
+        AppScaffold(timeText = {}) {
             if (container == null) {
                 HomeScreen(state = uiState, onRefresh = viewModel::refresh)
             } else {

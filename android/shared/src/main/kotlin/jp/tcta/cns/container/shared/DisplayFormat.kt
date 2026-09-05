@@ -25,7 +25,7 @@ object DisplayFormat {
         val h = total / 3600L
         val m = (total % 3600L) / 60L
         val sec = total % 60L
-        return if (h > 0) String.format(Locale.ROOT, "%d:%02d:%02d", h, m, sec)
+        return if (h > 0) String.format(Locale.ROOT, "%02d:%02d:%02d", h, m, sec)
         else String.format(Locale.ROOT, "%02d:%02d", m, sec)
     }
 

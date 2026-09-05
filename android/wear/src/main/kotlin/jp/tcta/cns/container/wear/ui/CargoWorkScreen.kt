@@ -3,12 +3,14 @@ package jp.tcta.cns.container.wear.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,7 +19,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,24 +35,33 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.CargoItem
 import jp.tcta.cns.container.shared.DisplayFormat
-import jp.tcta.cns.container.shared.ItemTypes
 import jp.tcta.cns.container.wear.R
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -67,12 +80,18 @@ private val BOTTOM_EDGE_HEIGHT = 64.dp
 /** 一覧の端からさらに払って部品表示へ戻るとみなす移動量 */
 private val LIST_DISMISS_THRESHOLD = 56.dp
 
+/** リングの開始角（3 時から時計回り）。下の 60 度は経過時間のために空ける */
+private const val RING_START_ANGLE = 120f
+
+/** リングの長さ（度） */
+private const val RING_SWEEP = 300f
+
 /**
  * 荷降ろし中の作業画面。
  *
  * 横スワイプは使わない（ウォッチの「戻る」操作をそのまま活かすため）。
  *
- * 部品表示は全画面 1 品目。背景は種類の色で塗りつぶし、文字は白か黒。
+ * 部品表示は全画面 1 品目。
  * - 1 回タップ … パレットを 1 枚減らす（CNS の画面と同じ）
  * - 2 回タップ … パレットを 1 枚戻す
  * - 縦スワイプ … 品目を切り替える（上へ払うと次、下へ払うと前。端まで行くと反対の端へ回る）
@@ -102,7 +121,12 @@ fun CargoWorkScreen(
         ?: items.firstOrNull()
 
     if (selected == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(ScreenBlack),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(
                 text = stringResource(R.string.cargo_empty),
                 style = MaterialTheme.typography.bodySmall,
@@ -128,8 +152,6 @@ fun CargoWorkScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         ItemPage(
             item = selected,
-            temperatureC = payload?.environment?.temperatureC,
-            humidityPercent = payload?.environment?.humidityPercent,
             startedAt = container?.startedAt,
             pausedAt = container?.pausedAt,
             onDecrement = { onDecrementPallet(selected.id) },
@@ -161,13 +183,14 @@ fun CargoWorkScreen(
 
 /**
  * 部品表示（全画面 1 品目）。
- * 上から 種類 / 機種名 / PL・CT / 気温・湿度 / 経過時間。
+ *
+ * 外周に残り割合のリング（種類の色。未達は灰色）、その内側は種類の色を暗く落とした地。
+ * 中身は上から 種類バッジ / 機種名 / PL・CT / PCS。上に現在時刻、下に経過時間。
+ * 大きさは画面の幅を基準に決めているので、時計の大きさが変わっても見え方が揃う。
  */
 @Composable
 private fun ItemPage(
     item: CargoItem,
-    temperatureC: Float?,
-    humidityPercent: Int?,
     startedAt: Long?,
     pausedAt: Long?,
     onDecrement: () -> Unit,
@@ -176,23 +199,21 @@ private fun ItemPage(
     onPrevItem: () -> Unit,
     onOpenList: () -> Unit,
 ) {
-    val background = itemTypeAccent(item.itemType)
-    val onBackground = contrastTextColor(background)
+    val accent = itemTypeAccent(item.itemType)
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     // 1 回タップは 2 回目が来ないと確定しないので、少し待ってから減らす（CNS と同じ）
     var pendingTap by remember { mutableStateOf<Job?>(null) }
-    // 縦スワイプの移動量。指を離したときに、しきい値を超えていれば品目を送る
     val density = LocalDensity.current
     val switchThresholdPx = with(density) { ITEM_SWITCH_THRESHOLD.toPx() }
     val bottomEdgePx = with(density) { BOTTOM_EDGE_HEIGHT.toPx() }
     var dragAmount by remember { mutableFloatStateOf(0f) }
     var fromBottomEdge by remember { mutableStateOf(false) }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(background)
+            .background(ScreenBlack)
             .pointerInput(item.id) {
                 detectTapGestures(
                     onTap = {
@@ -244,95 +265,235 @@ private fun ItemPage(
                 )
             },
     ) {
+        val w = maxWidth
+        val ringStroke = w * 0.042f
+        val ringInset = w * 0.035f
+        val innerDiameter = w - (ringInset + ringStroke) * 2 - w * 0.012f
+
+        // 内側の地。種類の色を暗く落として、中心をわずかに明るくする
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(innerDiameter)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        listOf(darkened(accent, 0.34f), darkened(accent, 0.17f)),
+                    ),
+                ),
+        )
+
+        ProgressRing(
+            accent = accent,
+            progress = (item.remainingPercentage ?: 100f) / 100f,
+            strokeWidth = ringStroke,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(ringInset),
+        )
+
+        // 中身
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
-                .fillMaxSize()
-                // 丸い画面の縁に文字がかからないよう左右を空ける
-                .padding(horizontal = 34.dp, vertical = 30.dp),
+                .align(Alignment.Center)
+                .width(innerDiameter * 0.88f),
         ) {
-            Text(
-                text = ItemTypes.labelOf(item.itemType),
-                style = MaterialTheme.typography.labelSmall,
-                color = onBackground.copy(alpha = 0.75f),
-                maxLines = 1,
+            TypeBadge(
+                itemType = item.itemType,
+                fontSize = (w.value * 0.038f).sp,
+                cubeSize = w * 0.052f,
             )
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(w * 0.022f))
             MarqueeText(
                 text = item.modelName ?: item.name,
-                style = MaterialTheme.typography.displaySmall,
-                color = onBackground,
+                style = TextStyle(fontSize = (w.value * 0.098f).sp, fontWeight = FontWeight.Black),
+                color = Color.White,
                 modifier = Modifier.fillMaxWidth(),
             )
-            Spacer(Modifier.height(6.dp))
-            BigPalletCarton(pallets = item.palletCount, cartons = item.cartonCount, color = onBackground)
-            if (temperatureC != null || humidityPercent != null) {
-                Spacer(Modifier.height(6.dp))
-                ClimateRow(
-                    temperatureC = temperatureC,
-                    humidityPercent = humidityPercent,
-                    color = onBackground.copy(alpha = 0.8f),
+            HairLine(Modifier.padding(vertical = w * 0.014f))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                ValueWithUnit(
+                    value = item.palletCount.coerceAtLeast(0).toString(),
+                    unit = "PL",
+                    width = w,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(w * 0.10f)
+                        .background(Color.White.copy(alpha = 0.28f)),
+                )
+                ValueWithUnit(
+                    value = item.cartonCount.coerceAtLeast(0).toString(),
+                    unit = "CT",
+                    width = w,
+                    modifier = Modifier.weight(1f),
                 )
             }
+            HairLine(Modifier.padding(vertical = w * 0.014f))
+            ValueWithUnit(
+                value = DisplayFormat.quantity(item.quantity.coerceAtLeast(0)),
+                unit = "PCS",
+                width = w,
+            )
         }
 
-        EdgeScrim(strength = 0.35f)
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
+        TimePill(
+            fontSize = (w.value * 0.048f).sp,
             modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 6.dp),
-        ) {
-            if (startedAt != null) {
-                ElapsedTimer(startedAt = startedAt, pausedAt = pausedAt, color = onBackground)
-                Spacer(Modifier.height(4.dp))
-            }
-            // ここから上へ払うと一覧が出る、という目印
-            Box(
+                .align(Alignment.TopCenter)
+                .padding(top = w * 0.035f),
+        )
+
+        if (startedAt != null) {
+            ElapsedTimer(
+                startedAt = startedAt,
+                pausedAt = pausedAt,
+                style = TextStyle(fontSize = (w.value * 0.055f).sp, fontWeight = FontWeight.Bold),
                 modifier = Modifier
-                    .width(28.dp)
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(onBackground.copy(alpha = 0.5f)),
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = w * 0.035f),
             )
         }
     }
 }
 
-/** PL と CT の大きな数字 */
+/** 種類バッジ。黒い丸枠に 種類名 ・ 立方体アイコン */
 @Composable
-private fun BigPalletCarton(pallets: Int, cartons: Int, color: Color) {
+private fun TypeBadge(
+    itemType: String?,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    cubeSize: Dp,
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(Color.Black.copy(alpha = 0.72f))
+            .padding(horizontal = 14.dp, vertical = 5.dp),
     ) {
-        BigNumber(label = "PL", value = pallets, color = color, modifier = Modifier.weight(1f))
+        Text(
+            text = itemTypeLabel(itemType),
+            style = TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold),
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.width(9.dp))
         Box(
             modifier = Modifier
                 .width(1.dp)
-                .height(40.dp)
-                .background(color.copy(alpha = 0.35f)),
+                .height(cubeSize * 0.8f)
+                .background(Color.White.copy(alpha = 0.35f)),
         )
-        BigNumber(label = "CT", value = cartons, color = color, modifier = Modifier.weight(1f))
+        Spacer(Modifier.width(9.dp))
+        Icon(
+            painter = painterResource(R.drawable.ic_cube),
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(cubeSize),
+        )
     }
 }
 
+/** 大きな数字と、その右下に添える単位 */
 @Composable
-private fun BigNumber(label: String, value: Int, color: Color, modifier: Modifier = Modifier) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
+private fun ValueWithUnit(
+    value: String,
+    unit: String,
+    width: Dp,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.Center,
+        modifier = modifier,
+    ) {
         Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = color.copy(alpha = 0.75f),
-        )
-        Text(
-            text = value.coerceAtLeast(0).toString(),
-            style = MaterialTheme.typography.numeralMedium,
-            color = color,
+            text = value,
+            style = TextStyle(fontSize = (width.value * 0.115f).sp, fontWeight = FontWeight.Black),
+            color = Color.White,
             maxLines = 1,
+        )
+        Spacer(Modifier.width(width * 0.012f))
+        Text(
+            text = unit,
+            style = TextStyle(fontSize = (width.value * 0.042f).sp, fontWeight = FontWeight.Bold),
+            color = Color.White,
+            maxLines = 1,
+            modifier = Modifier.padding(bottom = width * 0.014f),
+        )
+    }
+}
+
+/** 区切りの細い線 */
+@Composable
+private fun HairLine(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(Color.White.copy(alpha = 0.22f)),
+    )
+}
+
+/**
+ * 残り割合のリング。下側を空けた 300 度の弧。
+ * 未達の部分は灰色、進んでいる部分は種類の色。まわりにうっすら光を足している。
+ */
+@Composable
+private fun ProgressRing(
+    accent: Color,
+    progress: Float,
+    strokeWidth: Dp,
+    modifier: Modifier = Modifier,
+) {
+    val clamped = progress.coerceIn(0f, 1f)
+    Canvas(modifier = modifier) {
+        val stroke = strokeWidth.toPx()
+        val inset = stroke / 2f
+        val arcSize = Size(size.width - stroke, size.height - stroke)
+        val topLeft = Offset(inset, inset)
+
+        drawArc(
+            color = RingTrack,
+            startAngle = RING_START_ANGLE,
+            sweepAngle = RING_SWEEP,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
+        )
+
+        if (clamped <= 0f) return@Canvas
+
+        // 外側へにじむ光
+        listOf(2.4f to 0.10f, 1.8f to 0.16f, 1.3f to 0.24f).forEach { (scale, alpha) ->
+            drawArc(
+                color = accent.copy(alpha = alpha),
+                startAngle = RING_START_ANGLE,
+                sweepAngle = RING_SWEEP * clamped,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = stroke * scale, cap = StrokeCap.Round),
+            )
+        }
+        drawArc(
+            color = accent,
+            startAngle = RING_START_ANGLE,
+            sweepAngle = RING_SWEEP * clamped,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
         )
     }
 }
@@ -381,7 +542,7 @@ private fun ItemListPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(ScreenBlack),
     ) {
         ScalingLazyColumn(
             state = listState,
@@ -401,33 +562,31 @@ private fun ItemListPage(
 
 @Composable
 private fun ItemBar(item: CargoItem, selected: Boolean, onClick: () -> Unit) {
-    val background = itemTypeAccent(item.itemType)
-    val onBackground = contrastTextColor(background)
+    val accent = itemTypeAccent(item.itemType)
     Column(
         verticalArrangement = Arrangement.Center,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp)
-            .clip(RoundedCornerShape(27.dp))
-            .background(background)
+            .height(56.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(darkened(accent, if (selected) 0.34f else 0.20f))
             .then(
-                if (selected) Modifier.border(2.dp, onBackground.copy(alpha = 0.85f), RoundedCornerShape(27.dp))
-                else Modifier,
+                if (selected) Modifier.border(2.dp, accent, RoundedCornerShape(28.dp)) else Modifier,
             )
             .pointerInput(item.id) { detectTapGestures(onTap = { onClick() }) }
             .padding(horizontal = 16.dp),
     ) {
         Text(
             text = item.modelName ?: item.name,
-            style = MaterialTheme.typography.titleSmall,
-            color = onBackground,
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+            color = Color.White,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
-            text = "${item.palletCount}PL  ${item.cartonCount}CT  ${DisplayFormat.quantity(item.quantity)}pcs",
+            text = "${item.palletCount}PL  ${item.cartonCount}CT  ${DisplayFormat.quantity(item.quantity)}PCS",
             style = MaterialTheme.typography.labelSmall,
-            color = onBackground.copy(alpha = 0.85f),
+            color = Color.White.copy(alpha = 0.8f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
