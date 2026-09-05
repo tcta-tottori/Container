@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -27,8 +28,10 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import jp.tcta.cns.container.mobile.bridge.NativeSpeechBridge
 import jp.tcta.cns.container.mobile.bridge.WatchBridge
+import jp.tcta.cns.container.mobile.work.WorkStatusService
 import jp.tcta.cns.container.mobile.sync.WatchCommandReceiver
 import jp.tcta.cns.container.mobile.sync.WearSyncClient
+import jp.tcta.cns.container.shared.ContainerSyncCodec
 
 /**
  * CNS アプリ本体。CNS（Web）を WebView で全画面表示する。
@@ -45,6 +48,14 @@ class MainActivity : ComponentActivity() {
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var polyfill: String = ""
 
+    /** アプリが前面にあるか。裏からはフォアグラウンドサービスを始められない */
+    @Volatile
+    private var foreground = false
+
+    /** 最後に CNS から受け取った同期内容。前面に戻ったときに表示を出し直すのに使う */
+    @Volatile
+    private var lastSyncJson: String? = null
+
     private val fileChooserLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val callback = fileChooserCallback ?: return@registerForActivityResult
@@ -58,6 +69,9 @@ class MainActivity : ComponentActivity() {
             callback.onReceiveValue(if (uris.isEmpty()) null else uris.toTypedArray())
         }
 
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     private val micPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             speechBridge.onMicPermissionResult(granted)
@@ -69,6 +83,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // 荷降ろし現場で画面が消えないようにする
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        askNotificationPermission()
 
         polyfill = assets.open("cns-native-polyfill.js").bufferedReader().use { it.readText() }
 
@@ -94,9 +109,18 @@ class MainActivity : ComponentActivity() {
         setContentView(webView)
 
         val syncClient = WearSyncClient(this)
-        watchBridge = WatchBridge(syncClient, lifecycleScope) { message ->
-            runOnUiThread { Toast.makeText(this, getString(R.string.watch_sync_failed, message), Toast.LENGTH_SHORT).show() }
-        }
+        watchBridge = WatchBridge(
+            syncClient,
+            lifecycleScope,
+            onError = { message ->
+                runOnUiThread { Toast.makeText(this, getString(R.string.watch_sync_failed, message), Toast.LENGTH_SHORT).show() }
+            },
+            // 荷降ろし中はステータスバーにも出しておく（アプリを閉じているあいだも見える）
+            onPayload = { payload, json ->
+                lastSyncJson = json
+                WorkStatusService.update(this, payload, json, canStart = foreground)
+            },
+        )
         commandReceiver = WatchCommandReceiver(this) { json ->
             // ウォッチの操作を CNS へ渡す。CNS 側は画面のタップと同じ処理を行う
             runOnUiThread {
@@ -179,12 +203,28 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        foreground = true
         commandReceiver.start()
+        // 前面に戻ったときに、まだ出せていなければステータスバー表示を出す
+        val json = lastSyncJson
+        val payload = ContainerSyncCodec.decodeOrNull(json)
+        if (json != null && payload != null) {
+            WorkStatusService.update(this, payload, json, canStart = true)
+        }
     }
 
     override fun onStop() {
+        foreground = false
         commandReceiver.stop()
         super.onStop()
+    }
+
+    /** ステータスバーに作業中を出すための許可。断られてもアプリはそのまま使える */
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (!granted) notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     /** JavaScript の文字列リテラルにする */
@@ -263,6 +303,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        WorkStatusService.stop(this)
         speechBridge.destroy()
         webView.destroy()
         super.onDestroy()

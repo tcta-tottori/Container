@@ -296,11 +296,13 @@ export default function Home() {
       workStartTime: state.workStartTime,
       workPausedAt: state.workPausedAt,
       climate: switchbot ?? barWeather,
+      // 作業ページを開いた時点でウォッチに知らせる（通知を押すとその作業画面が開く）
+      workViewOpen: viewMode === 'work' && state.items.length > 0,
     });
   }, [
     state.containers, state.selectedContainerIdx, state.items, state.currentItemIdx,
     state.originalValues, state.completedIds, state.workStartTime, state.workPausedAt,
-    switchbot, barWeather,
+    switchbot, barWeather, viewMode,
   ]);
   const [sbStatus, setSbStatus] = useState<SwitchBotStatus>('idle');
   const [sbError, setSbError] = useState<string | null>(null);

@@ -16,6 +16,7 @@ import com.google.android.gms.wearable.Wearable
 import jp.tcta.cns.container.shared.ContainerSyncCodec
 import jp.tcta.cns.container.shared.ContainerSyncPayload
 import jp.tcta.cns.container.shared.DataLayerContract
+import jp.tcta.cns.container.wear.notify.WorkNotifier
 import jp.tcta.cns.container.wear.tile.ContainerTileService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -73,6 +74,8 @@ class ContainerRepository private constructor(context: Context) {
             prefs[KEY_RECEIVED_AT] = System.currentTimeMillis()
         }
         TileService.getUpdater(appContext).requestUpdate(ContainerTileService::class.java)
+        // スマホが作業ページを開いていれば知らせる。押すとその作業画面が直接開く
+        WorkNotifier.update(appContext, payload)
         return true
     }
 

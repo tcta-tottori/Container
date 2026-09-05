@@ -1,10 +1,14 @@
 package jp.tcta.cns.container.wear
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,6 +22,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedContainerId = intent?.containerIdExtra()
+        askNotificationPermission()
         setContent {
             WearApp(
                 requestedContainerId = requestedContainerId,
@@ -42,4 +47,14 @@ class MainActivity : ComponentActivity() {
 
     private fun Intent.containerIdExtra(): String? =
         getStringExtra(DataLayerContract.EXTRA_CONTAINER_ID)?.takeIf { it.isNotBlank() }
+
+    /** スマホが作業ページを開いたことを知らせるための許可。断られてもアプリはそのまま使える */
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    private fun askNotificationPermission() {
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
 }
