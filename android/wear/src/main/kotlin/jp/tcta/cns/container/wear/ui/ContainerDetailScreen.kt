@@ -1,5 +1,6 @@
 package jp.tcta.cns.container.wear.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -18,15 +19,14 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.DisplayFormat
 import jp.tcta.cns.container.wear.R
 
 /**
  * 画面 2: コンテナ詳細。
- * 先頭にコンテナのダイヤル（積載率のリング・コンテナ番号・PL / CT 合計・気温湿度・経過時間）、
- * 続けてコンテナ番号・形態・積載率・残容量・荷物数・SKU 数・状態・更新時刻、荷物一覧ボタン。
+ * 先頭にコンテナの概要（積載率バッジ・コンテナ番号・PL / CT 合計・経過時間）、
+ * 続けてコンテナ番号・形態・積載率・残容量・荷物数・SKU 数・状態・更新時刻、作業画面へのボタン。
  */
 @Composable
 fun ContainerDetailScreen(
@@ -38,14 +38,13 @@ fun ContainerDetailScreen(
     val container = state.payload?.container(containerId)
     val cargoCount = state.payload?.cargoOf(containerId)?.size ?: 0
 
-    ScreenScaffold(
-        scrollState = listState,
-        contentPadding = PaddingValues(0.dp),
-    ) { _ ->
+    // ScreenScaffold にスクロールを渡すと時刻がスクロールで隠れるため、Box で受ける
+    Box(modifier = Modifier.fillMaxSize()) {
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 0.dp, bottom = 40.dp),
+            // 上は常時表示の時刻のぶんを空ける
+            contentPadding = PaddingValues(top = 34.dp, bottom = 44.dp, start = 10.dp, end = 10.dp),
             autoCentering = AutoCenteringParams(itemIndex = 0, itemOffset = 0),
         ) {
             if (container == null) {
@@ -83,9 +82,10 @@ fun ContainerDetailScreen(
                         pallets = container.totalPallets,
                         cartons = container.totalCartons,
                     )
-                    if (container.startedAt != null) {
+                    val startedAt = container.startedAt
+                    if (startedAt != null) {
                         Spacer(Modifier.height(4.dp))
-                        ElapsedTimer(startedAt = container.startedAt, pausedAt = container.pausedAt)
+                        ElapsedTimer(startedAt = startedAt, pausedAt = container.pausedAt)
                     }
                 }
             }
