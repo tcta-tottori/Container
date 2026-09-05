@@ -27,6 +27,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import jp.tcta.cns.container.mobile.bridge.NativeSpeechBridge
 import jp.tcta.cns.container.mobile.bridge.WatchBridge
+import jp.tcta.cns.container.mobile.sync.WatchCommandReceiver
 import jp.tcta.cns.container.mobile.sync.WearSyncClient
 
 /**
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var speechBridge: NativeSpeechBridge
     private lateinit var watchBridge: WatchBridge
+    private lateinit var commandReceiver: WatchCommandReceiver
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var polyfill: String = ""
 
@@ -94,6 +96,12 @@ class MainActivity : ComponentActivity() {
         val syncClient = WearSyncClient(this)
         watchBridge = WatchBridge(syncClient, lifecycleScope) { message ->
             runOnUiThread { Toast.makeText(this, getString(R.string.watch_sync_failed, message), Toast.LENGTH_SHORT).show() }
+        }
+        commandReceiver = WatchCommandReceiver(this) { json ->
+            // ウォッチの操作を CNS へ渡す。CNS 側は画面のタップと同じ処理を行う
+            runOnUiThread {
+                webView.evaluateJavascript("window.CNSWatchCommand && window.CNSWatchCommand(${jsString(json)})", null)
+            }
         }
         speechBridge = NativeSpeechBridge(this, webView) {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -160,6 +168,33 @@ class MainActivity : ComponentActivity() {
         })
 
         loadCns()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        commandReceiver.start()
+    }
+
+    override fun onStop() {
+        commandReceiver.stop()
+        super.onStop()
+    }
+
+    /** JavaScript の文字列リテラルにする */
+    private fun jsString(value: String): String {
+        val sb = StringBuilder("\"")
+        for (ch in value) {
+            when (ch) {
+                '\\' -> sb.append("\\\\")
+                '"' -> sb.append("\\\"")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\u2028' -> sb.append("\\u2028")
+                '\u2029' -> sb.append("\\u2029")
+                else -> sb.append(ch)
+            }
+        }
+        return sb.append('"').toString()
     }
 
     private fun loadCns() {

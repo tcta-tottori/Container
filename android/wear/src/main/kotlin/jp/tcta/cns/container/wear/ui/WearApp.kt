@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.wear.compose.material3.AppScaffold
+import androidx.wear.compose.material3.TimeText
 import jp.tcta.cns.container.wear.ui.theme.ContainerWearTheme
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
@@ -49,7 +50,8 @@ fun WearApp(
     }
 
     ContainerWearTheme {
-        AppScaffold {
+        // 現在時刻は常に画面上部へ出す（スクロールしても隠さない）
+        AppScaffold(timeText = { TimeText() }) {
             SwipeDismissableNavHost(
                 navController = navController,
                 startDestination = Routes.LIST,
@@ -71,7 +73,13 @@ fun WearApp(
                 }
                 composable(Routes.CARGO) { entry ->
                     val id = entry.arguments?.getString(Routes.ARG_ID).orEmpty()
-                    CargoWorkScreen(state = uiState, containerId = id)
+                    CargoWorkScreen(
+                        state = uiState,
+                        containerId = id,
+                        onSelectItem = { itemId -> viewModel.selectItem(id, itemId) },
+                        onDecrementPallet = { itemId -> viewModel.decrementPallet(id, itemId) },
+                        onIncrementPallet = { itemId -> viewModel.incrementPallet(id, itemId) },
+                    )
                 }
             }
         }

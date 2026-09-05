@@ -28,7 +28,7 @@ class WatchBridge(
 
     /** 橋渡しの版。Web 側が将来の互換判定に使える */
     @JavascriptInterface
-    fun version(): Int = 1
+    fun version(): Int = 2
 
     /** CNS から JSON を受け取ってウォッチへ送る。送信中に来た分は最後の 1 つだけ後で送る */
     @JavascriptInterface

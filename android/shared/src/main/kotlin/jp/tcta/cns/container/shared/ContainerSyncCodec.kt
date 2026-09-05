@@ -10,16 +10,17 @@ import kotlinx.serialization.json.Json
  * - null の項目はキーごと省く（ペイロードを小さく保つ）
  */
 object ContainerSyncCodec {
-    private val json = Json {
+    /** ウォッチ ↔ スマホでやり取りする JSON の設定。[WatchCommandCodec] からも使う */
+    internal val jsonFormat = Json {
         ignoreUnknownKeys = true
         encodeDefaults = true
         explicitNulls = false
     }
 
-    fun encode(payload: ContainerSyncPayload): String = json.encodeToString(ContainerSyncPayload.serializer(), payload)
+    fun encode(payload: ContainerSyncPayload): String = jsonFormat.encodeToString(ContainerSyncPayload.serializer(), payload)
 
     /** 壊れた JSON は例外にする。安全に読みたいときは [decodeOrNull] */
-    fun decode(text: String): ContainerSyncPayload = json.decodeFromString(ContainerSyncPayload.serializer(), text)
+    fun decode(text: String): ContainerSyncPayload = jsonFormat.decodeFromString(ContainerSyncPayload.serializer(), text)
 
     fun decodeOrNull(text: String?): ContainerSyncPayload? =
         text?.let { runCatching { decode(it) }.getOrNull() }

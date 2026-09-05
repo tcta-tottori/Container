@@ -4,7 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import jp.tcta.cns.container.shared.ContainerSyncPayload
+import jp.tcta.cns.container.shared.WatchCommand
 import jp.tcta.cns.container.wear.data.ContainerRepository
+import jp.tcta.cns.container.wear.sync.CommandSender
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +30,7 @@ data class ContainerUiState(
  */
 class ContainerViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ContainerRepository.getInstance(application)
+    private val commandSender = CommandSender(application)
     private val phoneConnected = MutableStateFlow<Boolean?>(null)
     private val refreshing = MutableStateFlow(false)
 
@@ -46,6 +49,27 @@ class ContainerViewModel(application: Application) : AndroidViewModel(applicatio
 
     init {
         refresh()
+    }
+
+    /** 品目を切り替える。スマホ（CNS）の表示も追従する */
+    fun selectItem(containerId: String, itemId: String) =
+        send(WatchCommand.SELECT_ITEM, containerId, itemId)
+
+    /** パレットを 1 枚減らす（CNS の画面を 1 回タップしたのと同じ） */
+    fun decrementPallet(containerId: String, itemId: String) =
+        send(WatchCommand.DECREMENT_PALLET, containerId, itemId)
+
+    /** パレットを 1 枚戻す（CNS の画面を 2 回タップしたのと同じ） */
+    fun incrementPallet(containerId: String, itemId: String) =
+        send(WatchCommand.INCREMENT_PALLET, containerId, itemId)
+
+    private fun send(type: String, containerId: String, itemId: String) {
+        viewModelScope.launch {
+            val delivered = commandSender.send(
+                WatchCommand(type = type, itemId = itemId, containerId = containerId, issuedAt = System.currentTimeMillis()),
+            )
+            phoneConnected.value = delivered
+        }
     }
 
     /** Data Layer を読み直し、スマホ接続状態を確認する */

@@ -1,12 +1,17 @@
 package jp.tcta.cns.container.wear.ui
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -54,20 +59,35 @@ fun ContainerDetailScreen(
                 return@ScalingLazyColumn
             }
 
-            item(key = "dial") {
-                Dial(
-                    accent = MaterialTheme.colorScheme.primary,
-                    progress = container.loadPercentage / 100f,
-                    badgeText = "${stringResource(R.string.label_load)} ${DisplayFormat.percent(container.loadPercentage)}",
-                    title = container.id,
-                    subtitle = container.name.takeIf { it != container.id },
-                    pallets = container.totalPallets,
-                    cartons = container.totalCartons,
-                    environment = state.payload?.environment,
-                    startedAt = container.startedAt,
-                    pausedAt = container.pausedAt,
-                    warning = null,
-                )
+            item(key = "summary") {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    PillBadge(
+                        text = "${stringResource(R.string.label_load)} ${DisplayFormat.percent(container.loadPercentage)}",
+                        accent = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = container.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    PalletCartonRow(
+                        accent = MaterialTheme.colorScheme.primary,
+                        pallets = container.totalPallets,
+                        cartons = container.totalCartons,
+                    )
+                    if (container.startedAt != null) {
+                        Spacer(Modifier.height(4.dp))
+                        ElapsedTimer(startedAt = container.startedAt, pausedAt = container.pausedAt)
+                    }
+                }
             }
 
             item { KeyValueRow(stringResource(R.string.detail_container_no), container.id) }
