@@ -1172,8 +1172,8 @@ export default function ItemDetailPanel({
               </SwipeRow>
             );
           })}
-          {/* リスト下部余白（最下行が見えるように） */}
-          <div style={{ height: 60, flexShrink: 0 }} />
+          {/* リスト下部余白。いちばん下の行がマイクなどのボタンに隠れないようにする */}
+          <div className="detail-list-tail" />
         </div>
         {/* 下のボタンのあたりは少し暗くして、行と重なっても見やすくする */}
         <div className="detail-list-fade" />

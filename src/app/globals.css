@@ -830,6 +830,11 @@ body {
   display: flex; flex-direction: column; gap: 6px;
 }
 .detail-list-section .detail-list-scroll > * { flex-shrink: 0; }
+/* いちばん下の行が、マイク（56px）と右下のボタンに隠れないだけの余白 */
+.detail-list-tail {
+  height: calc(96px + env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0;
+}
 .detail-list-row.detail-list-pill {
   height: 42px; padding: 0 16px;
   border: 1.5px solid transparent; border-radius: 21px;
