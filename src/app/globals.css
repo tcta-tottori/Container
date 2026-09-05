@@ -299,7 +299,8 @@ body {
 
 /* ===== 右下の展開メニュー（クイック操作） ===== */
 .quick-fab {
-  position: fixed; right: 16px; bottom: 20px; z-index: 140;
+  /* マイクボタンと同じ高さに並べる（下端の安全領域を避ける） */
+  position: fixed; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 140;
   width: 48px; height: 48px; border-radius: 15px;
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(160deg, #262a3d 0%, #1c2033 100%);

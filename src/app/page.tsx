@@ -1753,7 +1753,12 @@ export default function Home() {
               onContextMenu={(e) => e.preventDefault()}
               className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
               style={{
-                position: 'fixed', bottom: 20, zIndex: 100,
+                position: 'fixed', zIndex: 100,
+                /*
+                 * 下端の安全領域（ジェスチャーバー）は、ボタンの内側ではなく置き場所で避ける。
+                 * padding で避けるとボタンの中身だけが上へずれてしまう。
+                 */
+                bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
                 width: 56, height: 56, borderRadius: '50%',
                 background: isSpeaking
                   ? 'radial-gradient(circle at 35% 35%, #b48eff, #8b5cf6 50%, #6d28d9 80%, #4c1d95)'
@@ -1770,7 +1775,6 @@ export default function Home() {
                     : '0 4px 20px rgba(74,110,247,0.35), 0 0 40px rgba(107,82,212,0.15), inset 0 1px 2px rgba(255,255,255,0.15)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.3s ease',
-                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
               }}>
               {isPreparingSpeech ? (
                 /* Gemini TTS 取得中: 回転スピナー */
