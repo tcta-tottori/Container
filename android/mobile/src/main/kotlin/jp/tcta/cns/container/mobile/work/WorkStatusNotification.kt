@@ -78,7 +78,7 @@ object WorkStatusNotification {
         if (Build.VERSION.SDK_INT >= 36) {
             // ステータスバーに出しておきたい「進行中」の通知として登録する
             builder.setShortCriticalText(status.shortText)
-            builder.setRequestPromotedOngoing(true)
+            requestPromotion(builder)
             builder.setStyle(
                 Notification.ProgressStyle()
                     .setProgress(status.progress)
@@ -95,6 +95,23 @@ object WorkStatusNotification {
             builder.setProgress(100, status.progress, false)
         }
         return builder.build()
+    }
+
+    /**
+     * 「ステータスバーに出しておきたい通知」として登録を頼む。
+     *
+     * この頼み方は Android 16 で入ったばかりで、端末によって名前が違うことがある。
+     * 見つからなければ何もしない（ふつうの進行中通知として通知領域に残る）。
+     */
+    private fun requestPromotion(builder: Notification.Builder) {
+        for (name in arrayOf("setRequestPromotedOngoing", "requestPromotedOngoing")) {
+            try {
+                builder.javaClass.getMethod(name, Boolean::class.javaPrimitiveType).invoke(builder, true)
+                return
+            } catch (_: Exception) {
+                // 次の名前を試す
+            }
+        }
     }
 
     fun cancel(context: Context) {
