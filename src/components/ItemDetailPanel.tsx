@@ -280,24 +280,14 @@ function rowTint(accent: string, amount: number): string {
 }
 
 /** 一覧の行に出す 数字＋単位。数字は大きく、単位はごく小さく */
-function ListValue({ value, unit, color, className }: {
-  value: string; unit: string; color: string; className: string;
+function ListValue({ value, unit, color }: {
+  value: string; unit: string; color: string;
 }) {
   return (
-    <span className={`detail-list-val ${className}`}>
+    <span className="detail-list-val">
       <span className="detail-list-val-num" style={{ color }}>{value}</span>
       <span className="detail-list-val-unit" style={{ color }}>{unit}</span>
     </span>
-  );
-}
-
-/** 行の右端の「>」 */
-function ChevronRight({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
   );
 }
 
@@ -618,6 +608,8 @@ export default function ItemDetailPanel({
     '--hero-c2': heroBg.c2,
     '--hero-c3': heroBg.c3,
     '--hero-bg': heroBg.base,
+    // カードの縁。品目の色をはっきり出す
+    '--hero-edge': `${accentColor}88`,
   } as React.CSSProperties;
 
   // ヘッダーの地も品目の種類に合わせる。画面全体で色がつながって見えるようにする
@@ -901,26 +893,14 @@ export default function ItemDetailPanel({
         var(--hero-bg)
       `,
     }}>
-      {/* === 上半分（アニメーショングラデーション） === */}
-      <div className="detail-upper hero-animated" style={{
+      {/* === 上半分（品目のカード） === */}
+      <div className="detail-upper" style={{
         position: 'relative', overflow: 'hidden', ...heroVars,
       }}>
-        {/* 深いグラデーション背景 + ノイズテクスチャ */}
+        {/* 地は動かさない、上から下への素直なグラデーション */}
         <div style={{
           position: 'absolute', inset: 0, zIndex: 0,
-          background: `
-            radial-gradient(ellipse 120% 80% at 70% 30%, var(--hero-c1) 0%, transparent 60%),
-            radial-gradient(ellipse 100% 100% at 20% 80%, var(--hero-c3) 0%, transparent 50%),
-            radial-gradient(ellipse 80% 60% at 90% 70%, var(--hero-c2) 0%, transparent 55%),
-            var(--hero-bg)
-          `,
-        }} />
-        {/* 動く靄レイヤー */}
-        <div className="hero-glow-layer" style={{
-          background: `
-            radial-gradient(ellipse 60% 50% at 30% 40%, var(--hero-c1) 0%, transparent 50%),
-            radial-gradient(ellipse 50% 60% at 70% 60%, var(--hero-c3) 0%, transparent 50%)
-          `,
+          background: 'linear-gradient(165deg, var(--hero-c1) 0%, var(--hero-c3) 45%, var(--hero-bg) 100%)',
         }} />
 
         {/* 積載分布ゲージ + 種類数 + 進捗率（右上 — 常時表示、バッジ行と同じ高さ）
@@ -1190,10 +1170,15 @@ export default function ItemDetailPanel({
                     ? { color: nameColor, textDecoration: 'line-through' }
                     : { color: nameColor, fontWeight: isActive ? 800 : 600 }
                   } />
-                <ListValue className="pl" value={fmtNum(it.palletCount)} unit="PL" color={plColor} />
-                <ListValue className="ct" value={fmtNum(it.fraction)} unit="CT" color={numColor} />
-                <ListValue className="pcs" value={Math.ceil(it.totalQty).toLocaleString()} unit="pcs" color={pcsColor} />
-                <ChevronRight className="detail-list-chev" />
+                <span className="detail-list-vals">
+                  {it.palletCount > 0 && (
+                    <ListValue value={fmtNum(it.palletCount)} unit="PL" color={plColor} />
+                  )}
+                  {it.fraction > 0 && (
+                    <ListValue value={fmtNum(it.fraction)} unit="CT" color={numColor} />
+                  )}
+                  <ListValue value={Math.ceil(it.totalQty).toLocaleString()} unit="pcs" color={pcsColor} />
+                </span>
               </>
             );
 
