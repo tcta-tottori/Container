@@ -73,6 +73,7 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -80,8 +81,6 @@ dependencies {
     // Compose for Wear OS（Material 3）
     implementation(libs.androidx.wear.compose.material3)
     implementation(libs.androidx.wear.compose.foundation)
-    implementation(libs.androidx.wear.compose.navigation)
-    implementation(libs.androidx.navigation.compose)
 
     // Tile（ProtoLayout Material 3）
     implementation(libs.androidx.wear.tiles)

@@ -127,7 +127,7 @@ class ContainerSyncCodecTest {
         assertEquals("1PL 5CT", DisplayFormat.palletCarton(1, 5))
         assertEquals("00:44", DisplayFormat.elapsed(44_000L))
         assertEquals("12:05", DisplayFormat.elapsed(725_000L))
-        assertEquals("1:02:03", DisplayFormat.elapsed(3_723_000L))
+        assertEquals("01:02:03", DisplayFormat.elapsed(3_723_000L))
         assertEquals("00:00", DisplayFormat.elapsed(-5_000L))
         assertEquals("24℃", DisplayFormat.temperature(23.6f))
         assertEquals("0PL 0CT", DisplayFormat.palletCarton(-1, 0))
