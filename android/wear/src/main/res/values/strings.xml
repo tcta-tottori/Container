@@ -15,6 +15,10 @@
     <string name="action_pallet">端数パレットの積み方</string>
     <string name="pallet_none">端数なし</string>
 
+    <!-- 通知 -->
+    <string name="notify_channel_work">荷降ろし中のお知らせ</string>
+    <string name="notify_channel_work_desc">スマホが作業ページを開いているあいだ表示します</string>
+
     <!-- Tile -->
     <string name="tile_label">コンテナ状況</string>
     <string name="label_remaining">残</string>

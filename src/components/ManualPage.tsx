@@ -157,7 +157,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
           <>
             <Section title="作業の流れ" color="#60a5fa">
               <Step num={1} title="ファイルを読み込む" icon="📁"
-                desc="読込画面でExcelファイルをドラッグ＆ドロップ、または「Googleドライブ」ボタンから選択。コンテナ日程・AQSS04L両方に対応。" />
+                desc="読込画面でExcelファイルをドラッグ＆ドロップ、またはタップして選択。コンテナ日程・AQSS04L両方に対応。" />
               <Step num={2} title="概要アナウンスを確認" icon="🔊"
                 desc="読込完了後、コンテナの概要（種類別品目数・類似品の有無）が自動でアナウンスされます。鍋コンテナは100/180サイズ別に読み上げ。" />
               <Step num={3} title="音声で「OK」と言う" icon="🗣️"
@@ -381,7 +381,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   </div>
                   <div>
                     <strong style={{ color: '#a78bfa' }}>声・トーンの設定</strong>: メニュー →「設定」→「音声・コール」で、使う音声API・話す人・トーン・速さ・音量を変更できます（通常コールと応援コールで別々に設定）。
-                    音声 API は <strong>Gemini TTS</strong>（高品質・通信あり）、<strong>sherpa-onnx</strong>（端末内で高音質・通信なし）、<strong>端末の音声</strong>から選べます。
+                    音声 API は <strong>Gemini TTS</strong>（高品質・通信あり）と <strong>端末の音声</strong>（通信なし）から選べます。アプリ版では端末に入っている日本語の声を選べます。
                   </div>
                 </div>
               </InfoCard>
@@ -480,8 +480,8 @@ export default function ManualPage({ onClose }: ManualPageProps) {
             <Section title="読込方法" color="#60a5fa">
               <Step num={1} title="ドラッグ＆ドロップ" icon="📂"
                 desc="読込画面のドロップゾーンにExcelファイルをドラッグ＆ドロップ。複数ファイル同時対応。" />
-              <Step num={2} title="Googleドライブ" icon="☁️"
-                desc="「Googleドライブ」ボタンでCNSフォルダ内のファイルを選択。OAuth認証で安全にアクセス。" />
+              <Step num={2} title="写真を撮って読込" icon="📷"
+                desc="「写真を撮って読込」でコンテナ日程の紙をその場で撮り、AI が品目を読み取ります。" />
               <Step num={3} title="最近のファイル" icon="🕐"
                 desc="メニュー →「履歴」→「最近のファイル」で、過去に読み込んだファイルをワンタップで再読込。" />
             </Section>

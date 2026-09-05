@@ -6,7 +6,7 @@ import type { OriginalValues } from '@/hooks/useContainerData';
 import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 import { buildJapanesePartName } from '@/lib/partTranslations';
-import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
+import { getNabeModelColor } from '@/lib/nabeColors';
 import { displayQuantities } from '@/lib/itemQuantity';
 import { buildVolumeWeights } from '@/lib/containerLoad';
 import { usePalletTap } from '@/hooks/usePalletTap';
@@ -269,6 +269,38 @@ function shortenName(name: string): string {
 }
 
 /* ===== スワイプ行（左→右にスワイプで完了） ===== */
+/** 種類の色を暗く敷いた、一覧の行の地。[amount] が大きいほど色が濃く出る */
+function rowTint(accent: string, amount: number): string {
+  const hex = accent.replace('#', '');
+  if (hex.length !== 6) return '#121814';
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgb(${Math.round(10 + r * amount)},${Math.round(16 + g * amount)},${Math.round(12 + b * amount)})`;
+}
+
+/** 一覧の行に出す 数字＋単位。数字は大きく、単位はごく小さく */
+function ListValue({ value, unit, color, className }: {
+  value: string; unit: string; color: string; className: string;
+}) {
+  return (
+    <span className={`detail-list-val ${className}`}>
+      <span className="detail-list-val-num" style={{ color }}>{value}</span>
+      <span className="detail-list-val-unit" style={{ color }}>{unit}</span>
+    </span>
+  );
+}
+
+/** 行の右端の「>」 */
+function ChevronRight({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
 function SwipeRow({ children, onSwipe, style, className }: {
   children: React.ReactNode; onSwipe: () => void;
   style?: React.CSSProperties; className?: string;
@@ -299,12 +331,13 @@ function SwipeRow({ children, onSwipe, style, className }: {
   }, [onSwipe]);
 
   return (
-    <div style={{ overflow: 'visible', position: 'relative' }}>
+    <div style={{ overflow: 'hidden', position: 'relative', borderRadius: 29 }}>
       <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%',
+        position: 'absolute', inset: 0,
         background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
-        boxShadow: '0 0 20px rgba(34,197,94,0.5), 0 0 40px rgba(34,197,94,0.2), inset 0 0 10px rgba(255,255,255,0.1)',
-        display: 'flex', alignItems: 'center', paddingLeft: 16,
+        boxShadow: 'inset 0 0 10px rgba(255,255,255,0.15)',
+        borderRadius: 29,
+        display: 'flex', alignItems: 'center', paddingLeft: 20,
         color: '#fff', fontSize: 12, fontWeight: 700, gap: 4,
         textShadow: '0 0 8px rgba(255,255,255,0.6)',
       }}>✓ 完了</div>
@@ -346,11 +379,12 @@ function UndoSwipeRow({ children, onSwipe, style, className, onClick }: {
   }, [onSwipe]);
 
   return (
-    <div style={{ overflow: 'hidden', position: 'relative' }}>
+    <div style={{ overflow: 'hidden', position: 'relative', borderRadius: 29 }}>
       <div style={{
-        position: 'absolute', right: 0, top: 0, bottom: 0, width: '100%',
+        position: 'absolute', inset: 0,
         background: 'linear-gradient(270deg, #dc2626 0%, #ef4444 100%)',
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16,
+        borderRadius: 29,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 20,
         color: '#fff', fontSize: 12, fontWeight: 700, gap: 4,
       }}>↩ 元に戻す</div>
       <div ref={rowRef} className={className} style={{ ...style, position: 'relative', zIndex: 1 }}
@@ -532,9 +566,6 @@ export default function ItemDetailPanel({
   const weightTotal = allItems.reduce((sum, it) => sum + weightOf(it), 0) || 1;
 
   // リスト行の背景色（メニューカラーと統一・ダーク系）
-  const TYPE_ROW_BG: Record<string, string> = {
-    'ポリカバー': '#162218', 'ジャーポット': '#1e1520', '箱': '#151e2c', '部品': '#1c1628', '鍋': '#1e1518', 'ヤーマン部品': '#1c1a14', 'その他': '#1a1a1e',
-  };
 
   // 種類別の背景色（ダーク/ライト）
   const isLightMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
@@ -588,6 +619,17 @@ export default function ItemDetailPanel({
     '--hero-c3': heroBg.c3,
     '--hero-bg': heroBg.base,
   } as React.CSSProperties;
+
+  // ヘッダーの地も品目の種類に合わせる。画面全体で色がつながって見えるようにする
+  useEffect(() => {
+    const root = document.documentElement;
+    const prev = root.style.getPropertyValue('--header-bg');
+    root.style.setProperty('--header-bg', heroBg.base);
+    return () => {
+      if (prev) root.style.setProperty('--header-bg', prev);
+      else root.style.removeProperty('--header-bg');
+    };
+  }, [heroBg.base]);
 
   // カウントアップアニメーション（フェードアウト中は値をフリーズ）
   const isTransitioning = animKey !== item.id;
@@ -851,7 +893,14 @@ export default function ItemDetailPanel({
   }, [fullscreenPallet, item.id, item.palletCount, inspectionDeducted]);
 
   return (
-    <div className="detail-root" style={{ background: '#1a1d2e' }}>
+    <div className="detail-root" style={{
+      ...heroVars,
+      // 画面全体も種類の色に合わせた暗い地にして、カードと一覧をその上に置く
+      background: `
+        radial-gradient(ellipse 150% 55% at 50% 22%, var(--hero-c2) 0%, transparent 70%),
+        var(--hero-bg)
+      `,
+    }}>
       {/* === 上半分（アニメーショングラデーション） === */}
       <div className="detail-upper hero-animated" style={{
         position: 'relative', overflow: 'hidden', ...heroVars,
@@ -1111,13 +1160,7 @@ export default function ItemDetailPanel({
       </div>
 
       {/* === 下半分リスト === */}
-      <div className="detail-list-section" style={{ background: '#1a1d2e' }}>
-        <div className="detail-list-header" style={{ background: '#1e2130' }}>
-          <span className="detail-list-h-name" style={{ color: 'rgba(255,255,255,0.6)' }}>品名</span>
-          <span className="detail-list-h-num" style={{ color: 'rgba(255,255,255,0.6)' }}>PL</span>
-          <span className="detail-list-h-num" style={{ color: 'rgba(255,255,255,0.6)' }}>CS</span>
-          <span className="detail-list-h-num detail-list-h-total" style={{ color: 'rgba(255,255,255,0.6)' }}>PCS</span>
-        </div>
+      <div className="detail-list-section">
         <div className="detail-list-scroll">
           {sortedItems.map((it) => {
             const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
@@ -1129,23 +1172,28 @@ export default function ItemDetailPanel({
             // 鍋は機種別カラーを使用
             const itNabeColor = getNabeModelColor(it.itemName, it.type);
             const itAccent = itNabeColor || c.accent;
-            const typeBg = itNabeColor ? nabeColorToDarkBg(itNabeColor) : (TYPE_ROW_BG[it.type] || TYPE_ROW_BG['その他']);
-            const rowBg = isDone ? '#1e1e22' : isActive ? '#2a1f10' : typeBg;
+            const rowBg = isDone ? '#1a1a1e' : rowTint(itAccent, isActive ? 0.24 : 0.15);
 
+            // 数字は大きく、単位はごく小さく。位置をそろえるため列の幅は決め打ちにする
+            const nameColor = isDone
+              ? '#999'
+              : isActive ? '#ffffff' : isLightMode ? '#1a1a2e' : (itNabeColor || 'rgba(255,255,255,0.9)');
+            const plColor = isDone ? '#999' : isActive ? '#ffffff' : isLightMode ? '#1a6030' : itAccent;
+            const numColor = isDone ? '#999' : isLightMode ? '#1a1a2e' : 'rgba(255,255,255,0.95)';
+            const pcsColor = isDone ? '#999' : isLightMode ? '#555' : 'rgba(255,255,255,0.85)';
             const content = (
               <>
                 <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#555' : itAccent }} />
                 <MarqueeText text={displayName}
                   className="detail-list-name"
                   style={isDone
-                    ? { color: '#999', textDecoration: 'line-through' }
-                    : isActive ? { fontWeight: 700, color: '#e67e00' } : { color: isLightMode ? '#1a1a2e' : (itNabeColor || 'rgba(255,255,255,0.85)') }
+                    ? { color: nameColor, textDecoration: 'line-through' }
+                    : { color: nameColor, fontWeight: isActive ? 800 : 600 }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e67e00' : isLightMode ? '#1a6030' : itAccent, fontWeight: 600 }}>{fmtNum(it.palletCount)}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e67e00' : isLightMode ? '#1a1a2e' : 'rgba(255,255,255,0.7)' }}>{fmtNum(it.fraction)}</span>
-                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#999' : isLightMode ? '#555' : 'rgba(255,255,255,0.55)' }}>
-                  {Math.ceil(it.totalQty).toLocaleString()}
-                </span>
+                <ListValue className="pl" value={fmtNum(it.palletCount)} unit="PL" color={plColor} />
+                <ListValue className="ct" value={fmtNum(it.fraction)} unit="CT" color={numColor} />
+                <ListValue className="pcs" value={Math.ceil(it.totalQty).toLocaleString()} unit="pcs" color={pcsColor} />
+                <ChevronRight className="detail-list-chev" />
               </>
             );
 
@@ -1154,8 +1202,8 @@ export default function ItemDetailPanel({
                 <UndoSwipeRow key={it.id}
                   onSwipe={() => onUncompleteItem?.(it.id)}
                   onClick={() => onUncompleteItem?.(it.id)}
-                  className="detail-list-row"
-                  style={{ background: rowBg, borderLeftColor: '#444', borderLeftWidth: 3 }}
+                  className="detail-list-row detail-list-pill done"
+                  style={{ background: rowBg }}
                 >{content}</UndoSwipeRow>
               );
             }
@@ -1173,11 +1221,11 @@ export default function ItemDetailPanel({
             return (
               <SwipeRow key={it.id}
                 onSwipe={() => onCompleteItem?.(it.id)}
-                className={`detail-list-row ${isActive ? 'active' : ''}`}
+                className={`detail-list-row detail-list-pill ${isActive ? 'active' : ''}`}
                 style={{
                   background: finalRowBg,
-                  borderLeftColor: isActive ? '#ff6d00' : itAccent,
-                  borderLeftWidth: isActive ? 4 : 3,
+                  // 選ばれている行だけオレンジの枠で囲む
+                  borderColor: isActive ? '#ff8c21' : `${itAccent}33`,
                 }}
               >
                 <div style={{ display: 'contents' }} onClick={() => onSelectItem?.(origIdx)}>

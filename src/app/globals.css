@@ -85,7 +85,16 @@ body {
   .detail-panel { width: 100%; height: 100%; }
   .list-panel-side { display: none; }
   .stat-grid-portrait { grid-template-columns: repeat(2, 1fr) !important; }
+  /* カードは画面の縁から少し離して、四隅を丸くする */
+  .detail-panel .detail-upper {
+    height: calc(50% - 10px);
+    margin: 10px 10px 0;
+    border-radius: 26px;
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
 }
+@media (orientation: landscape) { .detail-panel .detail-upper { margin: 0; } }
 .full-panel { width: 100%; height: 100%; }
 
 /* ===== Header ===== */
@@ -856,7 +865,7 @@ body {
 /* === リスト === */
 .detail-list-section {
   flex: 1; display: flex; flex-direction: column;
-  min-height: 0;
+  min-height: 0; background: transparent;
 }
 .detail-list-header {
   display: flex; align-items: center; gap: 4px;
@@ -870,6 +879,55 @@ body {
 .detail-list-h-num { width: 38px; text-align: center; flex-shrink: 0; }
 .detail-list-h-total { width: 50px; text-align: right; }
 .detail-list-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* === 一覧（縦画面）: 丸みのある帯 === */
+.detail-list-section .detail-list-scroll {
+  padding: 10px 10px 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.detail-list-section .detail-list-scroll > * { flex-shrink: 0; }
+.detail-list-row.detail-list-pill {
+  height: 58px; padding: 0 10px 0 16px;
+  border: 1.5px solid transparent; border-radius: 29px;
+  border-left-width: 1.5px;
+  gap: 10px; font-size: 15.5px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  animation: none;
+}
+.detail-list-row.detail-list-pill.active {
+  border-width: 2px;
+  animation: pill-glow 2s ease-in-out infinite;
+}
+.detail-list-row.detail-list-pill.done { opacity: 0.6; }
+@keyframes pill-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(255,140,33,0.14); }
+  50% { box-shadow: 0 0 12px rgba(255,140,33,0.30), 0 0 24px rgba(255,140,33,0.10); }
+}
+.detail-list-row.detail-list-pill .detail-list-dot { width: 10px; height: 10px; }
+.detail-list-row.detail-list-pill .detail-list-name {
+  flex: 1; min-width: 0; font-size: 15.5px; letter-spacing: -0.2px;
+}
+.detail-list-val {
+  display: flex; align-items: baseline; justify-content: flex-end;
+  gap: 2px; flex-shrink: 0;
+}
+.detail-list-val-num {
+  font-size: 21px; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.5px;
+}
+.detail-list-val-unit { font-size: 9.5px; font-weight: 700; opacity: 0.55; line-height: 1; }
+.detail-list-val.pl { width: 50px; }
+.detail-list-val.ct { width: 54px; }
+.detail-list-val.pcs { width: 82px; }
+.detail-list-chev { flex-shrink: 0; color: rgba(255,255,255,0.35); }
+[data-theme="light"] .detail-list-chev { color: rgba(0,0,0,0.3); }
+/* 幅の狭い端末では pcs の列を少し詰める */
+@media (max-width: 380px) {
+  .detail-list-val.pl { width: 44px; }
+  .detail-list-val.ct { width: 48px; }
+  .detail-list-val.pcs { width: 72px; }
+  .detail-list-val-num { font-size: 18px; }
+}
 .detail-list-row {
   display: flex; align-items: center; gap: 6px;
   padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.05);

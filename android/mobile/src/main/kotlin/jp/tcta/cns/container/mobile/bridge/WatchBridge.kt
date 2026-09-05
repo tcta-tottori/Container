@@ -4,6 +4,7 @@ import android.util.Log
 import android.webkit.JavascriptInterface
 import jp.tcta.cns.container.mobile.sync.WearSyncClient
 import jp.tcta.cns.container.shared.ContainerSyncCodec
+import jp.tcta.cns.container.shared.ContainerSyncPayload
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -18,6 +19,8 @@ class WatchBridge(
     private val syncClient: WearSyncClient,
     private val scope: CoroutineScope,
     private val onError: (String) -> Unit,
+    /** 受け取った内容。ステータスバーの作業中表示にも使う */
+    private val onPayload: (ContainerSyncPayload, String) -> Unit = { _, _ -> },
 ) {
     private var inFlight: Job? = null
     private var queued: String? = null
@@ -38,6 +41,7 @@ class WatchBridge(
             Log.w(TAG, "受け取った JSON を読めませんでした (${json.length} 文字)")
             return
         }
+        onPayload(payload, json)
         synchronized(this) {
             if (inFlight?.isActive == true) {
                 queued = json

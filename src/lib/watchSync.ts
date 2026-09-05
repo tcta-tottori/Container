@@ -77,6 +77,8 @@ export interface WatchSyncInput {
   workStartTime: number | null;
   workPausedAt: number | null;
   climate: { temperature: number; humidity: number } | null;
+  /** 作業ページを開いているか。開いた時点でウォッチへ「荷降ろし中」として知らせる */
+  workViewOpen?: boolean;
 }
 
 /** ウォッチから届く操作 */
@@ -208,7 +210,7 @@ function buildContainerInfo(
       ? '完了'
       : input.workPausedAt !== null
         ? '一時停止'
-        : input.workStartTime !== null
+        : input.workStartTime !== null || input.workViewOpen
           ? '荷降ろし中'
           : '荷降ろし待ち';
 
