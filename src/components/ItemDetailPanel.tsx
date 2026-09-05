@@ -269,6 +269,21 @@ function shortenName(name: string): string {
 }
 
 /* ===== スワイプ行（左→右にスワイプで完了） ===== */
+/** 種類の色を暗く落とした 1 色。[amount] が大きいほど色が濃く出る */
+function tint(accent: string, amount: number): string {
+  const hex = accent.replace('#', '');
+  if (hex.length !== 6) return '#1e2233';
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgb(${Math.round(8 + r * amount)},${Math.round(12 + g * amount)},${Math.round(10 + b * amount)})`;
+}
+
+/** 種類の色で塗りつぶすグラデーション */
+function tintGradient(accent: string, deg: number, from: number, mid: number, to: number): string {
+  return `linear-gradient(${deg}deg, ${tint(accent, from)} 0%, ${tint(accent, mid)} 55%, ${tint(accent, to)} 100%)`;
+}
+
 /** 一覧の行に出す 数字＋単位。数字は大きく、単位はごく小さく */
 function ListValue({ value, unit, color }: {
   value: string; unit: string; color: string;
@@ -832,10 +847,10 @@ export default function ItemDetailPanel({
     <div className="detail-root">
       {/* === 上半分（品目のカード） === */}
       <div className="detail-upper" style={{ position: 'relative', overflow: 'hidden' }}>
-        {/* 地はメニューと同じグレー。色は点や数字だけに使う */}
+        {/* 枠の中は品目の種類の色で塗る（動かさない、素直なグラデーション） */}
         <div style={{
           position: 'absolute', inset: 0, zIndex: 0,
-          background: 'linear-gradient(160deg, #23273a 0%, #1c2030 55%, #171a29 100%)',
+          background: tintGradient(accentColor, 160, 0.46, 0.26, 0.13),
         }} />
 
         {/* 積載分布ゲージ + 種類数 + 進捗率（右上 — 常時表示、バッジ行と同じ高さ）
@@ -1087,7 +1102,9 @@ export default function ItemDetailPanel({
             // 鍋は機種別カラーを使用
             const itNabeColor = getNabeModelColor(it.itemName, it.type);
             const itAccent = itNabeColor || c.accent;
-            const rowBg = isDone ? '#191b22' : isActive ? '#272c40' : '#1e2233';
+            const rowBg = isDone
+              ? 'linear-gradient(100deg, #202228 0%, #191b22 100%)'
+              : tintGradient(itAccent, 100, isActive ? 0.40 : 0.28, isActive ? 0.30 : 0.20, isActive ? 0.20 : 0.12);
 
             // 数字は大きく、単位はごく小さく。位置をそろえるため列の幅は決め打ちにする
             const nameColor = isDone
