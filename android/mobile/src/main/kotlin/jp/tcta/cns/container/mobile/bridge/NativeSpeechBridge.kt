@@ -229,7 +229,7 @@ class NativeSpeechBridge(
             tts?.stop()
             tts?.shutdown()
             tts = null
-            ttsReady = false
+            ttsState = TtsState.FAILED
         }
     }
 
