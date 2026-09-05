@@ -693,13 +693,17 @@ body {
 }
 
 /* ===== Detail panel ===== */
-.detail-root { display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden; }
+.detail-root {
+  display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden;
+  /* 地はメニューと同じグレー。色は品目の点・数字だけに使う */
+  background: linear-gradient(180deg, #171a29 0%, #14161f 100%);
+}
 .detail-upper {
   display: flex; flex-direction: column; gap: 4px;
   padding: 10px 14px 10px; position: relative; z-index: 1;
   border-radius: 18px;
-  /* 縁ははっきり描く。色は品目の種類に合わせて JS 側から入れる */
-  border: 2px solid var(--hero-edge, rgba(255,255,255,0.22));
+  /* 縁ははっきり描く（色は入れない） */
+  border: 2px solid rgba(255,255,255,0.16);
   height: 50%; flex-shrink: 0; overflow: hidden;
 }
 .detail-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; position: relative; z-index: 3; flex-shrink: 0; min-height: 24px; }
@@ -796,7 +800,16 @@ body {
 /* === リスト === */
 .detail-list-section {
   flex: 1; display: flex; flex-direction: column;
-  min-height: 0; background: transparent;
+  min-height: 0; background: transparent; position: relative;
+}
+/* 下のボタンのあたりを少し暗く落とす膜 */
+.detail-list-fade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 120px;
+  pointer-events: none; z-index: 2;
+  background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 45%, transparent 100%);
+}
+[data-theme="light"] .detail-list-fade {
+  background: linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.16) 45%, transparent 100%);
 }
 .detail-list-header {
   display: flex; align-items: center; gap: 4px;

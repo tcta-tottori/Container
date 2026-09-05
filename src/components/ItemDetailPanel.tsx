@@ -269,16 +269,6 @@ function shortenName(name: string): string {
 }
 
 /* ===== スワイプ行（左→右にスワイプで完了） ===== */
-/** 種類の色を暗く敷いた、一覧の行の地。[amount] が大きいほど色が濃く出る */
-function rowTint(accent: string, amount: number): string {
-  const hex = accent.replace('#', '');
-  if (hex.length !== 6) return '#121814';
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  return `rgb(${Math.round(10 + r * amount)},${Math.round(16 + g * amount)},${Math.round(12 + b * amount)})`;
-}
-
 /** 一覧の行に出す 数字＋単位。数字は大きく、単位はごく小さく */
 function ListValue({ value, unit, color }: {
   value: string; unit: string; color: string;
@@ -291,9 +281,11 @@ function ListValue({ value, unit, color }: {
   );
 }
 
-function SwipeRow({ children, onSwipe, style, className }: {
+function SwipeRow({ children, onSwipe, style, className, current }: {
   children: React.ReactNode; onSwipe: () => void;
   style?: React.CSSProperties; className?: string;
+  /** いま表示している部品の行か（一覧を真ん中に寄せるときの目印） */
+  current?: boolean;
 }) {
   const startX = useRef(0);
   const dx = useRef(0);
@@ -321,7 +313,8 @@ function SwipeRow({ children, onSwipe, style, className }: {
   }, [onSwipe]);
 
   return (
-    <div style={{ overflow: 'hidden', position: 'relative', borderRadius: 29 }}>
+    <div data-current-row={current ? '1' : undefined}
+      style={{ overflow: 'hidden', position: 'relative', borderRadius: 29 }}>
       <div style={{
         position: 'absolute', inset: 0,
         background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
@@ -487,6 +480,21 @@ export default function ItemDetailPanel({
     if (a180 !== b180) return a180 - b180;
     return a.itemName.localeCompare(b.itemName);
   };
+  // 一覧は、いま表示している部品が真ん中に来るように動かす
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = listScrollRef.current;
+    if (!box) return;
+    // 描き終わってから測る
+    const raf = requestAnimationFrame(() => {
+      const row = box.querySelector<HTMLElement>('[data-current-row="1"]');
+      if (!row) return;
+      const top = row.offsetTop - (box.clientHeight - row.offsetHeight) / 2;
+      box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [item.id]);
+
   const sortedItems = isNabeContainer
     ? [...activeItems.sort(nabeSort), ...doneItems.sort(nabeSort)]
     : [...activeItems, ...doneItems];
@@ -559,70 +567,6 @@ export default function ItemDetailPanel({
 
   // 種類別の背景色（ダーク/ライト）
   const isLightMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
-  const HERO_BG_DARK: Record<string, { base: string; c1: string; c2: string; c3: string }> = {
-    'ポリカバー': { base: '#081a12', c1: '#0a3d22', c2: '#06291a', c3: '#0d4a2a' },
-    'ジャーポット': { base: '#1a0818', c1: '#3d0a35', c2: '#29061e', c3: '#4a0d42' },
-    '箱': { base: '#1a1008', c1: '#3d280a', c2: '#291c06', c3: '#4a300d' },
-    '部品': { base: '#12081a', c1: '#280a3d', c2: '#1c0629', c3: '#300d4a' },
-    '鍋': { base: '#1a0808', c1: '#3d0a0a', c2: '#290606', c3: '#4a0d0d' },
-    'ヤーマン部品': { base: '#1a1608', c1: '#3d320a', c2: '#292406', c3: '#4a3c0d' },
-    'その他': { base: '#101218', c1: '#1a2030', c2: '#141822', c3: '#1e2838' },
-  };
-  const HERO_BG_LIGHT: Record<string, { base: string; c1: string; c2: string; c3: string }> = {
-    'ポリカバー': { base: '#0e8040', c1: '#009868', c2: '#38a828', c3: '#08904a' },    // 濃い緑→シアン
-    'ジャーポット': { base: '#6830a8', c1: '#902880', c2: '#5038b0', c3: '#883098' },   // 濃い紫
-    '箱': { base: '#a87810', c1: '#b89018', c2: '#986808', c3: '#c08818' },             // 濃いゴールド
-    '部品': { base: '#4040a8', c1: '#6030b8', c2: '#2858c0', c3: '#5038a8' },           // 濃い青紫
-    '鍋': { base: '#b83028', c1: '#c85020', c2: '#a82840', c3: '#c04828' },             // 濃い赤
-    'ヤーマン部品': { base: '#907810', c1: '#a89018', c2: '#806808', c3: '#988018' },   // 濃いゴールド
-    'その他': { base: '#386888', c1: '#2860a0', c2: '#487880', c3: '#205898' },         // 濃い青
-  };
-  const HERO_BG = isLightMode ? HERO_BG_LIGHT : HERO_BG_DARK;
-  // 鍋はnabeColorから背景を動的生成
-  const heroBg = (() => {
-    if (item.type === '鍋' && nabeColor) {
-      const hex = nabeColor.replace('#', '');
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      if (isLightMode) {
-        return {
-          base: `rgb(${Math.min(200, Math.round(r * 0.6 + 20))},${Math.min(200, Math.round(g * 0.6 + 20))},${Math.min(200, Math.round(b * 0.6 + 20))})`,
-          c1: `rgb(${Math.min(200, Math.round(r * 0.7 + 10))},${Math.min(200, Math.round(g * 0.5 + 40))},${Math.min(200, Math.round(b * 0.7 + 10))})`,
-          c2: `rgb(${Math.min(200, Math.round(r * 0.5 + 40))},${Math.min(200, Math.round(g * 0.65 + 20))},${Math.min(200, Math.round(b * 0.65 + 20))})`,
-          c3: `rgb(${Math.min(200, Math.round(r * 0.75))},${Math.min(200, Math.round(g * 0.55 + 30))},${Math.min(200, Math.round(b * 0.6 + 20))})`,
-        };
-      }
-      return {
-        base: `rgb(${Math.round(r * 0.1 + 8)},${Math.round(g * 0.1 + 8)},${Math.round(b * 0.1 + 8)})`,
-        c1: `rgb(${Math.round(r * 0.24 + 5)},${Math.round(g * 0.24 + 5)},${Math.round(b * 0.24 + 5)})`,
-        c2: `rgb(${Math.round(r * 0.16 + 4)},${Math.round(g * 0.16 + 4)},${Math.round(b * 0.16 + 4)})`,
-        c3: `rgb(${Math.round(r * 0.29 + 6)},${Math.round(g * 0.29 + 6)},${Math.round(b * 0.29 + 6)})`,
-      };
-    }
-    return HERO_BG[item.type] || HERO_BG['その他'];
-  })();
-
-  const heroVars = {
-    '--hero-c1': heroBg.c1,
-    '--hero-c2': heroBg.c2,
-    '--hero-c3': heroBg.c3,
-    '--hero-bg': heroBg.base,
-    // カードの縁。品目の色をはっきり出す
-    '--hero-edge': `${accentColor}88`,
-  } as React.CSSProperties;
-
-  // ヘッダーの地も品目の種類に合わせる。画面全体で色がつながって見えるようにする
-  useEffect(() => {
-    const root = document.documentElement;
-    const prev = root.style.getPropertyValue('--header-bg');
-    root.style.setProperty('--header-bg', heroBg.base);
-    return () => {
-      if (prev) root.style.setProperty('--header-bg', prev);
-      else root.style.removeProperty('--header-bg');
-    };
-  }, [heroBg.base]);
-
   // カウントアップアニメーション（フェードアウト中は値をフリーズ）
   const isTransitioning = animKey !== item.id;
   const rawFraction = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
@@ -885,22 +829,13 @@ export default function ItemDetailPanel({
   }, [fullscreenPallet, item.id, item.palletCount, inspectionDeducted]);
 
   return (
-    <div className="detail-root" style={{
-      ...heroVars,
-      // 画面全体も種類の色に合わせた暗い地にして、カードと一覧をその上に置く
-      background: `
-        radial-gradient(ellipse 150% 55% at 50% 22%, var(--hero-c2) 0%, transparent 70%),
-        var(--hero-bg)
-      `,
-    }}>
+    <div className="detail-root">
       {/* === 上半分（品目のカード） === */}
-      <div className="detail-upper" style={{
-        position: 'relative', overflow: 'hidden', ...heroVars,
-      }}>
-        {/* 地は動かさない、上から下への素直なグラデーション */}
+      <div className="detail-upper" style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* 地はメニューと同じグレー。色は点や数字だけに使う */}
         <div style={{
           position: 'absolute', inset: 0, zIndex: 0,
-          background: 'linear-gradient(165deg, var(--hero-c1) 0%, var(--hero-c3) 45%, var(--hero-bg) 100%)',
+          background: 'linear-gradient(160deg, #23273a 0%, #1c2030 55%, #171a29 100%)',
         }} />
 
         {/* 積載分布ゲージ + 種類数 + 進捗率（右上 — 常時表示、バッジ行と同じ高さ）
@@ -1141,7 +1076,7 @@ export default function ItemDetailPanel({
 
       {/* === 下半分リスト === */}
       <div className="detail-list-section">
-        <div className="detail-list-scroll">
+        <div className="detail-list-scroll" ref={listScrollRef}>
           {sortedItems.map((it) => {
             const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
             const isActive = it.id === item.id;
@@ -1152,7 +1087,7 @@ export default function ItemDetailPanel({
             // 鍋は機種別カラーを使用
             const itNabeColor = getNabeModelColor(it.itemName, it.type);
             const itAccent = itNabeColor || c.accent;
-            const rowBg = isDone ? '#1a1a1e' : rowTint(itAccent, isActive ? 0.24 : 0.15);
+            const rowBg = isDone ? '#191b22' : isActive ? '#272c40' : '#1e2233';
 
             // 数字は大きく、単位はごく小さく。位置をそろえるため列の幅は決め打ちにする
             const nameColor = isDone
@@ -1206,11 +1141,12 @@ export default function ItemDetailPanel({
             return (
               <SwipeRow key={it.id}
                 onSwipe={() => onCompleteItem?.(it.id)}
+                current={isActive}
                 className={`detail-list-row detail-list-pill ${isActive ? 'active' : ''}`}
                 style={{
                   background: finalRowBg,
                   // 選ばれている行だけオレンジの枠で囲む
-                  borderColor: isActive ? '#ff8c21' : `${itAccent}33`,
+                  borderColor: isActive ? '#ff8c21' : 'rgba(255,255,255,0.08)',
                 }}
               >
                 <div style={{ display: 'contents' }} onClick={() => onSelectItem?.(origIdx)}>
@@ -1222,6 +1158,8 @@ export default function ItemDetailPanel({
           {/* リスト下部余白（最下行が見えるように） */}
           <div style={{ height: 60, flexShrink: 0 }} />
         </div>
+        {/* 下のボタンのあたりは少し暗くして、行と重なっても見やすくする */}
+        <div className="detail-list-fade" />
       </div>
 
       {/* パレット全画面表示モーダル */}
