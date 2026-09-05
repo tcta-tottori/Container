@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ランチャーアイコンの背景（前景画像の外側は通常マスクで見えない） -->
+    <color name="ic_launcher_background">#585AEA</color>
+</resources>

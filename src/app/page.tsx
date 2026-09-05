@@ -17,6 +17,7 @@ import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, climateToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
+import { syncToWatch } from '@/lib/watchSync';
 import { getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled } from '@/lib/callPhrases';
 import { getVoiceSettings, subscribeVoiceSettings, VoiceSettings } from '@/lib/voiceSettings';
 import { prepareSherpaTts } from '@/lib/sherpaTts';
@@ -282,6 +283,25 @@ export default function Home() {
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
   const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
   const [switchbot, setSwitchbot] = useState<SwitchBotReading | null>(null);
+
+  // Pixel Watch へ同期（Android アプリで開いているときだけ。ブラウザでは何もしない）
+  useEffect(() => {
+    syncToWatch({
+      containers: state.containers,
+      selectedContainerIdx: state.selectedContainerIdx,
+      items: state.items,
+      currentItemIdx: state.currentItemIdx,
+      originalValues: state.originalValues,
+      completedIds: state.completedIds,
+      workStartTime: state.workStartTime,
+      workPausedAt: state.workPausedAt,
+      climate: switchbot ?? barWeather,
+    });
+  }, [
+    state.containers, state.selectedContainerIdx, state.items, state.currentItemIdx,
+    state.originalValues, state.completedIds, state.workStartTime, state.workPausedAt,
+    switchbot, barWeather,
+  ]);
   const [sbStatus, setSbStatus] = useState<SwitchBotStatus>('idle');
   const [sbError, setSbError] = useState<string | null>(null);
   const sbStopRef = useRef<null | (() => void)>(null);

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CNS</string>
+    <string name="offline_title">CNS を開けません</string>
+    <string name="offline_body">ネットワークにつながっていないか、サーバーに届きません。接続を確認してもう一度お試しください。</string>
+    <string name="offline_retry">再試行</string>
+    <string name="watch_sync_failed">ウォッチへ送信できませんでした: %1$s</string>
+    <string name="mic_permission_denied">マイクの権限がないため音声コマンドは使えません</string>
+</resources>
