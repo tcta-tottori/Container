@@ -3,6 +3,7 @@ package jp.tcta.cns.container.wear.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -29,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +55,9 @@ import kotlinx.coroutines.launch
 /** 1 回タップと 2 回タップを見分けるための待ち時間。CNS の usePalletTap と同じ */
 private const val DOUBLE_TAP_MS = 260L
 
+/** 縦スワイプで品目を切り替えるとみなす移動量 */
+private val ITEM_SWITCH_THRESHOLD = 44.dp
+
 /** 横スワイプで行き来する 2 面（0 = 部品表示 / 1 = 一覧） */
 private const val PAGE_COUNT = 2
 
@@ -66,6 +72,7 @@ private const val START_PAGE = 1_000_000
  *
  * 部品表示は全画面 1 品目。背景は種類の色で塗りつぶし、文字は白か黒。
  * 1 回タップでパレットを 1 枚減らし、2 回タップで 1 枚戻す（CNS の画面と同じ操作）。
+ * 縦スワイプで品目を切り替える（上へ払うと次、下へ払うと前。端まで行くと反対の端へ回る）。
  */
 @Composable
 fun CargoWorkScreen(
@@ -105,6 +112,16 @@ fun CargoWorkScreen(
     val pagerState = rememberPagerState(initialPage = START_PAGE) { Int.MAX_VALUE }
     val scope = rememberCoroutineScope()
 
+    // 縦スワイプでの品目送り。端まで行ったら反対の端へ回る
+    val selectedIndex = items.indexOfFirst { it.id == selected.id }
+    val stepItem: (Int) -> Unit = { delta ->
+        if (items.size > 1 && selectedIndex >= 0) {
+            val next = items[((selectedIndex + delta) % items.size + items.size) % items.size]
+            pendingId = next.id
+            onSelectItem(next.id)
+        }
+    }
+
     HorizontalPager(
         state = pagerState,
         modifier = Modifier
@@ -121,6 +138,8 @@ fun CargoWorkScreen(
                 pausedAt = container?.pausedAt,
                 onDecrement = { onDecrementPallet(selected.id) },
                 onIncrement = { onIncrementPallet(selected.id) },
+                onNextItem = { stepItem(1) },
+                onPrevItem = { stepItem(-1) },
             )
         } else {
             ItemListPage(
@@ -151,6 +170,8 @@ private fun ItemPage(
     pausedAt: Long?,
     onDecrement: () -> Unit,
     onIncrement: () -> Unit,
+    onNextItem: () -> Unit,
+    onPrevItem: () -> Unit,
 ) {
     val background = itemTypeAccent(item.itemType)
     val onBackground = contrastTextColor(background)
@@ -158,6 +179,9 @@ private fun ItemPage(
     val scope = rememberCoroutineScope()
     // 1 回タップは 2 回目が来ないと確定しないので、少し待ってから減らす（CNS と同じ）
     var pendingTap by remember { mutableStateOf<Job?>(null) }
+    // 縦スワイプの移動量。指を離したときに、しきい値を超えていれば品目を送る
+    val switchThresholdPx = with(LocalDensity.current) { ITEM_SWITCH_THRESHOLD.toPx() }
+    var dragAmount by remember { mutableFloatStateOf(0f) }
 
     Box(
         modifier = Modifier
@@ -178,6 +202,30 @@ private fun ItemPage(
                         pendingTap = null
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                         onIncrement()
+                    },
+                )
+            }
+            .pointerInput(item.id) {
+                // 縦スワイプで品目を切り替える。横スワイプはページ送りなので取らない
+                detectVerticalDragGestures(
+                    onDragStart = { dragAmount = 0f },
+                    onDragCancel = { dragAmount = 0f },
+                    onDragEnd = {
+                        when {
+                            dragAmount <= -switchThresholdPx -> {
+                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                                onNextItem()
+                            }
+                            dragAmount >= switchThresholdPx -> {
+                                view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                                onPrevItem()
+                            }
+                        }
+                        dragAmount = 0f
+                    },
+                    onVerticalDrag = { change, delta ->
+                        dragAmount += delta
+                        change.consume()
                     },
                 )
             },
