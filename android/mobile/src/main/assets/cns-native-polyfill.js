@@ -43,7 +43,38 @@
 
   function hasPending() { for (var k in utterances) return true; return false; }
 
-  var voices = [{ voiceURI: 'android-ja-JP', name: 'Android 日本語', lang: 'ja-JP', localService: true, 'default': true }];
+  /* 端末が持っている日本語の声。ネイティブから受け取って Web と同じ形に直す。
+     読み上げの準備が終わるまで空なので、しばらくは何度か聞きに行く。 */
+  var fallbackVoice = { voiceURI: 'android-ja-JP', name: 'Android 日本語', lang: 'ja-JP', localService: true, 'default': true };
+  var voices = [fallbackVoice];
+
+  function refreshVoices() {
+    if (typeof native.listVoices !== 'function') return false;
+    var list;
+    try { list = JSON.parse(native.listVoices() || '[]'); } catch (e) { return false; }
+    if (!list || !list.length) return false;
+    voices = list.map(function (v, i) {
+      return {
+        voiceURI: v.name,
+        name: v.label || v.name,
+        lang: 'ja-JP',
+        localService: !v.network,
+        'default': i === 0,
+      };
+    });
+    if (typeof synth.onvoiceschanged === 'function') {
+      try { synth.onvoiceschanged({ type: 'voiceschanged' }); } catch (e) { /* ignore */ }
+    }
+    return true;
+  }
+
+  var voiceTries = 0;
+  function pollVoices() {
+    if (refreshVoices() || ++voiceTries > 20) return;
+    setTimeout(pollVoices, 500);
+  }
+  setTimeout(pollVoices, 300);
+
   var synth = {
     speaking: false,
     pending: false,
@@ -54,6 +85,10 @@
       utterances[u._id] = u;
       synth.speaking = true;
       try {
+        // 声が選ばれていればそれで読ませる（選ばれていなければ端末のいちばん良い声）
+        if (u.voice && u.voice.voiceURI && typeof native.setVoice === 'function') {
+          try { native.setVoice(String(u.voice.voiceURI)); } catch (e) { /* ignore */ }
+        }
         native.speak(u._id, u.text, Number(u.rate) || 1, Number(u.pitch) || 1, Number(u.volume) || 1);
       } catch (e) {
         delete utterances[u._id];
@@ -71,8 +106,8 @@
     pause: function () { /* 未対応 */ },
     resume: function () { /* 未対応 */ },
     getVoices: function () { return voices.slice(); },
-    addEventListener: function () { /* voiceschanged は起きない */ },
-    removeEventListener: function () { /* ignore */ },
+    addEventListener: function (type, fn) { if (type === 'voiceschanged') synth.onvoiceschanged = fn; },
+    removeEventListener: function (type) { if (type === 'voiceschanged') synth.onvoiceschanged = null; },
   };
 
   window.__cnsTts = {

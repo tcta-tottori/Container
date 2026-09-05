@@ -6,7 +6,6 @@ import { itemNameForSpeech, areSimilarItems } from '@/lib/typeDetector';
 import { itemNameForCall } from '@/lib/partTranslations';
 import { displayQuantities, quantityToSpeech } from '@/lib/itemQuantity';
 import { geminiGenerateSpeech } from '@/lib/geminiTts';
-import { sherpaGenerateSpeech } from '@/lib/sherpaTts';
 import { getGeminiKey } from '@/lib/geminiApi';
 import {
   getVoiceSettings, saveVoiceSettings, styleInstruction, webSpeechVolume, VoiceEngine, VoiceProfile,
@@ -111,8 +110,12 @@ function speakWebSpeech(text: string, onDone?: () => void, profile?: VoiceProfil
   u.pitch = Math.min(2, Math.max(0, p.pitch));
   // 端末の音声は仕様上 1.0 が上限。ブースト分は乗せられない
   u.volume = webSpeechVolume(settings);
+  // 設定で選ばれている声を優先。無ければ日本語の声のいちばん最初（端末が良い順に並べている）
   const voices = window.speechSynthesis.getVoices();
-  const jaVoice = voices.find((v) => v.lang.startsWith('ja'));
+  const wanted = settings.webVoice
+    ? voices.find((v) => v.voiceURI === settings.webVoice)
+    : undefined;
+  const jaVoice = wanted || voices.find((v) => v.lang.startsWith('ja'));
   if (jaVoice) u.voice = jaVoice;
   let done = false;
   const finish = () => { if (done) return; done = true; _onSpeakEnd?.(); onDone?.(); };
@@ -123,10 +126,10 @@ function speakWebSpeech(text: string, onDone?: () => void, profile?: VoiceProfil
 }
 
 /**
- * 音声データを作って鳴らす共通処理（Gemini TTS / sherpa-onnx）。
+ * 音声データを作って鳴らす共通処理（Gemini TTS）。
  * 生成に時間がかかるため、先にコール開始を通知して録音を止める。
  * @param makeBlob 音声（WAV）を作る処理。中断は signal で伝える。
- * @param onFail   生成・再生に失敗したときの逃げ道（sherpa-onnx は端末の音声に切り替える）
+ * @param onFail   生成・再生に失敗したときの逃げ道（端末の音声に切り替える）
  */
 async function speakBlob(
   text: string,
@@ -194,20 +197,6 @@ function speakGemini(text: string, profile: VoiceProfile, onDone?: () => void): 
   );
 }
 
-/**
- * sherpa-onnx（端末内 TTS）で読み上げる。
- * モデルが未配置・読み込み失敗のときはコールが無音にならないよう端末の音声に切り替える。
- */
-function speakSherpa(text: string, profile: VoiceProfile, onDone?: () => void): Promise<void> {
-  return speakBlob(
-    text,
-    (signal) => sherpaGenerateSpeech(text, { sid: profile.sid, speed: profile.rate, signal }),
-    onDone,
-    // 生成に失敗 → 端末の音声で読み上げ直す
-    (finish) => speakWebSpeech(text, finish, profile),
-  );
-}
-
 /** 進行中のコールを停止（onEnd は呼ばない。新しい発話側で管理する） */
 function stopCurrentPlayback(): void {
   if (typeof window === 'undefined') return;
@@ -252,8 +241,6 @@ function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): vo
   const engine = activeEngine();
   if (engine === 'gemini') {
     void speakGemini(text, profile, done);
-  } else if (engine === 'sherpa') {
-    void speakSherpa(text, profile, done);
   } else {
     speakWebSpeech(text, done, profile);
   }

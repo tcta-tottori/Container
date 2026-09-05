@@ -50,6 +50,7 @@ class NativeSpeechBridge(
                 ttsState = if (status == TextToSpeech.SUCCESS) TtsState.READY else TtsState.FAILED
                 if (ttsReady) {
                     tts?.language = Locale.JAPAN
+                    applyPreferredVoice()
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) = js("window.__cnsTts && __cnsTts.onStart(${utteranceId?.toIntOrNull() ?: -1})")
                         override fun onDone(utteranceId: String?) = js("window.__cnsTts && __cnsTts.onEnd(${utteranceId?.toIntOrNull() ?: -1}, null)")
@@ -92,6 +93,105 @@ class NativeSpeechBridge(
     @JavascriptInterface
     fun stopSpeaking() {
         main.post { tts?.stop() }
+    }
+
+    // ---------- 声の選択 ----------
+
+    /** 選んでいる声の名前。空なら端末の既定（この橋渡しがいちばん良さそうなものを選ぶ） */
+    private var wantedVoice: String = ""
+
+    /**
+     * 使える日本語の声を JSON の配列で返す。
+     * `{"name":..., "label":..., "quality":..., "network":true/false}` の並び。
+     * 読み上げの準備が終わっていないときは空の配列を返す。
+     */
+    @JavascriptInterface
+    fun listVoices(): String {
+        val voices = japaneseVoices()
+        if (voices.isEmpty()) return "[]"
+        return voices.joinToString(prefix = "[", postfix = "]") { v ->
+            val label = voiceLabel(v)
+            """{"name":${jsonString(v.name)},"label":${jsonString(label)},""" +
+                """"quality":${v.quality},"network":${v.isNetworkConnectionRequired}}"""
+        }
+    }
+
+    /** 声を選ぶ。空文字なら自動（いちばん良さそうなもの）に戻す */
+    @JavascriptInterface
+    fun setVoice(name: String) {
+        main.post {
+            wantedVoice = name.trim()
+            applyPreferredVoice()
+        }
+    }
+
+    /** いま鳴っている声の名前。選べていないときは空文字 */
+    @JavascriptInterface
+    fun currentVoice(): String = tts?.voice?.name ?: ""
+
+    /**
+     * 声を当てる。指定があればそれを、無ければ品質のいちばん高いものを選ぶ。
+     * Google の音声サービスは通信を使う高品質な声を持っていることが多く、
+     * 端末の既定よりはっきり聞き取りやすい。
+     */
+    private fun applyPreferredVoice() {
+        val engine = tts ?: return
+        val voices = japaneseVoices()
+        if (voices.isEmpty()) return
+        val chosen = voices.firstOrNull { it.name == wantedVoice } ?: bestVoice(voices) ?: return
+        runCatching { engine.voice = chosen }
+            .onFailure { Log.w(TAG, "声を選べませんでした name=${chosen.name}", it) }
+    }
+
+    /** 日本語の声だけを、良さそうな順に並べて返す */
+    private fun japaneseVoices(): List<android.speech.tts.Voice> {
+        val engine = tts ?: return emptyList()
+        if (!ttsReady) return emptyList()
+        val all = runCatching { engine.voices }.getOrNull() ?: return emptyList()
+        return all
+            .filter { isJapanese(it) }
+            .filterNot { it.features?.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED) == true }
+            .sortedWith(compareByDescending<android.speech.tts.Voice> { it.quality }.thenBy { it.name })
+    }
+
+    private fun isJapanese(v: android.speech.tts.Voice): Boolean =
+        runCatching { v.locale.language == Locale.JAPANESE.language }.getOrDefault(false)
+
+    /**
+     * いちばん良さそうな声。品質が高いものを優先し、同じ品質なら
+     * 通信のいらないもの（電波が悪くても止まらない）を先に選ぶ。
+     */
+    private fun bestVoice(voices: List<android.speech.tts.Voice>): android.speech.tts.Voice? =
+        voices.maxWithOrNull(
+            compareBy<android.speech.tts.Voice> { it.quality }
+                .thenBy { if (it.isNetworkConnectionRequired) 0 else 1 },
+        )
+
+    /** 画面に出す名前。"ja-JP-neural-local" のような素っ気ない名前を少し読みやすくする */
+    private fun voiceLabel(v: android.speech.tts.Voice): String {
+        val quality = when {
+            v.quality >= 500 -> "とても高品質"
+            v.quality >= 400 -> "高品質"
+            v.quality >= 300 -> "標準"
+            else -> "簡易"
+        }
+        val where = if (v.isNetworkConnectionRequired) "通信あり" else "端末内"
+        return "${v.name}（$quality・$where）"
+    }
+
+    /** JavaScript の文字列にする */
+    private fun jsonString(value: String): String {
+        val sb = StringBuilder("\"")
+        for (ch in value) {
+            when (ch) {
+                '\\' -> sb.append("\\\\")
+                '"' -> sb.append("\\\"")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                else -> if (ch < ' ') sb.append(String.format(Locale.ROOT, "\\u%04x", ch.code)) else sb.append(ch)
+            }
+        }
+        return sb.append('"').toString()
     }
 
     // ---------- 音声認識 ----------

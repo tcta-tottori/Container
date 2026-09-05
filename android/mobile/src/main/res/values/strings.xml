@@ -7,6 +7,8 @@
     <string name="watch_sync_failed">ウォッチへ送信できませんでした: %1$s</string>
     <string name="mic_permission_denied">マイクの権限がないため音声コマンドは使えません</string>
 
+    <string name="photo_chooser_title">写真を撮る / 選ぶ</string>
+
     <!-- ステータスバーの作業中表示 -->
     <string name="notify_channel_work">荷降ろし中の表示</string>
     <string name="notify_channel_work_desc">作業中の機種と残りをステータスバーに出しておきます</string>

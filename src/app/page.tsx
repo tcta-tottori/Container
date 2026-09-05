@@ -19,8 +19,6 @@ import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, climateToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
 import { syncToWatch, setWatchCommandHandler } from '@/lib/watchSync';
 import { getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled } from '@/lib/callPhrases';
-import { getVoiceSettings, subscribeVoiceSettings, VoiceSettings } from '@/lib/voiceSettings';
-import { prepareSherpaTts } from '@/lib/sherpaTts';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
@@ -208,8 +206,12 @@ function UpdateNotification() {
   );
 }
 
-/** 「お願いします！」ボタンで読み上げる言葉 */
-const REQUEST_CALL_TEXT = 'お願いします！';
+/** 「お願いします！」ボタンで読み上げる言葉。押すたびにこの中から選ぶ */
+const REQUEST_CALL_TEXTS = ['お願いします！', '長谷川さん！お願いします！'];
+
+function pickRequestCall(): string {
+  return REQUEST_CALL_TEXTS[Math.floor(Math.random() * REQUEST_CALL_TEXTS.length)];
+}
 
 export default function Home() {
   const {
@@ -246,18 +248,6 @@ export default function Home() {
   const { speak, speakCheer, speakThenCheer, announceItem, announceAllComplete, announceContainerSummary } =
     useSpeech();
 
-  /**
-   * sherpa-onnx（端末内 TTS）を選んでいるときは、最初のコールで待たされないよう
-   * 先にモデルを読み込んでおく。設定を切り替えたときも読み込む。
-   */
-  useEffect(() => {
-    const preload = (s: VoiceSettings) => {
-      if (s.engine !== 'sherpa' || !s.sherpa.preload) return;
-      void prepareSherpaTts().catch(() => { /* 失敗しても端末の音声で鳴る */ });
-    };
-    preload(getVoiceSettings());
-    return subscribeVoiceSettings(preload);
-  }, []);
 
   const prevItemRef = useRef<string | null>(null);
   const currentItemRef = useRef(currentItem);
@@ -599,7 +589,7 @@ export default function Home() {
   }, [handleSbReading]);
 
   /**
-   * 読込の進み具合。Googleドライブから取ってくる分と、そのあとの解析とで
+   * 読込の進み具合。ファイルを取ってくる分と、そのあとの解析とで
    * 別々に数えているため、あとの段階が小さい値を出しても戻さない。
    */
   const advanceProgress = useCallback((p: number) => {
@@ -619,16 +609,6 @@ export default function Home() {
     }, 1000); // 100%表示1秒
   }, []);
 
-  /**
-   * Googleドライブから取ってくる間のローディング表示。
-   * 取得が終わるとそのまま各ファイルの読込処理が続きを受け持つので、
-   * 選んでから作業ページに着くまで画面が途切れない。
-   */
-  const handleDriveLoading = useCallback((msg: string | null, progress?: number) => {
-    setLoadingMsg(msg);
-    setLoadingProgress(progress ?? 0);
-    if (msg === null) setLoadingClosing(false);
-  }, []);
 
   const handleFileLoaded = useCallback(
     async (file: File) => {
@@ -1547,7 +1527,7 @@ export default function Home() {
           selectedIdx={state.selectedContainerIdx}
           onSelectContainer={selectContainer}
           onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
-          onRequestCall={view === 'work' ? () => speakCheer(REQUEST_CALL_TEXT) : undefined}
+          onRequestCall={view === 'work' ? () => speakCheer(pickRequestCall()) : undefined}
           onWeather={view === 'work' ? handleWeatherCall : undefined}
           waterPlaying={waterPlaying}
           onWater={toggleWater}
@@ -1573,7 +1553,6 @@ export default function Home() {
                 onJkpLoaded={handleJkpLoaded}
                 onMasterLoaded={handleMasterLoaded}
                 onPhotoLoaded={handlePhotoLoaded}
-                onLoadingChange={handleDriveLoading}
               />
             </div>
           )}

@@ -17,10 +17,8 @@ const LEGACY_ENABLED_KEY = 'cns_gemini_tts_enabled';
 const LEGACY_MODEL_KEY = 'cns_gemini_tts_model';
 
 /** 音声エンジン */
-export type VoiceEngine = 'gemini' | 'web' | 'sherpa';
+export type VoiceEngine = 'gemini' | 'web';
 
-/** sherpa-onnx（端末内 TTS）のアセット置き場の既定値（`public/sherpa/`） */
-export const DEFAULT_SHERPA_BASE_URL = 'sherpa/';
 
 /** Gemini TTS の既定モデル */
 export const DEFAULT_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
@@ -68,17 +66,8 @@ export interface VoiceProfile {
   rate: number;
   /** 声の高さ（0.6〜1.6）。Web Speech のみ数値で反映、Gemini は指示文に反映 */
   pitch: number;
-  /** sherpa-onnx の話者番号（複数話者モデルのときだけ意味がある） */
-  sid: number;
 }
 
-/** sherpa-onnx（端末内 TTS）の設定 */
-export interface SherpaSettings {
-  /** WebAssembly 一式（.js / .wasm / .data）を置いてある場所 */
-  baseUrl: string;
-  /** アプリを開いたときに自動で読み込んでおくか */
-  preload: boolean;
-}
 
 export interface VoiceSettings {
   /** 使用する音声 API */
@@ -95,17 +84,21 @@ export interface VoiceSettings {
    * 端末の音声（Web Speech API）は音を取り出せないため 1.0 が上限になる。
    */
   volume: number;
-  /** sherpa-onnx（端末内 TTS）の設定 */
-  sherpa: SherpaSettings;
+  /**
+   * 端末の音声で使う声。`SpeechSynthesisVoice.voiceURI`。
+   * アプリ版では端末が持っている日本語の声（Google の高品質な声など）から選べる。
+   * 空なら端末にいちばん良い声を選ばせる。
+   */
+  webVoice: string;
 }
 
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   engine: 'gemini',
   model: DEFAULT_TTS_MODEL,
-  main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0, sid: 0 },
-  cheer: { voice: 'Zephyr', tone: 'cheer',  customStyle: '', rate: 1.1, pitch: 1.0, sid: 0 },
+  main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0 },
+  cheer: { voice: 'Zephyr', tone: 'cheer',  customStyle: '', rate: 1.1, pitch: 1.0 },
   volume: 1.0,
-  sherpa: { baseUrl: DEFAULT_SHERPA_BASE_URL, preload: true },
+  webVoice: '',
 };
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -119,22 +112,13 @@ function normalizeProfile(p: Partial<VoiceProfile> | undefined, fallback: VoiceP
     customStyle: typeof p?.customStyle === 'string' ? p.customStyle : '',
     rate: clamp(Number(p?.rate ?? fallback.rate), 0.6, 1.6),
     pitch: clamp(Number(p?.pitch ?? fallback.pitch), 0.6, 1.6),
-    sid: Math.max(0, Math.floor(Number(p?.sid ?? fallback.sid) || 0)),
   };
 }
 
-function normalizeSherpa(s: Partial<SherpaSettings> | undefined): SherpaSettings {
-  return {
-    baseUrl: typeof s?.baseUrl === 'string' && s.baseUrl.trim()
-      ? s.baseUrl.trim()
-      : DEFAULT_SHERPA_BASE_URL,
-    preload: s?.preload !== false,
-  };
-}
 
 /** 保存された値がどのエンジンを指しているか（知らない値は Gemini 扱い） */
 function normalizeEngine(v: unknown): VoiceEngine {
-  return v === 'web' || v === 'sherpa' ? v : 'gemini';
+  return v === 'web' ? 'web' : 'gemini';
 }
 
 /** 旧バージョンの設定から引き継ぐ（初回のみ） */
@@ -170,7 +154,7 @@ export function getVoiceSettings(): VoiceSettings {
     main: normalizeProfile(parsed.main, DEFAULT_VOICE_SETTINGS.main),
     cheer: normalizeProfile(parsed.cheer, DEFAULT_VOICE_SETTINGS.cheer),
     volume: clamp(Number(parsed.volume ?? 1), 0, MAX_VOLUME),
-    sherpa: normalizeSherpa(parsed.sherpa),
+    webVoice: typeof parsed.webVoice === 'string' ? parsed.webVoice : '',
   };
   return _cache;
 }
@@ -182,7 +166,7 @@ export function saveVoiceSettings(next: VoiceSettings): void {
     main: normalizeProfile(next.main, DEFAULT_VOICE_SETTINGS.main),
     cheer: normalizeProfile(next.cheer, DEFAULT_VOICE_SETTINGS.cheer),
     volume: clamp(Number(next.volume), 0, MAX_VOLUME),
-    sherpa: normalizeSherpa(next.sherpa),
+    webVoice: typeof next.webVoice === 'string' ? next.webVoice : '',
   };
   if (typeof window !== 'undefined') {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(_cache)); } catch { /* ignore */ }
@@ -220,7 +204,6 @@ export function webSpeechVolume(settings: VoiceSettings): number {
 /** エンジンの表示名 */
 export function engineLabel(engine: VoiceEngine): string {
   if (engine === 'web') return '端末の音声';
-  if (engine === 'sherpa') return 'sherpa-onnx';
   return 'Gemini TTS';
 }
 

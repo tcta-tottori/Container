@@ -3,14 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS,
-  DEFAULT_SHERPA_BASE_URL,
   VoiceSettings, VoiceProfile, VoiceEngine,
   getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, styleInstruction, webSpeechVolume,
 } from '@/lib/voiceSettings';
-import {
-  prepareSherpaTts, sherpaGenerateSpeech, clearSherpaCache,
-  getSherpaState, subscribeSherpaState, SherpaState,
-} from '@/lib/sherpaTts';
 import { MAX_VOLUME, applyVolume, isBoostSupported } from '@/lib/audioBoost';
 import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/geminiTts';
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
@@ -106,9 +101,8 @@ function ProfileEditor({
     <div>
       {/* 話者 */}
       <Label hint={
-        engine === 'web' ? '端末の音声では話者を選べません（速さ・高さのみ反映）'
-          : engine === 'sherpa' ? 'sherpa-onnx では下の「話者番号」で選びます'
-            : undefined
+        engine === 'web' ? 'ここは Gemini TTS 用です。端末の音声は上の「端末の声」で選びます'
+          : undefined
       }>
         話す人（声）
       </Label>
@@ -181,8 +175,8 @@ function ProfileEditor({
         padding: '8px 11px', borderRadius: 9,
         background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
       }}>
-        {engine === 'sherpa'
-          ? 'sherpa-onnx では「話す速さ」と「話者番号」が反映されます（トーン・声の高さはモデル側で決まります）。'
+        {engine === 'web'
+          ? '端末の音声では「話す速さ」と「声の高さ」が反映されます。'
           : `指示文: ${styleInstruction(profile)}`}
       </div>
 
@@ -196,26 +190,6 @@ function ProfileEditor({
         format={(v) => `${v.toFixed(2)}`}
         onChange={(v) => onChange({ ...profile, pitch: v })}
       />
-
-      {engine === 'sherpa' && (
-        <>
-          <Label hint="複数話者のモデル（VITS など）のとき、どの声で読むかの番号。1人だけのモデルは 0 のまま">
-            話者番号
-          </Label>
-          <input
-            type="number"
-            min={0}
-            value={profile.sid}
-            onChange={(e) => onChange({ ...profile, sid: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-            style={{
-              width: '100%', padding: '11px 13px', borderRadius: 10, marginBottom: 14,
-              background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)',
-              color: '#fff', fontSize: 14, fontFamily: 'var(--font-mono)',
-              outline: 'none', boxSizing: 'border-box',
-            }}
-          />
-        </>
-      )}
 
       <button
         onClick={onTest}
@@ -250,13 +224,30 @@ export default function VoiceSettingsPanel() {
   const detachRef = useRef<(() => void) | null>(null);
   // SSR とクライアントで初期描画をそろえるため、対応判定はマウント後に行う
   const [boostSupported, setBoostSupported] = useState(true);
-  const [sherpa, setSherpa] = useState<SherpaState>(() => getSherpaState());
+  /** 端末が持っている日本語の声（アプリ版では Google の高品質な声が並ぶ） */
+  const [webVoices, setWebVoices] = useState<{ uri: string; name: string }[]>([]);
 
   useEffect(() => { setBoostSupported(isBoostSupported()); }, []);
 
+  // 端末の声は少し遅れて出てくることがあるので、変化を待ち受ける
   useEffect(() => {
-    setSherpa(getSherpaState());
-    return subscribeSherpaState(setSherpa);
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const synth = window.speechSynthesis;
+    const read = () => {
+      const list = synth.getVoices()
+        .filter((v) => v.lang && v.lang.toLowerCase().startsWith('ja'))
+        .map((v) => ({ uri: v.voiceURI, name: v.name }));
+      setWebVoices(list);
+    };
+    read();
+    synth.addEventListener?.('voiceschanged', read);
+    const timer = setInterval(read, 1000);
+    const stop = setTimeout(() => clearInterval(timer), 8000);
+    return () => {
+      synth.removeEventListener?.('voiceschanged', read);
+      clearInterval(timer);
+      clearTimeout(stop);
+    };
   }, []);
 
   useEffect(() => {
@@ -294,19 +285,20 @@ export default function VoiceSettingsPanel() {
       u.rate = Math.min(2, Math.max(0.5, profile.rate * 1.1));
       u.pitch = Math.min(2, Math.max(0, profile.pitch));
       u.volume = webSpeechVolume(settings);
+      const picked = window.speechSynthesis.getVoices()
+        .find((v) => v.voiceURI === settings.webVoice);
+      if (picked) u.voice = picked;
       window.speechSynthesis.speak(u);
       return;
     }
 
     setTesting(true);
     try {
-      const blob = settings.engine === 'sherpa'
-        ? await sherpaGenerateSpeech(text, { sid: profile.sid, speed: profile.rate })
-        : await geminiGenerateSpeech(text, {
-          voice: profile.voice,
-          model: settings.model,
-          stylePrefix: styleInstruction(profile),
-        });
+      const blob = await geminiGenerateSpeech(text, {
+        voice: profile.voice,
+        model: settings.model,
+        stylePrefix: styleInstruction(profile),
+      });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       const detach = await applyVolume(audio, settings.volume);
@@ -329,7 +321,7 @@ export default function VoiceSettingsPanel() {
     }
   }, [settings]);
 
-  const canSample = settings.engine === 'web' || settings.engine === 'sherpa' || keySaved;
+  const canSample = settings.engine === 'web' || keySaved;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -356,11 +348,10 @@ export default function VoiceSettingsPanel() {
       </div>
 
       {/* ===== 音声 API ===== */}
-      <Label hint="Gemini TTS は高品質（通信あり）。sherpa-onnx は端末内で高音質・通信なし。端末の音声は準備不要">音声 API</Label>
+      <Label hint="Gemini TTS は高品質（通信あり）。端末の音声は準備不要で通信もいらない">音声 API</Label>
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         {([
           { id: 'gemini' as VoiceEngine, label: 'Gemini TTS' },
-          { id: 'sherpa' as VoiceEngine, label: 'sherpa-onnx' },
           { id: 'web' as VoiceEngine, label: '端末の音声' },
         ]).map(({ id, label }) => {
           const active = settings.engine === id;
@@ -493,141 +484,40 @@ export default function VoiceSettingsPanel() {
         </>
       )}
 
-      {settings.engine === 'sherpa' && (
+      {settings.engine === 'web' && (
         <>
-          <Label hint="sherpa-onnx の WebAssembly 一式（.js / .wasm / .data）を置いた場所。既定はアプリ内の sherpa/ フォルダ">
-            モデルの置き場所
+          <Label hint="端末に入っている日本語の声。アプリ版では「Google 音声サービス」の高品質な声もここに並ぶ">
+            端末の声
           </Label>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-            <input
-              type="text"
-              value={settings.sherpa.baseUrl}
-              onChange={(e) => update({ ...settings, sherpa: { ...settings.sherpa, baseUrl: e.target.value } })}
-              placeholder={DEFAULT_SHERPA_BASE_URL}
-              autoComplete="off"
-              style={{
-                flex: 1, minWidth: 0, padding: '11px 13px', borderRadius: 10,
-                background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)',
-                color: '#fff', fontSize: 13, fontFamily: 'var(--font-mono)', outline: 'none',
-              }}
-            />
-            <button
-              onClick={() => update({ ...settings, sherpa: { ...settings.sherpa, baseUrl: DEFAULT_SHERPA_BASE_URL } })}
-              style={{
-                padding: '11px 14px', borderRadius: 10, flexShrink: 0,
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
-                color: '#94a3b8', fontSize: 12, cursor: 'pointer',
-              }}
-            >
-              初期値
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <button
-              onClick={() => { void prepareSherpaTts(true).catch(() => { /* 状態は下に出る */ }); }}
-              disabled={sherpa.status === 'loading'}
-              style={{
-                flex: 1, padding: '12px', borderRadius: 10,
-                background: 'linear-gradient(135deg, rgba(52,211,153,0.3), rgba(96,165,250,0.3))',
-                border: '1px solid rgba(52,211,153,0.4)',
-                color: '#fff', fontSize: 13, fontWeight: 700,
-                cursor: sherpa.status === 'loading' ? 'default' : 'pointer',
-                opacity: sherpa.status === 'loading' ? 0.6 : 1,
-              }}
-            >
-              {sherpa.status === 'loading' ? '読み込み中...' : 'モデルを準備する'}
-            </button>
-            <button
-              onClick={() => { void clearSherpaCache(); }}
-              style={{
-                padding: '12px 14px', borderRadius: 10, flexShrink: 0,
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
-                color: '#94a3b8', fontSize: 12, cursor: 'pointer',
-              }}
-            >
-              保存分を削除
-            </button>
-          </div>
-
-          {/* 読み込みの進み具合・状態 */}
-          {sherpa.status === 'loading' && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{
-                height: 6, borderRadius: 999, overflow: 'hidden',
-                background: 'rgba(255,255,255,0.1)',
-              }}>
-                <div style={{
-                  width: `${Math.round(sherpa.progress * 100)}%`, height: '100%',
-                  background: 'linear-gradient(90deg, #8b5cf6, #4a6ef7)', transition: 'width 0.2s ease',
-                }} />
-              </div>
-              <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 5 }}>
-                {sherpa.message}（{Math.round(sherpa.progress * 100)}%）
-              </div>
+          {webVoices.length === 0 ? (
+            <div style={{
+              color: '#94a3b8', fontSize: 11, lineHeight: 1.6, marginBottom: 16,
+              padding: '9px 12px', borderRadius: 10,
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+            }}>
+              使える声を探しています。出てこないときは端末の既定の声で読み上げます。
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+              {[{ uri: '', name: 'おまかせ（いちばん良い声）' }, ...webVoices].map((v) => {
+                const active = settings.webVoice === v.uri;
+                return (
+                  <button
+                    key={v.uri || 'auto'}
+                    onClick={() => update({ ...settings, webVoice: v.uri })}
+                    style={{
+                      textAlign: 'left', padding: '10px 12px', borderRadius: 10,
+                      background: active ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${active ? 'rgba(167,139,250,0.6)' : 'rgba(255,255,255,0.1)'}`,
+                      color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >
+                    {v.name}
+                  </button>
+                );
+              })}
             </div>
           )}
-          {sherpa.status === 'ready' && (
-            <div style={{
-              marginBottom: 12, padding: '9px 13px', borderRadius: 10, fontSize: 12,
-              background: 'rgba(52,211,153,0.12)', color: '#6ee7b7',
-              border: '1px solid rgba(52,211,153,0.25)',
-            }}>
-              準備できました（話者{sherpa.numSpeakers}人）。この端末では通信なしでコールできます。
-            </div>
-          )}
-          {sherpa.status === 'error' && sherpa.error && (
-            <div style={{
-              color: '#fca5a5', fontSize: 11, lineHeight: 1.6, marginBottom: 12,
-              padding: '9px 12px', borderRadius: 10, wordBreak: 'break-all',
-              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-            }}>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>まだ使えません</div>
-              {sherpa.error}
-            </div>
-          )}
-
-          {/* 起動時に読み込むか */}
-          <div
-            onClick={() => update({ ...settings, sherpa: { ...settings.sherpa, preload: !settings.sherpa.preload } })}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
-              padding: '12px 14px', marginBottom: 14, borderRadius: 12,
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-            }}
-          >
-            <div style={{ flex: 1 }}>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>アプリを開いたら先に読み込む</div>
-              <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 3 }}>
-                最初のコールを待たずに鳴らせます
-              </div>
-            </div>
-            <div style={{
-              width: 44, height: 26, borderRadius: 999, flexShrink: 0,
-              background: settings.sherpa.preload ? 'linear-gradient(135deg, #8b5cf6, #4a6ef7)' : 'rgba(255,255,255,0.15)',
-              border: '1px solid rgba(255,255,255,0.15)', position: 'relative',
-            }}>
-              <div style={{
-                position: 'absolute', top: 2, left: settings.sherpa.preload ? 20 : 2,
-                width: 20, height: 20, borderRadius: '50%', background: '#fff',
-                transition: 'left 0.15s ease',
-              }} />
-            </div>
-          </div>
-
-          <div style={{
-            color: '#64748b', fontSize: 11, lineHeight: 1.7, marginBottom: 16,
-            padding: '9px 12px', borderRadius: 9,
-            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-          }}>
-            sherpa-onnx（Next-gen Kaldi・Apache-2.0）を端末の中で動かします。VITS / Piper / Kokoro などの
-            日本語モデルを ONNX のまま読み上げるので、通信なしでも自然な抑揚でコールできます。<br />
-            置き場所に次の4ファイルを入れてください。<br />
-            <span style={{ fontFamily: 'var(--font-mono)', color: '#94a3b8' }}>
-              sherpa-onnx-wasm-main-tts.js / .wasm / .data、sherpa-onnx-tts.js
-            </span><br />
-            一度読み込んだファイルは端末に残るので、2回目からは圏外でも鳴ります。
-          </div>
         </>
       )}
 
@@ -646,7 +536,7 @@ export default function VoiceSettingsPanel() {
           <>
             <br />
             端末の音声はブラウザの仕様で 100% が上限です。もっと大きくしたいときは
-            Gemini TTS か sherpa-onnx に切り替えるか、端末側のメディア音量を上げてください。
+            Gemini TTS に切り替えるか、端末側のメディア音量を上げてください。
           </>
         )}
         {settings.engine !== 'web' && !boostSupported && (
@@ -707,10 +597,9 @@ export default function VoiceSettingsPanel() {
 
       <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, lineHeight: 1.6, marginTop: 12 }}>
         ※ 通常コールは品名・残数・進捗などの読み上げ、応援コールは応援ボタンと定期コールの応援に使います。<br />
-        ※ Gemini TTS はコールのたびに通信します。圏外や API エラーのときは音が出ないため、
-        その場合は「sherpa-onnx」か「端末の音声」に切り替えてください。<br />
-        ※ sherpa-onnx は最初にモデルを読み込むと、そのあとは通信なしでコールできます。
-        モデルが見つからないときは自動で端末の音声に切り替えて鳴らします。
+        ※ Gemini TTS はコールのたびに通信します。圏外や API エラーのときは自動で端末の音声に切り替えて鳴らします。<br />
+        ※ 端末の音声はアプリ版だと端末に入っている日本語の声から選べます。
+        「Google 音声サービス」の高品質な声を入れておくと、標準の声よりはっきり聞き取れます。
       </p>
     </div>
   );

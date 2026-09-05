@@ -1,7 +1,7 @@
 /**
  * 音声合成（TTS）で共通に使う音声データの組み立てと、日本語テキストの前処理。
  *
- * Gemini TTS は 16bit PCM（L16）、sherpa-onnx は -1〜1 の Float32 サンプルを返すため、
+ * Gemini TTS は 16bit PCM（L16）を返すため、
  * どちらも WAV に包み直して <audio> で鳴らせる形にする。
  */
 
