@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -35,16 +32,6 @@ import jp.tcta.cns.container.shared.DisplayFormat
 import jp.tcta.cns.container.shared.ItemTypes
 import kotlinx.coroutines.delay
 
-/** ステータス文字列に応じた色。完了は青、作業中は緑、待ちはオレンジ */
-@Composable
-fun statusColor(status: String?): Color = when {
-    status == null -> MaterialTheme.colorScheme.onSurfaceVariant
-    status.contains("完了") -> MaterialTheme.colorScheme.tertiary
-    status.contains("中") -> MaterialTheme.colorScheme.primary
-    status.contains("待") -> MaterialTheme.colorScheme.secondary
-    else -> MaterialTheme.colorScheme.onSurfaceVariant
-}
-
 /** 種類の色。元のコンテナアプリの accent と同じ値 */
 fun itemTypeAccent(itemType: String?): Color = Color(ItemTypes.colorOf(itemType).accent)
 
@@ -54,28 +41,6 @@ fun itemTypeAccent(itemType: String?): Color = Color(ItemTypes.colorOf(itemType)
  */
 fun contrastTextColor(background: Color): Color =
     if (background.luminance() > 0.4f) Color.Black else Color.White
-
-/** 積載率の横バー（コンテナ一覧のカード用） */
-@Composable
-fun LoadBar(fraction: Float, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.primary) {
-    val clamped = fraction.coerceIn(0f, 1f)
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(6.dp)
-            .clip(RoundedCornerShape(3.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        if (clamped > 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(clamped)
-                    .background(color),
-            )
-        }
-    }
-}
 
 /**
  * 枠に収まらない文字は横へ流して見せる。

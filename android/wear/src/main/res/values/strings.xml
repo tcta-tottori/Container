@@ -1,22 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">コンテナ</string>
-    <string name="tile_label">コンテナ状況</string>
 
-    <string name="list_title">コンテナ</string>
-    <string name="empty_title">データ未受信</string>
-    <string name="empty_body">スマートフォンのアプリから送信してください</string>
-    <string name="action_refresh">再読み込み</string>
-    <string name="action_containers">コンテナ一覧へ</string>
-    <string name="phone_connected">スマホ接続中</string>
-    <string name="phone_disconnected">スマホ未接続 ・ 最後の受信内容</string>
+    <!-- 待機画面 -->
+    <string name="action_refresh">再読込</string>
+    <string name="status_refreshing">読み込み中…</string>
+    <string name="status_no_work">荷降ろし中のコンテナがありません</string>
+    <string name="status_no_data">データ未受信</string>
+    <string name="phone_disconnected">スマホ未接続</string>
     <string name="received_at">受信 %1$s</string>
 
-    <string name="label_load">積載</string>
-    <string name="label_remaining">残</string>
-
+    <!-- 作業画面 -->
     <string name="cargo_empty">荷物の情報がありません</string>
 
+    <!-- Tile -->
+    <string name="tile_label">コンテナ状況</string>
+    <string name="label_remaining">残</string>
     <string name="tile_no_data">スマホから\nデータ未受信</string>
     <string name="tile_open">開く</string>
     <string name="tile_detail">詳細</string>
