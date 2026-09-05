@@ -17,7 +17,7 @@ import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, climateToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
-import { syncToWatch } from '@/lib/watchSync';
+import { syncToWatch, setWatchCommandHandler } from '@/lib/watchSync';
 import { getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled } from '@/lib/callPhrases';
 import { getVoiceSettings, subscribeVoiceSettings, VoiceSettings } from '@/lib/voiceSettings';
 import { prepareSherpaTts } from '@/lib/sherpaTts';
@@ -1089,6 +1089,29 @@ export default function Home() {
     },
     [selectItem]
   );
+
+  /*
+   * Pixel Watch からの操作を受け取る（Android アプリで開いているときだけ）。
+   * 画面のタップと同じ処理を通すので、コールも表示も CNS の操作と揃う。
+   * 対象の品目がいまの品目と違うときは、まず切り替えるだけにして誤操作を防ぐ。
+   */
+  useEffect(() => {
+    setWatchCommandHandler((command) => {
+      const idx = state.items.findIndex((it) => it.id === command.itemId);
+      if (idx < 0) return;
+      if (command.type === 'selectItem') {
+        handleSelectItem(idx);
+        return;
+      }
+      if (idx !== state.currentItemIdx) {
+        handleSelectItem(idx);
+        return;
+      }
+      if (command.type === 'decrementPallet') handleDecrease();
+      else if (command.type === 'incrementPallet') handleIncrease();
+    });
+    return () => setWatchCommandHandler(null);
+  }, [state.items, state.currentItemIdx, handleSelectItem, handleDecrease, handleIncrease]);
 
   const switchView = useCallback((mode: ViewMode) => {
     setViewMode(mode);

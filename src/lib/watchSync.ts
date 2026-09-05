@@ -75,6 +75,18 @@ export interface WatchSyncInput {
   climate: { temperature: number; humidity: number } | null;
 }
 
+/** ウォッチから届く操作 */
+export interface WatchCommand {
+  /** 'selectItem' | 'decrementPallet' | 'incrementPallet' */
+  type: string;
+  /** 対象の品目 ID */
+  itemId: string;
+  /** 対象のコンテナ ID */
+  containerId?: string;
+  /** ウォッチで操作した時刻 */
+  issuedAt?: number;
+}
+
 /** Android アプリが用意する橋渡し */
 interface CNSWatchBridge {
   postSync(json: string): void;
@@ -84,6 +96,8 @@ interface CNSWatchBridge {
 declare global {
   interface Window {
     CNSWatch?: CNSWatchBridge;
+    /** アプリがウォッチからの操作を渡してくる入口 */
+    CNSWatchCommand?: (json: string) => void;
   }
 }
 
@@ -282,4 +296,27 @@ export function syncToWatch(input: WatchSyncInput): void {
   pendingInput = input;
   if (pendingTimer) clearTimeout(pendingTimer);
   pendingTimer = setTimeout(flush, 300);
+}
+
+/**
+ * ウォッチからの操作を受け取る係を登録する。
+ * アプリ（WebView）の中でだけ呼ばれる。null を渡すと解除。
+ */
+export function setWatchCommandHandler(handler: ((command: WatchCommand) => void) | null): void {
+  if (typeof window === 'undefined') return;
+  if (!handler) {
+    delete window.CNSWatchCommand;
+    return;
+  }
+  window.CNSWatchCommand = (json: string) => {
+    let command: WatchCommand;
+    try {
+      command = JSON.parse(json) as WatchCommand;
+    } catch {
+      console.warn('watch command parse failed');
+      return;
+    }
+    if (!command || typeof command.type !== 'string' || typeof command.itemId !== 'string') return;
+    handler(command);
+  };
 }

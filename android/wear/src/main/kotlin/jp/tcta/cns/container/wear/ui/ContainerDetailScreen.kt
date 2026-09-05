@@ -1,27 +1,32 @@
 package jp.tcta.cns.container.wear.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.DisplayFormat
 import jp.tcta.cns.container.wear.R
 
 /**
  * 画面 2: コンテナ詳細。
- * 先頭にコンテナのダイヤル（積載率のリング・コンテナ番号・PL / CT 合計・気温湿度・経過時間）、
- * 続けてコンテナ番号・形態・積載率・残容量・荷物数・SKU 数・状態・更新時刻、荷物一覧ボタン。
+ * 先頭にコンテナの概要（積載率バッジ・コンテナ番号・PL / CT 合計・経過時間）、
+ * 続けてコンテナ番号・形態・積載率・残容量・荷物数・SKU 数・状態・更新時刻、作業画面へのボタン。
  */
 @Composable
 fun ContainerDetailScreen(
@@ -33,14 +38,13 @@ fun ContainerDetailScreen(
     val container = state.payload?.container(containerId)
     val cargoCount = state.payload?.cargoOf(containerId)?.size ?: 0
 
-    ScreenScaffold(
-        scrollState = listState,
-        contentPadding = PaddingValues(0.dp),
-    ) { _ ->
+    // ScreenScaffold にスクロールを渡すと時刻がスクロールで隠れるため、Box で受ける
+    Box(modifier = Modifier.fillMaxSize()) {
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 0.dp, bottom = 40.dp),
+            // 上は常時表示の時刻のぶんを空ける
+            contentPadding = PaddingValues(top = 34.dp, bottom = 44.dp, start = 10.dp, end = 10.dp),
             autoCentering = AutoCenteringParams(itemIndex = 0, itemOffset = 0),
         ) {
             if (container == null) {
@@ -54,20 +58,36 @@ fun ContainerDetailScreen(
                 return@ScalingLazyColumn
             }
 
-            item(key = "dial") {
-                Dial(
-                    accent = MaterialTheme.colorScheme.primary,
-                    progress = container.loadPercentage / 100f,
-                    badgeText = "${stringResource(R.string.label_load)} ${DisplayFormat.percent(container.loadPercentage)}",
-                    title = container.id,
-                    subtitle = container.name.takeIf { it != container.id },
-                    pallets = container.totalPallets,
-                    cartons = container.totalCartons,
-                    environment = state.payload?.environment,
-                    startedAt = container.startedAt,
-                    pausedAt = container.pausedAt,
-                    warning = null,
-                )
+            item(key = "summary") {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    PillBadge(
+                        text = "${stringResource(R.string.label_load)} ${DisplayFormat.percent(container.loadPercentage)}",
+                        accent = MaterialTheme.colorScheme.primary,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = container.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    PalletCartonRow(
+                        accent = MaterialTheme.colorScheme.primary,
+                        pallets = container.totalPallets,
+                        cartons = container.totalCartons,
+                    )
+                    val startedAt = container.startedAt
+                    if (startedAt != null) {
+                        Spacer(Modifier.height(4.dp))
+                        ElapsedTimer(startedAt = startedAt, pausedAt = container.pausedAt)
+                    }
+                }
             }
 
             item { KeyValueRow(stringResource(R.string.detail_container_no), container.id) }

@@ -104,6 +104,20 @@ class ContainerSyncCodecTest {
     }
 
     @Test
+    fun `watch command round trip`() {
+        val command = WatchCommand(
+            type = WatchCommand.DECREMENT_PALLET,
+            itemId = "3TG123A1-0",
+            containerId = "2026-09-10_TCLU4021378",
+            issuedAt = 1_756_900_000_000L,
+        )
+        val decoded = WatchCommandCodec.decodeOrNull(WatchCommandCodec.encode(command))
+        assertEquals(command, decoded)
+        assertNull(WatchCommandCodec.decodeOrNull("{壊れた"))
+        assertNull(WatchCommandCodec.decodeOrNull(null))
+    }
+
+    @Test
     fun `display format`() {
         assertEquals("72%", DisplayFormat.percent(71.6f))
         assertEquals("100%", DisplayFormat.percent(140f))

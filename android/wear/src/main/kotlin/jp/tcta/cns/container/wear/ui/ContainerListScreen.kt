@@ -1,6 +1,8 @@
 package jp.tcta.cns.container.wear.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,8 +21,6 @@ import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.Card
 import androidx.wear.compose.material3.ListHeader
 import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.ScreenScaffold
-import androidx.wear.compose.material3.ScreenScaffoldDefaults
 import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.ContainerInfo
 import jp.tcta.cns.container.shared.DisplayFormat
@@ -39,14 +39,13 @@ fun ContainerListScreen(
     val listState = rememberScalingLazyListState()
     val containers = state.payload?.containers.orEmpty()
 
-    ScreenScaffold(
-        scrollState = listState,
-        contentPadding = ScreenScaffoldDefaults.contentPadding,
-    ) { contentPadding ->
+    // ScreenScaffold にスクロールを渡すと時刻がスクロールで隠れるため、Box で受ける
+    Box(modifier = Modifier.fillMaxSize()) {
         ScalingLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = contentPadding,
+            // 上は常時表示の時刻のぶんを空ける
+            contentPadding = PaddingValues(top = 34.dp, bottom = 44.dp, start = 10.dp, end = 10.dp),
         ) {
             item {
                 ListHeader { Text(stringResource(R.string.list_title)) }

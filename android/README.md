@@ -238,6 +238,11 @@ WebView で全画面表示する。CNS の Web コードはブラウザ向けの
 そのほか: ファイル選択（Excel・写真）の `<input type="file">` 対応、マイク権限の要求、画面を消さない設定、
 オフライン時はキャッシュから起動、CNS 以外のリンクはブラウザで開く。
 
+ファイル選択は絞り込みをせず全ファイルを見せる（`MainActivity.buildFileChooserIntent`）。
+WebView 既定の `createIntent()` は accept 属性の拡張子を MIME 型に直して絞り込むが、
+Android は `.xlsm`（マクロ付きブック）の MIME 型を知らないため、そのままだと xlsm が一覧に出てこない。
+どの形式を読むかは CNS 側（`src/lib/fileClassifier.ts` の `EXCEL_EXTENSIONS`）が拡張子で判断する。
+
 制限:
 
 - Google Drive の取り込みは、Google が WebView 内の OAuth ログインを許可していないため使えない。
@@ -251,11 +256,29 @@ WebView で全画面表示する。CNS の Web コードはブラウザ向けの
 | --- | --- |
 | 一覧 | カードごとにコンテナ名・積載率バー・残容量・ステータス。タップで詳細へ |
 | 詳細 | 先頭にコンテナのダイヤル（積載率のリング・コンテナ番号・PL / CT 合計・気温湿度・経過時間）、続けてコンテナ番号・形態・積載率・残容量・荷物数・SKU 数・状態・更新時刻、荷物一覧ボタン |
-| 作業画面（荷物一覧） | 先頭に「いま見ている品目」のダイヤル: 種類の色のリング（残り割合）・「● 100%」バッジ・機種名（大）・品名・PL（種類の色）/ CT（白）の大きな数字・気温（橙）湿度（青）・経過時間・警告マーク。その下に品目切り替えチップ（選択中は種類の色）。タップでダイヤルが切り替わる |
+| 作業画面（荷降ろし中） | 左 2/3 に丸枠（固定）: 上から 種類バッジ / 機種名（大・種類の色）/ PL（種類の色）・CT（白）/ 気温（橙）・湿度（青）。外周のリングは残り割合、下端に経過時間、警告があれば右上にマーク。右 1/3 は機種一覧（縦スクロール、選択中は種類の色）|
 
-ダイヤルは `wear/.../ui/Components.kt` の `Dial`。リングは `Canvas` で描いた 300° の弧（下側は経過時間のために空ける）。
+丸枠は `wear/.../ui/CargoWorkScreen.kt`。リングは `Canvas` で描いた 300° の弧（下側は経過時間のために空ける）。
 経過時間は `ContainerInfo.startedAt` から 1 秒ごとに数え直す。気温・湿度は `ContainerSyncPayload.environment`。
+現在時刻は `AppScaffold(timeText = { TimeText() })` で常に画面上部に出す。
 テーマ（黒地に緑）は `wear/.../ui/theme/Theme.kt`。
+
+### ウォッチからの操作（スマホと双方向）
+
+丸枠と機種一覧はタップで CNS を動かす。ウォッチ側では数字を書き換えず、CNS からの同期で更新する
+（画面の値が CNS と食い違わないようにするため）。
+
+| 操作 | 送るコマンド | CNS 側の処理 |
+| --- | --- | --- |
+| 丸枠を 1 回タップ | `decrementPallet` | パレットを 1 枚減らす（画面の 1 回タップと同じ。残数コールも鳴る）|
+| 丸枠を 2 回タップ | `incrementPallet` | パレットを 1 枚戻す |
+| 機種一覧をタップ | `selectItem` | その品目に切り替える（スマホの画面も追従する）|
+
+1 回タップは 2 回目が来ないと確定しないので 260ms 待ってから送る（CNS の `usePalletTap` と同じ）。
+送信は `MessageClient`（パス `/container/command`）で、スマホ側は `WatchCommandReceiver` が受けて
+`window.CNSWatchCommand` に渡し、CNS が `handleDecrease` / `handleIncrease` / `handleSelectItem` を呼ぶ。
+対象の品目が CNS の現在品目と違うときは、まず切り替えるだけにして誤操作を防いでいる。
+CNS アプリが前面にないときは届かない（そのときウォッチの表示は変わらない）。
 
 右スワイプで前の画面に戻る（`SwipeDismissableNavHost`）。
 `ScreenScaffold` + `ScalingLazyColumn` で丸型ディスプレイの上下に余白を取り、
@@ -275,4 +298,5 @@ Tile のどこをタップしても、コンテナ ID を Intent extra に付け
 - ウォッチからの操作（パレット数の減算、品目の切り替え）を `MessageClient` でスマホへ送り、
   スマホ側の表示も追従させる（双方向同期）
 - Google Drive 取り込みをアプリ内で使えるようにする（Chrome Custom Tabs での認証など）
+- ウォッチからの品目の完了操作
 - 100 KB を超える大きなデータの Asset 分割

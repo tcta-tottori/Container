@@ -27,6 +27,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import jp.tcta.cns.container.mobile.bridge.NativeSpeechBridge
 import jp.tcta.cns.container.mobile.bridge.WatchBridge
+import jp.tcta.cns.container.mobile.sync.WatchCommandReceiver
 import jp.tcta.cns.container.mobile.sync.WearSyncClient
 
 /**
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var webView: WebView
     private lateinit var speechBridge: NativeSpeechBridge
     private lateinit var watchBridge: WatchBridge
+    private lateinit var commandReceiver: WatchCommandReceiver
     private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
     private var polyfill: String = ""
 
@@ -95,6 +97,12 @@ class MainActivity : ComponentActivity() {
         watchBridge = WatchBridge(syncClient, lifecycleScope) { message ->
             runOnUiThread { Toast.makeText(this, getString(R.string.watch_sync_failed, message), Toast.LENGTH_SHORT).show() }
         }
+        commandReceiver = WatchCommandReceiver(this) { json ->
+            // ウォッチの操作を CNS へ渡す。CNS 側は画面のタップと同じ処理を行う
+            runOnUiThread {
+                webView.evaluateJavascript("window.CNSWatchCommand && window.CNSWatchCommand(${jsString(json)})", null)
+            }
+        }
         speechBridge = NativeSpeechBridge(this, webView) {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -135,12 +143,19 @@ class MainActivity : ComponentActivity() {
                 fileChooserCallback?.onReceiveValue(null)
                 fileChooserCallback = filePathCallback
                 return try {
-                    fileChooserLauncher.launch(fileChooserParams.createIntent())
+                    fileChooserLauncher.launch(buildFileChooserIntent(fileChooserParams))
                     true
                 } catch (e: Exception) {
                     Log.w(TAG, "ファイル選択を開けませんでした", e)
-                    fileChooserCallback = null
-                    false
+                    // 端末にファイル選択の画面が無いときは WebView 既定の Intent で開き直す
+                    try {
+                        fileChooserLauncher.launch(fileChooserParams.createIntent())
+                        true
+                    } catch (fallback: Exception) {
+                        Log.w(TAG, "既定のファイル選択も開けませんでした", fallback)
+                        fileChooserCallback = null
+                        false
+                    }
                 }
             }
 
@@ -160,6 +175,54 @@ class MainActivity : ComponentActivity() {
         })
 
         loadCns()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        commandReceiver.start()
+    }
+
+    override fun onStop() {
+        commandReceiver.stop()
+        super.onStop()
+    }
+
+    /** JavaScript の文字列リテラルにする */
+    private fun jsString(value: String): String {
+        val sb = StringBuilder("\"")
+        for (ch in value) {
+            when (ch) {
+                '\\' -> sb.append("\\\\")
+                '"' -> sb.append("\\\"")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\u2028' -> sb.append("\\u2028")
+                '\u2029' -> sb.append("\\u2029")
+                else -> sb.append(ch)
+            }
+        }
+        return sb.append('"').toString()
+    }
+
+    /**
+     * ファイル選択の Intent。
+     *
+     * WebView 既定の `createIntent()` は accept 属性の拡張子を MIME 型に直して絞り込むが、
+     * Android は `.xlsm`（マクロ付きブック）の MIME 型を知らないため、
+     * そのままだと xlsm が一覧に出てこない（選べない）。
+     * CNS 側が拡張子で振り分けているので、ここでは絞り込まずに全ファイルを見せる。
+     * 写真の撮影が要求されているときだけ、カメラを開ける既定の Intent に任せる。
+     */
+    private fun buildFileChooserIntent(params: WebChromeClient.FileChooserParams): Intent {
+        if (params.isCaptureEnabled) return params.createIntent()
+        return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(
+                Intent.EXTRA_ALLOW_MULTIPLE,
+                params.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE,
+            )
+        }
     }
 
     private fun loadCns() {

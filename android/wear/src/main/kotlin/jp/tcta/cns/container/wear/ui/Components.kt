@@ -8,9 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,8 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -39,11 +34,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.DisplayFormat
-import jp.tcta.cns.container.shared.Environment
 import jp.tcta.cns.container.shared.ItemTypes
 import jp.tcta.cns.container.wear.ui.theme.WearColors
 import kotlinx.coroutines.delay
@@ -124,113 +117,6 @@ fun TypeBadge(itemType: String?, modifier: Modifier = Modifier) {
     PillBadge(text = ItemTypes.labelOf(itemType), accent = itemTypeAccent(itemType), modifier = modifier)
 }
 
-/**
- * 参考デザインのダイヤル。丸型ディスプレイいっぱいに出す。
- *
- * 外周: 進み具合のリング（[accent] 色、下側 60° は空けて経過時間を置く）
- * 中央: バッジ → 大きなタイトル（機種名）→ 補足 → PL / CT の数字 → 気温・湿度
- * 右上: 警告マーク（[warning] があるとき）
- * 下端: 経過時間（[startedAt] があるとき、1 秒ごとに更新）
- */
-@Composable
-fun Dial(
-    accent: Color,
-    progress: Float,
-    badgeText: String,
-    title: String,
-    subtitle: String?,
-    pallets: Int,
-    cartons: Int,
-    environment: Environment?,
-    startedAt: Long?,
-    warning: String?,
-    modifier: Modifier = Modifier,
-    pausedAt: Long? = null,
-    ringInset: Dp = 12.dp,
-) {
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(1f),
-        contentAlignment = Alignment.Center,
-    ) {
-        // リングの内側を種類の色でうっすら染める
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(ringInset + 4.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.radialGradient(
-                        listOf(accent.copy(alpha = 0.10f), accent.copy(alpha = 0.18f), Color.Transparent),
-                    ),
-                ),
-        )
-        ProgressRing(
-            accent = accent,
-            progress = progress,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(ringInset),
-        )
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceEvenly,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = ringInset + 18.dp, vertical = ringInset + 12.dp),
-        ) {
-            PillBadge(text = badgeText, accent = accent)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.displaySmall,
-                    color = accent,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (!subtitle.isNullOrBlank()) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-            PalletCartonRow(accent = accent, pallets = pallets, cartons = cartons)
-            if (environment != null && (environment.temperatureC != null || environment.humidityPercent != null)) {
-                EnvironmentRow(environment)
-            }
-        }
-        if (!warning.isNullOrBlank()) {
-            Icon(
-                imageVector = Icons.Filled.Warning,
-                contentDescription = warning,
-                tint = WearColors.Orange,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = ringInset + 14.dp, end = ringInset + 14.dp)
-                    .size(18.dp),
-            )
-        }
-        if (startedAt != null) {
-            ElapsedTimer(
-                startedAt = startedAt,
-                pausedAt = pausedAt,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 2.dp),
-            )
-        }
-    }
-}
-
 /** 進み具合のリング。下側 60° を空けた 300° の弧 */
 @Composable
 fun ProgressRing(accent: Color, progress: Float, modifier: Modifier = Modifier, strokeWidth: Dp = 5.dp) {
@@ -276,7 +162,7 @@ fun PalletCartonRow(accent: Color, pallets: Int, cartons: Int) {
         Box(
             modifier = Modifier
                 .width(1.dp)
-                .height(44.dp)
+                .height(38.dp)
                 .background(MaterialTheme.colorScheme.outlineVariant),
         )
         BigNumber(label = "CT", value = cartons, color = Color.White, modifier = Modifier.weight(1f))
@@ -302,33 +188,33 @@ private fun BigNumber(label: String, value: Int, color: Color, modifier: Modifie
 
 /** 気温（オレンジ）と湿度（青） */
 @Composable
-fun EnvironmentRow(environment: Environment, modifier: Modifier = Modifier) {
+fun ClimateRow(temperatureC: Float?, humidityPercent: Int?, modifier: Modifier = Modifier) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
         modifier = modifier.fillMaxWidth(),
     ) {
-        environment.temperatureC?.let { temp ->
+        temperatureC?.let { temp ->
             Text(
-                text = "気温 ${DisplayFormat.temperature(temp)}",
+                text = DisplayFormat.temperature(temp),
                 style = MaterialTheme.typography.labelSmall,
                 color = WearColors.Orange,
                 maxLines = 1,
             )
         }
-        if (environment.temperatureC != null && environment.humidityPercent != null) {
-            Spacer(Modifier.width(6.dp))
+        if (temperatureC != null && humidityPercent != null) {
+            Spacer(Modifier.width(5.dp))
             Box(
                 modifier = Modifier
                     .width(1.dp)
-                    .height(12.dp)
+                    .height(10.dp)
                     .background(MaterialTheme.colorScheme.outlineVariant),
             )
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(5.dp))
         }
-        environment.humidityPercent?.let { humidity ->
+        humidityPercent?.let { humidity ->
             Text(
-                text = "湿度 ${humidity}%",
+                text = "$humidity%",
                 style = MaterialTheme.typography.labelSmall,
                 color = WearColors.Blue,
                 maxLines = 1,
