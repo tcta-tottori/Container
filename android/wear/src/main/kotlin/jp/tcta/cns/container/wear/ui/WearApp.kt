@@ -1,6 +1,7 @@
 package jp.tcta.cns.container.wear.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -20,11 +21,13 @@ import jp.tcta.cns.container.wear.ui.theme.ContainerWearTheme
  * 画面をめくる操作は縦だけにしてあるので、横スワイプはウォッチの「戻る」がそのまま働く。
  *
  * @param requestedContainerId Tile から渡されたコンテナ ID。あればそのコンテナを優先して開く
+ * @param onKeepScreenOn 画面を消さないでほしいかどうか。作業画面のあいだだけ true になる
  */
 @Composable
 fun WearApp(
     requestedContainerId: String?,
     onRequestConsumed: () -> Unit,
+    onKeepScreenOn: (Boolean) -> Unit = {},
     viewModel: ContainerViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -41,6 +44,12 @@ fun WearApp(
     val payload = uiState.payload
     val container = payload?.container(pinnedContainerId)
         ?: payload?.containers?.firstOrNull { it.isWorking() }
+
+    // 荷降ろし中は腕を下ろしても消えないようにする。待機画面ではふだんどおり消す
+    DisposableEffect(container != null) {
+        onKeepScreenOn(container != null)
+        onDispose { onKeepScreenOn(false) }
+    }
 
     ContainerWearTheme {
         // 現在時刻は常に画面上部へ出す

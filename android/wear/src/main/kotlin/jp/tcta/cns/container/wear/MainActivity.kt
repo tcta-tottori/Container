@@ -17,13 +17,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 荷降ろし中に画面が消えないようにする（アプリを開いている間だけ）
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         requestedContainerId = intent?.containerIdExtra()
         setContent {
             WearApp(
                 requestedContainerId = requestedContainerId,
                 onRequestConsumed = { requestedContainerId = null },
+                // 作業画面のあいだだけ画面を消さない。待機画面はふだんどおり消える
+                onKeepScreenOn = { keep ->
+                    if (keep) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                },
             )
         }
     }
