@@ -97,6 +97,7 @@ fun CargoWorkScreen(
                     cartons = selected.cartonCount,
                     environment = payload?.environment,
                     startedAt = container?.startedAt,
+                    pausedAt = container?.pausedAt,
                     warning = selected.warning,
                 )
             }

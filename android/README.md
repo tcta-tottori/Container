@@ -1,13 +1,13 @@
-# Pixel Watch 4 向け コンテナ表示アプリ
+# CNS Android アプリと Pixel Watch 4 向けウォッチアプリ
 
-スマートフォンで管理しているコンテナの荷物情報を Pixel Watch 4 で確認するための
-Wear OS アプリ（読み取り専用）と、その送信元になるスマートフォンアプリ。
+CNS（コンテナ荷降ろしの Web アプリ）を Android アプリとして動かし、
+その作業状態を Pixel Watch 4 で確認するための Wear OS アプリ（読み取り専用）。
 
 ```
 android/
 ├── shared/   共通データモデル + JSON コーデック（純 Kotlin/JVM、単体テストあり）
-├── mobile/   スマートフォン側。Wearable Data Layer API で /container/status を更新する
-└── wear/     Pixel Watch 側。一覧 / 詳細 / 荷物一覧 の 3 画面 + Tile
+├── mobile/   CNS アプリ。CNS（Web）を WebView で表示し、ウォッチ同期と音声をネイティブで橋渡しする
+└── wear/     Pixel Watch 側。一覧 / 詳細 / 作業画面（ダイヤル）の 3 画面 + Tile
 ```
 
 ## 開発環境
@@ -153,20 +153,23 @@ adb -s <ウォッチ> shell pm list packages | grep jp.tcta.cns.container     # 
 ## 同期のしくみ
 
 ```
-mobile                                          wear
-ContainerDataSource ──▶ ContainerSyncPayload ──▶ DataClient.putDataItem("/container/status")
-                                                       │  (Wearable Data Layer API)
-                                                       ▼
-                                          ContainerDataListenerService.onDataChanged
-                                                       │
-                                                       ▼
-                                          ContainerRepository (DataStore に JSON を保存)
-                                               │                    │
-                                               ▼                    ▼
-                                       Compose 画面 (Flow)     Tile 更新要求
+CNS (Web, src/lib/watchSync.ts)                    mobile (Android)                      wear
+作業状態 → ContainerSyncPayload の JSON ──▶ window.CNSWatch.postSync(json) ──▶ DataClient.putDataItem("/container/status")
+                                                                                          │ (Wearable Data Layer API)
+                                                                                          ▼
+                                                                    ContainerDataListenerService.onDataChanged
+                                                                                          │
+                                                                                          ▼
+                                                                    ContainerRepository (DataStore に JSON を保存)
+                                                                         │                    │
+                                                                         ▼                    ▼
+                                                                 Compose 画面 (Flow)     Tile 更新要求
 ```
 
-- DataItem のパスは `/container/status`。DataMap の `payload` キーに JSON 文字列を入れ、
+- CNS 側は `src/lib/watchSync.ts` が作業状態（コンテナ・現在の品目・パレット減算・完了・タイマー・気温湿度）から
+  `ContainerSyncPayload` と同じ形の JSON を作り、`window.CNSWatch.postSync` に渡す。300ms のあいだの連続変更は 1 回にまとめ、
+  内容が変わっていなければ送らない。ブラウザで開いているとき（橋渡しが無いとき）は何もしない。
+- mobile 側は `bridge/WatchBridge.kt` が JSON を受け取り、DataItem のパス `/container/status` に書く。DataMap の `payload` キーに JSON 文字列、
   `generatedAt` に生成時刻を入れる（同じ内容を送り直しても変更として届くようにするため）。
 - ウォッチは受信した JSON を DataStore にそのまま保存する。スマホと切断されていても
   最後に受信した内容を表示し、画面下部に「スマホ未接続 ・ 最後の受信内容」と受信時刻を出す。
@@ -221,12 +224,26 @@ ContainerDataSource ──▶ ContainerSyncPayload ──▶ DataClient.putDataI
 `ContainerInfo` / `CargoItem` は `shared/src/main/kotlin/jp/tcta/cns/container/shared/` にある。
 未知のキーは無視するので、スマホ側で先に項目を増やしても古いウォッチアプリは壊れない。
 
-## 既存システムとの接続
+## CNS アプリ（mobile）のしくみ
 
-`mobile/src/main/kotlin/jp/tcta/cns/container/mobile/data/ContainerDataSource.kt` が接続点。
-現在は `SampleContainerDataSource`（CNS の品目を模したサンプル）を使っている。
-実データに切り替えるときは `ContainerDataSource` を実装し、
-`MobileViewModel` の `dataSource` を差し替える。返す内容は `ContainerRecord`（`ContainerInfo` + `List<CargoItem>`）のリスト。
+`mobile/.../MainActivity.kt` が CNS（既定は `https://tcta-tottori.github.io/Container/`、`build.gradle.kts` の `CNS_URL`）を
+WebView で全画面表示する。CNS の Web コードはブラウザ向けのまま変えていない。
+
+| 橋渡し | 役割 |
+| --- | --- |
+| `window.CNSWatch`（`bridge/WatchBridge.kt`） | CNS からの JSON をウォッチへ送る |
+| `window.CNSNative`（`bridge/NativeSpeechBridge.kt`） | 読み上げ（Android TextToSpeech）と音声認識（Android SpeechRecognizer。Android 12 以上で端末内認識があればそれを優先） |
+| `assets/cns-native-polyfill.js` | WebView には無い `speechSynthesis` / `SpeechRecognition` を上の橋渡しで組み立てる。各ページの先頭で注入 |
+
+そのほか: ファイル選択（Excel・写真）の `<input type="file">` 対応、マイク権限の要求、画面を消さない設定、
+オフライン時はキャッシュから起動、CNS 以外のリンクはブラウザで開く。
+
+制限:
+
+- Google Drive の取り込みは、Google が WebView 内の OAuth ログインを許可していないため使えない。
+  端末のファイル選択（Files アプリ・Google Drive アプリからの選択）で Excel を読み込む。
+- 読み上げは端末の日本語 TTS エンジンを使う。Gemini TTS / sherpa-onnx は Web 側でそのまま動く。
+- 音声認識は Google の音声認識サービス（または端末内認識）を使う。開始時に短い効果音が鳴る端末がある。
 
 ## Wear OS 画面
 
@@ -257,5 +274,5 @@ Tile のどこをタップしても、コンテナ ID を Intent extra に付け
 
 - ウォッチからの操作（パレット数の減算、品目の切り替え）を `MessageClient` でスマホへ送り、
   スマホ側の表示も追従させる（双方向同期）
-- 気温・湿度・作業開始時刻を CNS の実データ（天気機能・タイマー）から取る
+- Google Drive 取り込みをアプリ内で使えるようにする（Chrome Custom Tabs での認証など）
 - 100 KB を超える大きなデータの Asset 分割

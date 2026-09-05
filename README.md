@@ -3,12 +3,13 @@
 コンテナ荷降ろし作業を支援するWebアプリケーション。
 Excelファイルから品目データを読み込み、リアルタイムの作業追跡・音声認識・読み上げ機能を提供する。　
 
-## Pixel Watch 4 向けアプリ（Wear OS）
+## Android アプリ / Pixel Watch 4 向けアプリ（Wear OS）
 
-スマートフォンで管理しているコンテナ情報を Pixel Watch 4 で確認する Wear OS アプリと、
-その送信元のスマートフォンアプリを `android/` に置いている（Kotlin / Jetpack Compose / Wear OS Material 3 /
-Wearable Data Layer API）。Android Studio で `android/` フォルダを開くとそのままビルドできる。
-構成・同期のしくみ・既存システムとの接続点は [android/README.md](android/README.md) を参照。
+`android/` に、CNS を WebView で動かす Android アプリ（`mobile`）と、作業状態を Pixel Watch 4 で確認する
+Wear OS アプリ（`wear`）を置いている（Kotlin / Compose for Wear OS Material 3 / Wearable Data Layer API）。
+CNS 側は `src/lib/watchSync.ts` が作業状態をウォッチ用の JSON にして、アプリが用意する `window.CNSWatch` に渡す
+（ブラウザで開いているときは何もしない）。Android Studio で `android/` フォルダを開くとそのままビルドできる。
+構成・同期のしくみ・インストール手順は [android/README.md](android/README.md) を参照。
 
 ## 主な機能
 

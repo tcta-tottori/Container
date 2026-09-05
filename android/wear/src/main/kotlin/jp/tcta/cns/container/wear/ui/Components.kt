@@ -145,6 +145,7 @@ fun Dial(
     startedAt: Long?,
     warning: String?,
     modifier: Modifier = Modifier,
+    pausedAt: Long? = null,
     ringInset: Dp = 12.dp,
 ) {
     Box(
@@ -221,6 +222,7 @@ fun Dial(
         if (startedAt != null) {
             ElapsedTimer(
                 startedAt = startedAt,
+                pausedAt = pausedAt,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 2.dp),
@@ -335,20 +337,21 @@ fun EnvironmentRow(environment: Environment, modifier: Modifier = Modifier) {
     }
 }
 
-/** 作業開始からの経過時間。1 秒ごとに描き直す */
+/** 作業開始からの経過時間。1 秒ごとに描き直す。[pausedAt] があればその時刻で止める */
 @Composable
-fun ElapsedTimer(startedAt: Long, modifier: Modifier = Modifier) {
+fun ElapsedTimer(startedAt: Long, modifier: Modifier = Modifier, pausedAt: Long? = null) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(startedAt) {
-        while (true) {
+    LaunchedEffect(startedAt, pausedAt) {
+        while (pausedAt == null) {
             now = System.currentTimeMillis()
             delay(1_000L)
         }
     }
+    val end = pausedAt ?: now
     Text(
-        text = DisplayFormat.elapsed(now - startedAt),
+        text = DisplayFormat.elapsed(end - startedAt),
         style = MaterialTheme.typography.titleMedium,
-        color = Color.White,
+        color = if (pausedAt != null) MaterialTheme.colorScheme.onSurfaceVariant else Color.White,
         maxLines = 1,
         modifier = modifier,
     )

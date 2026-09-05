@@ -14,6 +14,7 @@ import kotlinx.serialization.Serializable
  * @property totalPallets パレット合計（PL）
  * @property totalCartons 端数カートン合計（CT）
  * @property startedAt 荷降ろし作業の開始時刻（epoch millis）。ウォッチはここから経過時間を数える。未開始なら null
+ * @property pausedAt 一時停止した時刻（epoch millis）。ウォッチの経過時間はこの時刻で止める。動いていれば null
  * @property itemCount SKU 数（品目の種類数）
  * @property status 状態（例: 荷降ろし中 / 完了）
  * @property updatedAt 更新時刻（epoch millis）
@@ -32,4 +33,5 @@ data class ContainerInfo(
     val totalPallets: Int = 0,
     val totalCartons: Int = 0,
     val startedAt: Long? = null,
+    val pausedAt: Long? = null,
 )

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- UI は Compose Material 3 で描くので、Activity のテーマは最小限にする -->
-    <style name="Theme.ContainerSync" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@android:color/white</item>
+    <!-- CNS の背景色（#1a1d2e）に合わせた全画面テーマ -->
+    <style name="Theme.ContainerSync" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#1A1D2E</item>
+        <item name="android:statusBarColor">#1A1D2E</item>
+        <item name="android:navigationBarColor">#1A1D2E</item>
     </style>
 </resources>

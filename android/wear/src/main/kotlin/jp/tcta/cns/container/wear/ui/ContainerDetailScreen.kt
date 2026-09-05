@@ -65,6 +65,7 @@ fun ContainerDetailScreen(
                     cartons = container.totalCartons,
                     environment = state.payload?.environment,
                     startedAt = container.startedAt,
+                    pausedAt = container.pausedAt,
                     warning = null,
                 )
             }
