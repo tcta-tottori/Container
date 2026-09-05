@@ -17,11 +17,9 @@ import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
 object Routes {
     const val ARG_ID = "containerId"
     const val LIST = "containers"
-    const val DETAIL = "containers/{$ARG_ID}"
-    const val CARGO = "containers/{$ARG_ID}/cargo"
+    const val WORK = "containers/{$ARG_ID}/work"
 
-    fun detail(id: String) = "containers/${encode(id)}"
-    fun cargo(id: String) = "containers/${encode(id)}/cargo"
+    fun work(id: String) = "containers/${encode(id)}/work"
 
     // ルートは Uri として解釈されるので、記号を含む ID は percent-encoding しておく
     private fun encode(id: String): String = Uri.encode(id)
@@ -29,9 +27,9 @@ object Routes {
 
 /**
  * ウォッチアプリ全体。
- * 一覧 → 詳細 → 荷物一覧 の 3 画面を、右スワイプで戻れる NavHost でつなぐ。
+ * コンテナ一覧 → 作業画面 の 2 段。作業画面は横スワイプで「部品表示」と「一覧」を行き来する。
  *
- * @param requestedContainerId Tile から渡されたコンテナ ID。あれば詳細画面を直接開く
+ * @param requestedContainerId Tile から渡されたコンテナ ID。あればそのコンテナの作業画面を直接開く
  */
 @Composable
 fun WearApp(
@@ -44,7 +42,7 @@ fun WearApp(
 
     LaunchedEffect(requestedContainerId) {
         if (requestedContainerId != null) {
-            navController.navigate(Routes.detail(requestedContainerId)) { launchSingleTop = true }
+            navController.navigate(Routes.work(requestedContainerId)) { launchSingleTop = true }
             onRequestConsumed()
         }
     }
@@ -59,19 +57,12 @@ fun WearApp(
                 composable(Routes.LIST) {
                     ContainerListScreen(
                         state = uiState,
-                        onContainerClick = { id -> navController.navigate(Routes.detail(id)) },
+                        // コンテナを選んだら、そのまま作業画面へ入る
+                        onContainerClick = { id -> navController.navigate(Routes.work(id)) },
                         onRefresh = viewModel::refresh,
                     )
                 }
-                composable(Routes.DETAIL) { entry ->
-                    val id = entry.arguments?.getString(Routes.ARG_ID).orEmpty()
-                    ContainerDetailScreen(
-                        state = uiState,
-                        containerId = id,
-                        onShowCargo = { navController.navigate(Routes.cargo(id)) },
-                    )
-                }
-                composable(Routes.CARGO) { entry ->
+                composable(Routes.WORK) { entry ->
                     val id = entry.arguments?.getString(Routes.ARG_ID).orEmpty()
                     CargoWorkScreen(
                         state = uiState,
