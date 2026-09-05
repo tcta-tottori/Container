@@ -1,6 +1,8 @@
 package jp.tcta.cns.container.wear.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
@@ -138,6 +140,7 @@ fun CargoWorkScreen(
     }
 
     var showList by remember(containerId) { mutableStateOf(false) }
+    var showPallet by remember(containerId) { mutableStateOf(false) }
 
     // 縦スワイプでの品目送り。端まで行ったら反対の端へ回る
     val selectedIndex = items.indexOfFirst { it.id == selected.id }
@@ -159,6 +162,7 @@ fun CargoWorkScreen(
             onNextItem = { stepItem(1) },
             onPrevItem = { stepItem(-1) },
             onOpenList = { showList = true },
+            onOpenPallet = { showPallet = true },
         )
 
         AnimatedVisibility(
@@ -176,6 +180,20 @@ fun CargoWorkScreen(
                     onSelectItem(id)
                     showList = false
                 },
+            )
+        }
+
+        // 立方体アイコンを押したときの、端数パレットの積み方
+        AnimatedVisibility(
+            visible = showPallet,
+            modifier = Modifier.fillMaxSize(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            PalletDiagramOverlay(
+                item = selected,
+                accent = itemTypeAccent(selected.itemType),
+                onClose = { showPallet = false },
             )
         }
     }
@@ -198,6 +216,7 @@ private fun ItemPage(
     onNextItem: () -> Unit,
     onPrevItem: () -> Unit,
     onOpenList: () -> Unit,
+    onOpenPallet: () -> Unit,
 ) {
     val accent = itemTypeAccent(item.itemType)
     val view = LocalView.current
@@ -304,6 +323,7 @@ private fun ItemPage(
                 itemType = item.itemType,
                 fontSize = (w.value * 0.038f).sp,
                 cubeSize = w * 0.052f,
+                onCubeClick = onOpenPallet,
             )
             Spacer(Modifier.height(w * 0.022f))
             MarqueeText(
@@ -371,6 +391,7 @@ private fun TypeBadge(
     itemType: String?,
     fontSize: androidx.compose.ui.unit.TextUnit,
     cubeSize: Dp,
+    onCubeClick: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -394,11 +415,15 @@ private fun TypeBadge(
                 .background(Color.White.copy(alpha = 0.35f)),
         )
         Spacer(Modifier.width(9.dp))
+        // 立方体を押すと、端数パレットの積み方が出る
         Icon(
             painter = painterResource(R.drawable.ic_cube),
-            contentDescription = null,
+            contentDescription = stringResource(R.string.action_pallet),
             tint = Color.White,
-            modifier = Modifier.size(cubeSize),
+            modifier = Modifier
+                .size(cubeSize * 1.5f)
+                .pointerInput(Unit) { detectTapGestures(onTap = { onCubeClick() }) }
+                .padding(cubeSize * 0.25f),
         )
     }
 }

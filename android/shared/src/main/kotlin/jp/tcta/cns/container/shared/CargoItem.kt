@@ -17,6 +17,8 @@ import kotlinx.serialization.Serializable
  * @property modelName 機種名（代表機種。例: JPV-H100）。作業画面で大きく出す。無ければ [name] を出す
  * @property remainingPercentage 残り割合 (0..100)。100 = 未着手、0 = 完了。作業画面のリングに使う。不明なら null
  * @property warning 注意書き（例: 類似品あり）。あれば作業画面に警告マークを出す
+ * @property qtyPerPallet 1 パレットあたりのケース数。端数パレットの積み方を組み立てるのに使う
+ * @property measurements 1 ケースの外寸 "55*38*38"（cm）。同上
  * @property location 位置（例: 前方 パレット 1-3）。不明なら null
  * @property status 状態（例: 未着手 / 作業中 / 完了）。不明なら null
  */
@@ -31,6 +33,8 @@ data class CargoItem(
     val modelName: String? = null,
     val remainingPercentage: Float? = null,
     val warning: String? = null,
+    val qtyPerPallet: Int = 0,
+    val measurements: String? = null,
     val location: String? = null,
     val status: String? = null,
 )

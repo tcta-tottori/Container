@@ -12,6 +12,8 @@
 
     <!-- 作業画面 -->
     <string name="cargo_empty">荷物の情報がありません</string>
+    <string name="action_pallet">端数パレットの積み方</string>
+    <string name="pallet_none">端数なし</string>
 
     <!-- Tile -->
     <string name="tile_label">コンテナ状況</string>

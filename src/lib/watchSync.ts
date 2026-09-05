@@ -41,6 +41,10 @@ export interface WatchCargoItem {
   modelName?: string;
   remainingPercentage?: number;
   warning?: string;
+  /** 1パレットあたりのケース数（ウォッチで端数パレットの積み方を描くのに使う） */
+  qtyPerPallet?: number;
+  /** 1ケースの外寸 "55*38*38"（cm）。同上 */
+  measurements?: string;
   location?: string;
   status?: string;
 }
@@ -148,6 +152,8 @@ function buildWorkingItems(input: WatchSyncInput): WatchCargoItem[] {
       modelName: item.representModel || undefined,
       remainingPercentage: completed ? 0 : originalCartons > 0 ? pct((remainingCartons / originalCartons) * 100) : 100,
       warning: similar.length > 0 ? `類似品: ${similar.map((s) => s.itemName).join('、')}` : undefined,
+      qtyPerPallet: item.qtyPerPallet || undefined,
+      measurements: item.measurements || undefined,
       location: item.partNumber || undefined,
       status: completed ? '完了' : idx === currentItemIdx ? '作業中' : '未着手',
     };
@@ -167,6 +173,8 @@ function buildPlainItems(items: ContainerItem[]): WatchCargoItem[] {
       itemType: item.type,
       modelName: item.representModel || undefined,
       remainingPercentage: 100,
+      qtyPerPallet: item.qtyPerPallet || undefined,
+      measurements: item.measurements || undefined,
       location: item.partNumber || undefined,
       status: '未着手',
     };
