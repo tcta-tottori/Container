@@ -143,12 +143,19 @@ class MainActivity : ComponentActivity() {
                 fileChooserCallback?.onReceiveValue(null)
                 fileChooserCallback = filePathCallback
                 return try {
-                    fileChooserLauncher.launch(fileChooserParams.createIntent())
+                    fileChooserLauncher.launch(buildFileChooserIntent(fileChooserParams))
                     true
                 } catch (e: Exception) {
                     Log.w(TAG, "ファイル選択を開けませんでした", e)
-                    fileChooserCallback = null
-                    false
+                    // 端末にファイル選択の画面が無いときは WebView 既定の Intent で開き直す
+                    try {
+                        fileChooserLauncher.launch(fileChooserParams.createIntent())
+                        true
+                    } catch (fallback: Exception) {
+                        Log.w(TAG, "既定のファイル選択も開けませんでした", fallback)
+                        fileChooserCallback = null
+                        false
+                    }
                 }
             }
 
@@ -195,6 +202,27 @@ class MainActivity : ComponentActivity() {
             }
         }
         return sb.append('"').toString()
+    }
+
+    /**
+     * ファイル選択の Intent。
+     *
+     * WebView 既定の `createIntent()` は accept 属性の拡張子を MIME 型に直して絞り込むが、
+     * Android は `.xlsm`（マクロ付きブック）の MIME 型を知らないため、
+     * そのままだと xlsm が一覧に出てこない（選べない）。
+     * CNS 側が拡張子で振り分けているので、ここでは絞り込まずに全ファイルを見せる。
+     * 写真の撮影が要求されているときだけ、カメラを開ける既定の Intent に任せる。
+     */
+    private fun buildFileChooserIntent(params: WebChromeClient.FileChooserParams): Intent {
+        if (params.isCaptureEnabled) return params.createIntent()
+        return Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(
+                Intent.EXTRA_ALLOW_MULTIPLE,
+                params.mode == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE,
+            )
+        }
     }
 
     private fun loadCns() {

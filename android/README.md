@@ -238,6 +238,11 @@ WebView で全画面表示する。CNS の Web コードはブラウザ向けの
 そのほか: ファイル選択（Excel・写真）の `<input type="file">` 対応、マイク権限の要求、画面を消さない設定、
 オフライン時はキャッシュから起動、CNS 以外のリンクはブラウザで開く。
 
+ファイル選択は絞り込みをせず全ファイルを見せる（`MainActivity.buildFileChooserIntent`）。
+WebView 既定の `createIntent()` は accept 属性の拡張子を MIME 型に直して絞り込むが、
+Android は `.xlsm`（マクロ付きブック）の MIME 型を知らないため、そのままだと xlsm が一覧に出てこない。
+どの形式を読むかは CNS 側（`src/lib/fileClassifier.ts` の `EXCEL_EXTENSIONS`）が拡張子で判断する。
+
 制限:
 
 - Google Drive の取り込みは、Google が WebView 内の OAuth ログインを許可していないため使えない。
