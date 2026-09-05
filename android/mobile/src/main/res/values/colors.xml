@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- ランチャーアイコンの背景（CNS アイコンのグラデーションの中間色） -->
-    <color name="ic_launcher_background">#8351CD</color>
-</resources>
