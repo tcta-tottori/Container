@@ -7,6 +7,7 @@
     <string name="empty_title">データ未受信</string>
     <string name="empty_body">スマートフォンのアプリから送信してください</string>
     <string name="action_refresh">再読み込み</string>
+    <string name="action_containers">コンテナ一覧へ</string>
     <string name="phone_connected">スマホ接続中</string>
     <string name="phone_disconnected">スマホ未接続 ・ 最後の受信内容</string>
     <string name="received_at">受信 %1$s</string>

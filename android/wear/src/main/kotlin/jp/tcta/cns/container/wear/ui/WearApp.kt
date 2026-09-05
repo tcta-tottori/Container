@@ -6,12 +6,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.wear.compose.foundation.rememberSwipeToDismissBoxState
 import androidx.wear.compose.material3.AppScaffold
 import androidx.wear.compose.material3.TimeText
 import jp.tcta.cns.container.wear.ui.theme.ContainerWearTheme
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import androidx.wear.compose.navigation.rememberSwipeDismissableNavHostState
 
 /** 画面のルート定義 */
 object Routes {
@@ -39,6 +41,9 @@ fun WearApp(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val navController = rememberSwipeDismissableNavController()
+    // 作業画面は横スワイプをページ送りに使うので、戻る操作の状態を自分で持って画面左端に割り当てる
+    val swipeToDismissBoxState = rememberSwipeToDismissBoxState()
+    val navHostState = rememberSwipeDismissableNavHostState(swipeToDismissBoxState)
 
     LaunchedEffect(requestedContainerId) {
         if (requestedContainerId != null) {
@@ -53,6 +58,7 @@ fun WearApp(
             SwipeDismissableNavHost(
                 navController = navController,
                 startDestination = Routes.LIST,
+                state = navHostState,
             ) {
                 composable(Routes.LIST) {
                     ContainerListScreen(
@@ -70,6 +76,8 @@ fun WearApp(
                         onSelectItem = { itemId -> viewModel.selectItem(id, itemId) },
                         onDecrementPallet = { itemId -> viewModel.decrementPallet(id, itemId) },
                         onIncrementPallet = { itemId -> viewModel.incrementPallet(id, itemId) },
+                        onBack = { navController.popBackStack() },
+                        swipeToDismissBoxState = swipeToDismissBoxState,
                     )
                 }
             }

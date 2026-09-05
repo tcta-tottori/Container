@@ -34,7 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.foundation.LocalSwipeToDismissBoxState
+import androidx.wear.compose.foundation.SwipeToDismissBoxState
 import androidx.wear.compose.foundation.edgeSwipeToDismiss
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
@@ -74,6 +74,8 @@ fun CargoWorkScreen(
     onSelectItem: (String) -> Unit,
     onDecrementPallet: (String) -> Unit,
     onIncrementPallet: (String) -> Unit,
+    onBack: () -> Unit,
+    swipeToDismissBoxState: SwipeToDismissBoxState,
 ) {
     val payload = state.payload
     val container = payload?.container(containerId)
@@ -108,7 +110,7 @@ fun CargoWorkScreen(
         modifier = Modifier
             .fillMaxSize()
             // 横スワイプはページ送りに使うので、戻る操作は画面の左端からのスワイプにする
-            .edgeSwipeToDismiss(LocalSwipeToDismissBoxState.current),
+            .edgeSwipeToDismiss(swipeToDismissBoxState),
     ) { page ->
         if (page % PAGE_COUNT == 0) {
             ItemPage(
@@ -124,6 +126,7 @@ fun CargoWorkScreen(
             ItemListPage(
                 items = items,
                 selectedId = selected.id,
+                onBack = onBack,
                 onSelect = { id ->
                     pendingId = id
                     onSelectItem(id)
@@ -271,6 +274,7 @@ private fun BigNumber(label: String, value: Int, color: Color, modifier: Modifie
 private fun ItemListPage(
     items: List<CargoItem>,
     selectedId: String,
+    onBack: () -> Unit,
     onSelect: (String) -> Unit,
 ) {
     val listState = rememberScalingLazyListState()
@@ -288,6 +292,10 @@ private fun ItemListPage(
         ) {
             items(items, key = { it.id }) { item ->
                 ItemBar(item = item, selected = item.id == selectedId, onClick = { onSelect(item.id) })
+            }
+            // 画面左端からのスワイプでも戻れるが、押して戻れる場所も用意しておく
+            item(key = "back") {
+                BackBar(onClick = onBack)
             }
         }
         EdgeScrim()
@@ -325,6 +333,27 @@ private fun ItemBar(item: CargoItem, selected: Boolean, onClick: () -> Unit) {
             color = onBackground.copy(alpha = 0.85f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** コンテナ一覧へ戻るバー */
+@Composable
+private fun BackBar(onClick: () -> Unit) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) },
+    ) {
+        Text(
+            text = stringResource(R.string.action_containers),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
         )
     }
 }
