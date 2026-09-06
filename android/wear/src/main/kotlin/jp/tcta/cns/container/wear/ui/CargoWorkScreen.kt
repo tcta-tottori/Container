@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -50,14 +51,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,10 +71,11 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.CargoItem
+import jp.tcta.cns.container.shared.Environment
+import jp.tcta.cns.container.shared.PalletLayout
 import jp.tcta.cns.container.shared.DisplayFormat
 import jp.tcta.cns.container.wear.R
 import kotlinx.coroutines.Job
@@ -83,6 +88,9 @@ private const val DOUBLE_TAP_MS = 260L
 
 /** 縦スワイプで品目を切り替えるとみなす移動量 */
 private val ITEM_SWITCH_THRESHOLD = 44.dp
+
+/** 詳細画面のパレット図の向き（度） */
+private const val DETAIL_PALLET_ANGLE_DEG = -35f
 
 /** 一覧の右に出す弧の太さ */
 private val INDICATOR_STROKE = 4.dp
@@ -161,6 +169,8 @@ fun CargoWorkScreen(
 
     var showList by remember(containerId) { mutableStateOf(false) }
     var showPallet by remember(containerId) { mutableStateOf(false) }
+    // 一覧で長押しした品目。詳しい内容を出しているあいだだけ入っている
+    var detailItem by remember(containerId) { mutableStateOf<CargoItem?>(null) }
 
     // 残りが端数パレットだけになった瞬間に、積み方を自動で出す（スマホ版と同じ）。
     // 1 品目につき 1 回だけ。何も触らなければ 5 秒で自動的に閉じる
@@ -192,6 +202,8 @@ fun CargoWorkScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         ItemPage(
             item = selected,
+            items = items,
+            environment = payload?.environment,
             startedAt = container?.startedAt,
             pausedAt = container?.pausedAt,
             onDecrement = { onDecrementPallet(selected.id) },
@@ -211,6 +223,7 @@ fun CargoWorkScreen(
             ItemListPage(
                 items = items,
                 selectedId = selected.id,
+                onShowDetail = { detailItem = it },
                 onClose = { showList = false },
                 onSelect = { id ->
                     pendingId = id
@@ -220,7 +233,21 @@ fun CargoWorkScreen(
             )
         }
 
-        // 立方体アイコンを押したときの、端数パレットの積み方
+        // 一覧で長押ししたときの、詳しい内容
+        AnimatedVisibility(
+            visible = detailItem != null,
+            modifier = Modifier.fillMaxSize(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            // 閉じたあとも消えるまでのあいだ描くので、最後の品目を覚えておく
+            val shown = remember(detailItem) { detailItem }
+            if (shown != null) {
+                ItemDetailPage(item = shown, onClose = { detailItem = null })
+            }
+        }
+
+        // CT の枠を押したときの、端数パレットの積み方
         AnimatedVisibility(
             visible = showPallet,
             modifier = Modifier.fillMaxSize(),
@@ -246,6 +273,8 @@ fun CargoWorkScreen(
 @Composable
 private fun ItemPage(
     item: CargoItem,
+    items: List<CargoItem>,
+    environment: Environment?,
     startedAt: Long?,
     pausedAt: Long?,
     onDecrement: () -> Unit,
@@ -266,10 +295,25 @@ private fun ItemPage(
     var dragAmount by remember { mutableFloatStateOf(0f) }
     var fromBottomEdge by remember { mutableStateOf(false) }
 
+    // リューズを時計回りに回すと一覧へ。受け取るには焦点が要る
+    val rotaryFocus = remember { FocusRequester() }
+    LaunchedEffect(item.id) { runCatching { rotaryFocus.requestFocus() } }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(ScreenBlack)
+            .onRotaryScrollEvent { event ->
+                if (event.verticalScrollPixels > 0f) {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                    onOpenList()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusRequester(rotaryFocus)
+            .focusable()
             .pointerInput(item.id) {
                 detectTapGestures(
                     onTap = {
@@ -359,9 +403,9 @@ private fun ItemPage(
         ) {
             TypeBadge(
                 itemType = item.itemType,
+                counts = remainingByType(items),
                 fontSize = (w.value * 0.038f).sp,
-                cubeSize = w * 0.052f,
-                onCubeClick = onOpenPallet,
+                dotSize = w * 0.030f,
             )
             Spacer(Modifier.height(w * 0.022f))
             MarqueeText(
@@ -394,15 +438,45 @@ private fun ItemPage(
                     unit = "CT",
                     width = w,
                     numberScale = 0.168f,
-                    modifier = Modifier.weight(1f),
+                    // CT の枠を押すと端数パレットの積み方が出る
+                    modifier = Modifier
+                        .weight(1f)
+                        .pointerInput(item.id) {
+                            detectTapGestures(onTap = { onOpenPallet() })
+                        },
                 )
             }
-            HairLine(Modifier.padding(vertical = w * 0.014f))
-            ValueWithUnit(
-                value = DisplayFormat.quantity(countUp(item.quantity.coerceAtLeast(0), item.id)),
-                unit = "PCS",
-                width = w,
-                numberScale = 0.072f,
+            // PL も CT も 0 のときだけ、代わりに PCS を出す
+            if (item.palletCount <= 0 && item.cartonCount <= 0) {
+                HairLine(Modifier.padding(vertical = w * 0.014f))
+                ValueWithUnit(
+                    value = DisplayFormat.quantity(countUp(item.quantity.coerceAtLeast(0), item.id)),
+                    unit = "PCS",
+                    width = w,
+                    numberScale = 0.072f,
+                )
+            }
+        }
+
+        // 気温は左の斜め上、湿度は右の斜め上
+        environment?.temperatureC?.let { celsius ->
+            CornerReading(
+                text = DisplayFormat.temperature(celsius),
+                color = ElapsedOrange,
+                fontSize = (w.value * 0.050f).sp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = w * 0.155f, top = w * 0.115f),
+            )
+        }
+        environment?.humidityPercent?.let { humidity ->
+            CornerReading(
+                text = "$humidity%",
+                color = HumidityBlue,
+                fontSize = (w.value * 0.050f).sp,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(end = w * 0.155f, top = w * 0.115f),
             )
         }
 
@@ -426,21 +500,180 @@ private fun ItemPage(
     }
 }
 
-/** 種類バッジ。黒い丸枠に 種類名 ・ 立方体アイコン */
+/**
+ * 一覧で長押ししたときに出す、品目の詳しい内容。
+ *
+ * 品名・種類・気高コード・1 箱の外寸・1 パレットのケース数・残りの数、
+ * それに端数パレットの積み方を並べる。2 回タップで一覧へ戻る。
+ */
+@Composable
+private fun ItemDetailPage(item: CargoItem, onClose: () -> Unit) {
+    val accent = itemTypeAccent(item.itemType)
+    val stack = remember(item.id, item.cartonCount, item.qtyPerPallet, item.measurements, item.name) {
+        PalletLayout.buildFractionStack(
+            cartons = item.cartonCount,
+            qtyPerPallet = item.qtyPerPallet,
+            itemType = item.itemType,
+            itemName = item.name,
+            measurements = item.measurements,
+        )
+    }
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(ScreenBlack)
+            // 2 回タップで一覧へ戻る
+            .pointerInput(item.id) { detectTapGestures(onDoubleTap = { onClose() }) },
+    ) {
+        val w = maxWidth
+        val listState = rememberScalingLazyListState()
+        ScalingLazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 30.dp, bottom = 30.dp, start = 14.dp, end = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            item {
+                MarqueeText(
+                    text = item.modelName ?: item.name,
+                    style = TextStyle(fontSize = (w.value * 0.072f).sp, fontWeight = FontWeight.Black),
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            item {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, bottom = 6.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(w * 0.030f)
+                            .clip(CircleShape)
+                            .background(accent),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = itemTypeLabel(item.itemType),
+                        style = TextStyle(fontSize = (w.value * 0.042f).sp, fontWeight = FontWeight.Bold),
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 1,
+                    )
+                }
+            }
+            item { DetailRow("KTE", item.location ?: "—", w) }
+            item { DetailRow("外寸", item.measurements ?: "—", w) }
+            item { DetailRow("1PL", if (item.qtyPerPallet > 0) "${item.qtyPerPallet}CT" else "—", w) }
+            item { DetailRow("残り", DisplayFormat.palletCarton(item.palletCount, item.cartonCount), w) }
+            item { DetailRow("個数", "${DisplayFormat.quantity(item.quantity)} PCS", w) }
+            item {
+                DetailRow("進み", DisplayFormat.percent(100f - (item.remainingPercentage ?: 100f)), w)
+            }
+            if (!stack.isEmpty) {
+                item {
+                    Text(
+                        text = stringResource(R.string.action_pallet),
+                        style = TextStyle(fontSize = (w.value * 0.040f).sp, fontWeight = FontWeight.Bold),
+                        color = Color.White.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                item {
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(w * 0.62f),
+                    ) {
+                        drawPallet(stack, DETAIL_PALLET_ANGLE_DEG, 1f, 1f)
+                    }
+                }
+            }
+            item {
+                Text(
+                    text = stringResource(R.string.detail_close_hint),
+                    style = TextStyle(fontSize = (w.value * 0.036f).sp),
+                    color = Color.White.copy(alpha = 0.45f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                )
+            }
+        }
+        EdgeScrim()
+    }
+}
+
+/** 詳細画面の 1 行（見出しと中身） */
+@Composable
+private fun DetailRow(label: String, value: String, width: Dp) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+    ) {
+        Text(
+            text = label,
+            style = TextStyle(fontSize = (width.value * 0.038f).sp, fontWeight = FontWeight.Bold),
+            color = Color.White.copy(alpha = 0.5f),
+            maxLines = 1,
+            modifier = Modifier.width(width * 0.16f),
+        )
+        MarqueeText(
+            text = value,
+            style = TextStyle(
+                fontSize = (width.value * 0.048f).sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+            ),
+            color = ListNumber,
+            textAlign = TextAlign.Start,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+/**
+ * まだ残っている品目を種類ごとに数える。
+ * 完了した品目と、残りが無くなった品目は数えない。
+ */
+private fun remainingByType(items: List<CargoItem>): List<Pair<String?, Int>> =
+    items
+        .filter { it.status?.contains("完了") != true }
+        .filter { it.palletCount > 0 || it.cartonCount > 0 || it.quantity > 0 }
+        .groupBy { it.itemType }
+        .map { (type, list) -> type to list.size }
+        .sortedByDescending { it.second }
+
+/**
+ * 種類バッジ。黒い丸枠に 左から
+ * 種類の色の丸 ・ 種類名 ・ 種類ごとの残り数（色の丸＋数）。
+ */
 @Composable
 private fun TypeBadge(
     itemType: String?,
+    counts: List<Pair<String?, Int>>,
     fontSize: androidx.compose.ui.unit.TextUnit,
-    cubeSize: Dp,
-    onCubeClick: () -> Unit,
+    dotSize: Dp,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(RoundedCornerShape(percent = 50))
             .background(Color.Black.copy(alpha = 0.72f))
-            .padding(horizontal = 14.dp, vertical = 5.dp),
+            .padding(horizontal = 11.dp, vertical = 5.dp),
     ) {
+        Box(
+            modifier = Modifier
+                .size(dotSize)
+                .clip(CircleShape)
+                .background(itemTypeAccent(itemType)),
+        )
+        Spacer(Modifier.width(6.dp))
         Text(
             text = itemTypeLabel(itemType),
             style = TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold),
@@ -448,25 +681,50 @@ private fun TypeBadge(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.width(9.dp))
-        Box(
-            modifier = Modifier
-                .width(1.dp)
-                .height(cubeSize * 0.8f)
-                .background(Color.White.copy(alpha = 0.35f)),
-        )
-        Spacer(Modifier.width(9.dp))
-        // 立方体を押すと、端数パレットの積み方が出る
-        Icon(
-            painter = painterResource(R.drawable.ic_cube),
-            contentDescription = stringResource(R.string.action_pallet),
-            tint = Color.White,
-            modifier = Modifier
-                .size(cubeSize * 1.5f)
-                .pointerInput(Unit) { detectTapGestures(onTap = { onCubeClick() }) }
-                .padding(cubeSize * 0.25f),
-        )
+        if (counts.isNotEmpty()) {
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(dotSize * 1.6f)
+                    .background(Color.White.copy(alpha = 0.35f)),
+            )
+            Spacer(Modifier.width(7.dp))
+            counts.forEachIndexed { index, (type, count) ->
+                if (index > 0) Spacer(Modifier.width(7.dp))
+                Box(
+                    modifier = Modifier
+                        .size(dotSize * 0.78f)
+                        .clip(CircleShape)
+                        .background(itemTypeAccent(type)),
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    text = count.toString(),
+                    style = TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold),
+                    color = Color.White.copy(alpha = 0.85f),
+                    maxLines = 1,
+                )
+            }
+        }
     }
+}
+
+/** 画面の斜め上に置く、気温や湿度のひとこと */
+@Composable
+private fun CornerReading(
+    text: String,
+    color: Color,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold),
+        color = color,
+        maxLines = 1,
+        modifier = modifier,
+    )
 }
 
 /** 大きな数字と、その右下に添える単位 */
@@ -576,6 +834,7 @@ private fun ItemListPage(
     selectedId: String,
     onClose: () -> Unit,
     onSelect: (String) -> Unit,
+    onShowDetail: (CargoItem) -> Unit,
 ) {
     val listState = rememberScalingLazyListState()
     val selectedIndex = items.indexOfFirst { it.id == selectedId }
@@ -646,6 +905,7 @@ private fun ItemListPage(
                     selected = item.id == selectedId,
                     barWidth = barWidth,
                     onClick = { onSelect(item.id) },
+                    onLongClick = { onShowDetail(item) },
                 )
             }
         }
@@ -710,7 +970,13 @@ private fun ListScrollIndicator(
 }
 
 @Composable
-private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: () -> Unit) {
+private fun ItemBar(
+    item: CargoItem,
+    selected: Boolean,
+    barWidth: Dp,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     val accent = itemTypeAccent(item.itemType)
     // いま出している品目は黄色い枠を点滅させて分かるようにする
     val blink = rememberInfiniteTransition(label = "selectedBar")
@@ -745,7 +1011,12 @@ private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: (
                     Modifier
                 },
             )
-            .pointerInput(item.id) { detectTapGestures(onTap = { onClick() }) }
+            .pointerInput(item.id) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = { onLongClick() },
+                )
+            }
             .padding(horizontal = 12.dp),
     ) {
         Row(
@@ -772,26 +1043,40 @@ private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: (
             ) {
                 if (item.palletCount > 0) BarValue(item.palletCount, "PL", barWidth)
                 if (item.cartonCount > 0) BarValue(item.cartonCount, "CT", barWidth)
-                BarValue(item.quantity, "PCS", barWidth)
+                // PL も CT も 0 のときだけ、代わりに PCS を出す
+                if (item.palletCount <= 0 && item.cartonCount <= 0) {
+                    BarValue(item.quantity, "PCS", barWidth)
+                }
             }
         }
     }
 }
 
-/** 一覧のバーに出す 数字＋単位 */
+/**
+ * 一覧のバーに出す 数字＋単位。
+ * 品名（白・標準の書体）と見分けがつくよう、数字は色も書体も変えている。
+ */
 @Composable
 private fun BarValue(value: Int, unit: String, barWidth: Dp) {
     Row(verticalAlignment = Alignment.Bottom) {
         Text(
             text = DisplayFormat.quantity(value.coerceAtLeast(0)),
-            style = TextStyle(fontSize = (barWidth.value * 0.098f).sp, fontWeight = FontWeight.Black),
-            color = Color.White,
+            style = TextStyle(
+                fontSize = (barWidth.value * 0.098f).sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.Monospace,
+            ),
+            color = ListNumber,
             maxLines = 1,
         )
         Text(
             text = unit,
-            style = TextStyle(fontSize = (barWidth.value * 0.036f).sp, fontWeight = FontWeight.Bold),
-            color = Color.White.copy(alpha = 0.75f),
+            style = TextStyle(
+                fontSize = (barWidth.value * 0.036f).sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+            ),
+            color = ListNumber.copy(alpha = 0.62f),
             maxLines = 1,
             modifier = Modifier.padding(bottom = barWidth * 0.008f),
         )

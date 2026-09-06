@@ -264,7 +264,7 @@ private class View(
     }
 }
 
-private fun DrawScope.drawPallet(stack: PalletStack, angleDeg: Float, enter: Float, zoom: Float) {
+internal fun DrawScope.drawPallet(stack: PalletStack, angleDeg: Float, enter: Float, zoom: Float) {
     val pw = stack.palletWidth
     val pd = stack.palletDepth
     val ph = stack.totalHeight

@@ -15,6 +15,8 @@ interface QuickActionsProps {
   onWeather?: () => void;
   /** 「お願いします！」のコール（作業ページでのみ有効） */
   onRequestCall?: () => void;
+  /** 「長谷川さん！お願いします！」のコール（作業ページでのみ有効） */
+  onNameCall?: () => void;
   /** 水の音 */
   waterPlaying: boolean;
   onWater: () => void;
@@ -96,7 +98,7 @@ function Row({
  */
 export default function QuickActions({
   containers, selectedIdx, onSelectContainer,
-  onCheer, onWeather, onRequestCall,
+  onCheer, onWeather, onRequestCall, onNameCall,
   waterPlaying, onWater, onWaterSettings,
   switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, hidden,
 }: QuickActionsProps) {
@@ -187,6 +189,15 @@ export default function QuickActions({
                 title="お願いします！"
                 sub="合図のコール"
                 onClick={() => { onRequestCall(); setOpen(false); }}
+              />
+            )}
+
+            {onNameCall && (
+              <Row
+                icon={<HandIcon size={22} />}
+                title="長谷川さん！お願いします！"
+                sub="名前を呼ぶ合図のコール"
+                onClick={() => { onNameCall(); setOpen(false); }}
               />
             )}
 

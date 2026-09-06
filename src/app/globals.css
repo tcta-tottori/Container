@@ -802,24 +802,10 @@ body {
   flex: 1; display: flex; flex-direction: column;
   min-height: 0; background: transparent; position: relative;
 }
-/* 下のボタンのあたりを少し暗く落とす膜 */
-.detail-list-fade {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 120px;
-  pointer-events: none; z-index: 2;
-  background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 45%, transparent 100%);
-}
-/* 上（カードとの境目）も暗く落として、行が潜り込んで見えるようにする */
-.detail-list-fade-top {
-  position: absolute; left: 0; right: 0; top: 0; height: 34px;
-  pointer-events: none; z-index: 2;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.34) 55%, transparent 100%);
-}
-[data-theme="light"] .detail-list-fade {
-  background: linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.16) 45%, transparent 100%);
-}
-[data-theme="light"] .detail-list-fade-top {
-  background: linear-gradient(to bottom, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.12) 55%, transparent 100%);
-}
+/*
+ * 一覧の上下は、黒い膜をかぶせるのではなく行そのものを透かして消す。
+ * 上はカードの下へ、下はボタンの裏へ、切れ目なく溶けていく。
+ */
 .detail-list-header {
   display: flex; align-items: center; gap: 4px;
   padding: 5px 12px; flex-shrink: 0;
@@ -837,6 +823,25 @@ body {
 .detail-list-section .detail-list-scroll {
   padding: 22px 10px 0;
   display: flex; flex-direction: column; gap: 6px;
+  /* 端に近づくほど薄くなる。上はカードへ潜り、下はボタンの裏へ抜ける */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.35) 14px,
+    #000 46px,
+    #000 calc(100% - 130px),
+    rgba(0, 0, 0, 0.35) calc(100% - 34px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.35) 14px,
+    #000 46px,
+    #000 calc(100% - 130px),
+    rgba(0, 0, 0, 0.35) calc(100% - 34px),
+    transparent 100%
+  );
 }
 .detail-list-section .detail-list-scroll > * { flex-shrink: 0; }
 /* いちばん下の行が、マイク（56px）と右下のボタンに隠れないだけの余白 */
