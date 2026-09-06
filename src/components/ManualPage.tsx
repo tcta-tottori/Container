@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { APP_VERSION } from '@/lib/appVersion';
 
 interface ManualPageProps {
   onClose: () => void;
@@ -95,12 +96,13 @@ function VoiceTable() {
 
 /* ===== メインコンポーネント ===== */
 export default function ManualPage({ onClose }: ManualPageProps) {
-  const [tab, setTab] = useState<'basic' | 'voice' | 'data' | 'nabe'>('basic');
+  const [tab, setTab] = useState<'basic' | 'voice' | 'data' | 'watch' | 'nabe'>('basic');
 
   const tabs = [
     { id: 'basic' as const, label: '基本操作', icon: '📋' },
     { id: 'voice' as const, label: '音声', icon: '🎤' },
     { id: 'data' as const, label: 'データ', icon: '📁' },
+    { id: 'watch' as const, label: 'ウォッチ', icon: '⌚' },
     { id: 'nabe' as const, label: '鍋ルール', icon: '🍲' },
   ];
 
@@ -114,7 +116,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
       <div style={{
         position: 'sticky', top: 0, zIndex: 1,
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: '12px 16px',
+        padding: 'calc(var(--safe-top) + 12px) 16px 12px',
         background: 'rgba(26,29,46,0.95)', backdropFilter: 'blur(12px)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
@@ -126,7 +128,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
         }}>✕</button>
         <div>
           <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>操作マニュアル</span>
-          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>CNS v2.2</span>
+          <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginLeft: 8, fontFamily: 'var(--font-mono)' }}>CNS Ver.{APP_VERSION}</span>
         </div>
       </div>
 
@@ -138,13 +140,14 @@ export default function ManualPage({ onClose }: ManualPageProps) {
         {tabs.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             style={{
-              flex: 1, padding: '8px 4px', borderRadius: 10, fontSize: 11, fontWeight: 700,
+              flex: 1, padding: '8px 2px', borderRadius: 10, fontSize: 10.5, fontWeight: 700,
               cursor: 'pointer', border: 'none', transition: 'all 0.2s',
               background: tab === t.id ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.04)',
               color: tab === t.id ? '#60a5fa' : 'rgba(255,255,255,0.45)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+              whiteSpace: 'nowrap',
             }}>
-            <span style={{ fontSize: 13 }}>{t.icon}</span>{t.label}
+            <span style={{ fontSize: 12 }}>{t.icon}</span>{t.label}
           </button>
         ))}
       </div>
@@ -157,7 +160,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
           <>
             <Section title="作業の流れ" color="#60a5fa">
               <Step num={1} title="ファイルを読み込む" icon="📁"
-                desc="読込画面でExcelファイルをドラッグ＆ドロップ、またはタップして選択。コンテナ日程・AQSS04L両方に対応。" />
+                desc="読込画面の枠にドラッグ＆ドロップ、または枠をタップして「ファイルを選ぶ / 写真を撮る」から選択。コンテナ日程・AQSS04L 両方に対応。" />
               <Step num={2} title="概要アナウンスを確認" icon="🔊"
                 desc="読込完了後、コンテナの概要（種類別品目数・類似品の有無）が自動でアナウンスされます。鍋コンテナは100/180サイズ別に読み上げ。" />
               <Step num={3} title="音声で「OK」と言う" icon="🗣️"
@@ -478,10 +481,10 @@ export default function ManualPage({ onClose }: ManualPageProps) {
             </Section>
 
             <Section title="読込方法" color="#60a5fa">
-              <Step num={1} title="ドラッグ＆ドロップ" icon="📂"
-                desc="読込画面のドロップゾーンにExcelファイルをドラッグ＆ドロップ。複数ファイル同時対応。" />
-              <Step num={2} title="写真を撮って読込" icon="📷"
-                desc="「写真を撮って読込」でコンテナ日程の紙をその場で撮り、AI が品目を読み取ります。" />
+              <Step num={1} title="枠にドラッグ＆ドロップ" icon="📂"
+                desc="読込画面の枠に Excel ファイルをドラッグ＆ドロップ。複数ファイル同時対応。" />
+              <Step num={2} title="枠をタップして選ぶ" icon="👆"
+                desc="枠をタップすると画面の真ん中にポップアップが出ます。「ファイルを選ぶ」で Excel や保存済みの写真、「写真を撮る」でコンテナ日程の紙をその場で撮って AI に読ませます。" />
               <Step num={3} title="最近のファイル" icon="🕐"
                 desc="メニュー →「履歴」→「最近のファイル」で、過去に読み込んだファイルをワンタップで再読込。" />
             </Section>
@@ -497,6 +500,132 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   </div>
                   <div>
                     AQSS04L単体でもマスタ紐付により<strong style={{ color: '#f59e0b' }}>コンテナ日程と同等の表示</strong>が可能です。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+          </>
+        )}
+
+        {/* ===== ウォッチ ===== */}
+        {tab === 'watch' && (
+          <>
+            <Section title="はじめに" color="#60a5fa">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    Pixel Watch 側のアプリは、スマホの CNS アプリ（WebView 版）とつながって動きます。
+                    スマホをブラウザで開いているときは同期しません。
+                  </div>
+                  <div>
+                    スマホとウォッチの両方に同じアプリ（同じ署名）を入れてください。
+                    ウォッチ側は<strong style={{ color: '#60a5fa' }}>最後に受け取った内容を端末に残す</strong>ので、
+                    スマホと離れても表示は消えません。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
+            <Section title="部品表示（作業画面）" color="#22c55e">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    外周のリングが<strong style={{ color: '#22c55e' }}>残りの割合</strong>です（種類の色。減った分は灰色）。
+                    中は上から <strong>種類バッジ</strong>（種類の色の丸・種類名・種類ごとの残り数）、
+                    <strong>気温と湿度</strong>、<strong>機種名</strong>、<strong>PL / CT</strong>、<strong>PCS</strong> の順に並びます。
+                    上に現在時刻、下に作業の経過時間が出ます。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#22c55e' }}>1回タップ</strong> … パレットを1枚減らす（スマホの PL タップと同じ）<br />
+                    <strong style={{ color: '#22c55e' }}>2回タップ</strong> … パレットを1枚戻す<br />
+                    <strong style={{ color: '#22c55e' }}>上下スワイプ</strong> … 品目を切り替える（端まで行くと反対の端へ回る）<br />
+                    <strong style={{ color: '#22c55e' }}>画面のいちばん下から上へ払う</strong> … 一覧を開く<br />
+                    <strong style={{ color: '#22c55e' }}>リューズを時計回り</strong> … 一覧を開く<br />
+                    <strong style={{ color: '#22c55e' }}>CT の枠をタップ</strong> … 端数パレットの積み方を出す
+                  </div>
+                  <div>
+                    作業画面のあいだは<strong style={{ color: '#fbbf24' }}>画面が消えません</strong>。
+                    待機画面ではふだんどおり消えます。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
+            <Section title="一覧" color="#a78bfa">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    行は品目の種類の色で塗り分けられ、いま出している品目は
+                    <strong style={{ color: '#fde047' }}>黄色い枠が点滅</strong>します。
+                    枠に収まらない品名は横へ流れます。右端の弧が今どのあたりを見ているかを示します。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    数は <strong>PL / CT</strong> を出し、どちらも 0 のときだけ <strong>PCS</strong> を出します。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#a78bfa' }}>タップ</strong> … その品目に切り替える（スマホの表示も一緒に切り替わります）<br />
+                    <strong style={{ color: '#a78bfa' }}>長押し</strong> … 気高コード・外寸・1パレットのケース数・残り・積み方を出す詳細画面<br />
+                    <strong style={{ color: '#a78bfa' }}>詳細画面で2回タップ</strong> … 一覧へ戻る
+                  </div>
+                  <div>
+                    いちばん上／下まで行くと、その指ではそこで止まります。
+                    指を離してから<strong style={{ color: '#a78bfa' }}>もう一度端の向こうへ払う</strong>と部品表示へ戻ります。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
+            <Section title="端数パレットの積み方" color="#38bdf8">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    残りが<strong style={{ color: '#38bdf8' }}>端数パレットだけになった瞬間</strong>に自動で出ます（1品目につき1回）。
+                    CT の枠をタップしても出せます。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    中央から回りながら大きくなって出てきて、勢いよく回り始めてだんだん落ち着きます（スマホ版と同じ見え方・同じ角度）。
+                  </div>
+                  <div>
+                    <strong style={{ color: '#38bdf8' }}>1回タップ</strong>で回転の停止／再開、
+                    <strong style={{ color: '#38bdf8' }}>横になぞる</strong>と手で回せ、<strong style={{ color: '#38bdf8' }}>つまむ</strong>と拡大縮小。
+                    <strong style={{ color: '#38bdf8' }}>2回タップ</strong>で閉じ、何も触らなければ<strong style={{ color: '#fbbf24' }}>5秒</strong>で自動的に閉じます。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
+            <Section title="通知・タイル・待機画面" color="#f59e0b">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    スマホで<strong style={{ color: '#fbbf24' }}>作業ページを開くとウォッチに通知</strong>が届きます。
+                    押すとそのコンテナの作業画面が直接開きます。荷降ろしが終わると通知は消えます。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#fbbf24' }}>タイル</strong>（文字盤を横に払って出る画面）にも、選択中のコンテナの積載率・残り・状態が出ます。
+                  </div>
+                  <div>
+                    荷降ろし中のコンテナが無いときは<strong style={{ color: '#fbbf24' }}>再読込ボタン</strong>だけの待機画面になります。
+                    スマホとつながっていないときもここに出ます。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
+            <Section title="スマホ側のアプリ（APK）" color="#c084fc">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#c084fc' }}>ステータスバー表示</strong>: 荷降ろし中は、機種名・PL/CT・残りをステータスバーに出しておきます。
+                    アプリを閉じても残り、押すと作業ページに戻ります。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#c084fc' }}>写真を撮って読込</strong>: 読込画面のポップアップから、その場でカメラが開きます。
+                    撮った写真は縮小されない大きさのまま AI に渡されます。
+                  </div>
+                  <div>
+                    <strong style={{ color: '#c084fc' }}>20分で自動終了</strong>: 裏に回したまま約20分たつとアプリを終了します。
+                    読み込んだコンテナと作業の進み具合は残らないので、続きは履歴から読み直してください。
                   </div>
                 </div>
               </InfoCard>
