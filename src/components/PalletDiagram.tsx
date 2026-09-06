@@ -363,7 +363,7 @@ function buildNabeSlots(
 }
 
 /**
- * JPI など「1段7個」の積み方。
+ * 頭に JP が付く品目（JPI・JPV・JPK など）の「1段7個」の積み方。
  *
  * 1段目: 横3個 ＋ 縦4個
  *   - 右側に「横」（長い辺が左右）を奥から手前へ3個ならべる
@@ -377,7 +377,7 @@ function buildNabeSlots(
  * 2段目は 縦3個 → 横4個 の順。
  * ※ y は 0 が手前。奥ほど y が大きい
  */
-function buildJPI7Slots(
+function buildJP7Slots(
   bwCm: number, bdCm: number, bhPx: number, layers: number,
   pw: number, pd: number, cm2px: number,
 ): BoxSlot[] {
@@ -559,7 +559,7 @@ function buildGenericSlots(
  * mode 'backColumn'（ポリカバー・鍋など）:
  *   奥の列から積む。1列ぶんを上（4〜5段目）まで積み終えてから手前の列に移る。
  *   列のなかは 中央 → 左 → 右 の順。
- * mode 'layer'（PDU の段ボール・1段7個の JPI など）:
+ * mode 'layer'（PDU の段ボール・1段7個の JP 系など）:
  *   1段ずつ仕上げていく。1段のなかの順番は seq（積み方で決まっている順）に従い、
  *   seq が無ければ 奥→手前・中央→左→右 の順にする。
  */
@@ -713,8 +713,12 @@ function getBoxDimsCm(measurements?: string, itemName?: string): [number, number
   return [55, 38, 38];
 }
 
-function isJPIType(itemName?: string): boolean {
-  return !!itemName && /JPI[+\-]?[A-Z]/.test(itemName.replace(/\s/g, ''));
+/**
+ * 1段7個で積む品目か。
+ * 頭に JP が付くもの（JPI・JPV・JPK など）はすべてこの積み方をする。
+ */
+function isJP7Type(itemName?: string): boolean {
+  return !!itemName && /^JP[A-Z]/.test(itemName.replace(/\s/g, '').toUpperCase());
 }
 
 /** PDU が付くジャーポット（2箱シュリンクで1玉の積み方）。PDZ など他の機種は従来どおり */
@@ -733,7 +737,7 @@ export default function PalletDiagram({
 
   const [bwCm, bdCm, bhCm] = getBoxDimsCm(measurements, itemName);
   const isNabe = type === '鍋';
-  const isJPI = isJPIType(itemName);
+  const isJP7 = isJP7Type(itemName);
   const isJarPot = type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName || '');
   const isPdu = isJarPot && isPduJarPot(itemName);
   // PDU は2箱で1玉のため、図に描く1個 = 2ケース
@@ -748,7 +752,7 @@ export default function PalletDiagram({
     // 180サイズ(3×42=126): パレットからはみ出る
     palletWcm = 110;
     palletDcm = 110;
-  } else if (isJPI) {
+  } else if (isJP7) {
     // 1段ごとに90度まわして積むので、どちらの向きでも収まる正方形にする
     const smallDim = Math.min(bwCm, bdCm);
     const largeDim = Math.max(bwCm, bdCm);
@@ -779,12 +783,12 @@ export default function PalletDiagram({
     allSlots = buildJarPotSlots(bh, layers, pw, pd);
     perLayer = 4;
   } else if (isNabe) {
-    // 鍋はどの種目（JPI含む）でも統一で1段6個
+    // 鍋はどの種目（JP 系含む）でも統一で1段6個
 
     allSlots = buildNabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
-  } else if (isJPI) {
-    allSlots = buildJPI7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
+  } else if (isJP7) {
+    allSlots = buildJP7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = 7;
   } else {
     // qtyPerPalletを使って現実的な段数・個数/段を決定
@@ -865,7 +869,7 @@ export default function PalletDiagram({
    * パレットが出たあと、箱が積む順番どおりに上から落ちてくる。
    * 3D の重なり順を崩さないよう、箱ごとの入れ物は増やさず、
    * 箱の translateZ をそのまま持つキーフレームを奥行きごとに作って当てる。 */
-  const stackOrder = stackAnim ? buildStackOrder(renderSlots, (isPdu || isJPI) ? 'layer' : 'backColumn') : null;
+  const stackOrder = stackAnim ? buildStackOrder(renderSlots, (isPdu || isJP7) ? 'layer' : 'backColumn') : null;
   // 速さ（1 = 標準）。大きいほど速い
   const speed = Math.min(4, Math.max(0.25, stackSpeed || 1));
   /** パレットが出てから最初の箱が落ちてくるまで（秒） */

@@ -97,9 +97,12 @@ object PalletLayout {
         return Triple(55f, 38f, 38f)
     }
 
-    /** JPI の積み方をする品目か */
-    fun isJpiType(itemName: String?): Boolean =
-        itemName != null && Regex("""JPI[+\-]?[A-Z]""").containsMatchIn(itemName.replace(" ", ""))
+    /**
+     * 1 段 7 個で積む品目か。
+     * 頭に JP が付くもの（JPI・JPV・JPK など）はすべてこの積み方をする。
+     */
+    fun isJp7Type(itemName: String?): Boolean =
+        itemName != null && Regex("""^JP[A-Z]""").containsMatchIn(itemName.replace(" ", "").uppercase())
 
     /** PDU が付くジャーポット（2 箱シュリンクで 1 玉） */
     fun isPduJarPot(itemName: String?): Boolean =
@@ -145,7 +148,7 @@ object PalletLayout {
 
         val (bwCm, bdCm, bhCm) = boxDimensionsCm(measurements, itemName)
         val isNabe = itemType == ItemTypes.POT
-        val isJpi = isJpiType(itemName)
+        val isJp7 = isJp7Type(itemName)
         val isJarPot = itemType == ItemTypes.JAR_POT || Regex("^(PDR|PDU|PVW)").containsMatchIn(itemName)
         val isPdu = isJarPot && isPduJarPot(itemName)
         val casesPerBox = if (isPdu) PDU_CASES_PER_BUNDLE else 1
@@ -153,7 +156,7 @@ object PalletLayout {
         // パレットの大きさ（cm）
         val palletWcm: Float
         val palletDcm: Float
-        if (isJpi && !isNabe) {
+        if (isJp7 && !isNabe) {
             val side = max(bwCm, bdCm) + min(bwCm, bdCm) * 2
             palletWcm = side
             palletDcm = side
@@ -184,8 +187,8 @@ object PalletLayout {
                 slots = nabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px).toMutableList()
                 perLayer = if (slots.isNotEmpty()) (slots.size.toFloat() / layers).roundToInt() else 6
             }
-            isJpi -> {
-                slots = jpi7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px).toMutableList()
+            isJp7 -> {
+                slots = jp7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px).toMutableList()
                 perLayer = 7
             }
             else -> {
@@ -238,7 +241,7 @@ object PalletLayout {
         }
 
         val render = fractionSlots(slots, perLayer, drawn)
-        val order = stackOrder(render, if (isPdu || isJpi) StackMode.LAYER else StackMode.BACK_COLUMN)
+        val order = stackOrder(render, if (isPdu || isJp7) StackMode.LAYER else StackMode.BACK_COLUMN)
         val maxZ = render.fold(PALLET_BASE_HEIGHT) { acc, s -> max(acc, s.z + s.h) }
         return PalletStack(
             slots = render,
@@ -283,8 +286,8 @@ object PalletLayout {
         return out
     }
 
-    /** JPI: 1 段 7 個。段ごとに 90 度まわして噛み合わせる */
-    private fun jpi7Slots(
+    /** JP 系: 1 段 7 個。段ごとに 90 度まわして噛み合わせる */
+    private fun jp7Slots(
         bwCm: Float, bdCm: Float, bhPx: Float, layers: Int,
         pw: Float, pd: Float, cm2px: Float,
     ): List<BoxSlot> {
@@ -472,7 +475,7 @@ object PalletLayout {
      * 箱を積む順番。返す配列は「[slots] の添字 → 何番目に積むか」。
      *
      * BACK_COLUMN（ポリカバー・鍋など）… 奥の列から。1 列を上まで積んでから手前の列へ。列のなかは中央 → 左 → 右
-     * LAYER（PDU・JPI など）… 1 段ずつ仕上げる。段のなかは決まった順（seq）に従う
+     * LAYER（PDU・JP 系など）… 1 段ずつ仕上げる。段のなかは決まった順（seq）に従う
      */
     private fun stackOrder(slots: List<BoxSlot>, mode: StackMode): List<Int> {
         if (slots.isEmpty()) return emptyList()
