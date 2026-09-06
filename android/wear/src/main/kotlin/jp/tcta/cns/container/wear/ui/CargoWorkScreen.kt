@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -19,7 +20,6 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -83,6 +82,18 @@ private const val DOUBLE_TAP_MS = 260L
 
 /** 縦スワイプで品目を切り替えるとみなす移動量 */
 private val ITEM_SWITCH_THRESHOLD = 44.dp
+
+/** 一覧の右に出す弧の太さ */
+private val INDICATOR_STROKE = 4.dp
+
+/** 弧を画面の縁からどれだけ内側に置くか */
+private val INDICATOR_INSET = 3.dp
+
+/** 弧が開く角度（度）。右の中央を挟んで上下に同じだけ */
+private const val INDICATOR_SWEEP_DEG = 62f
+
+/** 端数だけになってから積み方を出すまでの待ち（ミリ秒）。スマホ版と同じ */
+private const val AUTO_PALLET_DELAY_MS = 400L
 
 /** 画面のいちばん下の、一覧を引き出せる帯の高さ */
 private val BOTTOM_EDGE_HEIGHT = 64.dp
@@ -149,6 +160,23 @@ fun CargoWorkScreen(
 
     var showList by remember(containerId) { mutableStateOf(false) }
     var showPallet by remember(containerId) { mutableStateOf(false) }
+
+    // 残りが端数パレットだけになった瞬間に、積み方を自動で出す（スマホ版と同じ）。
+    // 1 品目につき 1 回だけ。何も触らなければ 5 秒で自動的に閉じる
+    val fractionOnly = selected.palletCount <= 0 && selected.cartonCount > 0
+    val shownFor = remember(containerId) { mutableSetOf<String>() }
+    var prevFraction by remember(containerId) { mutableStateOf<Pair<String, Boolean>?>(null) }
+    LaunchedEffect(selected.id, fractionOnly) {
+        val prev = prevFraction
+        prevFraction = selected.id to fractionOnly
+        // 作業画面を開いた最初の 1 回は出さない（「端数になった」瞬間だけ）
+        if (prev == null) return@LaunchedEffect
+        if (!fractionOnly) return@LaunchedEffect
+        if (prev.second && prev.first == selected.id) return@LaunchedEffect
+        if (!shownFor.add(selected.id)) return@LaunchedEffect
+        delay(AUTO_PALLET_DELAY_MS)
+        showPallet = true
+    }
 
     // 縦スワイプでの品目送り。端まで行ったら反対の端へ回る
     val selectedIndex = items.indexOfFirst { it.id == selected.id }
@@ -606,45 +634,58 @@ private fun ItemListPage(
         ListScrollIndicator(
             index = listState.centerItemIndex,
             count = items.size,
-            modifier = Modifier.align(Alignment.CenterEnd),
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }
 
 /**
- * 一覧のどのあたりを見ているかを示す，右端の細いバー。
- * 丸い画面に沿うよう，中央を少しふくらませた位置に置く。
+ * 一覧のどのあたりを見ているかを示す，右端のバー。
+ * 丸い画面の縁に沿った弧にして、縁で切れないようにする。
  */
 @Composable
-private fun BoxWithConstraintsScope.ListScrollIndicator(
+private fun ListScrollIndicator(
     index: Int,
     count: Int,
     modifier: Modifier = Modifier,
 ) {
     if (count <= 1) return
-    val trackHeight = maxHeight * 0.42f
     // つまみの長さは項目数に応じて縮むが，短くなりすぎないようにする
     val thumbRatio = (1f / count).coerceAtLeast(0.22f)
     val position = (index.toFloat() / (count - 1).toFloat()).coerceIn(0f, 1f)
-    val animated by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = position,
-        label = "listScroll",
-    )
-    Box(
-        modifier = modifier
-            .padding(end = 4.dp)
-            .width(4.dp)
-            .height(trackHeight)
-            .clip(RoundedCornerShape(2.dp))
-            .background(Color.White.copy(alpha = 0.16f)),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(trackHeight * thumbRatio)
-                .offset(y = (trackHeight - trackHeight * thumbRatio) * animated)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.72f)),
+    val animated by animateFloatAsState(targetValue = position, label = "listScroll")
+    val track = Color.White.copy(alpha = 0.16f)
+    val thumb = Color.White.copy(alpha = 0.75f)
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val stroke = INDICATOR_STROKE.toPx()
+        // 画面の縁より少し内側を通る弧。左右どちらの端でも切れない
+        val inset = stroke / 2f + INDICATOR_INSET.toPx()
+        val diameter = size.minDimension - inset * 2f
+        val topLeft = Offset(
+            x = (size.width - diameter) / 2f,
+            y = (size.height - diameter) / 2f,
+        )
+        val arcSize = Size(diameter, diameter)
+        // 右側の中央（3 時）を中心に、上下へ同じだけ開く
+        val startAngle = -INDICATOR_SWEEP_DEG / 2f
+        drawArc(
+            color = track,
+            startAngle = startAngle,
+            sweepAngle = INDICATOR_SWEEP_DEG,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
+        )
+        val thumbSweep = INDICATOR_SWEEP_DEG * thumbRatio
+        drawArc(
+            color = thumb,
+            startAngle = startAngle + (INDICATOR_SWEEP_DEG - thumbSweep) * animated,
+            sweepAngle = thumbSweep,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
         )
     }
 }
