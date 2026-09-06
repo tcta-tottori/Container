@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -582,9 +583,14 @@ private fun ItemListPage(
         if (selectedIndex >= 0) runCatching { listState.animateScrollToItem(selectedIndex) }
     }
 
-    // 端でさらに払われた分を数えて、しきい値を超えたら閉じる
+    /*
+     * 端まで来たら、その指ではいったんそこで止まる。
+     * 指を離してから「もう一度」端の向こうへ払ったときだけ部品表示へ戻る。
+     */
     val dismissThresholdPx = with(LocalDensity.current) { LIST_DISMISS_THRESHOLD.toPx() }
     var overscroll by remember { mutableFloatStateOf(0f) }
+    // 端に着いた指を離したら true。次の払いで閉じられるようになる
+    var armed by remember { mutableStateOf(false) }
     val edgePull = remember(dismissThresholdPx) {
         object : NestedScrollConnection {
             override fun onPostScroll(
@@ -592,15 +598,28 @@ private fun ItemListPage(
                 available: Offset,
                 source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
             ): Offset {
-                if (consumed.y != 0f) overscroll = 0f
-                if (available.y != 0f) {
+                // 一覧が動いているあいだは端に着いていない。数え直して、また構え直させる
+                if (consumed.y != 0f) {
+                    overscroll = 0f
+                    armed = false
+                }
+                if (available.y != 0f && armed) {
                     overscroll += available.y
                     if (abs(overscroll) >= dismissThresholdPx) {
                         overscroll = 0f
+                        armed = false
                         onClose()
                     }
                 }
                 return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                // 指を離した（勢いも消えた）ところで構える。
+                // 端に着いていなければ次の onPostScroll ですぐ外れる
+                overscroll = 0f
+                armed = true
+                return Velocity.Zero
             }
         }
     }

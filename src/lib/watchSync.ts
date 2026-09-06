@@ -12,6 +12,17 @@ import { Container, ContainerItem } from './types';
 import { displayQuantities } from './itemQuantity';
 import { areSimilarItems } from './typeDetector';
 import { summarizeLoad } from './containerLoad';
+import { buildJapanesePartName } from './partTranslations';
+
+/**
+ * ウォッチに出す品名。スマホの一覧・カードと同じ決め方にする
+ * （日本語の部品名があればそれ、無ければ「ポリカバー」を落とした品名）。
+ */
+function displayName(item: ContainerItem): string {
+  const jp = buildJapanesePartName(item);
+  if (jp) return jp;
+  return item.itemName.replace(/ポリカバー/g, '').replace(/^[\s\-]+|[\s\-]+$/g, '') || item.itemName;
+}
 
 /** android/shared の ContainerInfo と同じ形 */
 export interface WatchContainerInfo {
@@ -151,7 +162,7 @@ function buildWorkingItems(input: WatchSyncInput): WatchCargoItem[] {
       palletCount: completed ? 0 : q.pallets,
       cartonCount: completed ? 0 : q.cartons,
       itemType: item.type,
-      modelName: item.representModel || undefined,
+      modelName: displayName(item),
       remainingPercentage: completed ? 0 : originalCartons > 0 ? pct((remainingCartons / originalCartons) * 100) : 100,
       warning: similar.length > 0 ? `類似品: ${similar.map((s) => s.itemName).join('、')}` : undefined,
       qtyPerPallet: item.qtyPerPallet || undefined,
@@ -173,7 +184,7 @@ function buildPlainItems(items: ContainerItem[]): WatchCargoItem[] {
       palletCount: q.pallets,
       cartonCount: q.cartons,
       itemType: item.type,
-      modelName: item.representModel || undefined,
+      modelName: displayName(item),
       remainingPercentage: 100,
       qtyPerPallet: item.qtyPerPallet || undefined,
       measurements: item.measurements || undefined,
