@@ -1,6 +1,12 @@
 package jp.tcta.cns.container.wear.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -345,20 +351,20 @@ private fun ItemPage(
                     value = countUp(item.palletCount.coerceAtLeast(0), item.id).toString(),
                     unit = "PL",
                     width = w,
-                    numberScale = 0.135f,
+                    numberScale = 0.168f,
                     modifier = Modifier.weight(1f),
                 )
                 Box(
                     modifier = Modifier
                         .width(1.dp)
-                        .height(w * 0.115f)
+                        .height(w * 0.140f)
                         .background(Color.White.copy(alpha = 0.28f)),
                 )
                 ValueWithUnit(
                     value = countUp(item.cartonCount.coerceAtLeast(0), item.id).toString(),
                     unit = "CT",
                     width = w,
-                    numberScale = 0.135f,
+                    numberScale = 0.168f,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -646,6 +652,17 @@ private fun BoxWithConstraintsScope.ListScrollIndicator(
 @Composable
 private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: () -> Unit) {
     val accent = itemTypeAccent(item.itemType)
+    // いま出している品目は黄色い枠を点滅させて分かるようにする
+    val blink = rememberInfiniteTransition(label = "selectedBar")
+    val blinkAlpha by blink.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "selectedBarAlpha",
+    )
     Box(
         modifier = Modifier
             .fillMaxWidth(0.92f)
@@ -653,7 +670,11 @@ private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: (
             .clip(RoundedCornerShape(23.dp))
             .background(darkened(accent, if (selected) 0.68f else 0.48f))
             .then(
-                if (selected) Modifier.border(2.dp, accent, RoundedCornerShape(23.dp)) else Modifier,
+                if (selected) {
+                    Modifier.border(2.dp, SelectedYellow.copy(alpha = blinkAlpha), RoundedCornerShape(23.dp))
+                } else {
+                    Modifier
+                },
             )
             .pointerInput(item.id) { detectTapGestures(onTap = { onClick() }) }
             .padding(horizontal = 12.dp),
@@ -662,7 +683,7 @@ private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: (
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxSize(),
         ) {
-            // 左 3/5: 品名。選んでいる行だけ横へ流す（全行流すとスクロールがカクつく）
+            // 左 3/5: 品名。枠に収まらないものは横へ流す（収まっていれば動かない）
             MarqueeText(
                 text = item.modelName ?: item.name,
                 style = TextStyle(
@@ -671,7 +692,6 @@ private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: (
                 ),
                 color = Color.White,
                 textAlign = TextAlign.Start,
-                marquee = selected,
                 modifier = Modifier.weight(3f),
             )
             // 右 2/5: PL / CT / PCS。数字は大きく、単位はごく小さく。

@@ -145,7 +145,8 @@ fun PalletDiagramOverlay(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(item.id) { detectTapGestures(onTap = { onClose() }) },
+            // 2 回タップで閉じる（1 回タップは図の停止／再開に使う）
+            .pointerInput(item.id) { detectTapGestures(onDoubleTap = { onClose() }) },
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val w = maxWidth
@@ -177,9 +178,12 @@ fun PalletDiagramOverlay(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
-                            // 図をタップすると止まる / また回り出す
+                            // 1 回タップで止まる／また回り出す。2 回タップで閉じる
                             .pointerInput(stack) {
-                                detectTapGestures(onTap = { paused = !paused })
+                                detectTapGestures(
+                                    onTap = { paused = !paused },
+                                    onDoubleTap = { onClose() },
+                                )
                             }
                             // 横になぞると自分で回せる。つまむと大きさが変わる
                             .pointerInput(stack) {

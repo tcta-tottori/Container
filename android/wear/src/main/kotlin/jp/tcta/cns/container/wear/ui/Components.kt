@@ -50,6 +50,9 @@ val RingTrack = Color(0xFF8A8A8E)
 /** 経過時間の色 */
 val ElapsedOrange = Color(0xFFFF8C21)
 
+/** 一覧で「いま出している品目」を示す枠の色 */
+val SelectedYellow = Color(0xFFFFD429)
+
 /** 種類の色。元のコンテナアプリの accent と同じ値 */
 fun itemTypeAccent(itemType: String?): Color = Color(ItemTypes.colorOf(itemType).accent)
 
