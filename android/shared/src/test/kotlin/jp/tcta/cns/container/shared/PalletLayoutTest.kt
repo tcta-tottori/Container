@@ -36,8 +36,12 @@ class PalletLayoutTest {
     fun `pdu and jpi are recognised`() {
         assertTrue(PalletLayout.isPduJarPot("PDU-A40A"))
         assertTrue(!PalletLayout.isPduJarPot("PDZ-A40A"))
-        assertTrue(PalletLayout.isJpiType("JPI-H100"))
-        assertTrue(!PalletLayout.isJpiType("JPV-H100"))
+        // 頭に JP が付くものはすべて 1 段 7 個
+        assertTrue(PalletLayout.isJp7Type("JPI-H100"))
+        assertTrue(PalletLayout.isJp7Type("JPV-H100"))
+        assertTrue(PalletLayout.isJp7Type("JPK+G18C(T)"))
+        assertTrue(!PalletLayout.isJp7Type("JRI-G100(KKB)"))
+        assertTrue(!PalletLayout.isJp7Type("PDZ-A100"))
     }
 
     @Test
