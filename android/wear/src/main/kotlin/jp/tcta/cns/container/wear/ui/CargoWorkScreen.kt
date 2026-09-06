@@ -1,6 +1,8 @@
 package jp.tcta.cns.container.wear.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -49,6 +51,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.focus.FocusRequester
@@ -100,6 +103,12 @@ private val INDICATOR_INSET = 3.dp
 
 /** 弧が開く角度（度）。右の中央を挟んで上下に同じだけ */
 private const val INDICATOR_SWEEP_DEG = 62f
+
+/** 品目が切り替わるときに、いったん縮む大きさ */
+private const val ITEM_SWAP_MIN_SCALE = 0.72f
+
+/** 縮んだところから元の大きさへ戻るまでの時間（ミリ秒） */
+private const val ITEM_SWAP_MS = 320
 
 /** 端数だけになってから積み方を出すまでの待ち（ミリ秒）。スマホ版と同じ */
 private const val AUTO_PALLET_DELAY_MS = 400L
@@ -393,13 +402,23 @@ private fun ItemPage(
                 .padding(ringInset),
         )
 
-        // 中身
+        // 中身。品目が変わるたびに、いったん引いてからまた寄る
+        val swap = remember { Animatable(1f) }
+        LaunchedEffect(item.id) {
+            swap.snapTo(ITEM_SWAP_MIN_SCALE)
+            swap.animateTo(1f, tween(ITEM_SWAP_MS, easing = FastOutSlowInEasing))
+        }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .align(Alignment.Center)
-                .width(innerDiameter * 0.88f),
+                .width(innerDiameter * 0.88f)
+                .graphicsLayer {
+                    scaleX = swap.value
+                    scaleY = swap.value
+                    alpha = ((swap.value - ITEM_SWAP_MIN_SCALE) / (1f - ITEM_SWAP_MIN_SCALE)).coerceIn(0f, 1f)
+                },
         ) {
             TypeBadge(
                 itemType = item.itemType,
@@ -407,7 +426,9 @@ private fun ItemPage(
                 fontSize = (w.value * 0.038f).sp,
                 dotSize = w * 0.030f,
             )
-            Spacer(Modifier.height(w * 0.022f))
+            // 気温と湿度は、種類バッジと機種名のあいだに並べる
+            ClimateRow(environment = environment, fontSize = (w.value * 0.044f).sp, gap = w * 0.055f)
+            Spacer(Modifier.height(w * 0.018f))
             MarqueeText(
                 text = item.modelName ?: item.name,
                 style = TextStyle(fontSize = (w.value * 0.098f).sp, fontWeight = FontWeight.Black),
@@ -446,39 +467,16 @@ private fun ItemPage(
                         },
                 )
             }
-            // PL も CT も 0 のときだけ、代わりに PCS を出す
-            if (item.palletCount <= 0 && item.cartonCount <= 0) {
-                HairLine(Modifier.padding(vertical = w * 0.014f))
-                ValueWithUnit(
-                    value = DisplayFormat.quantity(countUp(item.quantity.coerceAtLeast(0), item.id)),
-                    unit = "PCS",
-                    width = w,
-                    numberScale = 0.072f,
-                )
-            }
+            // PCS は常に同じ場所に出す（数によって並びが動かないようにする）
+            HairLine(Modifier.padding(vertical = w * 0.014f))
+            ValueWithUnit(
+                value = DisplayFormat.quantity(countUp(item.quantity.coerceAtLeast(0), item.id)),
+                unit = "PCS",
+                width = w,
+                numberScale = 0.072f,
+            )
         }
 
-        // 気温は左の斜め上、湿度は右の斜め上
-        environment?.temperatureC?.let { celsius ->
-            CornerReading(
-                text = DisplayFormat.temperature(celsius),
-                color = ElapsedOrange,
-                fontSize = (w.value * 0.050f).sp,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = w * 0.155f, top = w * 0.115f),
-            )
-        }
-        environment?.humidityPercent?.let { humidity ->
-            CornerReading(
-                text = "$humidity%",
-                color = HumidityBlue,
-                fontSize = (w.value * 0.050f).sp,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = w * 0.155f, top = w * 0.115f),
-            )
-        }
 
         TimePill(
             fontSize = (w.value * 0.048f).sp,
@@ -710,7 +708,34 @@ private fun TypeBadge(
     }
 }
 
-/** 画面の斜め上に置く、気温や湿度のひとこと */
+/** 種類バッジの下に並べる、気温と湿度 */
+@Composable
+private fun ClimateRow(
+    environment: Environment?,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    gap: Dp,
+) {
+    val celsius = environment?.temperatureC
+    val humidity = environment?.humidityPercent
+    if (celsius == null && humidity == null) return
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+    ) {
+        if (celsius != null) {
+            CornerReading(text = DisplayFormat.temperature(celsius), color = ElapsedOrange, fontSize = fontSize)
+        }
+        if (celsius != null && humidity != null) Spacer(Modifier.width(gap))
+        if (humidity != null) {
+            CornerReading(text = "$humidity%", color = HumidityBlue, fontSize = fontSize)
+        }
+    }
+}
+
+/** 気温や湿度のひとこと */
 @Composable
 private fun CornerReading(
     text: String,
@@ -1062,9 +1087,11 @@ private fun BarValue(value: Int, unit: String, barWidth: Dp) {
         Text(
             text = DisplayFormat.quantity(value.coerceAtLeast(0)),
             style = TextStyle(
-                fontSize = (barWidth.value * 0.098f).sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace,
+                fontSize = (barWidth.value * 0.104f).sp,
+                // 細身の書体。数字も「,」も同じ細さで並ぶ
+                fontWeight = FontWeight.Light,
+                fontFamily = FontFamily.SansSerif,
+                letterSpacing = 0.2.sp,
             ),
             color = ListNumber,
             maxLines = 1,
@@ -1073,8 +1100,8 @@ private fun BarValue(value: Int, unit: String, barWidth: Dp) {
             text = unit,
             style = TextStyle(
                 fontSize = (barWidth.value * 0.036f).sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Normal,
+                fontFamily = FontFamily.SansSerif,
             ),
             color = ListNumber.copy(alpha = 0.62f),
             maxLines = 1,
