@@ -808,8 +808,17 @@ body {
   pointer-events: none; z-index: 2;
   background: linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.45) 45%, transparent 100%);
 }
+/* 上（カードとの境目）も暗く落として、行が潜り込んで見えるようにする */
+.detail-list-fade-top {
+  position: absolute; left: 0; right: 0; top: 0; height: 34px;
+  pointer-events: none; z-index: 2;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.34) 55%, transparent 100%);
+}
 [data-theme="light"] .detail-list-fade {
   background: linear-gradient(to top, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.16) 45%, transparent 100%);
+}
+[data-theme="light"] .detail-list-fade-top {
+  background: linear-gradient(to bottom, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0.12) 55%, transparent 100%);
 }
 .detail-list-header {
   display: flex; align-items: center; gap: 4px;
@@ -826,7 +835,7 @@ body {
 
 /* === 一覧（縦画面）: 丸みのある帯 === */
 .detail-list-section .detail-list-scroll {
-  padding: 8px 10px 0;
+  padding: 22px 10px 0;
   display: flex; flex-direction: column; gap: 6px;
 }
 .detail-list-section .detail-list-scroll > * { flex-shrink: 0; }
@@ -847,7 +856,10 @@ body {
   border-width: 2px;
   animation: pill-glow 2s ease-in-out infinite;
 }
-.detail-list-row.detail-list-pill.done { opacity: 0.6; }
+.detail-list-row.detail-list-pill.done {
+  /* 透過させると、スワイプで出る赤い地が透けて見えるので不透明のまま暗くする */
+  opacity: 1;
+}
 @keyframes pill-glow {
   0%, 100% { box-shadow: 0 0 6px rgba(255,140,33,0.14); }
   50% { box-shadow: 0 0 12px rgba(255,140,33,0.30), 0 0 24px rgba(255,140,33,0.10); }

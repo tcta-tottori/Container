@@ -1,6 +1,13 @@
 package jp.tcta.cns.container.wear.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -13,7 +20,6 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,7 +27,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,6 +51,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -77,6 +83,18 @@ private const val DOUBLE_TAP_MS = 260L
 
 /** 縦スワイプで品目を切り替えるとみなす移動量 */
 private val ITEM_SWITCH_THRESHOLD = 44.dp
+
+/** 一覧の右に出す弧の太さ */
+private val INDICATOR_STROKE = 4.dp
+
+/** 弧を画面の縁からどれだけ内側に置くか */
+private val INDICATOR_INSET = 3.dp
+
+/** 弧が開く角度（度）。右の中央を挟んで上下に同じだけ */
+private const val INDICATOR_SWEEP_DEG = 62f
+
+/** 端数だけになってから積み方を出すまでの待ち（ミリ秒）。スマホ版と同じ */
+private const val AUTO_PALLET_DELAY_MS = 400L
 
 /** 画面のいちばん下の、一覧を引き出せる帯の高さ */
 private val BOTTOM_EDGE_HEIGHT = 64.dp
@@ -143,6 +161,23 @@ fun CargoWorkScreen(
 
     var showList by remember(containerId) { mutableStateOf(false) }
     var showPallet by remember(containerId) { mutableStateOf(false) }
+
+    // 残りが端数パレットだけになった瞬間に、積み方を自動で出す（スマホ版と同じ）。
+    // 1 品目につき 1 回だけ。何も触らなければ 5 秒で自動的に閉じる
+    val fractionOnly = selected.palletCount <= 0 && selected.cartonCount > 0
+    val shownFor = remember(containerId) { mutableSetOf<String>() }
+    var prevFraction by remember(containerId) { mutableStateOf<Pair<String, Boolean>?>(null) }
+    LaunchedEffect(selected.id, fractionOnly) {
+        val prev = prevFraction
+        prevFraction = selected.id to fractionOnly
+        // 作業画面を開いた最初の 1 回は出さない（「端数になった」瞬間だけ）
+        if (prev == null) return@LaunchedEffect
+        if (!fractionOnly) return@LaunchedEffect
+        if (prev.second && prev.first == selected.id) return@LaunchedEffect
+        if (!shownFor.add(selected.id)) return@LaunchedEffect
+        delay(AUTO_PALLET_DELAY_MS)
+        showPallet = true
+    }
 
     // 縦スワイプでの品目送り。端まで行ったら反対の端へ回る
     val selectedIndex = items.indexOfFirst { it.id == selected.id }
@@ -345,20 +380,20 @@ private fun ItemPage(
                     value = countUp(item.palletCount.coerceAtLeast(0), item.id).toString(),
                     unit = "PL",
                     width = w,
-                    numberScale = 0.135f,
+                    numberScale = 0.168f,
                     modifier = Modifier.weight(1f),
                 )
                 Box(
                     modifier = Modifier
                         .width(1.dp)
-                        .height(w * 0.115f)
+                        .height(w * 0.140f)
                         .background(Color.White.copy(alpha = 0.28f)),
                 )
                 ValueWithUnit(
                     value = countUp(item.cartonCount.coerceAtLeast(0), item.id).toString(),
                     unit = "CT",
                     width = w,
-                    numberScale = 0.135f,
+                    numberScale = 0.168f,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -548,9 +583,14 @@ private fun ItemListPage(
         if (selectedIndex >= 0) runCatching { listState.animateScrollToItem(selectedIndex) }
     }
 
-    // 端でさらに払われた分を数えて、しきい値を超えたら閉じる
+    /*
+     * 端まで来たら、その指ではいったんそこで止まる。
+     * 指を離してから「もう一度」端の向こうへ払ったときだけ部品表示へ戻る。
+     */
     val dismissThresholdPx = with(LocalDensity.current) { LIST_DISMISS_THRESHOLD.toPx() }
     var overscroll by remember { mutableFloatStateOf(0f) }
+    // 端に着いた指を離したら true。次の払いで閉じられるようになる
+    var armed by remember { mutableStateOf(false) }
     val edgePull = remember(dismissThresholdPx) {
         object : NestedScrollConnection {
             override fun onPostScroll(
@@ -558,15 +598,28 @@ private fun ItemListPage(
                 available: Offset,
                 source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
             ): Offset {
-                if (consumed.y != 0f) overscroll = 0f
-                if (available.y != 0f) {
+                // 一覧が動いているあいだは端に着いていない。数え直して、また構え直させる
+                if (consumed.y != 0f) {
+                    overscroll = 0f
+                    armed = false
+                }
+                if (available.y != 0f && armed) {
                     overscroll += available.y
                     if (abs(overscroll) >= dismissThresholdPx) {
                         overscroll = 0f
+                        armed = false
                         onClose()
                     }
                 }
                 return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                // 指を離した（勢いも消えた）ところで構える。
+                // 端に着いていなければ次の onPostScroll ですぐ外れる
+                overscroll = 0f
+                armed = true
+                return Velocity.Zero
             }
         }
     }
@@ -600,45 +653,58 @@ private fun ItemListPage(
         ListScrollIndicator(
             index = listState.centerItemIndex,
             count = items.size,
-            modifier = Modifier.align(Alignment.CenterEnd),
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }
 
 /**
- * 一覧のどのあたりを見ているかを示す，右端の細いバー。
- * 丸い画面に沿うよう，中央を少しふくらませた位置に置く。
+ * 一覧のどのあたりを見ているかを示す，右端のバー。
+ * 丸い画面の縁に沿った弧にして、縁で切れないようにする。
  */
 @Composable
-private fun BoxWithConstraintsScope.ListScrollIndicator(
+private fun ListScrollIndicator(
     index: Int,
     count: Int,
     modifier: Modifier = Modifier,
 ) {
     if (count <= 1) return
-    val trackHeight = maxHeight * 0.42f
     // つまみの長さは項目数に応じて縮むが，短くなりすぎないようにする
     val thumbRatio = (1f / count).coerceAtLeast(0.22f)
     val position = (index.toFloat() / (count - 1).toFloat()).coerceIn(0f, 1f)
-    val animated by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = position,
-        label = "listScroll",
-    )
-    Box(
-        modifier = modifier
-            .padding(end = 4.dp)
-            .width(4.dp)
-            .height(trackHeight)
-            .clip(RoundedCornerShape(2.dp))
-            .background(Color.White.copy(alpha = 0.16f)),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(trackHeight * thumbRatio)
-                .offset(y = (trackHeight - trackHeight * thumbRatio) * animated)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.72f)),
+    val animated by animateFloatAsState(targetValue = position, label = "listScroll")
+    val track = Color.White.copy(alpha = 0.16f)
+    val thumb = Color.White.copy(alpha = 0.75f)
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val stroke = INDICATOR_STROKE.toPx()
+        // 画面の縁より少し内側を通る弧。左右どちらの端でも切れない
+        val inset = stroke / 2f + INDICATOR_INSET.toPx()
+        val diameter = size.minDimension - inset * 2f
+        val topLeft = Offset(
+            x = (size.width - diameter) / 2f,
+            y = (size.height - diameter) / 2f,
+        )
+        val arcSize = Size(diameter, diameter)
+        // 右側の中央（3 時）を中心に、上下へ同じだけ開く
+        val startAngle = -INDICATOR_SWEEP_DEG / 2f
+        drawArc(
+            color = track,
+            startAngle = startAngle,
+            sweepAngle = INDICATOR_SWEEP_DEG,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
+        )
+        val thumbSweep = INDICATOR_SWEEP_DEG * thumbRatio
+        drawArc(
+            color = thumb,
+            startAngle = startAngle + (INDICATOR_SWEEP_DEG - thumbSweep) * animated,
+            sweepAngle = thumbSweep,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
         )
     }
 }
@@ -646,14 +712,38 @@ private fun BoxWithConstraintsScope.ListScrollIndicator(
 @Composable
 private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: () -> Unit) {
     val accent = itemTypeAccent(item.itemType)
+    // いま出している品目は黄色い枠を点滅させて分かるようにする
+    val blink = rememberInfiniteTransition(label = "selectedBar")
+    val blinkAlpha by blink.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "selectedBarAlpha",
+    )
     Box(
         modifier = Modifier
             .fillMaxWidth(0.92f)
             .height(46.dp)
             .clip(RoundedCornerShape(23.dp))
-            .background(darkened(accent, if (selected) 0.68f else 0.48f))
+            // 左上が明るく右下へ落ちるグラデーション。平らな塗りより奥行きが出る
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        darkened(accent, if (selected) 0.86f else 0.62f),
+                        darkened(accent, if (selected) 0.56f else 0.38f),
+                        darkened(accent, if (selected) 0.34f else 0.22f),
+                    ),
+                ),
+            )
             .then(
-                if (selected) Modifier.border(2.dp, accent, RoundedCornerShape(23.dp)) else Modifier,
+                if (selected) {
+                    Modifier.border(2.dp, SelectedYellow.copy(alpha = blinkAlpha), RoundedCornerShape(23.dp))
+                } else {
+                    Modifier
+                },
             )
             .pointerInput(item.id) { detectTapGestures(onTap = { onClick() }) }
             .padding(horizontal = 12.dp),
@@ -662,7 +752,7 @@ private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: (
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxSize(),
         ) {
-            // 左 3/5: 品名。選んでいる行だけ横へ流す（全行流すとスクロールがカクつく）
+            // 左 3/5: 品名。枠に収まらないものは横へ流す（収まっていれば動かない）
             MarqueeText(
                 text = item.modelName ?: item.name,
                 style = TextStyle(
@@ -671,7 +761,6 @@ private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: (
                 ),
                 color = Color.White,
                 textAlign = TextAlign.Start,
-                marquee = selected,
                 modifier = Modifier.weight(3f),
             )
             // 右 2/5: PL / CT / PCS。数字は大きく、単位はごく小さく。
