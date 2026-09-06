@@ -1175,9 +1175,6 @@ export default function ItemDetailPanel({
           {/* リスト下部余白。いちばん下の行がマイクなどのボタンに隠れないようにする */}
           <div className="detail-list-tail" />
         </div>
-        {/* 上下を少し暗くして、行が枠の外へ潜り込んで見えるようにする */}
-        <div className="detail-list-fade-top" />
-        <div className="detail-list-fade" />
       </div>
 
       {/* パレット全画面表示モーダル */}

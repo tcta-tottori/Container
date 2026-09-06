@@ -14,6 +14,7 @@
     <string name="cargo_empty">荷物の情報がありません</string>
     <string name="action_pallet">端数パレットの積み方</string>
     <string name="pallet_none">端数なし</string>
+    <string name="detail_close_hint">2 回タップで一覧へ戻る</string>
 
     <!-- 通知 -->
     <string name="notify_channel_work">荷降ろし中のお知らせ</string>

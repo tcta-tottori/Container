@@ -206,12 +206,11 @@ function UpdateNotification() {
   );
 }
 
-/** 「お願いします！」ボタンで読み上げる言葉。押すたびにこの中から選ぶ */
-const REQUEST_CALL_TEXTS = ['お願いします！', '長谷川さん！お願いします！'];
+/** 「お願いします！」ボタンで読み上げる言葉 */
+const REQUEST_CALL_TEXT = 'お願いします！';
 
-function pickRequestCall(): string {
-  return REQUEST_CALL_TEXTS[Math.floor(Math.random() * REQUEST_CALL_TEXTS.length)];
-}
+/** 「長谷川さん！お願いします！」ボタンで読み上げる言葉 */
+const NAME_CALL_TEXT = '長谷川さん！お願いします！';
 
 export default function Home() {
   const {
@@ -1527,7 +1526,8 @@ export default function Home() {
           selectedIdx={state.selectedContainerIdx}
           onSelectContainer={selectContainer}
           onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
-          onRequestCall={view === 'work' ? () => speakCheer(pickRequestCall()) : undefined}
+          onRequestCall={view === 'work' ? () => speakCheer(REQUEST_CALL_TEXT) : undefined}
+          onNameCall={view === 'work' ? () => speakCheer(NAME_CALL_TEXT) : undefined}
           onWeather={view === 'work' ? handleWeatherCall : undefined}
           waterPlaying={waterPlaying}
           onWater={toggleWater}
