@@ -1123,11 +1123,12 @@ export default function ItemDetailPanel({
                     : { color: nameColor, fontWeight: isActive ? 800 : 600 }
                   } />
                 <span className="detail-list-vals">
-                  {it.palletCount > 0 && (
-                    <ListValue value={fmtNum(it.palletCount)} unit="PL" color={plColor} />
-                  )}
-                  {it.fraction > 0 && (
-                    <ListValue value={fmtNum(it.fraction)} unit="CT" color={numColor} />
+                  {/* PL も CT も 0 のときだけ pcs だけにする。それ以外は全部出す */}
+                  {!(it.palletCount <= 0 && it.fraction <= 0) && (
+                    <>
+                      <ListValue value={fmtNum(it.palletCount)} unit="PL" color={plColor} />
+                      <ListValue value={fmtNum(it.fraction)} unit="CT" color={numColor} />
+                    </>
                   )}
                   <ListValue value={Math.ceil(it.totalQty).toLocaleString()} unit="pcs" color={pcsColor} />
                 </span>
