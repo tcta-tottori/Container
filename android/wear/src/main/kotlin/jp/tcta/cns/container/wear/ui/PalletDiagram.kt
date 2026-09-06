@@ -41,6 +41,7 @@ import jp.tcta.cns.container.shared.PALLET_BASE_HEIGHT
 import jp.tcta.cns.container.shared.PalletLayout
 import jp.tcta.cns.container.shared.PalletStack
 import jp.tcta.cns.container.wear.R
+import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.hypot
@@ -75,6 +76,9 @@ private const val SWIPE_DEG = 180f
 
 /** 触るのをやめてから自動回転に戻るまでの間（ミリ秒） */
 private const val SPIN_RESUME_DELAY_MS = 300L
+
+/** 何も触らないまま経ったら自動で閉じるまでの時間（ミリ秒）。スマホ版と同じ 5 秒 */
+private const val AUTO_CLOSE_MS = 5_000L
 
 /** 段ボールの色。面の向きで明るさを変えて立体に見せる */
 private val CardboardBase = Color(0xFFD9B486)
@@ -115,7 +119,15 @@ fun PalletDiagramOverlay(
     var enter by remember(stack) { mutableFloatStateOf(0f) }
     var zoom by remember(stack) { mutableFloatStateOf(1f) }
     var paused by remember(stack) { mutableStateOf(false) }
-    var lastTouchAt by remember(stack) { mutableLongStateOf(0L) }
+    // 最後に触った時刻。開いた時点から数え始める
+    var lastTouchAt by remember(stack) { mutableLongStateOf(System.currentTimeMillis()) }
+
+    // 何も触らないまま 5 秒経ったら自動で閉じる
+    LaunchedEffect(stack, lastTouchAt) {
+        delay(AUTO_CLOSE_MS)
+        onClose()
+    }
+
     LaunchedEffect(stack) {
         angleDeg = START_ANGLE_DEG
         enter = 0f
@@ -146,7 +158,12 @@ fun PalletDiagramOverlay(
             .fillMaxSize()
             .background(Color.Black)
             // 2 回タップで閉じる（1 回タップは図の停止／再開に使う）
-            .pointerInput(item.id) { detectTapGestures(onDoubleTap = { onClose() }) },
+            .pointerInput(item.id) {
+                detectTapGestures(
+                    onTap = { lastTouchAt = System.currentTimeMillis() },
+                    onDoubleTap = { onClose() },
+                )
+            },
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val w = maxWidth
@@ -181,7 +198,10 @@ fun PalletDiagramOverlay(
                             // 1 回タップで止まる／また回り出す。2 回タップで閉じる
                             .pointerInput(stack) {
                                 detectTapGestures(
-                                    onTap = { paused = !paused },
+                                    onTap = {
+                                        paused = !paused
+                                        lastTouchAt = System.currentTimeMillis()
+                                    },
                                     onDoubleTap = { onClose() },
                                 )
                             }

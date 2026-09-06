@@ -668,7 +668,16 @@ private fun ItemBar(item: CargoItem, selected: Boolean, barWidth: Dp, onClick: (
             .fillMaxWidth(0.92f)
             .height(46.dp)
             .clip(RoundedCornerShape(23.dp))
-            .background(darkened(accent, if (selected) 0.68f else 0.48f))
+            // 左上が明るく右下へ落ちるグラデーション。平らな塗りより奥行きが出る
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        darkened(accent, if (selected) 0.86f else 0.62f),
+                        darkened(accent, if (selected) 0.56f else 0.38f),
+                        darkened(accent, if (selected) 0.34f else 0.22f),
+                    ),
+                ),
+            )
             .then(
                 if (selected) {
                     Modifier.border(2.dp, SelectedYellow.copy(alpha = blinkAlpha), RoundedCornerShape(23.dp))
