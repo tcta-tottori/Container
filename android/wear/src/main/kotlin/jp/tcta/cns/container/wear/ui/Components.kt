@@ -194,14 +194,17 @@ private const val COUNT_UP_MS = 1000
 /** 値が変わったとき（パレットを減らしたときなど）になじませる時間 */
 private const val COUNT_CHANGE_MS = 500
 
-/** バーが減るときにかける時間。動き始めが速いぶん、少し長めにとる */
-private const val BAR_CHANGE_MS = 700
+/** バーが減るときにかける時間。ゆっくり、はっきり緩急がつくよう長めにとる */
+private const val BAR_CHANGE_MS = 1400
 
 private val EaseInOutCubic = CubicBezierEasing(0.65f, 0f, 0.35f, 1f)
 private val EaseInOutQuad = CubicBezierEasing(0.45f, 0f, 0.55f, 1f)
 
-/** 動き始めが速く、止まる位置に近づくにつれてゆっくりになる曲線 */
-private val EaseOutQuint = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
+/**
+ * 動き始めが速く、止まる位置に近づくにつれてぐっとゆっくりになる曲線。
+ * 前半で大半を動き、後半は長く尾を引く（緩急がはっきり出る）。
+ */
+private val EaseOutExpo = CubicBezierEasing(0.12f, 0.94f, 0.22f, 1f)
 
 /**
  * 数字を数えて見せる。
@@ -234,7 +237,7 @@ fun countUp(target: Int, key: Any): Int {
 fun smoothFraction(target: Float, key: Any): Float {
     val animated = remember(key) { Animatable(target) }
     LaunchedEffect(key, target) {
-        animated.animateTo(target, tween(BAR_CHANGE_MS, easing = EaseOutQuint))
+        animated.animateTo(target, tween(BAR_CHANGE_MS, easing = EaseOutExpo))
     }
     return animated.value
 }

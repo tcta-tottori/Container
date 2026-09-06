@@ -541,7 +541,8 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     <strong style={{ color: '#22c55e' }}>上下スワイプ</strong> … 品目を切り替える（端まで行くと反対の端へ回る）<br />
                     <strong style={{ color: '#22c55e' }}>画面のいちばん下から上へ払う</strong> … 一覧を開く<br />
                     <strong style={{ color: '#22c55e' }}>リューズを時計回り</strong> … 一覧を開く<br />
-                    <strong style={{ color: '#22c55e' }}>CT の枠をタップ</strong> … 端数パレットの積み方を出す
+                    <strong style={{ color: '#22c55e' }}>CT の枠をタップ</strong> … 端数パレットの積み方を出す<br />
+                    <strong style={{ color: '#22c55e' }}>長押し</strong> … コールの選択を出す（下の「ウォッチからコールする」参照）
                   </div>
                   <div>
                     作業画面のあいだは<strong style={{ color: '#fbbf24' }}>画面が消えません</strong>。
@@ -589,6 +590,27 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     <strong style={{ color: '#38bdf8' }}>1回タップ</strong>で回転の停止／再開、
                     <strong style={{ color: '#38bdf8' }}>横になぞる</strong>と手で回せ、<strong style={{ color: '#38bdf8' }}>つまむ</strong>と拡大縮小。
                     <strong style={{ color: '#38bdf8' }}>2回タップ</strong>で閉じ、何も触らなければ<strong style={{ color: '#fbbf24' }}>5秒</strong>で自動的に閉じます。
+                  </div>
+                </div>
+              </InfoCard>
+            </Section>
+
+            <Section title="ウォッチからコールする" color="#fb923c">
+              <InfoCard>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    部品表示を<strong style={{ color: '#fb923c' }}>長押し</strong>すると、コールの選択が出ます。
+                    選ぶと<strong style={{ color: '#fb923c' }}>スマホのスピーカーからコールが鳴ります</strong>
+                    （ウォッチからは鳴りません）。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <strong style={{ color: '#fb923c' }}>お願いします！</strong> / <strong style={{ color: '#fb923c' }}>長谷川さん！</strong> …
+                    スマホの右下メニューにある同じコールと同じものです。<br />
+                    <strong style={{ color: '#fb923c' }}>応援コール</strong> … 設定に登録した文からひとつ読み上げます。<br />
+                    <strong style={{ color: '#fb923c' }}>いまの品目を読み上げ</strong> … 品名とパレット・ケース数を読み上げます。
+                  </div>
+                  <div>
+                    スマホの CNS アプリが動いていないと届きません。画面のどこかを押すと選択を閉じます。
                   </div>
                 </div>
               </InfoCard>

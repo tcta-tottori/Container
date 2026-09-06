@@ -94,7 +94,7 @@ export interface WatchSyncInput {
 
 /** ウォッチから届く操作 */
 export interface WatchCommand {
-  /** 'selectItem' | 'decrementPallet' | 'incrementPallet' */
+  /** 'selectItem' | 'decrementPallet' | 'incrementPallet' | 'call' */
   type: string;
   /** 対象の品目 ID */
   itemId: string;
@@ -102,6 +102,8 @@ export interface WatchCommand {
   containerId?: string;
   /** ウォッチで操作した時刻 */
   issuedAt?: number;
+  /** 'call' のときにどのコールか（'request' | 'name' | 'cheer' | 'item'） */
+  arg?: string;
 }
 
 /** Android アプリが用意する橋渡し */
