@@ -63,10 +63,20 @@ class ContainerViewModel(application: Application) : AndroidViewModel(applicatio
     fun incrementPallet(containerId: String, itemId: String) =
         send(WatchCommand.INCREMENT_PALLET, containerId, itemId)
 
-    private fun send(type: String, containerId: String, itemId: String) {
+    /** スマホでコールを鳴らす。[which] は WatchCommand.CALL_* のどれか */
+    fun call(containerId: String, itemId: String, which: String) =
+        send(WatchCommand.CALL, containerId, itemId, which)
+
+    private fun send(type: String, containerId: String, itemId: String, arg: String? = null) {
         viewModelScope.launch {
             val delivered = commandSender.send(
-                WatchCommand(type = type, itemId = itemId, containerId = containerId, issuedAt = System.currentTimeMillis()),
+                WatchCommand(
+                    type = type,
+                    itemId = itemId,
+                    containerId = containerId,
+                    issuedAt = System.currentTimeMillis(),
+                    arg = arg,
+                ),
             )
             phoneConnected.value = delivered
         }

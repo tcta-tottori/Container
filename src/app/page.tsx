@@ -1078,6 +1078,14 @@ export default function Home() {
    */
   useEffect(() => {
     setWatchCommandHandler((command) => {
+      // コールはどの品目でも鳴らせる（品目の指定は要らない）
+      if (command.type === 'call') {
+        if (command.arg === 'name') speakCheer(NAME_CALL_TEXT);
+        else if (command.arg === 'cheer') speakCheer(getRandomCallPhrase());
+        else if (command.arg === 'item') { if (currentItem) announceItem(currentItem, state.items); }
+        else speakCheer(REQUEST_CALL_TEXT);
+        return;
+      }
       const idx = state.items.findIndex((it) => it.id === command.itemId);
       if (idx < 0) return;
       if (command.type === 'selectItem') {
@@ -1092,7 +1100,10 @@ export default function Home() {
       else if (command.type === 'incrementPallet') handleIncrease();
     });
     return () => setWatchCommandHandler(null);
-  }, [state.items, state.currentItemIdx, handleSelectItem, handleDecrease, handleIncrease]);
+  }, [
+    state.items, state.currentItemIdx, handleSelectItem, handleDecrease, handleIncrease,
+    speakCheer, announceItem, currentItem,
+  ]);
 
   const switchView = useCallback((mode: ViewMode) => {
     setViewMode(mode);

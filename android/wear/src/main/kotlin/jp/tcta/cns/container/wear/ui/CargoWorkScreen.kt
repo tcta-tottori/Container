@@ -79,6 +79,7 @@ import androidx.wear.compose.material3.Text
 import jp.tcta.cns.container.shared.CargoItem
 import jp.tcta.cns.container.shared.Environment
 import jp.tcta.cns.container.shared.PalletLayout
+import jp.tcta.cns.container.shared.WatchCommand
 import jp.tcta.cns.container.shared.DisplayFormat
 import jp.tcta.cns.container.wear.R
 import kotlinx.coroutines.Job
@@ -145,6 +146,7 @@ fun CargoWorkScreen(
     onSelectItem: (String) -> Unit,
     onDecrementPallet: (String) -> Unit,
     onIncrementPallet: (String) -> Unit,
+    onCall: (String, String) -> Unit,
 ) {
     val payload = state.payload
     val container = payload?.container(containerId)
@@ -180,6 +182,8 @@ fun CargoWorkScreen(
     var showPallet by remember(containerId) { mutableStateOf(false) }
     // 一覧で長押しした品目。詳しい内容を出しているあいだだけ入っている
     var detailItem by remember(containerId) { mutableStateOf<CargoItem?>(null) }
+    // 長押しで出すコールの選択
+    var showCalls by remember(containerId) { mutableStateOf(false) }
 
     // 残りが端数パレットだけになった瞬間に、積み方を自動で出す（スマホ版と同じ）。
     // 1 品目につき 1 回だけ。何も触らなければ 5 秒で自動的に閉じる
@@ -221,7 +225,24 @@ fun CargoWorkScreen(
             onPrevItem = { stepItem(-1) },
             onOpenList = { showList = true },
             onOpenPallet = { showPallet = true },
+            onOpenCalls = { showCalls = true },
         )
+
+        // 長押しで出すコールの選択
+        AnimatedVisibility(
+            visible = showCalls,
+            modifier = Modifier.fillMaxSize(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            CallMenu(
+                onPick = { which ->
+                    showCalls = false
+                    onCall(selected.id, which)
+                },
+                onClose = { showCalls = false },
+            )
+        }
 
         AnimatedVisibility(
             visible = showList,
@@ -292,6 +313,7 @@ private fun ItemPage(
     onPrevItem: () -> Unit,
     onOpenList: () -> Unit,
     onOpenPallet: () -> Unit,
+    onOpenCalls: () -> Unit,
 ) {
     val accent = itemTypeAccent(item.itemType)
     val view = LocalView.current
@@ -338,6 +360,13 @@ private fun ItemPage(
                         pendingTap = null
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                         onIncrement()
+                    },
+                    // 長押しでコールの選択を出す
+                    onLongPress = {
+                        pendingTap?.cancel()
+                        pendingTap = null
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                        onOpenCalls()
                     },
                 )
             }
@@ -420,14 +449,15 @@ private fun ItemPage(
                     alpha = ((swap.value - ITEM_SWAP_MIN_SCALE) / (1f - ITEM_SWAP_MIN_SCALE)).coerceIn(0f, 1f)
                 },
         ) {
+            // 気温と湿度は、時刻の下・種類バッジの上に並べる
+            ClimateRow(environment = environment, fontSize = (w.value * 0.044f).sp, gap = w * 0.055f)
+            Spacer(Modifier.height(w * 0.014f))
             TypeBadge(
                 itemType = item.itemType,
                 counts = remainingByType(items),
                 fontSize = (w.value * 0.038f).sp,
                 dotSize = w * 0.030f,
             )
-            // 気温と湿度は、種類バッジと機種名のあいだに並べる
-            ClimateRow(environment = environment, fontSize = (w.value * 0.044f).sp, gap = w * 0.055f)
             Spacer(Modifier.height(w * 0.018f))
             MarqueeText(
                 text = item.modelName ?: item.name,
@@ -705,6 +735,63 @@ private fun TypeBadge(
                 )
             }
         }
+    }
+}
+
+/** 長押しで出すコールの選択。押すとスマホでコールが鳴る */
+@Composable
+private fun CallMenu(onPick: (String) -> Unit, onClose: () -> Unit) {
+    val calls = listOf(
+        WatchCommand.CALL_REQUEST to stringResource(R.string.call_request),
+        WatchCommand.CALL_NAME to stringResource(R.string.call_name),
+        WatchCommand.CALL_CHEER to stringResource(R.string.call_cheer),
+        WatchCommand.CALL_ITEM to stringResource(R.string.call_item),
+    )
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.88f))
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
+    ) {
+        val w = maxWidth
+        ScalingLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp, start = 12.dp, end = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            item {
+                Text(
+                    text = stringResource(R.string.call_title),
+                    style = TextStyle(fontSize = (w.value * 0.044f).sp, fontWeight = FontWeight.Bold),
+                    color = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+            items(calls) { (which, label) ->
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(23.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF2E3550), Color(0xFF1B2033)),
+                            ),
+                        )
+                        .border(1.5.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(23.dp))
+                        .pointerInput(which) { detectTapGestures(onTap = { onPick(which) }) },
+                ) {
+                    Text(
+                        text = label,
+                        style = TextStyle(fontSize = (w.value * 0.050f).sp, fontWeight = FontWeight.Bold),
+                        color = Color.White,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        EdgeScrim()
     }
 }
 

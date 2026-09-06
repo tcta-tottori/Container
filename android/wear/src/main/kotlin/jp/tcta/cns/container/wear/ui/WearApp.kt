@@ -62,6 +62,7 @@ fun WearApp(
                     onSelectItem = { itemId -> viewModel.selectItem(container.id, itemId) },
                     onDecrementPallet = { itemId -> viewModel.decrementPallet(container.id, itemId) },
                     onIncrementPallet = { itemId -> viewModel.incrementPallet(container.id, itemId) },
+                    onCall = { itemId, which -> viewModel.call(container.id, itemId, which) },
                 )
             }
         }

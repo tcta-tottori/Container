@@ -16,6 +16,13 @@
     <string name="pallet_none">端数なし</string>
     <string name="detail_close_hint">2 回タップで一覧へ戻る</string>
 
+    <!-- コール -->
+    <string name="call_title">コールを選ぶ</string>
+    <string name="call_request">お願いします！</string>
+    <string name="call_name">長谷川さん！</string>
+    <string name="call_cheer">応援コール</string>
+    <string name="call_item">いまの品目を読み上げ</string>
+
     <!-- 通知 -->
     <string name="notify_channel_work">荷降ろし中のお知らせ</string>
     <string name="notify_channel_work_desc">スマホが作業ページを開いているあいだ表示します</string>
