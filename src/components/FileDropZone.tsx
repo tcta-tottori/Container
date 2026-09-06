@@ -237,46 +237,6 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                   ))}
                 </div>
               )}
-              {/* 押したら出る選び方。枠の中にそのまま出す */}
-              {pickOpen && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}
-                >
-                  <PickButton
-                    label="ファイルを選ぶ"
-                    hint="Excel / 保存済みの写真"
-                    onClick={() => { setPickOpen(false); inputRef.current?.click(); }}
-                    icon={
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
-                      </svg>
-                    }
-                  />
-                  <PickButton
-                    label="写真を撮る"
-                    hint="コンテナ日程の紙をその場で撮る"
-                    onClick={() => { setPickOpen(false); cameraRef.current?.click(); }}
-                    icon={
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                      </svg>
-                    }
-                  />
-                  <button
-                    onClick={() => setPickOpen(false)}
-                    style={{
-                      padding: '8px', borderRadius: 10, background: 'transparent', border: 'none',
-                      color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer',
-                    }}
-                  >
-                    やめる
-                  </button>
-                </div>
-              )}
               <input ref={inputRef} type="file" accept=".xlsx,.xlsm,.xls,.jpg,.jpeg,.png,.webp,.heic,.heif,.bmp,image/*" multiple
                 onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
                 className="hidden" />
@@ -289,6 +249,72 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
         </div>{/* columns閉じ */}
       </div>
 
+      {/* 読み込み方の選択（画面の真ん中に出すポップアップ） */}
+      {pickOpen && (
+        <div
+          onClick={() => setPickOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            animation: 'fadeIn 0.16s ease',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 360,
+              display: 'flex', flexDirection: 'column', gap: 10,
+              padding: 18, borderRadius: 22,
+              background: 'linear-gradient(160deg, #23273a 0%, #1c2030 55%, #171a29 100%)',
+              border: '1.5px solid rgba(255,255,255,0.14)',
+              boxShadow: '0 18px 50px rgba(0,0,0,0.6)',
+            }}
+          >
+            <div style={{
+              color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 700,
+              letterSpacing: 0.4, padding: '0 4px 2px',
+            }}>
+              読み込み方を選ぶ
+            </div>
+            <PickButton
+              label="ファイルを選ぶ"
+              hint="Excel / 保存済みの写真"
+              onClick={() => { setPickOpen(false); inputRef.current?.click(); }}
+              icon={
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
+                </svg>
+              }
+            />
+            <PickButton
+              label="写真を撮る"
+              hint="コンテナ日程の紙をその場で撮る"
+              onClick={() => { setPickOpen(false); cameraRef.current?.click(); }}
+              icon={
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              }
+            />
+            <button
+              onClick={() => setPickOpen(false)}
+              style={{
+                padding: '10px', borderRadius: 12, marginTop: 2,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              やめる
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
