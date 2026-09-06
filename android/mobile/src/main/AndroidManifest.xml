@@ -58,6 +58,11 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- 裏に回ったまま 20 分たったらアプリを終了する -->
+        <receiver
+            android:name=".work.IdleShutdownReceiver"
+            android:exported="false" />
+
         <!-- 荷降ろし中のあいだ、アプリを閉じてもステータスバーに表示を残す -->
         <service
             android:name=".work.WorkStatusService"

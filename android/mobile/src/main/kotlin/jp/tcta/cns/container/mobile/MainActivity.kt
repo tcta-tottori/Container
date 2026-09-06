@@ -30,6 +30,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import jp.tcta.cns.container.mobile.bridge.NativeSpeechBridge
 import jp.tcta.cns.container.mobile.bridge.WatchBridge
+import jp.tcta.cns.container.mobile.work.IdleShutdownReceiver
 import jp.tcta.cns.container.mobile.work.WorkStatusService
 import jp.tcta.cns.container.mobile.sync.WatchCommandReceiver
 import jp.tcta.cns.container.mobile.sync.WearSyncClient
@@ -215,6 +216,8 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         foreground = true
+        // 裏で長く放っておかれたときの終了予約を外す
+        IdleShutdownReceiver.cancelOnForeground(this)
         commandReceiver.start()
         // 前面に戻ったときに、まだ出せていなければステータスバー表示を出す
         val json = lastSyncJson
@@ -226,6 +229,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         foreground = false
+        // 裏に回ったまま 20 分たったら終了するよう仕掛ける
+        IdleShutdownReceiver.scheduleOnBackground(this)
         commandReceiver.stop()
         super.onStop()
     }
