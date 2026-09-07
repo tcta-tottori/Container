@@ -103,8 +103,8 @@ export function detectTypeByItemName(itemName: string): ItemType {
   if (name.startsWith('外箱') || name.startsWith('彩盒')) return '箱';
 
   let type: ItemType | null = null;
-  // ポリカバー: JP*, JRI*, JKX*, SR* で始まる
-  if (/^(JP[A-Z]|JRI|JKX|SR)/.test(name)) type = 'ポリカバー';
+  // ポリカバー: JP*, JRI*, JRD*, JKX*, SR* で始まる
+  if (/^(JP[A-Z]|JRI|JRD|JKX|SR)/.test(name)) type = 'ポリカバー';
   // ジャーポット: PDR*, PDU*, PVW*, PDZ*, WMS* で始まる
   else if (/^(PDR|PDU|PVW|PDZ|WMS)/.test(name)) type = 'ジャーポット';
 
@@ -196,9 +196,9 @@ export function extractColor(itemName: string): string | null {
   }
 
   // 括弧なしパターン: JRI-H100KKB, JPV-X100K 等、末尾の色コードを検出
-  // ポリカバー系プレフィックス(JRI-, JPI-, JPV-, JPK-, JPH-等)の品名のみ対象
+  // ポリカバー系プレフィックス(JRI-, JRD-, JPI-, JPV-, JPK-, JPD-, JPH-等)の品名のみ対象
   const name = itemName.replace(/ポリカバー/g, '').replace(/ﾎﾟﾘｶﾊﾞｰ/g, '').trim();
-  if (/^(JRI|JPI|JPV|JPK|JPH|JPA|JPB|JPG|JRG|JRB)-/.test(name)) {
+  if (/^(JRI|JRD|JPI|JPV|JPK|JPD|JPH|JPA|JPB|JPG|JRG|JRB)-/.test(name)) {
     // 末尾の色コード: KKB, KB, KM, KV, K, WS, WM, WG, WY, WP, W, TD, T
     const suffixMatch = name.match(/(KKB|KB|KM|KV|K|WS|WM|WG|WY|WP|W|TD|T)$/);
     if (suffixMatch) {

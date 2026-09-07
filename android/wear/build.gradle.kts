@@ -18,8 +18,8 @@ android {
         // 現行の Pixel Watch シリーズがすべて動く下限として 33 にしている。
         minSdk = 33
         targetSdk = 36
-        versionCode = 15
-        versionName = "2.4"
+        versionCode = 16
+        versionName = "2.5"
         // ネイティブコードを含まないため、生成される APK / AAB はそのまま 64bit 対応になる。
     }
 
