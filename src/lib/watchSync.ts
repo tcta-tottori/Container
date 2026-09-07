@@ -94,7 +94,7 @@ export interface WatchSyncInput {
 
 /** ウォッチから届く操作 */
 export interface WatchCommand {
-  /** 'selectItem' | 'decrementPallet' | 'incrementPallet' | 'call' */
+  /** 'selectItem' | 'decrementPallet' | 'incrementPallet' | 'uncompleteItem' | 'call' */
   type: string;
   /** 対象の品目 ID */
   itemId: string;

@@ -22,6 +22,11 @@
     <string name="call_name">長谷川さん！</string>
     <string name="call_cheer">応援コール</string>
     <string name="call_item">いまの品目を読み上げ</string>
+    <string name="action_increment">パレットを戻す</string>
+
+    <!-- 完了を元に戻す -->
+    <string name="undo_confirm">元に戻しますか</string>
+    <string name="undo_cancel">やめる</string>
 
     <!-- 通知 -->
     <string name="notify_channel_work">荷降ろし中のお知らせ</string>
