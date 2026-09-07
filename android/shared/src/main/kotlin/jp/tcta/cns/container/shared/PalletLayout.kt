@@ -97,12 +97,23 @@ object PalletLayout {
         return Triple(55f, 38f, 38f)
     }
 
-    /**
-     * 1 段 7 個で積む品目か。
-     * 頭に JP が付くもの（JPI・JPV・JPK など）はすべてこの積み方をする。
-     */
-    fun isJp7Type(itemName: String?): Boolean =
-        itemName != null && Regex("""^JP[A-Z]""").containsMatchIn(itemName.replace(" ", "").uppercase())
+    /** 1 段 7 個で積む機種の頭 */
+    private val SEVEN_PER_LAYER = listOf("JPI", "JPK", "JRD", "JPD")
+
+    /** 1 段 6 個で積む機種の頭 */
+    private val SIX_PER_LAYER = listOf("JRI", "JPV")
+
+    /** 空白を取って大文字にした品名。機種の頭を見るのに使う */
+    private fun normalizedName(itemName: String?): String =
+        itemName?.replace(" ", "")?.uppercase() ?: ""
+
+    /** 1 段 7 個で積む品目か（JPI・JPK・JRD・JPD） */
+    fun is7PerLayerType(itemName: String?): Boolean =
+        normalizedName(itemName).let { n -> SEVEN_PER_LAYER.any { n.startsWith(it) } }
+
+    /** 1 段 6 個で積む品目か（JRI・JPV）。鍋も種目を問わず 1 段 6 個 */
+    fun is6PerLayerType(itemName: String?): Boolean =
+        normalizedName(itemName).let { n -> SIX_PER_LAYER.any { n.startsWith(it) } }
 
     /** PDU が付くジャーポット（2 箱シュリンクで 1 玉） */
     fun isPduJarPot(itemName: String?): Boolean =
@@ -148,7 +159,9 @@ object PalletLayout {
 
         val (bwCm, bdCm, bhCm) = boxDimensionsCm(measurements, itemName)
         val isNabe = itemType == ItemTypes.POT
-        val isJp7 = isJp7Type(itemName)
+        val is7 = is7PerLayerType(itemName)
+        // 鍋と 7 個積みが先。どちらでもない JRI・JPV が 6 個積み
+        val is6 = !isNabe && !is7 && is6PerLayerType(itemName)
         val isJarPot = itemType == ItemTypes.JAR_POT || Regex("^(PDR|PDU|PVW)").containsMatchIn(itemName)
         val isPdu = isJarPot && isPduJarPot(itemName)
         val casesPerBox = if (isPdu) PDU_CASES_PER_BUNDLE else 1
@@ -156,7 +169,7 @@ object PalletLayout {
         // パレットの大きさ（cm）
         val palletWcm: Float
         val palletDcm: Float
-        if (isJp7 && !isNabe) {
+        if (is7 && !isNabe) {
             val side = max(bwCm, bdCm) + min(bwCm, bdCm) * 2
             palletWcm = side
             palletDcm = side
@@ -183,11 +196,12 @@ object PalletLayout {
                 slots = jarPotSlots(bh, layers, pw, pd).toMutableList()
                 perLayer = 4
             }
-            isNabe -> {
+            isNabe || is6 -> {
+                // 3 列 × 2 行 で 1 段 6 個
                 slots = nabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px).toMutableList()
                 perLayer = if (slots.isNotEmpty()) (slots.size.toFloat() / layers).roundToInt() else 6
             }
-            isJp7 -> {
+            is7 -> {
                 slots = jp7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px).toMutableList()
                 perLayer = 7
             }
@@ -241,7 +255,7 @@ object PalletLayout {
         }
 
         val render = fractionSlots(slots, perLayer, drawn)
-        val order = stackOrder(render, if (isPdu || isJp7) StackMode.LAYER else StackMode.BACK_COLUMN)
+        val order = stackOrder(render, if (isPdu || is7) StackMode.LAYER else StackMode.BACK_COLUMN)
         val maxZ = render.fold(PALLET_BASE_HEIGHT) { acc, s -> max(acc, s.z + s.h) }
         return PalletStack(
             slots = render,
@@ -255,7 +269,7 @@ object PalletLayout {
 
     // ---------- 段ごとの並べ方 ----------
 
-    /** 鍋・ポリカバー: 3 列 × N 行 */
+    /** 鍋・JRI・JPV: 3 列 × N 行（1 段 6 個） */
     private fun nabeSlots(
         bwCm: Float, bdCm: Float, bhPx: Float, layers: Int,
         pw: Float, pd: Float, cm2px: Float,
@@ -286,7 +300,7 @@ object PalletLayout {
         return out
     }
 
-    /** JP 系: 1 段 7 個。段ごとに 90 度まわして噛み合わせる */
+    /** JPI・JPK・JRD・JPD: 1 段 7 個。段ごとに 90 度まわして噛み合わせる */
     private fun jp7Slots(
         bwCm: Float, bdCm: Float, bhPx: Float, layers: Int,
         pw: Float, pd: Float, cm2px: Float,
@@ -475,7 +489,7 @@ object PalletLayout {
      * 箱を積む順番。返す配列は「[slots] の添字 → 何番目に積むか」。
      *
      * BACK_COLUMN（ポリカバー・鍋など）… 奥の列から。1 列を上まで積んでから手前の列へ。列のなかは中央 → 左 → 右
-     * LAYER（PDU・JP 系など）… 1 段ずつ仕上げる。段のなかは決まった順（seq）に従う
+     * LAYER（PDU・7 個積みなど）… 1 段ずつ仕上げる。段のなかは決まった順（seq）に従う
      */
     private fun stackOrder(slots: List<BoxSlot>, mode: StackMode): List<Int> {
         if (slots.isEmpty()) return emptyList()

@@ -33,15 +33,60 @@ class PalletLayoutTest {
     }
 
     @Test
-    fun `pdu and jpi are recognised`() {
+    fun `pdu and per-layer types are recognised`() {
         assertTrue(PalletLayout.isPduJarPot("PDU-A40A"))
         assertTrue(!PalletLayout.isPduJarPot("PDZ-A40A"))
-        // 頭に JP が付くものはすべて 1 段 7 個
-        assertTrue(PalletLayout.isJp7Type("JPI-H100"))
-        assertTrue(PalletLayout.isJp7Type("JPV-H100"))
-        assertTrue(PalletLayout.isJp7Type("JPK+G18C(T)"))
-        assertTrue(!PalletLayout.isJp7Type("JRI-G100(KKB)"))
-        assertTrue(!PalletLayout.isJp7Type("PDZ-A100"))
+        // 1 段 7 個: JPI・JPK・JRD・JPD
+        assertTrue(PalletLayout.is7PerLayerType("JPI-H100"))
+        assertTrue(PalletLayout.is7PerLayerType("JPK+G18C(T)"))
+        assertTrue(PalletLayout.is7PerLayerType("JRD-G100"))
+        assertTrue(PalletLayout.is7PerLayerType("JPD-G100"))
+        // 1 段 6 個: JRI・JPV
+        assertTrue(PalletLayout.is6PerLayerType("JRI-G100(KKB)"))
+        assertTrue(PalletLayout.is6PerLayerType("JPV-H100"))
+        // どちらでもない
+        assertTrue(!PalletLayout.is7PerLayerType("JPV-H100"))
+        assertTrue(!PalletLayout.is6PerLayerType("JPI-H100"))
+        assertTrue(!PalletLayout.is7PerLayerType("PDZ-A100"))
+        assertTrue(!PalletLayout.is6PerLayerType("PDZ-A100"))
+    }
+
+    @Test
+    fun `per-layer count follows the model prefix`() {
+        // 1 段 6 個の JPV: 6 個ちょうどで 1 段ぶんの高さに収まる
+        val jpv = PalletLayout.buildFractionStack(
+            cartons = 6, qtyPerPallet = 30,
+            itemType = ItemTypes.POLY_COVER, itemName = "JPV-G100-1",
+            measurements = "46*46*29.3",
+        )
+        assertEquals(6, jpv.slots.size)
+        assertEquals(1, jpv.slots.map { it.z }.distinct().size)
+
+        // 1 段 7 個の JPI: 7 個ちょうどで 1 段ぶん
+        val jpi = PalletLayout.buildFractionStack(
+            cartons = 7, qtyPerPallet = 35,
+            itemType = ItemTypes.POLY_COVER, itemName = "JPI-G100-1",
+            measurements = "46*46*29.3",
+        )
+        assertEquals(7, jpi.slots.size)
+        assertEquals(1, jpi.slots.map { it.z }.distinct().size)
+
+        // JRI も 1 段 6 個
+        val jri = PalletLayout.buildFractionStack(
+            cartons = 6, qtyPerPallet = 30,
+            itemType = ItemTypes.POLY_COVER, itemName = "JRI-G100(KKB)",
+            measurements = "46*46*29.3",
+        )
+        assertEquals(1, jri.slots.map { it.z }.distinct().size)
+
+        // JRD は 1 段 7 個
+        val jrd = PalletLayout.buildFractionStack(
+            cartons = 7, qtyPerPallet = 35,
+            itemType = ItemTypes.POLY_COVER, itemName = "JRD-G100",
+            measurements = "46*46*29.3",
+        )
+        assertEquals(7, jrd.slots.size)
+        assertEquals(1, jrd.slots.map { it.z }.distinct().size)
     }
 
     @Test
