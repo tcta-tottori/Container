@@ -4,7 +4,7 @@
  * 時刻だけだと、いつ更新されたものが入っているのか分からないため日付も出す。
  */
 
-export const APP_VERSION = '7.2';
+export const APP_VERSION = '7.3';
 
 /** ビルド日時（例: 2026.8.8 11:15）。ビルド時に next.config.mjs が埋め込む */
 export const APP_UPDATED = process.env.NEXT_PUBLIC_BUILD_TIME || '---';

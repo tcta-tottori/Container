@@ -8,7 +8,8 @@ import kotlinx.serialization.Serializable
  * MessageClient で [DataLayerContract.COMMAND_PATH] に JSON を送り、
  * スマホ側は WebView の CNS に渡して、画面上の操作と同じ処理を行う。
  *
- * @property type [SELECT_ITEM] / [DECREMENT_PALLET] / [INCREMENT_PALLET] / [CALL]
+ * @property type [SELECT_ITEM] / [DECREMENT_PALLET] / [INCREMENT_PALLET] /
+ *   [UNCOMPLETE_ITEM] / [CALL]
  * @property itemId 対象の品目 ID。ウォッチで選択中のもの
  * @property containerId 対象のコンテナ ID
  * @property issuedAt ウォッチで操作した時刻（epoch millis）。取りこぼしや重複の判定に使う
@@ -31,6 +32,9 @@ data class WatchCommand(
 
         /** パレットを 1 枚戻す（画面の 2 回タップと同じ） */
         const val INCREMENT_PALLET = "incrementPallet"
+
+        /** 完了にした品目を元に戻す */
+        const val UNCOMPLETE_ITEM = "uncompleteItem"
 
         /** スマホでコールを鳴らす。どのコールかは [arg] で指定する */
         const val CALL = "call"

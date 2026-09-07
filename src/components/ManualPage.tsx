@@ -539,13 +539,13 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     上に現在時刻、下に作業の経過時間が出ます。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#22c55e' }}>1回タップ</strong> … パレットを1枚減らす（スマホの PL タップと同じ）<br />
-                    <strong style={{ color: '#22c55e' }}>2回タップ</strong> … パレットを1枚戻す<br />
+                    <strong style={{ color: '#22c55e' }}>2回タップ</strong> … パレットを1枚減らす（スマホの PL タップと同じ）。
+                    うっかり触って減らないよう、1回タップでは何も起きません。<br />
                     <strong style={{ color: '#22c55e' }}>上下スワイプ</strong> … 品目を切り替える（端まで行くと反対の端へ回る）<br />
                     <strong style={{ color: '#22c55e' }}>画面のいちばん下から上へ払う</strong> … 一覧を開く<br />
-                    <strong style={{ color: '#22c55e' }}>リューズを時計回り</strong> … 一覧を開く<br />
                     <strong style={{ color: '#22c55e' }}>CT の枠をタップ</strong> … 端数パレットの積み方を出す<br />
-                    <strong style={{ color: '#22c55e' }}>長押し</strong> … コールの選択を出す（下の「ウォッチからコールする」参照）
+                    <strong style={{ color: '#22c55e' }}>長押し</strong> … 「パレットを戻す」とコールの選択を出す（下の「ウォッチからコールする」参照）<br />
+                    <strong style={{ color: '#22c55e' }}>リューズ</strong> … 部品表示では何も起きません（一覧でだけ使います）
                   </div>
                   <div>
                     作業画面のあいだは<strong style={{ color: '#fbbf24' }}>画面が消えません</strong>。
@@ -567,9 +567,15 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     数は <strong>PL / CT</strong> を出し、どちらも 0 のときだけ <strong>PCS</strong> を出します。
                   </div>
                   <div style={{ marginBottom: 8 }}>
+                    スマホの一覧と同じように、<strong style={{ color: '#a78bfa' }}>終わった品目はグレーになっていちばん下へ</strong>移ります。
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#a78bfa' }}>タップ</strong> … その品目に切り替える（スマホの表示も一緒に切り替わります）<br />
+                    <strong style={{ color: '#a78bfa' }}>終わった行を2回タップ</strong> … 「元に戻しますか」が出ます。
+                    チェックを押すと未完了に戻ります（画面のどこかを押すとやめられます）<br />
                     <strong style={{ color: '#a78bfa' }}>長押し</strong> … 気高コード・外寸・1パレットのケース数・残り・積み方を出す詳細画面<br />
-                    <strong style={{ color: '#a78bfa' }}>詳細画面で2回タップ</strong> … 一覧へ戻る
+                    <strong style={{ color: '#a78bfa' }}>詳細画面で2回タップ</strong> … 一覧へ戻る<br />
+                    <strong style={{ color: '#a78bfa' }}>リューズ</strong> … 一覧を上下に動かします
                   </div>
                   <div>
                     いちばん上／下まで行くと、その指ではそこで止まります。
@@ -602,8 +608,9 @@ export default function ManualPage({ onClose }: ManualPageProps) {
               <InfoCard>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', lineHeight: 1.8 }}>
                   <div style={{ marginBottom: 8 }}>
-                    部品表示を<strong style={{ color: '#fb923c' }}>長押し</strong>すると、コールの選択が出ます。
-                    選ぶと<strong style={{ color: '#fb923c' }}>スマホのスピーカーからコールが鳴ります</strong>
+                    部品表示を<strong style={{ color: '#fb923c' }}>長押し</strong>すると選択が出ます。
+                    いちばん上の<strong style={{ color: '#fb923c' }}>パレットを戻す</strong>で減らしすぎた分を戻せます。
+                    コールを選ぶと<strong style={{ color: '#fb923c' }}>スマホのスピーカーからコールが鳴ります</strong>
                     （ウォッチからは鳴りません）。
                   </div>
                   <div style={{ marginBottom: 8 }}>

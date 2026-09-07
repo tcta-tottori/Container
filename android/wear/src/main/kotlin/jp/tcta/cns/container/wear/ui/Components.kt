@@ -59,6 +59,9 @@ val HumidityBlue = Color(0xFF4FC3F7)
 /** 一覧の数字の色。品名（白）と見分けがつくようにする */
 val ListNumber = Color(0xFFFFE9B0)
 
+/** 荷降ろしが済んだ品目の色 */
+val DoneGray = Color(0xFF8A8A8E)
+
 /** 種類の色。元のコンテナアプリの accent と同じ値 */
 fun itemTypeAccent(itemType: String?): Color = Color(ItemTypes.colorOf(itemType).accent)
 

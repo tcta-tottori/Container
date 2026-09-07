@@ -63,6 +63,10 @@ class ContainerViewModel(application: Application) : AndroidViewModel(applicatio
     fun incrementPallet(containerId: String, itemId: String) =
         send(WatchCommand.INCREMENT_PALLET, containerId, itemId)
 
+    /** 完了にした品目を元に戻す */
+    fun uncompleteItem(containerId: String, itemId: String) =
+        send(WatchCommand.UNCOMPLETE_ITEM, containerId, itemId)
+
     /** スマホでコールを鳴らす。[which] は WatchCommand.CALL_* のどれか */
     fun call(containerId: String, itemId: String, which: String) =
         send(WatchCommand.CALL, containerId, itemId, which)

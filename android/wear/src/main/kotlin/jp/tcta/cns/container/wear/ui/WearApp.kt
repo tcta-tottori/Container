@@ -63,6 +63,7 @@ fun WearApp(
                     onDecrementPallet = { itemId -> viewModel.decrementPallet(container.id, itemId) },
                     onIncrementPallet = { itemId -> viewModel.incrementPallet(container.id, itemId) },
                     onCall = { itemId, which -> viewModel.call(container.id, itemId, which) },
+                    onUncomplete = { itemId -> viewModel.uncompleteItem(container.id, itemId) },
                 )
             }
         }

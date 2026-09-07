@@ -1088,6 +1088,11 @@ export default function Home() {
       }
       const idx = state.items.findIndex((it) => it.id === command.itemId);
       if (idx < 0) return;
+      // 完了を戻すのは、いま出している品目でなくてもそのまま効かせる
+      if (command.type === 'uncompleteItem') {
+        uncompleteItem(command.itemId);
+        return;
+      }
       if (command.type === 'selectItem') {
         handleSelectItem(idx);
         return;
@@ -1102,7 +1107,7 @@ export default function Home() {
     return () => setWatchCommandHandler(null);
   }, [
     state.items, state.currentItemIdx, handleSelectItem, handleDecrease, handleIncrease,
-    speakCheer, announceItem, currentItem,
+    speakCheer, announceItem, currentItem, uncompleteItem,
   ]);
 
   const switchView = useCallback((mode: ViewMode) => {

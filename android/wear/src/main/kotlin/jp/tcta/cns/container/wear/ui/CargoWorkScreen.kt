@@ -19,6 +19,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -82,13 +83,9 @@ import jp.tcta.cns.container.shared.PalletLayout
 import jp.tcta.cns.container.shared.WatchCommand
 import jp.tcta.cns.container.shared.DisplayFormat
 import jp.tcta.cns.container.wear.R
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-
-/** 1 回タップと 2 回タップを見分けるための待ち時間。CNS の usePalletTap と同じ */
-private const val DOUBLE_TAP_MS = 260L
 
 /** 縦スワイプで品目を切り替えるとみなす移動量 */
 private val ITEM_SWITCH_THRESHOLD = 44.dp
@@ -104,6 +101,12 @@ private val INDICATOR_INSET = 3.dp
 
 /** 弧が開く角度（度）。右の中央を挟んで上下に同じだけ */
 private const val INDICATOR_SWEEP_DEG = 62f
+
+/** 「元に戻しますか」でチェックを見せてから戻すまでの待ち */
+private const val UNDO_CHECK_MS = 260L
+
+/** 長押しの画面で「パレットを戻す」を表す目印 */
+private const val ACTION_INCREMENT = "__increment"
 
 /** 品目が切り替わるときに、いったん縮む大きさ */
 private const val ITEM_SWAP_MIN_SCALE = 0.72f
@@ -147,10 +150,16 @@ fun CargoWorkScreen(
     onDecrementPallet: (String) -> Unit,
     onIncrementPallet: (String) -> Unit,
     onCall: (String, String) -> Unit,
+    onUncomplete: (String) -> Unit,
 ) {
     val payload = state.payload
     val container = payload?.container(containerId)
     val items = payload?.cargoOf(containerId).orEmpty()
+
+    // 完了した品目は下にまとめる（スマホの一覧と同じ並び）
+    val orderedItems = remember(items) {
+        items.filter { !it.isDone() } + items.filter { it.isDone() }
+    }
 
     // CNS 側で「作業中」の品目を選択中として扱う。ウォッチで切り替えると CNS も追従する
     val syncedId = items.firstOrNull { it.status?.contains("中") == true }?.id
@@ -220,7 +229,6 @@ fun CargoWorkScreen(
             startedAt = container?.startedAt,
             pausedAt = container?.pausedAt,
             onDecrement = { onDecrementPallet(selected.id) },
-            onIncrement = { onIncrementPallet(selected.id) },
             onNextItem = { stepItem(1) },
             onPrevItem = { stepItem(-1) },
             onOpenList = { showList = true },
@@ -236,6 +244,10 @@ fun CargoWorkScreen(
             exit = fadeOut(),
         ) {
             CallMenu(
+                onIncrement = {
+                    showCalls = false
+                    onIncrementPallet(selected.id)
+                },
                 onPick = { which ->
                     showCalls = false
                     onCall(selected.id, which)
@@ -251,9 +263,10 @@ fun CargoWorkScreen(
             exit = slideOutVertically { it },
         ) {
             ItemListPage(
-                items = items,
+                items = orderedItems,
                 selectedId = selected.id,
                 onShowDetail = { detailItem = it },
+                onUncomplete = onUncomplete,
                 onClose = { showList = false },
                 onSelect = { id ->
                     pendingId = id
@@ -308,7 +321,6 @@ private fun ItemPage(
     startedAt: Long?,
     pausedAt: Long?,
     onDecrement: () -> Unit,
-    onIncrement: () -> Unit,
     onNextItem: () -> Unit,
     onPrevItem: () -> Unit,
     onOpenList: () -> Unit,
@@ -317,54 +329,25 @@ private fun ItemPage(
 ) {
     val accent = itemTypeAccent(item.itemType)
     val view = LocalView.current
-    val scope = rememberCoroutineScope()
-    // 1 回タップは 2 回目が来ないと確定しないので、少し待ってから減らす（CNS と同じ）
-    var pendingTap by remember { mutableStateOf<Job?>(null) }
     val density = LocalDensity.current
     val switchThresholdPx = with(density) { ITEM_SWITCH_THRESHOLD.toPx() }
     val bottomEdgePx = with(density) { BOTTOM_EDGE_HEIGHT.toPx() }
     var dragAmount by remember { mutableFloatStateOf(0f) }
     var fromBottomEdge by remember { mutableStateOf(false) }
 
-    // リューズを時計回りに回すと一覧へ。受け取るには焦点が要る
-    val rotaryFocus = remember { FocusRequester() }
-    LaunchedEffect(item.id) { runCatching { rotaryFocus.requestFocus() } }
-
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(ScreenBlack)
-            .onRotaryScrollEvent { event ->
-                if (event.verticalScrollPixels > 0f) {
-                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
-                    onOpenList()
-                    true
-                } else {
-                    false
-                }
-            }
-            .focusRequester(rotaryFocus)
-            .focusable()
             .pointerInput(item.id) {
                 detectTapGestures(
-                    onTap = {
-                        pendingTap?.cancel()
-                        pendingTap = scope.launch {
-                            delay(DOUBLE_TAP_MS)
-                            view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
-                            onDecrement()
-                        }
-                    },
+                    // うっかり触って減らないよう、減らすのは 2 回タップ
                     onDoubleTap = {
-                        pendingTap?.cancel()
-                        pendingTap = null
-                        view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                        onIncrement()
+                        view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                        onDecrement()
                     },
-                    // 長押しでコールの選択を出す
+                    // 長押しで、パレットを戻す／コールを選ぶ画面を出す
                     onLongPress = {
-                        pendingTap?.cancel()
-                        pendingTap = null
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
                         onOpenCalls()
                     },
@@ -738,10 +721,102 @@ private fun TypeBadge(
     }
 }
 
+/** 荷降ろしが済んだ品目か */
+private fun CargoItem.isDone(): Boolean = status?.contains("完了") == true
+
+/**
+ * 完了した品目を元に戻すか聞く画面。
+ * 「元に戻しますか」のチェックを入れると戻る。
+ */
+@Composable
+private fun UndoDialog(item: CargoItem, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.9f))
+            .pointerInput(item.id) { detectTapGestures(onTap = { onDismiss() }) },
+        contentAlignment = Alignment.Center,
+    ) {
+        val w = maxWidth
+        // チェックを入れたら、少し見せてから元に戻す
+        var checked by remember(item.id) { mutableStateOf(false) }
+        LaunchedEffect(checked) {
+            if (checked) {
+                delay(UNDO_CHECK_MS)
+                onConfirm()
+            }
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth(0.86f)
+                .pointerInput(item.id) { detectTapGestures { } },
+        ) {
+            MarqueeText(
+                text = item.modelName ?: item.name,
+                style = TextStyle(fontSize = (w.value * 0.052f).sp, fontWeight = FontWeight.Bold),
+                color = Color.White,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(10.dp))
+            // このチェックを入れると元に戻る
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.linearGradient(listOf(Color(0xFF2E3550), Color(0xFF1B2033))),
+                    )
+                    .border(1.5.dp, SelectedYellow.copy(alpha = 0.65f), RoundedCornerShape(24.dp))
+                    .pointerInput(item.id) { detectTapGestures(onTap = { checked = true }) }
+                    .padding(horizontal = 14.dp),
+            ) {
+                // チェック枠。押すとチェックが入って元に戻る
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(if (checked) SelectedYellow else Color.Transparent)
+                        .border(2.dp, SelectedYellow, RoundedCornerShape(5.dp)),
+                ) {
+                    if (checked) {
+                        Text(
+                            text = "✓",
+                            style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Black),
+                            color = Color.Black,
+                            maxLines = 1,
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = stringResource(R.string.undo_confirm),
+                    style = TextStyle(fontSize = (w.value * 0.046f).sp, fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                    maxLines = 1,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.undo_cancel),
+                style = TextStyle(fontSize = (w.value * 0.040f).sp),
+                color = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier
+                    .pointerInput(item.id) { detectTapGestures(onTap = { onDismiss() }) }
+                    .padding(8.dp),
+            )
+        }
+    }
+}
+
 /** 長押しで出すコールの選択。押すとスマホでコールが鳴る */
 @Composable
-private fun CallMenu(onPick: (String) -> Unit, onClose: () -> Unit) {
+private fun CallMenu(onIncrement: () -> Unit, onPick: (String) -> Unit, onClose: () -> Unit) {
     val calls = listOf(
+        ACTION_INCREMENT to stringResource(R.string.action_increment),
         WatchCommand.CALL_REQUEST to stringResource(R.string.call_request),
         WatchCommand.CALL_NAME to stringResource(R.string.call_name),
         WatchCommand.CALL_CHEER to stringResource(R.string.call_cheer),
@@ -780,7 +855,11 @@ private fun CallMenu(onPick: (String) -> Unit, onClose: () -> Unit) {
                             ),
                         )
                         .border(1.5.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(23.dp))
-                        .pointerInput(which) { detectTapGestures(onTap = { onPick(which) }) },
+                        .pointerInput(which) {
+                            detectTapGestures(
+                                onTap = { if (which == ACTION_INCREMENT) onIncrement() else onPick(which) },
+                            )
+                        },
                 ) {
                     Text(
                         text = label,
@@ -947,8 +1026,15 @@ private fun ItemListPage(
     onClose: () -> Unit,
     onSelect: (String) -> Unit,
     onShowDetail: (CargoItem) -> Unit,
+    onUncomplete: (String) -> Unit,
 ) {
     val listState = rememberScalingLazyListState()
+    val scope = rememberCoroutineScope()
+    // リューズで一覧を動かす。受け取るには焦点が要る
+    val rotaryFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { rotaryFocus.requestFocus() } }
+    // 完了を戻すか聞いている品目
+    var undoTarget by remember { mutableStateOf<CargoItem?>(null) }
     val selectedIndex = items.indexOfFirst { it.id == selectedId }
     LaunchedEffect(selectedId) {
         if (selectedIndex >= 0) runCatching { listState.animateScrollToItem(selectedIndex) }
@@ -1007,6 +1093,12 @@ private fun ItemListPage(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    scope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(rotaryFocus)
+                .focusable()
                 .nestedScroll(edgePull),
             contentPadding = PaddingValues(top = 34.dp, bottom = 34.dp, start = 12.dp, end = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -1016,12 +1108,24 @@ private fun ItemListPage(
                     item = item,
                     selected = item.id == selectedId,
                     barWidth = barWidth,
-                    onClick = { onSelect(item.id) },
+                    onClick = { if (!item.isDone()) onSelect(item.id) },
                     onLongClick = { onShowDetail(item) },
+                    // 完了した行は 2 回タップで「元に戻しますか」を出す
+                    onDoubleClick = { if (item.isDone()) undoTarget = item },
                 )
             }
         }
         EdgeScrim()
+        undoTarget?.let { target ->
+            UndoDialog(
+                item = target,
+                onConfirm = {
+                    undoTarget = null
+                    onUncomplete(target.id)
+                },
+                onDismiss = { undoTarget = null },
+            )
+        }
         ListScrollIndicator(
             index = listState.centerItemIndex,
             count = items.size,
@@ -1088,8 +1192,11 @@ private fun ItemBar(
     barWidth: Dp,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onDoubleClick: () -> Unit,
 ) {
-    val accent = itemTypeAccent(item.itemType)
+    val done = item.isDone()
+    // 完了した品目は色を落としてグレーにする
+    val accent = if (done) DoneGray else itemTypeAccent(item.itemType)
     // いま出している品目は黄色い枠を点滅させて分かるようにする
     val blink = rememberInfiniteTransition(label = "selectedBar")
     val blinkAlpha by blink.animateFloat(
@@ -1126,6 +1233,7 @@ private fun ItemBar(
             .pointerInput(item.id) {
                 detectTapGestures(
                     onTap = { onClick() },
+                    onDoubleTap = { onDoubleClick() },
                     onLongPress = { onLongClick() },
                 )
             }
@@ -1142,7 +1250,7 @@ private fun ItemBar(
                     fontSize = (barWidth.value * 0.085f).sp,
                     fontWeight = FontWeight.Bold,
                 ),
-                color = Color.White,
+                color = if (done) Color.White.copy(alpha = 0.45f) else Color.White,
                 textAlign = TextAlign.Start,
                 modifier = Modifier.weight(3f),
             )
@@ -1153,11 +1261,11 @@ private fun ItemBar(
                 horizontalArrangement = Arrangement.spacedBy(barWidth * 0.022f, Alignment.End),
                 modifier = Modifier.weight(2f),
             ) {
-                if (item.palletCount > 0) BarValue(item.palletCount, "PL", barWidth)
-                if (item.cartonCount > 0) BarValue(item.cartonCount, "CT", barWidth)
+                if (item.palletCount > 0) BarValue(item.palletCount, "PL", barWidth, done)
+                if (item.cartonCount > 0) BarValue(item.cartonCount, "CT", barWidth, done)
                 // PL も CT も 0 のときだけ、代わりに PCS を出す
                 if (item.palletCount <= 0 && item.cartonCount <= 0) {
-                    BarValue(item.quantity, "PCS", barWidth)
+                    BarValue(item.quantity, "PCS", barWidth, done)
                 }
             }
         }
@@ -1169,7 +1277,9 @@ private fun ItemBar(
  * 品名（白・標準の書体）と見分けがつくよう、数字は色も書体も変えている。
  */
 @Composable
-private fun BarValue(value: Int, unit: String, barWidth: Dp) {
+private fun BarValue(value: Int, unit: String, barWidth: Dp, done: Boolean = false) {
+    // 完了した行は数字も落として、まだの品目と見分けがつくようにする
+    val numberColor = if (done) Color.White.copy(alpha = 0.4f) else ListNumber
     Row(verticalAlignment = Alignment.Bottom) {
         Text(
             text = DisplayFormat.quantity(value.coerceAtLeast(0)),
@@ -1180,7 +1290,7 @@ private fun BarValue(value: Int, unit: String, barWidth: Dp) {
                 fontFamily = FontFamily.SansSerif,
                 letterSpacing = 0.2.sp,
             ),
-            color = ListNumber,
+            color = numberColor,
             maxLines = 1,
         )
         Text(
@@ -1190,7 +1300,7 @@ private fun BarValue(value: Int, unit: String, barWidth: Dp) {
                 fontWeight = FontWeight.Normal,
                 fontFamily = FontFamily.SansSerif,
             ),
-            color = ListNumber.copy(alpha = 0.62f),
+            color = numberColor.copy(alpha = 0.62f),
             maxLines = 1,
             modifier = Modifier.padding(bottom = barWidth * 0.008f),
         )
