@@ -102,6 +102,9 @@ private val INDICATOR_INSET = 3.dp
 /** 弧が開く角度（度）。右の中央を挟んで上下に同じだけ */
 private const val INDICATOR_SWEEP_DEG = 62f
 
+/** 「元に戻しますか」でチェックを見せてから戻すまでの待ち */
+private const val UNDO_CHECK_MS = 260L
+
 /** 長押しの画面で「パレットを戻す」を表す目印 */
 private const val ACTION_INCREMENT = "__increment"
 
@@ -735,6 +738,14 @@ private fun UndoDialog(item: CargoItem, onConfirm: () -> Unit, onDismiss: () -> 
         contentAlignment = Alignment.Center,
     ) {
         val w = maxWidth
+        // チェックを入れたら、少し見せてから元に戻す
+        var checked by remember(item.id) { mutableStateOf(false) }
+        LaunchedEffect(checked) {
+            if (checked) {
+                delay(UNDO_CHECK_MS)
+                onConfirm()
+            }
+        }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -759,17 +770,27 @@ private fun UndoDialog(item: CargoItem, onConfirm: () -> Unit, onDismiss: () -> 
                         Brush.linearGradient(listOf(Color(0xFF2E3550), Color(0xFF1B2033))),
                     )
                     .border(1.5.dp, SelectedYellow.copy(alpha = 0.65f), RoundedCornerShape(24.dp))
-                    .pointerInput(item.id) { detectTapGestures(onTap = { onConfirm() }) }
+                    .pointerInput(item.id) { detectTapGestures(onTap = { checked = true }) }
                     .padding(horizontal = 14.dp),
             ) {
-                // 空のチェック枠。押すとチェックが入って元に戻る
+                // チェック枠。押すとチェックが入って元に戻る
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .size(20.dp)
                         .clip(RoundedCornerShape(5.dp))
+                        .background(if (checked) SelectedYellow else Color.Transparent)
                         .border(2.dp, SelectedYellow, RoundedCornerShape(5.dp)),
-                )
+                ) {
+                    if (checked) {
+                        Text(
+                            text = "✓",
+                            style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.Black),
+                            color = Color.Black,
+                            maxLines = 1,
+                        )
+                    }
+                }
                 Spacer(Modifier.width(10.dp))
                 Text(
                     text = stringResource(R.string.undo_confirm),
