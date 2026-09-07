@@ -258,7 +258,8 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     列のなかは 中央 → 左 → 右 の順です。
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <strong style={{ color: '#38bdf8' }}>頭に JP が付く機種</strong>（JPI・JPV・JPK など）: <strong style={{ color: '#fbbf24' }}>1段7個</strong>で、段ごとに90度まわして噛み合わせます。
+                    <strong style={{ color: '#38bdf8' }}>JPI・JPK・JRD・JPD</strong>: <strong style={{ color: '#fbbf24' }}>1段7個</strong>で、段ごとに90度まわして噛み合わせます。<br />
+                    <strong style={{ color: '#38bdf8' }}>JRI・JPV</strong>: <strong style={{ color: '#fbbf24' }}>1段6個</strong>（3列×2行）で積みます。
                   </div>
                   <div>
                     <strong style={{ color: '#c084fc' }}>PDU の段ボール</strong>: 1段ずつ仕上げます。
@@ -676,7 +677,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   </div>
                   {[
                     { icon: '🔢', title: 'サイズ分類', desc: '100サイズ（緑）と180サイズ（青）で自動分類。バッジ・分布バー・リスト全てにサイズ表示。' },
-                    { icon: '📦', title: '1段6個統一', desc: 'JP 系含む全種目で1段6個の積み方。3列×2行のグリッド配置。' },
+                    { icon: '📦', title: '1段6個統一', desc: '鍋は機種を問わず、すべて1段6個の積み方。3列×2行のグリッド配置。' },
                     { icon: '🔍', title: '検査なし', desc: '鍋は検査を抜かない（端数＝元の端数のまま）。' },
                     { icon: '📋', title: 'リスト順', desc: '①100サイズ→②180サイズ→③機種名アルファベット順で自動ソート。' },
                     { icon: '🔗', title: '関連品', desc: '類似品表示なし。同じサイズの品目を「関連」として表示。' },
