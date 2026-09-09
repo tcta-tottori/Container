@@ -59,6 +59,15 @@ data class WatchCommand(
 
         /** せせらぎモード（川の映像）を開く */
         const val CALL_RIVER = "river"
+
+        /**
+         * 人物出現。誰を出すかを続けて書く（例: "person:yamamoto"）。
+         * 名前と写真はスマホ側（src/lib/people.ts）が持っている。
+         */
+        const val CALL_PERSON_PREFIX = "person:"
+
+        /** 人物出現の合図を作る */
+        fun personCall(personId: String): String = CALL_PERSON_PREFIX + personId
     }
 }
 

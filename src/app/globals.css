@@ -1481,3 +1481,84 @@ body {
 body.load3d-open > *:not(.load3d-layer) * {
   animation-play-state: paused !important;
 }
+
+/* ===== 人物出現 ===== */
+/*
+ * 一覧のところに、選んだ人がゆっくり現れて、ゆっくり消える。
+ * 縦向きは画面の下半分（一覧）、横向きは一覧が出ている右半分。
+ * ヘッダー（z-index 60）より下に置いて、時計や気温は隠さない。
+ */
+.person-appear {
+  position: fixed;
+  top: 50%; left: 0; right: 0; bottom: 0;
+  z-index: 55;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+  will-change: opacity, transform;
+}
+@media (orientation: landscape) {
+  .person-appear { top: 0; left: 50%; }
+}
+/* 人のうしろにうっすら光を置いて、暗がりから浮かび上がって見えるようにする */
+.person-appear::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 56% 56% at 50% 44%, rgba(255,255,255,0.07), transparent 72%);
+}
+.person-appear-photo {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain;
+  /* 四角い写真に見えないよう、まわりを透かして地に溶かす */
+  -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 44%, #000 52%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 62% at 50% 44%, #000 52%, transparent 100%);
+  pointer-events: none;
+}
+.person-appear-name {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  text-align: center; pointer-events: none;
+  font-size: 14px; font-weight: 800; letter-spacing: 3px;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95);
+}
+
+/* 現れる: すっと寄りながら浮かび上がる */
+@keyframes personIn {
+  from { opacity: 0; transform: scale(1.07) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+/* 消える: すこし引きながら溶けていく */
+@keyframes personOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(1.04) translateY(-6px); }
+}
+.person-appear-in { animation: personIn var(--person-in-ms) ease-out both; }
+.person-appear-out { animation: personOut var(--person-out-ms) ease-in both; }
+.person-appear-dismiss { animation: personOut var(--person-dismiss-ms) ease-in both; }
+
+/* 動きを減らす設定のときは、ふわっと出入りするだけにする */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes personIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes personOut { from { opacity: 1; } to { opacity: 0; } }
+}
+
+/* 人物出現の名前選び（右下メニューの中） */
+.quick-person-list { display: flex; gap: 8px; }
+.quick-person {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 6px; border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.85); cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-person:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.quick-person:active { transform: scale(0.98); }
+.quick-person img {
+  width: 46px; height: 46px; border-radius: 50%; object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+.quick-person span { font-size: 12px; font-weight: 700; }

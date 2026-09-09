@@ -123,6 +123,16 @@ private const val UNDO_CHECK_MS = 260L
 /** 長押しの画面で「パレットを戻す」を表す目印 */
 private const val ACTION_INCREMENT = "__increment"
 
+/** 長押しの画面で「人物出現」を表す目印。押すと誰を出すか選ぶ画面になる */
+private const val ACTION_PERSON = "__person"
+
+/** 出せる人。ID はスマホ側（src/lib/people.ts）と合わせてある */
+private val PEOPLE = listOf(
+    "yamamoto" to R.string.person_yamamoto,
+    "kotani" to R.string.person_kotani,
+    "nagamura" to R.string.person_nagamura,
+)
+
 /** 品目が切り替わるときに、いったん縮む大きさ */
 private const val ITEM_SWAP_MIN_SCALE = 0.72f
 
@@ -227,6 +237,8 @@ fun CargoWorkScreen(
     var detailItem by remember(containerId) { mutableStateOf<CargoItem?>(null) }
     // 長押しで出すコールの選択
     var showCalls by remember(containerId) { mutableStateOf(false) }
+    // 「人物出現」で、誰を出すかを選んでいるあいだ
+    var showPeople by remember(containerId) { mutableStateOf(false) }
 
     // 残りが端数パレットだけになった瞬間に、積み方を自動で出す（スマホ版と同じ）。
     // 1 品目につき 1 回だけ。何も触らなければ 5 秒で自動的に閉じる
@@ -272,7 +284,7 @@ fun CargoWorkScreen(
             startedAt = container?.startedAt,
             pausedAt = container?.pausedAt,
             // 何かをかぶせているあいだは、リューズの操作を向こうに任せる
-            active = !showList && !showPallet && !showCalls && detailItem == null,
+            active = !showList && !showPallet && !showCalls && !showPeople && detailItem == null,
             onDecrement = { onDecrementPallet(selected.id) },
             onNextItem = { stepItem(1) },
             onPrevItem = { stepItem(-1) },
@@ -294,11 +306,31 @@ fun CargoWorkScreen(
                     showCalls = false
                     onIncrementPallet(selected.id)
                 },
+                onPerson = {
+                    showCalls = false
+                    showPeople = true
+                },
                 onPick = { which ->
                     showCalls = false
                     onCall(selected.id, which)
                 },
                 onClose = { showCalls = false },
+            )
+        }
+
+        // 「人物出現」で誰を出すかを選ぶ
+        AnimatedVisibility(
+            visible = showPeople,
+            modifier = Modifier.fillMaxSize(),
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            PersonMenu(
+                onPick = { personId ->
+                    showPeople = false
+                    onCall(selected.id, WatchCommand.personCall(personId))
+                },
+                onClose = { showPeople = false },
             )
         }
 
@@ -1341,7 +1373,12 @@ private fun UndoDialog(item: CargoItem, onConfirm: () -> Unit, onDismiss: () -> 
  * 天気・水の音・せせらぎモードも、スマホのボタンを押したのと同じ動きになる。
  */
 @Composable
-private fun CallMenu(onIncrement: () -> Unit, onPick: (String) -> Unit, onClose: () -> Unit) {
+private fun CallMenu(
+    onIncrement: () -> Unit,
+    onPerson: () -> Unit,
+    onPick: (String) -> Unit,
+    onClose: () -> Unit,
+) {
     val calls = listOf(
         ACTION_INCREMENT to stringResource(R.string.action_increment),
         WatchCommand.CALL_REQUEST to stringResource(R.string.call_request),
@@ -1351,6 +1388,7 @@ private fun CallMenu(onIncrement: () -> Unit, onPick: (String) -> Unit, onClose:
         WatchCommand.CALL_WEATHER to stringResource(R.string.call_weather),
         WatchCommand.CALL_WATER to stringResource(R.string.call_water),
         WatchCommand.CALL_RIVER to stringResource(R.string.call_river),
+        ACTION_PERSON to stringResource(R.string.call_person),
     )
     BoxWithConstraints(
         modifier = Modifier
@@ -1387,12 +1425,74 @@ private fun CallMenu(onIncrement: () -> Unit, onPick: (String) -> Unit, onClose:
                         .border(1.5.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(23.dp))
                         .pointerInput(which) {
                             detectTapGestures(
-                                onTap = { if (which == ACTION_INCREMENT) onIncrement() else onPick(which) },
+                                onTap = {
+                                    when (which) {
+                                        ACTION_INCREMENT -> onIncrement()
+                                        ACTION_PERSON -> onPerson()
+                                        else -> onPick(which)
+                                    }
+                                },
                             )
                         },
                 ) {
                     Text(
                         text = label,
+                        style = TextStyle(fontSize = (w.value * 0.050f).sp, fontWeight = FontWeight.Bold),
+                        color = Color.White,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        EdgeScrim()
+    }
+}
+
+/**
+ * 「人物出現」で、誰を出すかを選ぶ画面。
+ * 押すとスマホの一覧のところに、その人が 10 秒だけ出る。
+ */
+@Composable
+private fun PersonMenu(onPick: (String) -> Unit, onClose: () -> Unit) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.88f))
+            .pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
+    ) {
+        val w = maxWidth
+        ScalingLazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 28.dp, bottom = 28.dp, start = 12.dp, end = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            item {
+                Text(
+                    text = stringResource(R.string.person_title),
+                    style = TextStyle(fontSize = (w.value * 0.044f).sp, fontWeight = FontWeight.Bold),
+                    color = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+            items(PEOPLE) { (personId, labelRes) ->
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .height(46.dp)
+                        .clip(RoundedCornerShape(23.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF3A2E50), Color(0xFF221B33)),
+                            ),
+                        )
+                        .border(1.5.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(23.dp))
+                        .pointerInput(personId) {
+                            detectTapGestures(onTap = { onPick(personId) })
+                        },
+                ) {
+                    Text(
+                        text = stringResource(labelRes),
                         style = TextStyle(fontSize = (w.value * 0.050f).sp, fontWeight = FontWeight.Bold),
                         color = Color.White,
                         maxLines = 1,

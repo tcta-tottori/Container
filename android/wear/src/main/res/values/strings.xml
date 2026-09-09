@@ -25,6 +25,13 @@
     <string name="call_weather">天気コール</string>
     <string name="call_water">水の音</string>
     <string name="call_river">せせらぎモード</string>
+    <string name="call_person">人物出現</string>
+
+    <!-- 人物出現。ID はスマホの src/lib/people.ts と合わせる -->
+    <string name="person_title">誰を出す？</string>
+    <string name="person_yamamoto">山本将</string>
+    <string name="person_kotani">小谷</string>
+    <string name="person_nagamura">長村</string>
     <string name="action_increment">パレットを戻す</string>
 
     <!-- 完了を元に戻す -->

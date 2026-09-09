@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Container } from '@/lib/types';
 import { SwitchBotReading, SwitchBotStatus } from '@/lib/switchbot';
 import { MegaphoneIcon, WeatherIcon, DropletIcon, CloseIcon, SettingsIcon, RiverIcon, HandIcon } from '@/components/AppIcons';
+import { PEOPLE } from '@/lib/people';
 
 interface QuickActionsProps {
   /** コンテナ選択（読込済みのときだけ表示） */
@@ -29,6 +30,8 @@ interface QuickActionsProps {
   onOpenSwitchBot: () => void;
   /** せせらぎモード（川の映像）を開く */
   onOpenRiver: () => void;
+  /** 人物出現。選んだ人が一覧のところに 10 秒だけ出る */
+  onShowPerson?: (id: string) => void;
   /** 左メニューなど別の画面が開いている間は隠す */
   hidden?: boolean;
 }
@@ -100,7 +103,7 @@ export default function QuickActions({
   containers, selectedIdx, onSelectContainer,
   onCheer, onWeather, onRequestCall, onNameCall,
   waterPlaying, onWater, onWaterSettings,
-  switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, hidden,
+  switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, onShowPerson, hidden,
 }: QuickActionsProps) {
   const [open, setOpen] = useState(false);
   const [sbInfoOpen, setSbInfoOpen] = useState(false);
@@ -234,6 +237,26 @@ export default function QuickActions({
               sub="川の映像に品目情報が流れます"
               onClick={() => { onOpenRiver(); setOpen(false); }}
             />
+
+            {/* 人物出現。名前を選ぶと、一覧のところにその人が 10 秒だけ出る */}
+            {onShowPerson && (
+              <>
+                <div className="quick-heading">人物出現</div>
+                <div className="quick-person-list">
+                  {PEOPLE.map((p) => (
+                    <button
+                      key={p.id}
+                      className="quick-person"
+                      onClick={() => { onShowPerson(p.id); setOpen(false); }}
+                      title={`${p.name} を出す`}
+                    >
+                      <img src={p.image} alt="" draggable={false} />
+                      <span>{p.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
 
             <Row
               icon={<SwitchBotMark size={22} />}

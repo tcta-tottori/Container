@@ -32,6 +32,8 @@ import { getWaterSoundEngine, setupWaterAutoResume } from '@/lib/waterSound';
 import { useWaterSound } from '@/hooks/useWaterSound';
 import WeatherPopup from '@/components/WeatherPopup';
 import QuickActions from '@/components/QuickActions';
+import PersonAppearance from '@/components/PersonAppearance';
+import { Person, PERSON_CALL_PREFIX, findPerson } from '@/lib/people';
 import RiverMode from '@/components/RiverMode';
 import MistVideo from '@/components/MistVideo';
 import { MIST_PEAK, MIST_CLEAR_MS } from '@/lib/mistVideo';
@@ -264,6 +266,8 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   // せせらぎモード（川の映像）
   const [riverOpen, setRiverOpen] = useState(false);
+  /** 一覧のところに出している人。出していないときは null */
+  const [person, setPerson] = useState<Person | null>(null);
   /** せせらぎモードから戻ったあと、元の画面の上で晴れていく靄 */
   const [riverTail, setRiverTail] = useState(false);
   /** せせらぎモードに入るとき、こちらで水の音BGMを止めたか（戻すときの目印） */
@@ -1248,6 +1252,15 @@ export default function Home() {
     riverPausedWaterRef.current = false;
   }, [waterPlaying, toggleWater]);
 
+  /**
+   * 人物出現。一覧のところに、選んだ人を 10 秒だけ出す。
+   * 出ている間にもう一度選ばれたら、その人に差し替えて数え直す。
+   */
+  const showPerson = useCallback((id: string) => {
+    const found = findPerson(id);
+    if (found) setPerson(found);
+  }, []);
+
   // 残した靄は晴れきったら片付ける
   useEffect(() => {
     if (!riverTail) return;
@@ -1273,6 +1286,7 @@ export default function Home() {
         else if (command.arg === 'weather') handleWeatherCall();
         else if (command.arg === 'water') toggleWater();
         else if (command.arg === 'river') openRiver();
+        else if (command.arg?.startsWith(PERSON_CALL_PREFIX)) showPerson(command.arg.slice(PERSON_CALL_PREFIX.length));
         else speakCheer(REQUEST_CALL_TEXT);
         return;
       }
@@ -1298,7 +1312,7 @@ export default function Home() {
   }, [
     state.items, state.currentItemIdx, handleSelectItem, handleDecrease, handleIncrease,
     speakCheer, announceItem, currentItem, uncompleteItem,
-    handleWeatherCall, toggleWater, openRiver,
+    handleWeatherCall, toggleWater, openRiver, showPerson,
   ]);
 
 
@@ -1431,6 +1445,10 @@ export default function Home() {
       {weatherPopup && (
         <WeatherPopup weather={weatherPopup} onClose={closeWeatherPopup} isSpeaking={isSpeaking} />
       )}
+      {/* 人物出現（一覧のところ）。10 秒で消える。ダブルタップでも消える */}
+      {person && !riverOpen && (
+        <PersonAppearance person={person} onDone={() => setPerson(null)} />
+      )}
       {historyOpen && (
         <HistoryModal
           onClose={() => setHistoryOpen(false)}
@@ -1562,6 +1580,7 @@ export default function Home() {
           onToggleSwitchBot={toggleSwitchBot}
           onOpenSwitchBot={() => setSbPopupOpen(true)}
           onOpenRiver={openRiver}
+          onShowPerson={showPerson}
           hidden={menuOpen || manualOpen || settingsTab !== null || historyOpen || riverOpen}
         />
 
