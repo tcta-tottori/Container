@@ -22,6 +22,9 @@
     <string name="call_name">長谷川さん！</string>
     <string name="call_cheer">応援コール</string>
     <string name="call_item">いまの品目を読み上げ</string>
+    <string name="call_weather">天気コール</string>
+    <string name="call_water">水の音</string>
+    <string name="call_river">せせらぎモード</string>
     <string name="action_increment">パレットを戻す</string>
 
     <!-- 完了を元に戻す -->

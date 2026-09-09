@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -114,7 +115,7 @@ private val INDICATOR_STROKE = 4.dp
 private val INDICATOR_INSET = 3.dp
 
 /** 弧が開く角度（度）。右の中央を挟んで上下に同じだけ */
-private const val INDICATOR_SWEEP_DEG = 62f
+private const val INDICATOR_SWEEP_DEG = 42f
 
 /** 「元に戻しますか」でチェックを見せてから戻すまでの待ち */
 private const val UNDO_CHECK_MS = 260L
@@ -137,6 +138,22 @@ private val BOTTOM_EDGE_HEIGHT = 64.dp
 /** 一覧の端からさらに払って部品表示へ戻るとみなす移動量 */
 private val LIST_DISMISS_THRESHOLD = 56.dp
 
+/**
+ * 部品表示でリューズを時計回りに回して一覧を開くまでの量。
+ * ひと目盛りがおよそ 64dp ぶんなので、3 目盛りほど回すことになる。
+ */
+private val ROTARY_OPEN_THRESHOLD = 190.dp
+
+/** リューズの回した量を数え直すまでの、手を止めていられる時間（ミリ秒） */
+private const val ROTARY_RESET_MS = 700L
+
+/**
+ * 部品表示の長押しで、コールの選択を出す上側の帯。画面の高さに対する割合。
+ * ここには 現在時刻・気温・湿度・種類バッジ が並んでいる。
+ * それより下（機種名・PL・CT・PCS）を長押しすると、その品目の詳細が出る。
+ */
+private const val CALL_ZONE_RATIO = 0.36f
+
 /** リングの開始角（3 時から時計回り）。下の 60 度は経過時間のために空ける */
 private const val RING_START_ANGLE = 120f
 
@@ -153,6 +170,9 @@ private const val RING_SWEEP = 300f
  * - 2 回タップ … パレットを 1 枚戻す
  * - 縦スワイプ … 品目を切り替える（上へ払うと次、下へ払うと前。端まで行くと反対の端へ回る）
  * - 画面のいちばん下から上へ払う … 一覧を開く
+ * - リューズを時計回りに多めに回す … 一覧を開く
+ * - 上のほう（時刻・気温・種類バッジ）を長押し … コールの選択を出す
+ * - それより下（機種名・PL・CT・PCS）を長押し … その品目の詳細を出す
  *
  * 一覧は、いちばん上からさらに下へ、またはいちばん下からさらに上へ払うと部品表示へ戻る。
  */
@@ -251,12 +271,15 @@ fun CargoWorkScreen(
             environment = payload?.environment,
             startedAt = container?.startedAt,
             pausedAt = container?.pausedAt,
+            // 何かをかぶせているあいだは、リューズの操作を向こうに任せる
+            active = !showList && !showPallet && !showCalls && detailItem == null,
             onDecrement = { onDecrementPallet(selected.id) },
             onNextItem = { stepItem(1) },
             onPrevItem = { stepItem(-1) },
             onOpenList = { showList = true },
             onOpenPallet = { showPallet = true },
             onOpenCalls = { showCalls = true },
+            onOpenDetail = { detailItem = selected },
         )
 
         // 長押しで出すコールの選択
@@ -335,6 +358,8 @@ fun CargoWorkScreen(
  * 外周に残り割合のリング（種類の色。未達は灰色）、その内側は種類の色を暗く落とした地。
  * 中身は上から 種類バッジ / 機種名 / PL・CT / PCS。上に現在時刻、下に経過時間。
  * 大きさは画面の幅を基準に決めているので、時計の大きさが変わっても見え方が揃う。
+ *
+ * @param active 何もかぶさっていないか。リューズの操作を受け取るのに使う
  */
 @Composable
 private fun ItemPage(
@@ -343,25 +368,55 @@ private fun ItemPage(
     environment: Environment?,
     startedAt: Long?,
     pausedAt: Long?,
+    active: Boolean,
     onDecrement: () -> Unit,
     onNextItem: () -> Unit,
     onPrevItem: () -> Unit,
     onOpenList: () -> Unit,
     onOpenPallet: () -> Unit,
     onOpenCalls: () -> Unit,
+    onOpenDetail: () -> Unit,
 ) {
     val accent = itemTypeAccent(item.itemType)
     val view = LocalView.current
     val density = LocalDensity.current
     val switchThresholdPx = with(density) { ITEM_SWITCH_THRESHOLD.toPx() }
     val bottomEdgePx = with(density) { BOTTOM_EDGE_HEIGHT.toPx() }
+    val rotaryOpenPx = with(density) { ROTARY_OPEN_THRESHOLD.toPx() }
     var dragAmount by remember { mutableFloatStateOf(0f) }
     var fromBottomEdge by remember { mutableStateOf(false) }
+
+    // リューズを時計回りに回した量。逆に回すか、手を止めると数え直す
+    var rotaryAmount by remember { mutableFloatStateOf(0f) }
+    var rotaryAt by remember { mutableLongStateOf(0L) }
+    // リューズを受け取るには焦点が要る。何かを閉じて戻ってきたら取り直す
+    val rotaryFocus = remember { FocusRequester() }
+    LaunchedEffect(active) {
+        if (active) runCatching { rotaryFocus.requestFocus() }
+    }
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(ScreenBlack)
+            .onRotaryScrollEvent { event ->
+                // 何かをかぶせているあいだは、下の画面が受け取らないようにする
+                if (!active) return@onRotaryScrollEvent false
+                val now = System.currentTimeMillis()
+                // しばらく手が止まっていたら、はじめから数え直す
+                if (now - rotaryAt > ROTARY_RESET_MS) rotaryAmount = 0f
+                rotaryAt = now
+                // 反時計回り（戻す向き）は数えない
+                rotaryAmount = if (event.verticalScrollPixels < 0f) 0f else rotaryAmount + event.verticalScrollPixels
+                if (rotaryAmount >= rotaryOpenPx) {
+                    rotaryAmount = 0f
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+                    onOpenList()
+                }
+                true
+            }
+            .focusRequester(rotaryFocus)
+            .focusable()
             .pointerInput(item.id) {
                 detectTapGestures(
                     // うっかり触って減らないよう、減らすのは 2 回タップ
@@ -369,10 +424,11 @@ private fun ItemPage(
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
                         onDecrement()
                     },
-                    // 長押しで、パレットを戻す／コールを選ぶ画面を出す
-                    onLongPress = {
+                    // 長押し。上のほう（時刻・気温・種類バッジ）はコール、
+                    // それより下（機種名・PL・CT・PCS）はその品目の詳細
+                    onLongPress = { offset ->
                         view.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
-                        onOpenCalls()
+                        if (offset.y < size.height * CALL_ZONE_RATIO) onOpenCalls() else onOpenDetail()
                     },
                 )
             }
@@ -1280,7 +1336,10 @@ private fun UndoDialog(item: CargoItem, onConfirm: () -> Unit, onDismiss: () -> 
     }
 }
 
-/** 長押しで出すコールの選択。押すとスマホでコールが鳴る */
+/**
+ * 長押しで出すコールの選択。押すとスマホが鳴らす（スマホのメニューと同じ並び）。
+ * 天気・水の音・せせらぎモードも、スマホのボタンを押したのと同じ動きになる。
+ */
 @Composable
 private fun CallMenu(onIncrement: () -> Unit, onPick: (String) -> Unit, onClose: () -> Unit) {
     val calls = listOf(
@@ -1289,6 +1348,9 @@ private fun CallMenu(onIncrement: () -> Unit, onPick: (String) -> Unit, onClose:
         WatchCommand.CALL_NAME to stringResource(R.string.call_name),
         WatchCommand.CALL_CHEER to stringResource(R.string.call_cheer),
         WatchCommand.CALL_ITEM to stringResource(R.string.call_item),
+        WatchCommand.CALL_WEATHER to stringResource(R.string.call_weather),
+        WatchCommand.CALL_WATER to stringResource(R.string.call_water),
+        WatchCommand.CALL_RIVER to stringResource(R.string.call_river),
     )
     BoxWithConstraints(
         modifier = Modifier

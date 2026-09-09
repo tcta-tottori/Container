@@ -1071,45 +1071,6 @@ export default function Home() {
     [selectItem]
   );
 
-  /*
-   * Pixel Watch からの操作を受け取る（Android アプリで開いているときだけ）。
-   * 画面のタップと同じ処理を通すので、コールも表示も CNS の操作と揃う。
-   * 対象の品目がいまの品目と違うときは、まず切り替えるだけにして誤操作を防ぐ。
-   */
-  useEffect(() => {
-    setWatchCommandHandler((command) => {
-      // コールはどの品目でも鳴らせる（品目の指定は要らない）
-      if (command.type === 'call') {
-        if (command.arg === 'name') speakCheer(NAME_CALL_TEXT);
-        else if (command.arg === 'cheer') speakCheer(getRandomCallPhrase());
-        else if (command.arg === 'item') { if (currentItem) announceItem(currentItem, state.items); }
-        else speakCheer(REQUEST_CALL_TEXT);
-        return;
-      }
-      const idx = state.items.findIndex((it) => it.id === command.itemId);
-      if (idx < 0) return;
-      // 完了を戻すのは、いま出している品目でなくてもそのまま効かせる
-      if (command.type === 'uncompleteItem') {
-        uncompleteItem(command.itemId);
-        return;
-      }
-      if (command.type === 'selectItem') {
-        handleSelectItem(idx);
-        return;
-      }
-      if (idx !== state.currentItemIdx) {
-        handleSelectItem(idx);
-        return;
-      }
-      if (command.type === 'decrementPallet') handleDecrease();
-      else if (command.type === 'incrementPallet') handleIncrease();
-    });
-    return () => setWatchCommandHandler(null);
-  }, [
-    state.items, state.currentItemIdx, handleSelectItem, handleDecrease, handleIncrease,
-    speakCheer, announceItem, currentItem, uncompleteItem,
-  ]);
-
   const switchView = useCallback((mode: ViewMode) => {
     setViewMode(mode);
     setMenuOpen(false);
@@ -1293,6 +1254,53 @@ export default function Home() {
     const t = setTimeout(() => setRiverTail(false), RIVER_TAIL_MS);
     return () => clearTimeout(t);
   }, [riverTail]);
+
+  /*
+   * Pixel Watch からの操作を受け取る（Android アプリで開いているときだけ）。
+   * 画面のタップと同じ処理を通すので、コールも表示も CNS の操作と揃う。
+   * 対象の品目がいまの品目と違うときは、まず切り替えるだけにして誤操作を防ぐ。
+   *
+   * 天気・水の音・せせらぎモードは、スマホのメニューのボタンを押したのと同じ。
+   * せせらぎモードと水の音を使うので、その処理を作ったあとに置いてある。
+   */
+  useEffect(() => {
+    setWatchCommandHandler((command) => {
+      // コールはどの品目でも鳴らせる（品目の指定は要らない）
+      if (command.type === 'call') {
+        if (command.arg === 'name') speakCheer(NAME_CALL_TEXT);
+        else if (command.arg === 'cheer') speakCheer(getRandomCallPhrase());
+        else if (command.arg === 'item') { if (currentItem) announceItem(currentItem, state.items); }
+        else if (command.arg === 'weather') handleWeatherCall();
+        else if (command.arg === 'water') toggleWater();
+        else if (command.arg === 'river') openRiver();
+        else speakCheer(REQUEST_CALL_TEXT);
+        return;
+      }
+      const idx = state.items.findIndex((it) => it.id === command.itemId);
+      if (idx < 0) return;
+      // 完了を戻すのは、いま出している品目でなくてもそのまま効かせる
+      if (command.type === 'uncompleteItem') {
+        uncompleteItem(command.itemId);
+        return;
+      }
+      if (command.type === 'selectItem') {
+        handleSelectItem(idx);
+        return;
+      }
+      if (idx !== state.currentItemIdx) {
+        handleSelectItem(idx);
+        return;
+      }
+      if (command.type === 'decrementPallet') handleDecrease();
+      else if (command.type === 'incrementPallet') handleIncrease();
+    });
+    return () => setWatchCommandHandler(null);
+  }, [
+    state.items, state.currentItemIdx, handleSelectItem, handleDecrease, handleIncrease,
+    speakCheer, announceItem, currentItem, uncompleteItem,
+    handleWeatherCall, toggleWater, openRiver,
+  ]);
+
 
 
   // 前回の再生状態を自動再開（ブラウザ制限のため最初の操作を待って再生）

@@ -50,6 +50,15 @@ data class WatchCommand(
 
         /** いまの品目を読み上げる */
         const val CALL_ITEM = "item"
+
+        /** 天気コール（スマホで天気を読み上げ、ポップアップも出す） */
+        const val CALL_WEATHER = "weather"
+
+        /** 流れる水の音を止める／流す */
+        const val CALL_WATER = "water"
+
+        /** せせらぎモード（川の映像）を開く */
+        const val CALL_RIVER = "river"
     }
 }
 
