@@ -29,6 +29,13 @@ const SELF_DECLARING_WORDS = [
 ];
 /** 種類を絞り込めない一般的な言葉。カタカナを数える前に取り除くだけ */
 const GENERIC_WORDS = ['カバー', 'ｶﾊﾞｰ'];
+/**
+ * 出荷の状態を表すだけの言葉。品物の名前ではないので、数える前に取り除く。
+ * これが残っていると、機種名のうしろに付いているだけで部品と見なしてしまう。
+ *   例) PDU+A30S(KZ)半完成 / PDRS30SﾊﾝｶﾝｾｲZS1C はどちらもジャーポット本体
+ * 「ｶﾝｾｲｿﾄﾌﾞﾀｶﾊﾞｰ」のような本当の部品名は ﾊﾝ が付かないので、これには当たらない。
+ */
+const STATE_WORDS = ['半完成', '半成品', '完成品', 'ﾊﾝｶﾝｾｲ', 'ハンカンセイ'];
 
 /**
  * 品名が「品物の名前」になっているか（＝機種名だけではないか）を見る。
@@ -36,6 +43,7 @@ const GENERIC_WORDS = ['カバー', 'ｶﾊﾞｰ'];
  * 機種名のあとや代わりに品物の名前が書いてあれば、それは本体ではなく部品。
  *   例) JPV-Lレバーメッキ / JRICﾎｳﾈﾂｲﾀC / ｶﾝｾｲｿﾄﾌﾞﾀｶﾊﾞｰ(KK) / SR-VSX180绝缘胶片
  * ただし品名じたいが「ポリカバー」と名乗っていれば、それは本体とみなす。
+ * 「半完成」「ﾊﾝｶﾝｾｲ」のような出荷の状態を表すだけの言葉は数えない（[STATE_WORDS]）。
  */
 export function isPartLikeName(itemName: string): boolean {
   const name = (itemName || '').trim();
@@ -43,7 +51,7 @@ export function isPartLikeName(itemName: string): boolean {
   // 自分でポリカバー／ジャーポットと名乗っているものは本体
   if (SELF_DECLARING_WORDS.some((w) => name.includes(w))) return false;
   let rest = name;
-  for (const w of GENERIC_WORDS) rest = rest.split(w).join('');
+  for (const w of [...STATE_WORDS, ...GENERIC_WORDS]) rest = rest.split(w).join('');
   const kata = rest.match(KATAKANA)?.length ?? 0;
   const kanji = rest.match(KANJI)?.length ?? 0;
   return kata >= 2 || kanji >= 2;
