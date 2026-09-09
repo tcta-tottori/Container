@@ -211,13 +211,22 @@ fun CargoWorkScreen(
         showPallet = true
     }
 
-    // 縦スワイプでの品目送り。端まで行ったら反対の端へ回る
-    val selectedIndex = items.indexOfFirst { it.id == selected.id }
+    // 縦スワイプでの品目送り。端まで行ったら反対の端へ回る。
+    // 荷降ろしが済んだ品目は送り先に入れない（一覧から選んだときだけ出す）
+    val stepItems = remember(items) {
+        val active = items.filter { !it.isDone() }
+        if (active.isEmpty()) items else active
+    }
+    val selectedIndex = stepItems.indexOfFirst { it.id == selected.id }
     val stepItem: (Int) -> Unit = { delta ->
-        if (items.size > 1 && selectedIndex >= 0) {
-            val next = items[((selectedIndex + delta) % items.size + items.size) % items.size]
-            pendingId = next.id
-            onSelectItem(next.id)
+        if (stepItems.isNotEmpty()) {
+            // 済んだ品目を一覧から選んで見ているときは、送り先を端から数え直す
+            val from = if (selectedIndex >= 0) selectedIndex else if (delta > 0) -1 else 0
+            val next = stepItems[((from + delta) % stepItems.size + stepItems.size) % stepItems.size]
+            if (next.id != selected.id) {
+                pendingId = next.id
+                onSelectItem(next.id)
+            }
         }
     }
 
