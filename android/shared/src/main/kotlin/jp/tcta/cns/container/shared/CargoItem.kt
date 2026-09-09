@@ -19,8 +19,20 @@ import kotlinx.serialization.Serializable
  * @property warning 注意書き（例: 類似品あり）。あれば作業画面に警告マークを出す
  * @property qtyPerPallet 1 パレットあたりのケース数。端数パレットの積み方を組み立てるのに使う
  * @property measurements 1 ケースの外寸 "55*38*38"（cm）。同上
- * @property location 位置（例: 前方 パレット 1-3）。不明なら null
+ * @property location 気高コード（KTE）。不明なら null
  * @property status 状態（例: 未着手 / 作業中 / 完了）。不明なら null
+ * @property newPartNumber 新建高コード（KEN）。不明なら null
+ * @property representModel 代表機種（「内容」シートの値）。[modelName] と違うときだけ詳細に出す
+ * @property description 英語の品名（AQSS の ITEM DESCRIPTION）。不明なら null
+ * @property color 色（黒 / 白 / 他色）。品名から読み取れたときだけ
+ * @property sizeLabel 鍋のサイズ（100 / 180）。鍋以外は null
+ * @property packingQty 入数（個 / ケース）。0 なら不明
+ * @property casesPerTier 1 段のケース数。0 なら不明
+ * @property grossWeight 1 ケースの総重量（kg）。不明なら null
+ * @property cbm 1 ケースのかさ（m³）。不明なら null
+ * @property originalPalletCount 荷降ろし前のパレット枚数。0 なら不明
+ * @property originalCartonCount 荷降ろし前の端数カートン数
+ * @property originalQuantity 荷降ろし前の総数（個）。0 なら不明
  */
 @Serializable
 data class CargoItem(
@@ -37,4 +49,23 @@ data class CargoItem(
     val measurements: String? = null,
     val location: String? = null,
     val status: String? = null,
-)
+    // --- ここから下はウォッチの詳細画面で出す（古いスマホ側が送らなくても既定値で動く） ---
+    val newPartNumber: String? = null,
+    val representModel: String? = null,
+    val description: String? = null,
+    val color: String? = null,
+    val sizeLabel: String? = null,
+    val packingQty: Int = 0,
+    val casesPerTier: Int = 0,
+    val grossWeight: Float? = null,
+    val cbm: Float? = null,
+    val originalPalletCount: Int = 0,
+    val originalCartonCount: Int = 0,
+    val originalQuantity: Int = 0,
+) {
+    /** 残りのケース数（パレットぶん + 端数）。重さ・かさの合計を出すのに使う */
+    val remainingCartons: Int get() = palletCount * qtyPerPallet + cartonCount
+
+    /** 荷降ろし前のケース数。0 なら元の数が分からない（古いスマホ側） */
+    val originalCartons: Int get() = originalPalletCount * qtyPerPallet + originalCartonCount
+}

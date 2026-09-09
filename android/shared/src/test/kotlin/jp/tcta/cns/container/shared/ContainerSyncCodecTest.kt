@@ -30,7 +30,13 @@ class ContainerSyncCodecTest {
         cargo = mapOf(
             container.id to listOf(
                 CargoItem("1", "ポリカバー 30cm 白", 480, palletCount = 8, cartonCount = 5, itemType = ItemTypes.POLY_COVER, modelName = "JPV-H100", remainingPercentage = 0f, warning = "類似品あり", location = "前方 パレット1-3", status = "完了"),
-                CargoItem("2", "鍋 26cm IH", 300, palletCount = 5, cartonCount = 2, itemType = ItemTypes.POT),
+                CargoItem(
+                    "2", "鍋 26cm IH", 300, palletCount = 5, cartonCount = 2, itemType = ItemTypes.POT,
+                    qtyPerPallet = 24, newPartNumber = "KEN-0002", representModel = "JPV-H100",
+                    description = "RICE COOKER", color = "黒", sizeLabel = "180",
+                    packingQty = 4, casesPerTier = 6, grossWeight = 12.5f, cbm = 0.0789f,
+                    originalPalletCount = 8, originalCartonCount = 2, originalQuantity = 480,
+                ),
             ),
         ),
         environment = Environment(temperatureC = 24f, humidityPercent = 86, measuredAt = 1_756_900_050_000L),
@@ -41,6 +47,26 @@ class ContainerSyncCodecTest {
         val json = ContainerSyncCodec.encode(payload)
         val decoded = ContainerSyncCodec.decode(json)
         assertEquals(payload, decoded)
+    }
+
+    @Test
+    fun `cargo item counts cartons from pallets`() {
+        val pot = payload.cargoOf(container.id)[1]
+        // 5PL × 24CT + 2CT
+        assertEquals(122, pot.remainingCartons)
+        // 8PL × 24CT + 2CT
+        assertEquals(194, pot.originalCartons)
+    }
+
+    @Test
+    fun `detail fields survive the round trip`() {
+        val pot = ContainerSyncCodec.decode(ContainerSyncCodec.encode(payload)).cargoOf(container.id)[1]
+        assertEquals("KEN-0002", pot.newPartNumber)
+        assertEquals("黒", pot.color)
+        assertEquals("180", pot.sizeLabel)
+        assertEquals(4, pot.packingQty)
+        assertEquals(12.5f, pot.grossWeight)
+        assertEquals(480, pot.originalQuantity)
     }
 
     @Test

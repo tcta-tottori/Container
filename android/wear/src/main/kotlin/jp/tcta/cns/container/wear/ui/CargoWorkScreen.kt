@@ -25,9 +25,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,6 +54,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -70,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -92,6 +97,15 @@ private val ITEM_SWITCH_THRESHOLD = 44.dp
 
 /** 詳細画面のパレット図の向き（度） */
 private const val DETAIL_PALLET_ANGLE_DEG = -35f
+
+/** 詳細画面を開いたとき、進み具合のバーが伸びきるまでの時間（ミリ秒） */
+private const val DETAIL_FILL_MS = 900
+
+/** 気高コードの札の色 */
+private val CodeBlue = Color(0xFF3B82F6)
+
+/** 新建高コードの札の色 */
+private val CodeRed = Color(0xFFEF4444)
 
 /** 一覧の右に出す弧の太さ */
 private val INDICATOR_STROKE = 4.dp
@@ -295,7 +309,7 @@ fun CargoWorkScreen(
             // 閉じたあとも消えるまでのあいだ描くので、最後の品目を覚えておく
             val shown = remember(detailItem) { detailItem }
             if (shown != null) {
-                ItemDetailPage(item = shown, onClose = { detailItem = null })
+                ItemDetailPage(item = shown, items = orderedItems, onClose = { detailItem = null })
             }
         }
 
@@ -523,11 +537,14 @@ private fun ItemPage(
 /**
  * 一覧で長押ししたときに出す、品目の詳しい内容。
  *
- * 品名・種類・気高コード・1 箱の外寸・1 パレットのケース数・残りの数、
- * それに端数パレットの積み方を並べる。2 回タップで一覧へ戻る。
+ * スマホの詳細パネルで見られることを、ウォッチでもひと通り見られるようにしている。
+ * 上から 何番目か / 種類・状態・色 / 機種名 / 気高コード・新建高コード /
+ * 進み具合 / 残りの数 / 1 箱のこと / 重さとかさ / 注意書き / 端数パレットの積み方。
+ *
+ * リューズでも指でも動かせる。2 回タップで一覧へ戻る。
  */
 @Composable
-private fun ItemDetailPage(item: CargoItem, onClose: () -> Unit) {
+private fun ItemDetailPage(item: CargoItem, items: List<CargoItem>, onClose: () -> Unit) {
     val accent = itemTypeAccent(item.itemType)
     val stack = remember(item.id, item.cartonCount, item.qtyPerPallet, item.measurements, item.name) {
         PalletLayout.buildFractionStack(
@@ -538,79 +555,296 @@ private fun ItemDetailPage(item: CargoItem, onClose: () -> Unit) {
             measurements = item.measurements,
         )
     }
+    val listState = rememberScalingLazyListState()
+    val scope = rememberCoroutineScope()
+    // リューズで動かす。受け取るには焦点が要る
+    val rotaryFocus = remember { FocusRequester() }
+    LaunchedEffect(item.id) { runCatching { rotaryFocus.requestFocus() } }
+
+    // 開いたときに 0 から伸びるバー。数字もこれに合わせて増える
+    val donePct = (100f - (item.remainingPercentage ?: 100f)).coerceIn(0f, 100f)
+    val fill = remember(item.id) { Animatable(0f) }
+    LaunchedEffect(item.id, donePct) {
+        fill.animateTo(donePct / 100f, tween(DETAIL_FILL_MS, easing = FastOutSlowInEasing))
+    }
+
+    val position = items.indexOfFirst { it.id == item.id }
+    val remainingCartons = item.remainingCartons
+    val originalCartons = item.originalCartons
+    val doneCartons = (originalCartons - remainingCartons).coerceAtLeast(0)
+    val grossWeight = item.grossWeight ?: 0f
+    val cbm = item.cbm ?: 0f
+    val tiers = if (item.casesPerTier > 0 && item.qtyPerPallet > 0) item.qtyPerPallet / item.casesPerTier else 0
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(ScreenBlack)
+            // 真っ黒ではなく、種類の色をうっすら敷いて奥行きを出す
+            .background(Brush.radialGradient(listOf(darkened(accent, 0.22f), ScreenBlack)))
             // 2 回タップで一覧へ戻る
             .pointerInput(item.id) { detectTapGestures(onDoubleTap = { onClose() }) },
     ) {
         val w = maxWidth
-        val listState = rememberScalingLazyListState()
+        val titleSize = (w.value * 0.034f).sp
+        val labelSize = (w.value * 0.036f).sp
         ScalingLazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 30.dp, bottom = 30.dp, start = 14.dp, end = 14.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .onRotaryScrollEvent { event ->
+                    scope.launch { listState.scrollBy(event.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(rotaryFocus)
+                .focusable(),
+            contentPadding = PaddingValues(top = 28.dp, bottom = 34.dp, start = 10.dp, end = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            item {
-                MarqueeText(
-                    text = item.modelName ?: item.name,
-                    style = TextStyle(fontSize = (w.value * 0.072f).sp, fontWeight = FontWeight.Black),
-                    color = Color.White,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp, bottom = 6.dp),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(w * 0.030f)
-                            .clip(CircleShape)
-                            .background(accent),
-                    )
-                    Spacer(Modifier.width(6.dp))
+            // コンテナの何番目の品目か
+            if (position >= 0 && items.size > 1) {
+                item {
                     Text(
-                        text = itemTypeLabel(item.itemType),
-                        style = TextStyle(fontSize = (w.value * 0.042f).sp, fontWeight = FontWeight.Bold),
-                        color = Color.White.copy(alpha = 0.85f),
+                        text = "${position + 1} / ${items.size}",
+                        style = TextStyle(fontSize = (w.value * 0.036f).sp, fontWeight = FontWeight.Bold),
+                        color = Color.White.copy(alpha = 0.40f),
                         maxLines = 1,
                     )
                 }
             }
-            item { DetailRow("KTE", item.location ?: "—", w) }
-            item { DetailRow("外寸", item.measurements ?: "—", w) }
-            item { DetailRow("1PL", if (item.qtyPerPallet > 0) "${item.qtyPerPallet}CT" else "—", w) }
-            item { DetailRow("残り", DisplayFormat.palletCarton(item.palletCount, item.cartonCount), w) }
-            item { DetailRow("個数", "${DisplayFormat.quantity(item.quantity)} PCS", w) }
+
+            // 種類と状態
             item {
-                DetailRow("進み", DisplayFormat.percent(100f - (item.remainingPercentage ?: 100f)), w)
-            }
-            if (!stack.isEmpty) {
-                item {
-                    Text(
-                        text = stringResource(R.string.action_pallet),
-                        style = TextStyle(fontSize = (w.value * 0.040f).sp, fontWeight = FontWeight.Bold),
-                        color = Color.White.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                item {
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(w * 0.62f),
-                    ) {
-                        drawPallet(stack, DETAIL_PALLET_ANGLE_DEG, 1f, 1f)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Pill(text = itemTypeLabel(item.itemType), fontSize = labelSize, color = accent, dot = accent)
+                    item.status?.let {
+                        Pill(text = it, fontSize = labelSize, color = statusColor(it))
                     }
                 }
             }
+
+            // 色と、鍋のサイズ
+            if (item.color != null || item.sizeLabel != null) {
+                item {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        item.color?.let {
+                            Pill(text = it, fontSize = labelSize, color = swatchColor(it), dot = swatchColor(it))
+                        }
+                        item.sizeLabel?.let {
+                            Pill(text = it, fontSize = labelSize, color = sizeColor(it))
+                        }
+                    }
+                }
+            }
+
+            // 機種名。種類の色でうっすら光らせる
+            item {
+                MarqueeText(
+                    text = item.modelName ?: item.name,
+                    style = TextStyle(
+                        fontSize = (w.value * 0.076f).sp,
+                        fontWeight = FontWeight.Black,
+                        shadow = Shadow(color = accent.copy(alpha = 0.75f), offset = Offset.Zero, blurRadius = 22f),
+                    ),
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            // 品名（機種名と違うときだけ）
+            if (item.modelName != null && item.modelName != item.name) {
+                item {
+                    MarqueeText(
+                        text = item.name,
+                        style = TextStyle(fontSize = (w.value * 0.040f).sp),
+                        color = Color.White.copy(alpha = 0.55f),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+
+            // 気高コード（KTE）と新建高コード（KEN）
+            if (item.location != null || item.newPartNumber != null) {
+                item {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        item.location?.let { CodeChip(label = "KTE", value = it, color = CodeBlue, width = w) }
+                        item.newPartNumber?.let { CodeChip(label = "KEN", value = it, color = CodeRed, width = w) }
+                    }
+                }
+            }
+
+            // 進み具合
+            item {
+                DetailCard(accent = accent) {
+                    Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.fillMaxWidth()) {
+                        CardTitle(text = "進み", color = accent, fontSize = titleSize, modifier = Modifier.weight(1f))
+                        Text(
+                            text = DisplayFormat.percent(fill.value * 100f),
+                            style = TextStyle(
+                                fontSize = (w.value * 0.072f).sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                            ),
+                            color = Color.White,
+                            maxLines = 1,
+                        )
+                    }
+                    Spacer(Modifier.height(5.dp))
+                    DetailBar(fraction = fill.value, accent = accent, height = w * 0.028f)
+                    if (originalCartons > 0) {
+                        Spacer(Modifier.height(6.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            StatTile(value = "$doneCartons", unit = "CT", label = "済み", width = w, valueColor = accent)
+                            StatTile(value = "$remainingCartons", unit = "CT", label = "残り", width = w)
+                            StatTile(
+                                value = DisplayFormat.palletCarton(item.originalPalletCount, item.originalCartonCount),
+                                unit = "",
+                                label = "元の数",
+                                width = w,
+                                valueScale = 0.040f,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 残りの数
+            item {
+                DetailCard(accent = accent) {
+                    CardTitle(text = "残り", color = accent, fontSize = titleSize)
+                    Spacer(Modifier.height(4.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        StatTile(value = "${item.palletCount.coerceAtLeast(0)}", unit = "PL", label = "パレット", width = w)
+                        StatTile(value = "${item.cartonCount.coerceAtLeast(0)}", unit = "CT", label = "端数", width = w)
+                        StatTile(
+                            value = DisplayFormat.quantity(item.quantity.coerceAtLeast(0)),
+                            unit = "",
+                            label = "PCS",
+                            width = w,
+                            valueScale = 0.052f,
+                        )
+                    }
+                    if (item.originalQuantity > 0 && item.originalQuantity != item.quantity) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "元 ${DisplayFormat.quantity(item.originalQuantity)} PCS",
+                            style = TextStyle(fontSize = (w.value * 0.034f).sp),
+                            color = Color.White.copy(alpha = 0.45f),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+
+            // 1 箱のこと
+            if (item.packingQty > 0 || item.qtyPerPallet > 0 || item.casesPerTier > 0 || item.measurements != null) {
+                item {
+                    DetailCard(accent = accent) {
+                        CardTitle(text = "1 箱", color = accent, fontSize = titleSize)
+                        Spacer(Modifier.height(4.dp))
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            if (item.packingQty > 0) {
+                                StatTile(value = "${item.packingQty}", unit = "個", label = "入数", width = w)
+                            }
+                            if (item.qtyPerPallet > 0) {
+                                StatTile(value = "${item.qtyPerPallet}", unit = "CT", label = "1PL", width = w)
+                            }
+                            if (item.casesPerTier > 0) {
+                                StatTile(value = "${item.casesPerTier}", unit = "CT", label = "1 段", width = w)
+                            }
+                        }
+                        if (item.measurements != null) {
+                            DetailRow("外寸", DisplayFormat.dimensions(item.measurements), w)
+                        }
+                        if (tiers > 0) {
+                            DetailRow("積み", "${item.casesPerTier}CT × ${tiers}段", w)
+                        }
+                    }
+                }
+            }
+
+            // 重さとかさ
+            if (grossWeight > 0f || cbm > 0f) {
+                item {
+                    DetailCard(accent = accent) {
+                        CardTitle(text = "重さ・かさ", color = accent, fontSize = titleSize)
+                        Spacer(Modifier.height(4.dp))
+                        if (grossWeight > 0f) {
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                StatTile(DisplayFormat.weight(grossWeight), "", "1 箱", w, valueScale = 0.048f)
+                                if (item.qtyPerPallet > 0) {
+                                    StatTile(
+                                        DisplayFormat.weight(grossWeight * item.qtyPerPallet), "", "1PL", w,
+                                        valueScale = 0.048f,
+                                    )
+                                }
+                                if (remainingCartons > 0) {
+                                    StatTile(
+                                        DisplayFormat.weight(grossWeight * remainingCartons), "", "残り", w,
+                                        valueScale = 0.048f, valueColor = accent,
+                                    )
+                                }
+                            }
+                        }
+                        if (cbm > 0f) {
+                            if (grossWeight > 0f) Spacer(Modifier.height(5.dp))
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                StatTile(DisplayFormat.volume(cbm), "", "1 箱", w, valueScale = 0.048f)
+                                if (remainingCartons > 0) {
+                                    StatTile(
+                                        DisplayFormat.volume(cbm * remainingCartons), "", "残り", w,
+                                        valueScale = 0.048f, valueColor = accent,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 代表機種と英語の品名
+            if (item.representModel != null || item.description != null) {
+                item {
+                    DetailCard(accent = accent) {
+                        item.representModel?.let { DetailRow("機種", it, w) }
+                        item.description?.let { DetailRow("EN", it, w) }
+                    }
+                }
+            }
+
+            // 注意書き（類似品あり など）
+            item.warning?.let { warning ->
+                item { WarningCard(text = warning, width = w) }
+            }
+
+            // 端数パレットの積み方
+            if (!stack.isEmpty) {
+                item {
+                    DetailCard(accent = accent) {
+                        CardTitle(text = stringResource(R.string.action_pallet), color = accent, fontSize = titleSize)
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(w * 0.60f),
+                        ) {
+                            drawPallet(stack, DETAIL_PALLET_ANGLE_DEG, 1f, 1f)
+                        }
+                    }
+                }
+            }
+
             item {
                 Text(
                     text = stringResource(R.string.detail_close_hint),
@@ -619,11 +853,236 @@ private fun ItemDetailPage(item: CargoItem, onClose: () -> Unit) {
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 10.dp),
+                        .padding(top = 6.dp),
                 )
             }
         }
         EdgeScrim()
+    }
+}
+
+/** 状態（未着手 / 作業中 / 完了）の色 */
+private fun statusColor(status: String): Color = when {
+    status.contains("完了") -> DoneGray
+    status.contains("中") -> SelectedYellow
+    else -> Color(0xFF9AA0A6)
+}
+
+/** 色（黒 / 白 / 他色）を、そのまま丸に出すための色 */
+private fun swatchColor(color: String): Color = when (color) {
+    "黒" -> Color(0xFF9AA0A6)
+    "白" -> Color(0xFFF1F3F4)
+    else -> Color(0xFFDAA520)
+}
+
+/** 鍋のサイズの色。スマホのバッジと同じ（100 = 緑、180 = 青） */
+private fun sizeColor(size: String): Color =
+    if (size == "180") Color(0xFF3B82F6) else Color(0xFF22C55E)
+
+/**
+ * 詳細画面の囲み。種類の色をうっすら敷いて、まとまりごとに分ける。
+ */
+@Composable
+private fun DetailCard(
+    accent: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            // 左上が明るく右下へ落ちる。平らな塗りより奥行きが出る
+            .background(
+                Brush.linearGradient(
+                    listOf(darkened(accent, 0.30f), darkened(accent, 0.14f), Color.Black.copy(alpha = 0.55f)),
+                ),
+            )
+            .border(1.dp, accent.copy(alpha = 0.28f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        content = content,
+    )
+}
+
+/** 囲みの見出し */
+@Composable
+private fun CardTitle(
+    text: String,
+    color: Color,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
+        color = color.copy(alpha = 0.95f),
+        maxLines = 1,
+        textAlign = TextAlign.Start,
+        modifier = modifier,
+    )
+}
+
+/**
+ * 囲みのなかに並べる、数字ひとつ分。
+ * 上に大きな数字（と単位）、下に小さな見出し。
+ */
+@Composable
+private fun RowScope.StatTile(
+    value: String,
+    unit: String,
+    label: String,
+    width: Dp,
+    valueScale: Float = 0.064f,
+    valueColor: Color = ListNumber,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.weight(1f),
+    ) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = value,
+                style = TextStyle(
+                    fontSize = (width.value * valueScale).sp,
+                    fontWeight = FontWeight.Black,
+                    fontFamily = FontFamily.Monospace,
+                ),
+                color = valueColor,
+                maxLines = 1,
+            )
+            if (unit.isNotEmpty()) {
+                Spacer(Modifier.width(1.dp))
+                Text(
+                    text = unit,
+                    style = TextStyle(fontSize = (width.value * valueScale * 0.46f).sp, fontWeight = FontWeight.Bold),
+                    color = valueColor.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    modifier = Modifier.padding(bottom = width * 0.006f),
+                )
+            }
+        }
+        Text(
+            text = label,
+            style = TextStyle(fontSize = (width.value * 0.030f).sp),
+            color = Color.White.copy(alpha = 0.5f),
+            maxLines = 1,
+        )
+    }
+}
+
+/** 進み具合のバー。種類の色で左から伸びる */
+@Composable
+private fun DetailBar(fraction: Float, accent: Color, height: Dp, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
+            .clip(RoundedCornerShape(percent = 50))
+            .background(Color.White.copy(alpha = 0.10f)),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(percent = 50))
+                .background(Brush.horizontalGradient(listOf(darkened(accent, 0.70f), accent))),
+        )
+    }
+}
+
+/** 気高コード・新建高コードの札 */
+@Composable
+private fun CodeChip(label: String, value: String, color: Color, width: Dp) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(Color.Black.copy(alpha = 0.45f))
+            .border(1.dp, color.copy(alpha = 0.45f), RoundedCornerShape(percent = 50))
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = label,
+            style = TextStyle(fontSize = (width.value * 0.030f).sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp),
+            color = color,
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = value,
+            style = TextStyle(
+                fontSize = (width.value * 0.040f).sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+            ),
+            color = Color.White.copy(alpha = 0.9f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** 小さなしるし（種類・状態・色・サイズ） */
+@Composable
+private fun Pill(
+    text: String,
+    fontSize: TextUnit,
+    color: Color,
+    dot: Color? = null,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(percent = 50))
+            .background(color.copy(alpha = 0.18f))
+            .border(1.dp, color.copy(alpha = 0.55f), RoundedCornerShape(percent = 50))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        if (dot != null) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(dot),
+            )
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(
+            text = text,
+            style = TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold),
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** 注意書き（類似品あり など）。オレンジで目立たせる */
+@Composable
+private fun WarningCard(text: String, width: Dp) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(ElapsedOrange.copy(alpha = 0.16f))
+            .border(1.dp, ElapsedOrange.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 9.dp, vertical = 7.dp),
+    ) {
+        Text(
+            text = "⚠",
+            style = TextStyle(fontSize = (width.value * 0.048f).sp, fontWeight = FontWeight.Bold),
+            color = ElapsedOrange,
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = text,
+            style = TextStyle(fontSize = (width.value * 0.038f).sp, fontWeight = FontWeight.Bold),
+            color = Color.White.copy(alpha = 0.92f),
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -634,19 +1093,19 @@ private fun DetailRow(label: String, value: String, width: Dp) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 3.dp),
+            .padding(vertical = 2.dp),
     ) {
         Text(
             text = label,
-            style = TextStyle(fontSize = (width.value * 0.038f).sp, fontWeight = FontWeight.Bold),
+            style = TextStyle(fontSize = (width.value * 0.034f).sp, fontWeight = FontWeight.Bold),
             color = Color.White.copy(alpha = 0.5f),
             maxLines = 1,
-            modifier = Modifier.width(width * 0.16f),
+            modifier = Modifier.width(width * 0.15f),
         )
         MarqueeText(
             text = value,
             style = TextStyle(
-                fontSize = (width.value * 0.048f).sp,
+                fontSize = (width.value * 0.044f).sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
             ),

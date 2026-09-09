@@ -10,7 +10,7 @@
  */
 import { Container, ContainerItem } from './types';
 import { displayQuantities } from './itemQuantity';
-import { areSimilarItems } from './typeDetector';
+import { areSimilarItems, extractColor } from './typeDetector';
 import { summarizeLoad } from './containerLoad';
 import { buildJapanesePartName } from './partTranslations';
 
@@ -56,8 +56,33 @@ export interface WatchCargoItem {
   qtyPerPallet?: number;
   /** 1ケースの外寸 "55*38*38"（cm）。同上 */
   measurements?: string;
+  /** 気高コード（KTE） */
   location?: string;
   status?: string;
+  /** 新建高コード（KEN） */
+  newPartNumber?: string;
+  /** 代表機種（「内容」シート E列） */
+  representModel?: string;
+  /** 英語の品名（AQSS の ITEM DESCRIPTION） */
+  description?: string;
+  /** 色（黒 / 白 / 他色） */
+  color?: string;
+  /** 鍋のサイズ（100 / 180） */
+  sizeLabel?: string;
+  /** 入数（個/ケース） */
+  packingQty?: number;
+  /** 1段のケース数 */
+  casesPerTier?: number;
+  /** 1ケースの総重量（kg） */
+  grossWeight?: number;
+  /** 1ケースのかさ（m³） */
+  cbm?: number;
+  /** 荷降ろし前のパレット枚数 */
+  originalPalletCount?: number;
+  /** 荷降ろし前の端数ケース数 */
+  originalCartonCount?: number;
+  /** 荷降ろし前の総数（個） */
+  originalQuantity?: number;
 }
 
 /** android/shared の ContainerSyncPayload と同じ形 */
@@ -137,6 +162,46 @@ function cartonsOf(palletCount: number, item: ContainerItem): number {
   return Math.max(0, palletCount * (item.qtyPerPallet || 0) + Math.ceil(item.fraction || 0));
 }
 
+/** 0 より大きい数だけ返す（不明な値はキーごと省いて、ウォッチ側で「—」にする） */
+function positive(value: number | undefined, digits = 0): number | undefined {
+  if (value === undefined || !isFinite(value) || value <= 0) return undefined;
+  const factor = Math.pow(10, digits);
+  return Math.round(value * factor) / factor;
+}
+
+/** 鍋のサイズ（100 / 180）。スマホの詳細パネルのバッジと同じ判定 */
+function nabeSize(item: ContainerItem): string | undefined {
+  if (item.type !== '鍋') return undefined;
+  return item.itemName.includes('180') || /18[RWCS]/.test(item.itemName) ? '180' : '100';
+}
+
+/** [detailFields] が返す項目。どれも省いてよい（ウォッチ側で「—」になる） */
+type WatchItemDetails = Pick<
+  WatchCargoItem,
+  'newPartNumber' | 'representModel' | 'description' | 'color' | 'sizeLabel'
+  | 'packingQty' | 'casesPerTier' | 'grossWeight' | 'cbm'
+>;
+
+/**
+ * ウォッチの詳細画面に出す、品目そのものの情報。
+ * 作業で減らない値なので、作業中のコンテナでも未着手のコンテナでも同じ。
+ */
+function detailFields(item: ContainerItem): WatchItemDetails {
+  const model = item.representModel?.trim();
+  return {
+    newPartNumber: item.newPartNumber || undefined,
+    // 機種名と同じなら送らない（詳細画面で二重に出さない）
+    representModel: model && model !== displayName(item) ? model : undefined,
+    description: item.description || undefined,
+    color: extractColor(item.itemName) || undefined,
+    sizeLabel: nabeSize(item),
+    packingQty: positive(item.packingQty),
+    casesPerTier: positive(item.casesPerTier),
+    grossWeight: positive(item.grossWeight, 2),
+    cbm: positive(item.cbm, 4),
+  };
+}
+
 function containerId(c: Container): string {
   return c.date ? `${c.date}_${c.containerNo}` : c.containerNo;
 }
@@ -154,6 +219,10 @@ function buildWorkingItems(input: WatchSyncInput): WatchCargoItem[] {
     const originalCartons = original ? cartonsOf(original.palletCount, item) : cartonsOf(item.palletCount, item);
     const remainingCartons = completed ? 0 : cartonsOf(item.palletCount, item);
     const q = displayQuantities(item);
+    // 元の数（進み具合と「済み」を出すのに使う）。画面と同じ PL / CT の数え方にそろえる
+    const originalQ = original
+      ? displayQuantities({ ...item, palletCount: original.palletCount, totalQty: original.totalQty })
+      : q;
     const similar = item.type === '鍋'
       ? []
       : items.filter((o) => o.id !== item.id && areSimilarItems(item.itemName, o.itemName));
@@ -171,6 +240,10 @@ function buildWorkingItems(input: WatchSyncInput): WatchCargoItem[] {
       measurements: item.measurements || undefined,
       location: item.partNumber || undefined,
       status: completed ? '完了' : idx === currentItemIdx ? '作業中' : '未着手',
+      originalPalletCount: positive(originalQ.pallets),
+      originalCartonCount: positive(originalQ.cartons),
+      originalQuantity: positive(original ? Math.ceil(original.totalQty) : q.pcs),
+      ...detailFields(item),
     };
   });
 }
@@ -192,6 +265,11 @@ function buildPlainItems(items: ContainerItem[]): WatchCargoItem[] {
       measurements: item.measurements || undefined,
       location: item.partNumber || undefined,
       status: '未着手',
+      // まだ手を付けていないので、元の数は今の数と同じ
+      originalPalletCount: positive(q.pallets),
+      originalCartonCount: positive(q.cartons),
+      originalQuantity: positive(q.pcs),
+      ...detailFields(item),
     };
   });
 }
