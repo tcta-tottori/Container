@@ -30,8 +30,10 @@ interface QuickActionsProps {
   onOpenSwitchBot: () => void;
   /** せせらぎモード（川の映像）を開く */
   onOpenRiver: () => void;
-  /** 人物出現。選んだ人が一覧のところに 10 秒だけ出る */
-  onShowPerson?: (id: string) => void;
+  /** 人物出現。選んだ人が一覧のところに出る（[always] なら消えずにずっと） */
+  onShowPerson?: (id: string, always: boolean) => void;
+  /** いま常時表示にしている人の ID。ボタンを光らせるのに使う */
+  alwaysPersonId?: string | null;
   /** 左メニューなど別の画面が開いている間は隠す */
   hidden?: boolean;
 }
@@ -103,10 +105,13 @@ export default function QuickActions({
   containers, selectedIdx, onSelectContainer,
   onCheer, onWeather, onRequestCall, onNameCall,
   waterPlaying, onWater, onWaterSettings,
-  switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, onShowPerson, hidden,
+  switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, onShowPerson, alwaysPersonId, hidden,
 }: QuickActionsProps) {
   const [open, setOpen] = useState(false);
   const [sbInfoOpen, setSbInfoOpen] = useState(false);
+  // 人物出現の出し方。true なら常時表示。いま常時表示にしている人がいればそれに合わせる
+  const [personAlways, setPersonAlways] = useState(false);
+  useEffect(() => { if (alwaysPersonId) setPersonAlways(true); }, [alwaysPersonId]);
 
   // 別の画面が開いたら閉じる
   useEffect(() => {
@@ -238,22 +243,50 @@ export default function QuickActions({
               onClick={() => { onOpenRiver(); setOpen(false); }}
             />
 
-            {/* 人物出現。名前を選ぶと、一覧のところにその人が 10 秒だけ出る */}
+            {/*
+              * 人物出現。名前を選ぶと、一覧のところにその人が出る。
+              * 「10秒」なら 10 秒で消え、「常時」なら消えずにずっと居る
+              * （一覧を見たいときは 1 回タップすると数秒だけ消える）。
+              */}
             {onShowPerson && (
               <>
-                <div className="quick-heading">人物出現</div>
-                <div className="quick-person-list">
-                  {PEOPLE.map((p) => (
+                <div className="quick-heading quick-heading-row">
+                  <span>人物出現</span>
+                  <span className="quick-seg">
                     <button
-                      key={p.id}
-                      className="quick-person"
-                      onClick={() => { onShowPerson(p.id); setOpen(false); }}
-                      title={`${p.name} を出す`}
+                      className={`quick-seg-btn${personAlways ? '' : ' active'}`}
+                      onClick={() => setPersonAlways(false)}
                     >
-                      <img src={p.image} alt="" draggable={false} />
-                      <span>{p.name}</span>
+                      10秒
                     </button>
-                  ))}
+                    <button
+                      className={`quick-seg-btn${personAlways ? ' active' : ''}`}
+                      onClick={() => setPersonAlways(true)}
+                    >
+                      常時
+                    </button>
+                  </span>
+                </div>
+                <div className="quick-person-list">
+                  {PEOPLE.map((p) => {
+                    const showing = alwaysPersonId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        className={`quick-person${showing ? ' active' : ''}`}
+                        onClick={() => { onShowPerson(p.id, personAlways); setOpen(false); }}
+                        title={showing ? `${p.name} の常時表示をやめる` : `${p.name} を出す`}
+                      >
+                        <img src={p.image} alt="" draggable={false} />
+                        <span>{showing ? 'やめる' : p.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="quick-person-hint">
+                  {personAlways
+                    ? '常時: ずっと出ます。1 回タップで少しだけ消え、2 回タップでやめます'
+                    : '10秒: ゆっくり出てゆっくり消えます。2 回タップですぐ消せます'}
                 </div>
               </>
             )}

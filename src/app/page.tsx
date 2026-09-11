@@ -268,6 +268,8 @@ export default function Home() {
   const [riverOpen, setRiverOpen] = useState(false);
   /** 一覧のところに出している人。出していないときは null */
   const [person, setPerson] = useState<Person | null>(null);
+  /** その人を常時表示にしているか（10 秒で消えず、タップで少しだけ消える） */
+  const [personAlways, setPersonAlways] = useState(false);
   /** せせらぎモードから戻ったあと、元の画面の上で晴れていく靄 */
   const [riverTail, setRiverTail] = useState(false);
   /** せせらぎモードに入るとき、こちらで水の音BGMを止めたか（戻すときの目印） */
@@ -1252,13 +1254,31 @@ export default function Home() {
     riverPausedWaterRef.current = false;
   }, [waterPlaying, toggleWater]);
 
+  /** いま常時表示にしている人（していなければ null）。メニューの光り方に使う */
+  const alwaysPersonId = personAlways && person ? person.id : null;
+
   /**
-   * 人物出現。一覧のところに、選んだ人を 10 秒だけ出す。
+   * 人物出現。一覧のところに、選んだ人を出す。
+   * [always] が false なら 10 秒で消える。true なら消えずにずっと居る。
    * 出ている間にもう一度選ばれたら、その人に差し替えて数え直す。
+   * 常時表示のときに同じ人をもう一度選んだら、常時表示をやめる。
    */
-  const showPerson = useCallback((id: string) => {
+  const showPerson = useCallback((id: string, always = false) => {
     const found = findPerson(id);
-    if (found) setPerson(found);
+    if (!found) return;
+    if (always && alwaysPersonId === id) {
+      setPerson(null);
+      setPersonAlways(false);
+      return;
+    }
+    setPerson(found);
+    setPersonAlways(always);
+  }, [alwaysPersonId]);
+
+  /** 人物出現を片付ける（10 秒たった / ダブルタップで切り上げた） */
+  const clearPerson = useCallback(() => {
+    setPerson(null);
+    setPersonAlways(false);
   }, []);
 
   // 残した靄は晴れきったら片付ける
@@ -1445,9 +1465,9 @@ export default function Home() {
       {weatherPopup && (
         <WeatherPopup weather={weatherPopup} onClose={closeWeatherPopup} isSpeaking={isSpeaking} />
       )}
-      {/* 人物出現（一覧のところ）。10 秒で消える。ダブルタップでも消える */}
+      {/* 人物出現（一覧のところ）。常時表示でなければ 10 秒で消える。ダブルタップでも消える */}
       {person && !riverOpen && (
-        <PersonAppearance person={person} onDone={() => setPerson(null)} />
+        <PersonAppearance person={person} always={personAlways} onDone={clearPerson} />
       )}
       {historyOpen && (
         <HistoryModal
@@ -1581,6 +1601,7 @@ export default function Home() {
           onOpenSwitchBot={() => setSbPopupOpen(true)}
           onOpenRiver={openRiver}
           onShowPerson={showPerson}
+          alwaysPersonId={alwaysPersonId}
           hidden={menuOpen || manualOpen || settingsTab !== null || historyOpen || riverOpen}
         />
 

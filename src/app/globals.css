@@ -1562,3 +1562,34 @@ body.load3d-open > *:not(.load3d-layer) * {
   border: 1px solid rgba(255,255,255,0.18);
 }
 .quick-person span { font-size: 12px; font-weight: 700; }
+
+/* 人物出現の出し方の切り替え（10秒 / 常時） */
+.quick-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.quick-seg {
+  display: inline-flex; padding: 2px; border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.quick-seg-btn {
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.5); background: transparent; border: none;
+  cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-seg-btn.active { background: rgba(167,139,250,0.28); color: #fff; }
+.quick-person-hint {
+  font-size: 10px; line-height: 1.5; padding: 0 4px;
+  color: rgba(255,255,255,0.38);
+}
+/* いま常時表示にしている人。もう一度押すとやめる */
+.quick-person.active {
+  background: rgba(167,139,250,0.22);
+  border-color: rgba(167,139,250,0.6);
+  color: #fff;
+}
+.quick-person.active img { border-color: rgba(196,181,253,0.9); }
+
+/* 常時表示で、タップして消えているあいだ。下の一覧を触れるようにする */
+.person-appear-hidden { opacity: 0; }
+.person-appear-dismiss, .person-appear-hidden { pointer-events: none; }
