@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ItemType } from '@/lib/types';
-import { isBigNabeBox } from '@/lib/itemQuantity';
+import { isBigNabeBox, nabePerLayer } from '@/lib/itemQuantity';
 import { cardboardFace } from './SizeDiagram';
 
 interface PalletDiagramProps {
@@ -31,8 +31,6 @@ interface PalletDiagramProps {
 /* ===== Constants ===== */
 const PALLET_H_PX = 8; // pallet base height in px
 
-/** 大きい箱の内鍋の 1 段あたりの箱の数 */
-export const NABE5_PER_LAYER = 5;
 
 /* ===== Parse measurements ===== */
 function parseMeas(s: string): [number, number, number] | null {
@@ -406,6 +404,45 @@ function buildNabe5Slots(
     for (let i = 0; i < 2; i++) put(0, side - (i + 1) * S, L, S, i);
     // 手前の「縦」3個。左から右へ
     for (let i = 0; i < 3; i++) put(i * S, 0, S, L, 2 + i);
+  }
+  return slots;
+}
+
+/**
+ * 大きい箱の内鍋の 180 サイズ（5L JPV-T180 など、1ケース12個入り）の「1段4個」の積み方。
+ *
+ * 風車（ピンホイール）状に、箱の向きを90度ずつ変えながら4個を回して置く。
+ * 段ごとに左右を入れ替えて（風車の回る向きを逆にして）、段どうしを噛み合わせる。
+ *
+ *   ┌───────────┬───┐
+ *   │    横 1    │縦 │  L + S の正方形。中央に (L−S)角 の隙間が空く
+ *   ├───┬───────┤ 2 │
+ *   │縦 │  空き  │   │
+ *   │ 4 ├───────┴───┤
+ *   │   │    横 3    │
+ *   └───┴───────────┘
+ *
+ * ※ y は 0 が手前。奥ほど y が大きい
+ */
+function buildNabe4Slots(
+  bwCm: number, bdCm: number, bhPx: number, layers: number,
+  side: number, cm2px: number,
+): BoxSlot[] {
+  const S = Math.min(bwCm, bdCm) * cm2px;  // 短い辺
+  const L = Math.max(bwCm, bdCm) * cm2px;  // 長い辺
+  const slots: BoxSlot[] = [];
+
+  for (let layer = 0; layer < layers; layer++) {
+    const z = PALLET_H_PX + layer * bhPx;
+    // 段ごとに左右を入れ替える（風車の回る向きが逆になり、段どうしが噛み合う）
+    const flip = layer % 2 === 1;
+    const put = (x: number, y: number, w: number, d: number, seq: number) => {
+      slots.push({ x: flip ? side - x - w : x, y, z, w, d, h: bhPx, seq });
+    };
+    put(0, side - S, L, S, 0);           // 奥の左: 横
+    put(L, side - L, S, L, 1);           // 奥の右: 縦
+    put(side - L, 0, L, S, 2);           // 手前の右: 横
+    put(0, 0, S, L, 3);                  // 手前の左: 縦
   }
   return slots;
 }
@@ -800,8 +837,12 @@ export default function PalletDiagram({
 
   const [bwCm, bdCm, bhCm] = getBoxDimsCm(measurements, itemName);
   const isNabe = type === '鍋';
-  // 大きい箱の内鍋（1ケース12個入りなど）は 1段5個。従来の8個入りは 1段6個のまま
-  const isNabe5 = isBigNabeBox(type, packingQty);
+  // 大きい箱の内鍋（1ケース12個入りなど）は 100/60サイズが1段5個、180サイズが1段4個。
+  // 従来の8個入りは 1段6個のまま
+  const nabeBig = isBigNabeBox(type, packingQty);
+  const nabeBigPerLayer = nabeBig ? nabePerLayer(type, packingQty, itemName || '') : 0;
+  const isNabe5 = nabeBigPerLayer === 5;
+  const isNabe4 = nabeBigPerLayer === 4;
   const is7 = is7PerLayerType(itemName);
   // 鍋と7個積みが先。どちらでもない JRI・JPV が6個積み
   const is6 = !isNabe && !is7 && is6PerLayerType(itemName);
@@ -813,10 +854,12 @@ export default function PalletDiagram({
   // Calculate pallet dimensions in cm
   let palletWcm: number;
   let palletDcm: number;
-  if (isNabe5) {
-    // 大きい箱の内鍋: 荷姿（L + 2S の正方形）をそのままパレットの大きさにする。
-    // 1段ごとに90度まわして積むので、どちらの向きでも収まる
-    const side = Math.max(bwCm, bdCm) + Math.min(bwCm, bdCm) * 2;
+  if (nabeBig) {
+    // 大きい箱の内鍋: 荷姿をそのままパレットの大きさにする。
+    // 1段5個は L + 2S の正方形、1段4個（風車）は L + S の正方形
+    const side = isNabe4
+      ? Math.max(bwCm, bdCm) + Math.min(bwCm, bdCm)
+      : Math.max(bwCm, bdCm) + Math.min(bwCm, bdCm) * 2;
     palletWcm = side;
     palletDcm = side;
   } else if (isNabe) {
@@ -855,10 +898,14 @@ export default function PalletDiagram({
   } else if (isJarPot) {
     allSlots = buildJarPotSlots(bh, layers, pw, pd);
     perLayer = 4;
+  } else if (isNabe4) {
+    // 大きい箱の内鍋の180サイズは 風車状に 1段4個
+    allSlots = buildNabe4Slots(bwCm, bdCm, bh, layers, pw, cm2px);
+    perLayer = nabeBigPerLayer;
   } else if (isNabe5) {
-    // 大きい箱の内鍋は 奥に横2個 ＋ 手前に縦3個 で 1段5個
+    // 大きい箱の内鍋の100/60サイズは 奥に横2個 ＋ 手前に縦3個 で 1段5個
     allSlots = buildNabe5Slots(bwCm, bdCm, bh, layers, pw, cm2px);
-    perLayer = NABE5_PER_LAYER;
+    perLayer = nabeBigPerLayer;
   } else if (isNabe || is6) {
     // 鍋はどの種目でも、JRI・JPV は3列×2行で、1段6個
     allSlots = buildNabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);

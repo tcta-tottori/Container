@@ -29,8 +29,11 @@ private const val VISUAL_SIZE = 70f
  */
 private const val NABE_BIG_BOX_MIN_PACKING_QTY = 9
 
-/** 大きい箱の内鍋の 1 段あたりの箱の数 */
-private const val NABE5_PER_LAYER = 5
+/** 大きい箱の内鍋の 1 段あたりの箱の数（100・60 サイズ） */
+private const val NABE_BIG_PER_LAYER = 5
+
+/** 大きい箱の内鍋の 1 段あたりの箱の数（180 サイズ。風車状） */
+private const val NABE_BIG_LARGE_PER_LAYER = 4
 
 private const val PDU_CASES_PER_BUNDLE = 2
 
@@ -130,6 +133,10 @@ object PalletLayout {
         itemName != null && Regex("PDU", RegexOption.IGNORE_CASE).containsMatchIn(itemName)
 
     /** 何段まで積むか */
+    /** 180 サイズ（段数が 1 つ少ない）か。品名で見る */
+    fun isLargeSizeName(itemName: String): Boolean =
+        itemName.contains("180") || Regex("18[RWCS]").containsMatchIn(itemName)
+
     fun stackLayers(itemType: String?, itemName: String, qtyPerPallet: Int, measurements: String?): Int {
         if (itemType == ItemTypes.JAR_POT || Regex("^(PDR|PDU|PVW)").containsMatchIn(itemName)) {
             val m = Regex("""(?:PD[RUZ]|PVW)[^0-9]{0,4}(\d{2})""").find(itemName)
@@ -138,7 +145,7 @@ object PalletLayout {
             return if (size >= 50) 4 else 5
         }
         if (itemType == ItemTypes.POLY_COVER || itemType == ItemTypes.POT) {
-            return if (itemName.contains("180") || Regex("18[RWCS]").containsMatchIn(itemName)) 4 else 5
+            return if (isLargeSizeName(itemName)) 4 else 5
         }
         val dims = parseMeasurements(measurements)
         if (dims != null && qtyPerPallet > 0) {
@@ -171,8 +178,11 @@ object PalletLayout {
 
         val (bwCm, bdCm, bhCm) = boxDimensionsCm(measurements, itemName)
         val isNabe = itemType == ItemTypes.POT
-        // 大きい箱の内鍋（1 ケース 12 個入りなど）は 1 段 5 個。従来の 8 個入りは 1 段 6 個のまま
-        val isNabe5 = isNabe && packingQty >= NABE_BIG_BOX_MIN_PACKING_QTY
+        // 大きい箱の内鍋（1 ケース 12 個入りなど）は 100・60 サイズが 1 段 5 個、
+        // 180 サイズが 1 段 4 個（風車状）。従来の 8 個入りは 1 段 6 個のまま
+        val nabeBig = isNabe && packingQty >= NABE_BIG_BOX_MIN_PACKING_QTY
+        val isNabe4 = nabeBig && isLargeSizeName(itemName)
+        val isNabe5 = nabeBig && !isNabe4
         val is7 = is7PerLayerType(itemName)
         // 鍋と 7 個積みが先。どちらでもない JRI・JPV が 6 個積み
         val is6 = !isNabe && !is7 && is6PerLayerType(itemName)
@@ -183,10 +193,14 @@ object PalletLayout {
         // パレットの大きさ（cm）
         val palletWcm: Float
         val palletDcm: Float
-        if (isNabe5 || (is7 && !isNabe)) {
-            // 荷姿（長辺 + 短辺 × 2 の正方形）をそのままパレットの大きさにする。
-            // 1 段ごとに 90 度まわして積むので、どちらの向きでも収まる
-            val side = max(bwCm, bdCm) + min(bwCm, bdCm) * 2
+        if (nabeBig || (is7 && !isNabe)) {
+            // 荷姿をそのままパレットの大きさにする。
+            // 1 段 4 個（風車）は 長辺 + 短辺、それ以外は 長辺 + 短辺 × 2 の正方形
+            val side = if (isNabe4) {
+                max(bwCm, bdCm) + min(bwCm, bdCm)
+            } else {
+                max(bwCm, bdCm) + min(bwCm, bdCm) * 2
+            }
             palletWcm = side
             palletDcm = side
         } else {
@@ -212,10 +226,15 @@ object PalletLayout {
                 slots = jarPotSlots(bh, layers, pw, pd).toMutableList()
                 perLayer = 4
             }
+            isNabe4 -> {
+                // 180 サイズは風車状に 1 段 4 個
+                slots = nabe4Slots(bwCm, bdCm, bh, layers, pw, cm2px).toMutableList()
+                perLayer = NABE_BIG_LARGE_PER_LAYER
+            }
             isNabe5 -> {
                 // 奥に横 2 個 ＋ 手前に縦 3 個 で 1 段 5 個
                 slots = nabe5Slots(bwCm, bdCm, bh, layers, pw, cm2px).toMutableList()
-                perLayer = NABE5_PER_LAYER
+                perLayer = NABE_BIG_PER_LAYER
             }
             isNabe || is6 -> {
                 // 3 列 × 2 行 で 1 段 6 個
@@ -330,6 +349,44 @@ object PalletLayout {
             for (i in 0 until 2) put(0f, side - (i + 1) * sSide, lSide, sSide, i)
             // 手前の「縦」3 個。左から右へ
             for (i in 0 until 3) put(i * sSide, 0f, sSide, lSide, 2 + i)
+        }
+        return out
+    }
+
+    /**
+     * 大きい箱の内鍋の 180 サイズ（5L JPV-T180 など、1 ケース 12 個入り）の「1 段 4 個」の積み方。
+     *
+     * 風車（ピンホイール）状に、箱の向きを 90 度ずつ変えながら 4 個を回して置く。
+     * 段ごとに左右を入れ替えて（風車の回る向きを逆にして）、段どうしを噛み合わせる。
+     *
+     *   ┌───────────┬───┐
+     *   │    横 1    │縦 │  L + S の正方形。中央に (L−S) 角の隙間が空く
+     *   ├───┬───────┤ 2 │
+     *   │縦 │  空き  │   │
+     *   │ 4 ├───────┴───┤
+     *   │   │    横 3    │
+     *   └───┴───────────┘
+     *
+     * ※ y は 0 が手前。奥ほど y が大きい
+     */
+    private fun nabe4Slots(
+        bwCm: Float, bdCm: Float, bhPx: Float, layers: Int,
+        side: Float, cm2px: Float,
+    ): List<BoxSlot> {
+        val sSide = min(bwCm, bdCm) * cm2px
+        val lSide = max(bwCm, bdCm) * cm2px
+        val out = mutableListOf<BoxSlot>()
+        for (layer in 0 until layers) {
+            val z = PALLET_BASE_HEIGHT + layer * bhPx
+            // 段ごとに左右を入れ替える（風車の回る向きが逆になり、段どうしが噛み合う）
+            val flip = layer % 2 == 1
+            fun put(x: Float, y: Float, w: Float, d: Float, seq: Int) {
+                out += BoxSlot(x = if (flip) side - x - w else x, y = y, z = z, w = w, d = d, h = bhPx, seq = seq)
+            }
+            put(0f, side - sSide, lSide, sSide, 0)       // 奥の左: 横
+            put(lSide, side - lSide, sSide, lSide, 1)    // 奥の右: 縦
+            put(side - lSide, 0f, lSide, sSide, 2)       // 手前の右: 横
+            put(0f, 0f, sSide, lSide, 3)                 // 手前の左: 縦
         }
         return out
     }

@@ -20,6 +20,23 @@ export function isLargeSizeName(itemName: string): boolean {
   return itemName.includes('180') || /18[RWCS]/.test(itemName);
 }
 
+/**
+ * 内鍋の 1 段あたりの箱の数。
+ *
+ * - 従来の 8 個入り（46×46×29cm ほど）… 3 列 × 2 行 で 1 段 6 個
+ * - 大きい箱（12 個入り）の 100・60 サイズ … 奥に横 2 個 ＋ 手前に縦 3 個 で 1 段 5 個
+ * - 大きい箱（12 個入り）の 180 サイズ     … 風車（ピンホイール）状に 1 段 4 個
+ *
+ * 段数は 100・60 サイズが 5 段、180 サイズが 4 段。
+ * つまり 1 パレットは 大きい箱: 100→25 / 180→16、従来: 100→30 / 180→24。
+ */
+export function nabePerLayer(
+  type: ItemType | undefined, packingQty: number | undefined, itemName: string,
+): number {
+  if (!isBigNabeBox(type, packingQty)) return 6;
+  return isLargeSizeName(itemName) ? 4 : 5;
+}
+
 /** 作業画面に出す PL / CT / pcs */
 export interface DisplayQuantities {
   /** パレット枚数（PL） */

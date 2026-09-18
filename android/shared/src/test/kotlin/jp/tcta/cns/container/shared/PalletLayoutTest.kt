@@ -114,6 +114,33 @@ class PalletLayoutTest {
     }
 
     @Test
+    fun `big nabe 180 stacks four per layer`() {
+        // 5L JPV-T180 のような 180 サイズの大きい箱は 風車状に 1 段 4 個・4 段
+        val stack = PalletLayout.buildFractionStack(
+            cartons = 16, qtyPerPallet = 16,
+            itemType = ItemTypes.POT, itemName = "JPVT180ｳﾁﾅﾍﾞ$",
+            measurements = "71*47*33", packingQty = 12,
+        )
+        assertEquals(16, stack.slots.size)
+        assertEquals(4, stack.slots.map { it.z }.distinct().size)
+        val zs = stack.slots.map { it.z }.distinct().sorted()
+        val lower = stack.slots.filter { it.z == zs[0] }
+        // 1 段は 横 2 個 ＋ 縦 2 個 の風車
+        assertEquals(4, lower.size)
+        assertEquals(2, lower.count { it.w > it.d })
+        assertEquals(2, lower.count { it.d > it.w })
+        // 段ごとに左右が入れ替わる（風車の向きが逆になり、上下の箱が噛み合う）
+        val upper = stack.slots.filter { it.z == zs[1] }
+        val place = { b: BoxSlot -> listOf(b.x, b.y, b.w, b.d) }
+        assertTrue(lower.map(place).toSet() != upper.map(place).toSet())
+        // どの箱もパレットの中に収まっている
+        for (b in stack.slots) {
+            assertTrue(b.x >= -0.01f && b.x + b.w <= stack.palletWidth + 0.01f)
+            assertTrue(b.y >= -0.01f && b.y + b.d <= stack.palletDepth + 0.01f)
+        }
+    }
+
+    @Test
     fun `big nabe layers interlock and stay on the pallet`() {
         // 2 段目は 90 度まわして噛み合わせる。荷姿からははみ出さない
         val stack = PalletLayout.buildFractionStack(
