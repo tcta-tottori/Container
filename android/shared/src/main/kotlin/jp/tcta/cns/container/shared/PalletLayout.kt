@@ -32,7 +32,7 @@ private const val NABE_BIG_BOX_MIN_PACKING_QTY = 9
 /** 大きい箱の内鍋の 1 段あたりの箱の数（100・60 サイズ） */
 private const val NABE_BIG_PER_LAYER = 5
 
-/** 大きい箱の内鍋の 1 段あたりの箱の数（180 サイズ。風車状） */
+/** 大きい箱の内鍋の 1 段あたりの箱の数（180 サイズ。2 列 × 2 行） */
 private const val NABE_BIG_LARGE_PER_LAYER = 4
 
 private const val PDU_CASES_PER_BUNDLE = 2
@@ -179,7 +179,7 @@ object PalletLayout {
         val (bwCm, bdCm, bhCm) = boxDimensionsCm(measurements, itemName)
         val isNabe = itemType == ItemTypes.POT
         // 大きい箱の内鍋（1 ケース 12 個入りなど）は 100・60 サイズが 1 段 5 個、
-        // 180 サイズが 1 段 4 個（風車状）。従来の 8 個入りは 1 段 6 個のまま
+        // 180 サイズが 1 段 4 個（2 列 × 2 行）。従来の 8 個入りは 1 段 6 個のまま
         val nabeBig = isNabe && packingQty >= NABE_BIG_BOX_MIN_PACKING_QTY
         val isNabe4 = nabeBig && isLargeSizeName(itemName)
         val isNabe5 = nabeBig && !isNabe4
@@ -193,14 +193,17 @@ object PalletLayout {
         // パレットの大きさ（cm）
         val palletWcm: Float
         val palletDcm: Float
-        if (nabeBig || (is7 && !isNabe)) {
-            // 荷姿をそのままパレットの大きさにする。
-            // 1 段 4 個（風車）は 長辺 + 短辺、それ以外は 長辺 + 短辺 × 2 の正方形
-            val side = if (isNabe4) {
-                max(bwCm, bdCm) + min(bwCm, bdCm)
-            } else {
-                max(bwCm, bdCm) + min(bwCm, bdCm) * 2
-            }
+        if (nabeBig) {
+            // 大きい箱の内鍋: 荷姿をそのままパレットの大きさにする
+            //   1 段 5 個 … 幅 max(2L, 3S) × 奥行き S + L
+            //   1 段 4 個 … 幅 2L × 奥行き 2S（2 列 × 2 行）
+            val sCm = min(bwCm, bdCm)
+            val lCm = max(bwCm, bdCm)
+            palletWcm = if (isNabe4) 2 * lCm else max(2 * lCm, 3 * sCm)
+            palletDcm = if (isNabe4) 2 * sCm else sCm + lCm
+        } else if (is7 && !isNabe) {
+            // 1 段ごとに 90 度まわして積むので、どちらの向きでも収まる正方形にする
+            val side = max(bwCm, bdCm) + min(bwCm, bdCm) * 2
             palletWcm = side
             palletDcm = side
         } else {
@@ -227,13 +230,13 @@ object PalletLayout {
                 perLayer = 4
             }
             isNabe4 -> {
-                // 180 サイズは風車状に 1 段 4 個
-                slots = nabe4Slots(bwCm, bdCm, bh, layers, pw, cm2px).toMutableList()
+                // 180 サイズは 2 列 × 2 行 で 1 段 4 個
+                slots = nabe4Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px).toMutableList()
                 perLayer = NABE_BIG_LARGE_PER_LAYER
             }
             isNabe5 -> {
-                // 奥に横 2 個 ＋ 手前に縦 3 個 で 1 段 5 個
-                slots = nabe5Slots(bwCm, bdCm, bh, layers, pw, cm2px).toMutableList()
+                // 奥に横 2 個（左右）＋ 手前に縦 3 個（左右）で 1 段 5 個
+                slots = nabe5Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px).toMutableList()
                 perLayer = NABE_BIG_PER_LAYER
             }
             isNabe || is6 -> {
@@ -313,42 +316,38 @@ object PalletLayout {
      * 大きい箱の内鍋（3L JPV-T100 など、1 ケース 12 個入り）の「1 段 5 個」の積み方。
      *
      * 奥に「横」（長辺が左右）を 2 個ならべ、その手前に「縦」（長辺が奥行き）を 3 個ならべる。
-     * 2 段目からは 1 段ごとに 90 度まわして、段どうしが噛み合うようにする。
+     * どちらの列も左右いっぱいに広げて置く。
      *
-     *   ┌───────────┬──────┐
-     *   │   横 1     │      │  奥: 横 2 個（幅 L・奥行 S）を奥から手前へ
-     *   ├───────────┤ 空き │
-     *   │   横 2     │      │
-     *   ├───┬───┬───┴──────┤
-     *   │縦1│縦2│縦3│ 空き │  手前: 縦 3 個（幅 S・奥行 L）を左から右へ
-     *   └───┴───┴───┴──────┘
+     *   ┌──────────┬──────────┐
+     *   │   横 1    │   横 2    │  奥: 幅 L・奥行 S を左右に 2 個
+     *   ├──────┬───┴───┬──────┤
+     *   │ 縦 3  │  縦 4  │ 縦 5  │  手前: 幅 S・奥行 L を左右に 3 個
+     *   └──────┴───────┴──────┘
      *
-     * 荷姿は一辺 L + 2S の正方形。奥行きは 2S（横 2 個）＋ L（縦 3 個）でちょうど一辺、
-     * 幅は 横が L、縦が 3S で、どちらも一辺に収まる。
+     * 荷姿は 幅 max(2L, 3S) × 奥行き S + L。
+     * 箱の長辺と短辺が 3:2 のときは 2L = 3S になり、両方の列がぴったりそろう。
      * ※ y は 0 が手前。奥ほど y が大きい
      */
     private fun nabe5Slots(
         bwCm: Float, bdCm: Float, bhPx: Float, layers: Int,
-        side: Float, cm2px: Float,
+        pw: Float, pd: Float, cm2px: Float,
     ): List<BoxSlot> {
         val sSide = min(bwCm, bdCm) * cm2px
         val lSide = max(bwCm, bdCm) * cm2px
+        // 列ごとに、幅の狭いほうは中央に寄せる
+        val backX0 = (pw - 2 * lSide) / 2
+        val frontX0 = (pw - 3 * sSide) / 2
         val out = mutableListOf<BoxSlot>()
         for (layer in 0 until layers) {
             val z = PALLET_BASE_HEIGHT + layer * bhPx
-            // 1 段ごとに 90 度まわす。正方形の荷姿なので、まわしてもはみ出さない
-            val turn = layer % 2 == 1
-            fun put(x: Float, y: Float, w: Float, d: Float, seq: Int) {
-                out += if (turn) {
-                    BoxSlot(x = side - y - d, y = x, z = z, w = d, d = w, h = bhPx, seq = seq)
-                } else {
-                    BoxSlot(x = x, y = y, z = z, w = w, d = d, h = bhPx, seq = seq)
-                }
+            // 奥の「横」2 個。左から右へ
+            for (i in 0 until 2) {
+                out += BoxSlot(x = backX0 + i * lSide, y = pd - sSide, z = z, w = lSide, d = sSide, h = bhPx, seq = i)
             }
-            // 奥の「横」2 個。i = 0 がいちばん奥
-            for (i in 0 until 2) put(0f, side - (i + 1) * sSide, lSide, sSide, i)
             // 手前の「縦」3 個。左から右へ
-            for (i in 0 until 3) put(i * sSide, 0f, sSide, lSide, 2 + i)
+            for (i in 0 until 3) {
+                out += BoxSlot(x = frontX0 + i * sSide, y = 0f, z = z, w = sSide, d = lSide, h = bhPx, seq = 2 + i)
+            }
         }
         return out
     }
@@ -356,37 +355,37 @@ object PalletLayout {
     /**
      * 大きい箱の内鍋の 180 サイズ（5L JPV-T180 など、1 ケース 12 個入り）の「1 段 4 個」の積み方。
      *
-     * 風車（ピンホイール）状に、箱の向きを 90 度ずつ変えながら 4 個を回して置く。
-     * 段ごとに左右を入れ替えて（風車の回る向きを逆にして）、段どうしを噛み合わせる。
+     * 2 列 × 2 行 で、4 個とも同じ向き（長辺が左右）に置く。
      *
-     *   ┌───────────┬───┐
-     *   │    横 1    │縦 │  L + S の正方形。中央に (L−S) 角の隙間が空く
-     *   ├───┬───────┤ 2 │
-     *   │縦 │  空き  │   │
-     *   │ 4 ├───────┴───┤
-     *   │   │    横 3    │
-     *   └───┴───────────┘
+     *   ┌──────────┬──────────┐
+     *   │   横 1    │   横 2    │  奥
+     *   ├──────────┼──────────┤
+     *   │   横 3    │   横 4    │  手前
+     *   └──────────┴──────────┘
      *
+     * 荷姿は 幅 2L × 奥行き 2S。
      * ※ y は 0 が手前。奥ほど y が大きい
      */
     private fun nabe4Slots(
         bwCm: Float, bdCm: Float, bhPx: Float, layers: Int,
-        side: Float, cm2px: Float,
+        pw: Float, pd: Float, cm2px: Float,
     ): List<BoxSlot> {
         val sSide = min(bwCm, bdCm) * cm2px
         val lSide = max(bwCm, bdCm) * cm2px
+        val x0 = (pw - 2 * lSide) / 2
+        val y0 = (pd - 2 * sSide) / 2
         val out = mutableListOf<BoxSlot>()
         for (layer in 0 until layers) {
             val z = PALLET_BASE_HEIGHT + layer * bhPx
-            // 段ごとに左右を入れ替える（風車の回る向きが逆になり、段どうしが噛み合う）
-            val flip = layer % 2 == 1
-            fun put(x: Float, y: Float, w: Float, d: Float, seq: Int) {
-                out += BoxSlot(x = if (flip) side - x - w else x, y = y, z = z, w = w, d = d, h = bhPx, seq = seq)
+            for (r in 0 until 2) {        // r = 0 が奥
+                for (c in 0 until 2) {    // c = 0 が左
+                    out += BoxSlot(
+                        x = x0 + c * lSide,
+                        y = y0 + (1 - r) * sSide,
+                        z = z, w = lSide, d = sSide, h = bhPx, seq = r * 2 + c,
+                    )
+                }
             }
-            put(0f, side - sSide, lSide, sSide, 0)       // 奥の左: 横
-            put(lSide, side - lSide, sSide, lSide, 1)    // 奥の右: 縦
-            put(side - lSide, 0f, lSide, sSide, 2)       // 手前の右: 横
-            put(0f, 0f, sSide, lSide, 3)                 // 手前の左: 縦
         }
         return out
     }

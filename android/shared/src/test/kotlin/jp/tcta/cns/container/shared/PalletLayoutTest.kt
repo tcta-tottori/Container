@@ -102,6 +102,14 @@ class PalletLayoutTest {
         // 奥の 2 個は「横」（幅が長辺）、手前の 3 個は「縦」（奥行きが長辺）
         assertEquals(2, big.slots.count { it.w > it.d })
         assertEquals(3, big.slots.count { it.d > it.w })
+        // 横 2 個は左右にならび、縦 3 個はその手前にならぶ
+        val back = big.slots.filter { it.w > it.d }
+        val front = big.slots.filter { it.d > it.w }
+        assertEquals(2, back.map { it.x }.distinct().size)
+        assertEquals(1, back.map { it.y }.distinct().size)
+        assertEquals(3, front.map { it.x }.distinct().size)
+        assertEquals(1, front.map { it.y }.distinct().size)
+        assertTrue(back.first().y > front.first().y)
 
         // 従来の 8 個入りの内鍋は、これまでどおり 1 段 6 個
         val small = PalletLayout.buildFractionStack(
@@ -125,14 +133,11 @@ class PalletLayoutTest {
         assertEquals(4, stack.slots.map { it.z }.distinct().size)
         val zs = stack.slots.map { it.z }.distinct().sorted()
         val lower = stack.slots.filter { it.z == zs[0] }
-        // 1 段は 横 2 個 ＋ 縦 2 個 の風車
+        // 1 段は 2 列 × 2 行。4 個とも同じ向き（長辺が左右）
         assertEquals(4, lower.size)
-        assertEquals(2, lower.count { it.w > it.d })
-        assertEquals(2, lower.count { it.d > it.w })
-        // 段ごとに左右が入れ替わる（風車の向きが逆になり、上下の箱が噛み合う）
-        val upper = stack.slots.filter { it.z == zs[1] }
-        val place = { b: BoxSlot -> listOf(b.x, b.y, b.w, b.d) }
-        assertTrue(lower.map(place).toSet() != upper.map(place).toSet())
+        assertEquals(4, lower.count { it.w > it.d })
+        assertEquals(2, lower.map { it.x }.distinct().size)
+        assertEquals(2, lower.map { it.y }.distinct().size)
         // どの箱もパレットの中に収まっている
         for (b in stack.slots) {
             assertTrue(b.x >= -0.01f && b.x + b.w <= stack.palletWidth + 0.01f)
@@ -141,8 +146,8 @@ class PalletLayoutTest {
     }
 
     @Test
-    fun `big nabe layers interlock and stay on the pallet`() {
-        // 2 段目は 90 度まわして噛み合わせる。荷姿からははみ出さない
+    fun `big nabe layers stack straight up and stay on the pallet`() {
+        // 段が変わっても並べ方は同じ。荷姿からははみ出さない
         val stack = PalletLayout.buildFractionStack(
             cartons = 10, qtyPerPallet = 25,
             itemType = ItemTypes.POT, itemName = "JPVT100ｳﾁﾅﾍﾞ$",
@@ -153,9 +158,9 @@ class PalletLayoutTest {
         val zs = stack.slots.map { it.z }.distinct().sorted()
         val lower = stack.slots.filter { it.z == zs[0] }
         val upper = stack.slots.filter { it.z == zs[1] }
-        // 1 段目と 2 段目で「横」と「縦」の数が入れ替わる
-        assertEquals(2, lower.count { it.w > it.d })
-        assertEquals(2, upper.count { it.d > it.w })
+        // どの段も同じ並べ方（横 2 個 ＋ 縦 3 個）
+        val place = { b: BoxSlot -> listOf(b.x, b.y, b.w, b.d) }
+        assertEquals(lower.map(place).toSet(), upper.map(place).toSet())
         // どの箱もパレットの中に収まっている
         for (b in stack.slots) {
             assertTrue(b.x >= -0.01f && b.x + b.w <= stack.palletWidth + 0.01f)

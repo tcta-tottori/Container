@@ -370,40 +370,39 @@ function buildNabeSlots(
  * 大きい箱の内鍋（3L JPV-T100 など、1ケース12個入り）の「1段5個」の積み方。
  *
  * 奥に「横」（長辺が左右）を2個ならべ、その手前に「縦」（長辺が奥行き）を3個ならべる。
- * 2段目からは1段ごとに90度まわして、段どうしが噛み合うようにする（実際の積み方と同じ）。
+ * どちらの列も左右いっぱいに広げて置く。
  *
- *   ┌───────────┬──────┐
- *   │   横 1     │      │  奥: 横2個（幅 L・奥行 S）を奥から手前へ
- *   ├───────────┤ 空き │
- *   │   横 2     │      │
- *   ├───┬───┬───┴──────┤
- *   │縦1│縦2│縦3│ 空き │  手前: 縦3個（幅 S・奥行 L）を左から右へ
- *   └───┴───┴───┴──────┘
+ *   ┌──────────┬──────────┐
+ *   │   横 1    │   横 2    │  奥: 幅 L・奥行 S を左右に2個
+ *   ├──────┬───┴───┬──────┤
+ *   │ 縦 3  │  縦 4  │ 縦 5  │  手前: 幅 S・奥行 L を左右に3個
+ *   └──────┴───────┴──────┘
  *
- * 荷姿は一辺 L + 2S の正方形。奥行きは 2S（横2個）＋ L（縦3個）でちょうど一辺に収まり、
- * 幅は 横が L、縦が 3S でどちらも一辺に収まる。
+ * 荷姿は 幅 max(2L, 3S) × 奥行き S + L。
+ * 箱の長辺と短辺が 3:2 のときは 2L = 3S になり、両方の列がぴったりそろう。
  * ※ y は 0 が手前。奥ほど y が大きい
  */
 function buildNabe5Slots(
   bwCm: number, bdCm: number, bhPx: number, layers: number,
-  side: number, cm2px: number,
+  pw: number, pd: number, cm2px: number,
 ): BoxSlot[] {
   const S = Math.min(bwCm, bdCm) * cm2px;  // 短い辺
   const L = Math.max(bwCm, bdCm) * cm2px;  // 長い辺
+  // 列ごとに、幅の狭いほうは中央に寄せる
+  const backX0 = (pw - 2 * L) / 2;
+  const frontX0 = (pw - 3 * S) / 2;
   const slots: BoxSlot[] = [];
 
   for (let layer = 0; layer < layers; layer++) {
     const z = PALLET_H_PX + layer * bhPx;
-    // 1段ごとに90度まわす。正方形の荷姿なので、まわしてもはみ出さない
-    const turn = layer % 2 === 1;
-    const put = (x: number, y: number, w: number, d: number, seq: number) => {
-      const b = turn ? { x: side - y - d, y: x, w: d, d: w } : { x, y, w, d };
-      slots.push({ ...b, z, h: bhPx, seq });
-    };
-    // 奥の「横」2個。i=0 がいちばん奥
-    for (let i = 0; i < 2; i++) put(0, side - (i + 1) * S, L, S, i);
+    // 奥の「横」2個。左から右へ
+    for (let i = 0; i < 2; i++) {
+      slots.push({ x: backX0 + i * L, y: pd - S, z, w: L, d: S, h: bhPx, seq: i });
+    }
     // 手前の「縦」3個。左から右へ
-    for (let i = 0; i < 3; i++) put(i * S, 0, S, L, 2 + i);
+    for (let i = 0; i < 3; i++) {
+      slots.push({ x: frontX0 + i * S, y: 0, z, w: S, d: L, h: bhPx, seq: 2 + i });
+    }
   }
   return slots;
 }
@@ -411,41 +410,42 @@ function buildNabe5Slots(
 /**
  * 大きい箱の内鍋の 180 サイズ（5L JPV-T180 など、1ケース12個入り）の「1段4個」の積み方。
  *
- * 風車（ピンホイール）状に、箱の向きを90度ずつ変えながら4個を回して置く。
- * 段ごとに左右を入れ替えて（風車の回る向きを逆にして）、段どうしを噛み合わせる。
+ * 2列 × 2行 で、4個とも同じ向き（長辺が左右）に置く。
  *
- *   ┌───────────┬───┐
- *   │    横 1    │縦 │  L + S の正方形。中央に (L−S)角 の隙間が空く
- *   ├───┬───────┤ 2 │
- *   │縦 │  空き  │   │
- *   │ 4 ├───────┴───┤
- *   │   │    横 3    │
- *   └───┴───────────┘
+ *   ┌──────────┬──────────┐
+ *   │   横 1    │   横 2    │  奥
+ *   ├──────────┼──────────┤
+ *   │   横 3    │   横 4    │  手前
+ *   └──────────┴──────────┘
  *
+ * 荷姿は 幅 2L × 奥行き 2S。
  * ※ y は 0 が手前。奥ほど y が大きい
  */
 function buildNabe4Slots(
   bwCm: number, bdCm: number, bhPx: number, layers: number,
-  side: number, cm2px: number,
+  pw: number, pd: number, cm2px: number,
 ): BoxSlot[] {
   const S = Math.min(bwCm, bdCm) * cm2px;  // 短い辺
   const L = Math.max(bwCm, bdCm) * cm2px;  // 長い辺
+  const x0 = (pw - 2 * L) / 2;
+  const y0 = (pd - 2 * S) / 2;
   const slots: BoxSlot[] = [];
 
   for (let layer = 0; layer < layers; layer++) {
     const z = PALLET_H_PX + layer * bhPx;
-    // 段ごとに左右を入れ替える（風車の回る向きが逆になり、段どうしが噛み合う）
-    const flip = layer % 2 === 1;
-    const put = (x: number, y: number, w: number, d: number, seq: number) => {
-      slots.push({ x: flip ? side - x - w : x, y, z, w, d, h: bhPx, seq });
-    };
-    put(0, side - S, L, S, 0);           // 奥の左: 横
-    put(L, side - L, S, L, 1);           // 奥の右: 縦
-    put(side - L, 0, L, S, 2);           // 手前の右: 横
-    put(0, 0, S, L, 3);                  // 手前の左: 縦
+    for (let r = 0; r < 2; r++) {        // r = 0 が奥
+      for (let c = 0; c < 2; c++) {      // c = 0 が左
+        slots.push({
+          x: x0 + c * L,
+          y: y0 + (1 - r) * S,
+          z, w: L, d: S, h: bhPx, seq: r * 2 + c,
+        });
+      }
+    }
   }
   return slots;
 }
+
 
 /**
  * JPI・JPK・JRD・JPD の「1段7個」の積み方。
@@ -855,13 +855,13 @@ export default function PalletDiagram({
   let palletWcm: number;
   let palletDcm: number;
   if (nabeBig) {
-    // 大きい箱の内鍋: 荷姿をそのままパレットの大きさにする。
-    // 1段5個は L + 2S の正方形、1段4個（風車）は L + S の正方形
-    const side = isNabe4
-      ? Math.max(bwCm, bdCm) + Math.min(bwCm, bdCm)
-      : Math.max(bwCm, bdCm) + Math.min(bwCm, bdCm) * 2;
-    palletWcm = side;
-    palletDcm = side;
+    // 大きい箱の内鍋: 荷姿をそのままパレットの大きさにする
+    //   1段5個 … 幅 max(2L, 3S) × 奥行き S + L
+    //   1段4個 … 幅 2L × 奥行き 2S（2列×2行）
+    const sCm = Math.min(bwCm, bdCm);
+    const lCm = Math.max(bwCm, bdCm);
+    palletWcm = isNabe4 ? 2 * lCm : Math.max(2 * lCm, 3 * sCm);
+    palletDcm = isNabe4 ? 2 * sCm : sCm + lCm;
   } else if (isNabe) {
     // 鍋パレット: 物理パレット110×110cmを中心に表示
     // 100サイズ(3×38=114): ほぼパレットに収まる
@@ -899,12 +899,12 @@ export default function PalletDiagram({
     allSlots = buildJarPotSlots(bh, layers, pw, pd);
     perLayer = 4;
   } else if (isNabe4) {
-    // 大きい箱の内鍋の180サイズは 風車状に 1段4個
-    allSlots = buildNabe4Slots(bwCm, bdCm, bh, layers, pw, cm2px);
+    // 大きい箱の内鍋の180サイズは 2列×2行 で 1段4個
+    allSlots = buildNabe4Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = nabeBigPerLayer;
   } else if (isNabe5) {
     // 大きい箱の内鍋の100/60サイズは 奥に横2個 ＋ 手前に縦3個 で 1段5個
-    allSlots = buildNabe5Slots(bwCm, bdCm, bh, layers, pw, cm2px);
+    allSlots = buildNabe5Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = nabeBigPerLayer;
   } else if (isNabe || is6) {
     // 鍋はどの種目でも、JRI・JPV は3列×2行で、1段6個
