@@ -44,6 +44,11 @@ export function classifyFile(name: string): { role: FileRole; label: string } {
   if (upper.includes('コンテナ日程')) {
     return { role: 'container_schedule', label: 'コンテナ日程' };
   }
+  // 中身（品目）だけを書き出したファイル。「コンテナ内容_20260902.xlsx」のように
+  // 日付がファイル名に付いていることが多い
+  if (upper.includes('コンテナ内容')) {
+    return { role: 'container', label: 'コンテナ内容' };
+  }
   if (upper.startsWith('AQSS04L') || upper.includes('AQSS04L')) {
     return { role: 'aqss04l', label: 'AQSS04L (Invoice)' };
   }
