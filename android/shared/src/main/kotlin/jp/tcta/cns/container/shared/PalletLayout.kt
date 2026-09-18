@@ -22,6 +22,16 @@ const val PALLET_BASE_HEIGHT = 8f
 private const val VISUAL_SIZE = 70f
 
 /** PDU のポットは 2 箱をラミネートして 1 玉にする */
+/**
+ * 内鍋の「大きい箱」とみなす入数のさかい目。
+ * 従来の内鍋は 1 ケース 8 個入りで 1 段 6 個、3L JPV-T100 のような 12 個入りの
+ * 大きい箱は 1 段 5 個で積む（スマホ側の src/lib/itemQuantity.ts と同じ決まり）。
+ */
+private const val NABE_BIG_BOX_MIN_PACKING_QTY = 9
+
+/** 大きい箱の内鍋の 1 段あたりの箱の数 */
+private const val NABE5_PER_LAYER = 5
+
 private const val PDU_CASES_PER_BUNDLE = 2
 
 /** PDU の 1 段あたりの玉数 */
@@ -147,6 +157,7 @@ object PalletLayout {
      * @param itemType 種類（[ItemTypes] の値）
      * @param itemName 品名（機種の判定に使う）
      * @param measurements 箱の寸法 "55*38*38"（cm）
+     * @param packingQty 入数（個 / ケース）。大きい箱の内鍋（1 段 5 個）かどうかの判定に使う
      */
     fun buildFractionStack(
         cartons: Int,
@@ -154,11 +165,14 @@ object PalletLayout {
         itemType: String?,
         itemName: String,
         measurements: String?,
+        packingQty: Int = 0,
     ): PalletStack {
         if (cartons <= 0) return PalletStack(emptyList(), emptyList(), VISUAL_SIZE, VISUAL_SIZE, PALLET_BASE_HEIGHT, 1)
 
         val (bwCm, bdCm, bhCm) = boxDimensionsCm(measurements, itemName)
         val isNabe = itemType == ItemTypes.POT
+        // 大きい箱の内鍋（1 ケース 12 個入りなど）は 1 段 5 個。従来の 8 個入りは 1 段 6 個のまま
+        val isNabe5 = isNabe && packingQty >= NABE_BIG_BOX_MIN_PACKING_QTY
         val is7 = is7PerLayerType(itemName)
         // 鍋と 7 個積みが先。どちらでもない JRI・JPV が 6 個積み
         val is6 = !isNabe && !is7 && is6PerLayerType(itemName)
@@ -169,7 +183,9 @@ object PalletLayout {
         // パレットの大きさ（cm）
         val palletWcm: Float
         val palletDcm: Float
-        if (is7 && !isNabe) {
+        if (isNabe5 || (is7 && !isNabe)) {
+            // 荷姿（長辺 + 短辺 × 2 の正方形）をそのままパレットの大きさにする。
+            // 1 段ごとに 90 度まわして積むので、どちらの向きでも収まる
             val side = max(bwCm, bdCm) + min(bwCm, bdCm) * 2
             palletWcm = side
             palletDcm = side
@@ -195,6 +211,11 @@ object PalletLayout {
             isJarPot -> {
                 slots = jarPotSlots(bh, layers, pw, pd).toMutableList()
                 perLayer = 4
+            }
+            isNabe5 -> {
+                // 奥に横 2 個 ＋ 手前に縦 3 個 で 1 段 5 個
+                slots = nabe5Slots(bwCm, bdCm, bh, layers, pw, cm2px).toMutableList()
+                perLayer = NABE5_PER_LAYER
             }
             isNabe || is6 -> {
                 // 3 列 × 2 行 で 1 段 6 個
@@ -268,6 +289,50 @@ object PalletLayout {
     }
 
     // ---------- 段ごとの並べ方 ----------
+
+    /**
+     * 大きい箱の内鍋（3L JPV-T100 など、1 ケース 12 個入り）の「1 段 5 個」の積み方。
+     *
+     * 奥に「横」（長辺が左右）を 2 個ならべ、その手前に「縦」（長辺が奥行き）を 3 個ならべる。
+     * 2 段目からは 1 段ごとに 90 度まわして、段どうしが噛み合うようにする。
+     *
+     *   ┌───────────┬──────┐
+     *   │   横 1     │      │  奥: 横 2 個（幅 L・奥行 S）を奥から手前へ
+     *   ├───────────┤ 空き │
+     *   │   横 2     │      │
+     *   ├───┬───┬───┴──────┤
+     *   │縦1│縦2│縦3│ 空き │  手前: 縦 3 個（幅 S・奥行 L）を左から右へ
+     *   └───┴───┴───┴──────┘
+     *
+     * 荷姿は一辺 L + 2S の正方形。奥行きは 2S（横 2 個）＋ L（縦 3 個）でちょうど一辺、
+     * 幅は 横が L、縦が 3S で、どちらも一辺に収まる。
+     * ※ y は 0 が手前。奥ほど y が大きい
+     */
+    private fun nabe5Slots(
+        bwCm: Float, bdCm: Float, bhPx: Float, layers: Int,
+        side: Float, cm2px: Float,
+    ): List<BoxSlot> {
+        val sSide = min(bwCm, bdCm) * cm2px
+        val lSide = max(bwCm, bdCm) * cm2px
+        val out = mutableListOf<BoxSlot>()
+        for (layer in 0 until layers) {
+            val z = PALLET_BASE_HEIGHT + layer * bhPx
+            // 1 段ごとに 90 度まわす。正方形の荷姿なので、まわしてもはみ出さない
+            val turn = layer % 2 == 1
+            fun put(x: Float, y: Float, w: Float, d: Float, seq: Int) {
+                out += if (turn) {
+                    BoxSlot(x = side - y - d, y = x, z = z, w = d, d = w, h = bhPx, seq = seq)
+                } else {
+                    BoxSlot(x = x, y = y, z = z, w = w, d = d, h = bhPx, seq = seq)
+                }
+            }
+            // 奥の「横」2 個。i = 0 がいちばん奥
+            for (i in 0 until 2) put(0f, side - (i + 1) * sSide, lSide, sSide, i)
+            // 手前の「縦」3 個。左から右へ
+            for (i in 0 until 3) put(i * sSide, 0f, sSide, lSide, 2 + i)
+        }
+        return out
+    }
 
     /** 鍋・JRI・JPV: 3 列 × N 行（1 段 6 個） */
     private fun nabeSlots(

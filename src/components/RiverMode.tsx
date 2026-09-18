@@ -981,7 +981,7 @@ function RiverPalletFs({
           qtyPerPallet={item.qtyPerPallet}
           type={item.type}
           itemName={item.itemName}
-          measurements={item.measurements}
+          measurements={item.measurements} packingQty={item.packingQty}
           overrideRotateY={0}
           noIntro
         />

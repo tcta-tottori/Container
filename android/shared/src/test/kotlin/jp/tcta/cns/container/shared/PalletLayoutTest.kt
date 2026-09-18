@@ -90,6 +90,53 @@ class PalletLayoutTest {
     }
 
     @Test
+    fun `big nabe boxes stack five per layer`() {
+        // 3L JPV-T100 のような 1 ケース 12 個入りの大きい箱は 1 段 5 個
+        val big = PalletLayout.buildFractionStack(
+            cartons = 5, qtyPerPallet = 25,
+            itemType = ItemTypes.POT, itemName = "JPVT100ｳﾁﾅﾍﾞ$",
+            measurements = "66*44*30", packingQty = 12,
+        )
+        assertEquals(5, big.slots.size)
+        assertEquals(1, big.slots.map { it.z }.distinct().size)
+        // 奥の 2 個は「横」（幅が長辺）、手前の 3 個は「縦」（奥行きが長辺）
+        assertEquals(2, big.slots.count { it.w > it.d })
+        assertEquals(3, big.slots.count { it.d > it.w })
+
+        // 従来の 8 個入りの内鍋は、これまでどおり 1 段 6 個
+        val small = PalletLayout.buildFractionStack(
+            cartons = 6, qtyPerPallet = 30,
+            itemType = ItemTypes.POT, itemName = "JPVG100ｳﾁﾅﾍﾞ$1",
+            measurements = "46*46*29.3", packingQty = 8,
+        )
+        assertEquals(6, small.slots.size)
+        assertEquals(1, small.slots.map { it.z }.distinct().size)
+    }
+
+    @Test
+    fun `big nabe layers interlock and stay on the pallet`() {
+        // 2 段目は 90 度まわして噛み合わせる。荷姿からははみ出さない
+        val stack = PalletLayout.buildFractionStack(
+            cartons = 10, qtyPerPallet = 25,
+            itemType = ItemTypes.POT, itemName = "JPVT100ｳﾁﾅﾍﾞ$",
+            measurements = "66*44*30", packingQty = 12,
+        )
+        assertEquals(10, stack.slots.size)
+        assertEquals(2, stack.slots.map { it.z }.distinct().size)
+        val zs = stack.slots.map { it.z }.distinct().sorted()
+        val lower = stack.slots.filter { it.z == zs[0] }
+        val upper = stack.slots.filter { it.z == zs[1] }
+        // 1 段目と 2 段目で「横」と「縦」の数が入れ替わる
+        assertEquals(2, lower.count { it.w > it.d })
+        assertEquals(2, upper.count { it.d > it.w })
+        // どの箱もパレットの中に収まっている
+        for (b in stack.slots) {
+            assertTrue(b.x >= -0.01f && b.x + b.w <= stack.palletWidth + 0.01f)
+            assertTrue(b.y >= -0.01f && b.y + b.d <= stack.palletDepth + 0.01f)
+        }
+    }
+
+    @Test
     fun `fraction stack places exactly the remainder`() {
         val stack = PalletLayout.buildFractionStack(
             cartons = 15,

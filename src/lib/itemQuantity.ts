@@ -1,4 +1,24 @@
-import { ContainerItem } from './types';
+import { ContainerItem, ItemType } from './types';
+
+/**
+ * 内鍋の「大きい箱」とみなす入数のさかい目。
+ *
+ * これまでの内鍋は 1 ケース 8 個入り（46×46×29cm ほど）で、パレットには
+ * 3 列 × 2 行 の 1 段 6 個で積む。
+ * 3L JPV-T100 のように 1 ケース 12 個入りの大きい箱は箱そのものが長方形で、
+ * 奥に横 2 個・手前に縦 3 個の 1 段 5 個で積む（40ft コンテナの実際の積み方）。
+ */
+export const NABE_BIG_BOX_MIN_PACKING_QTY = 9;
+
+/** 大きい箱の内鍋か（1 段 5 個で積むほう） */
+export function isBigNabeBox(type: ItemType | undefined, packingQty: number | undefined): boolean {
+  return type === '鍋' && (packingQty ?? 0) >= NABE_BIG_BOX_MIN_PACKING_QTY;
+}
+
+/** 180 サイズ（段数が 1 つ少ない）か。品名で見る */
+export function isLargeSizeName(itemName: string): boolean {
+  return itemName.includes('180') || /18[RWCS]/.test(itemName);
+}
 
 /** 作業画面に出す PL / CT / pcs */
 export interface DisplayQuantities {

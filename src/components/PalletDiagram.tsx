@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ItemType } from '@/lib/types';
+import { isBigNabeBox } from '@/lib/itemQuantity';
 import { cardboardFace } from './SizeDiagram';
 
 interface PalletDiagramProps {
@@ -11,6 +12,8 @@ interface PalletDiagramProps {
   type: ItemType;
   itemName?: string;
   measurements?: string;
+  /** 入数（個/ケース）。大きい箱の内鍋（1段5個）かどうかの判定に使う */
+  packingQty?: number;
   overrideRotateY?: number;
   wireframe?: boolean;
   /** 出現時のフェードインを省く（全画面表示のように最初から見せたいとき） */
@@ -27,6 +30,9 @@ interface PalletDiagramProps {
 
 /* ===== Constants ===== */
 const PALLET_H_PX = 8; // pallet base height in px
+
+/** 大きい箱の内鍋の 1 段あたりの箱の数 */
+export const NABE5_PER_LAYER = 5;
 
 /* ===== Parse measurements ===== */
 function parseMeas(s: string): [number, number, number] | null {
@@ -358,6 +364,48 @@ function buildNabeSlots(
         });
       }
     }
+  }
+  return slots;
+}
+
+/**
+ * 大きい箱の内鍋（3L JPV-T100 など、1ケース12個入り）の「1段5個」の積み方。
+ *
+ * 奥に「横」（長辺が左右）を2個ならべ、その手前に「縦」（長辺が奥行き）を3個ならべる。
+ * 2段目からは1段ごとに90度まわして、段どうしが噛み合うようにする（実際の積み方と同じ）。
+ *
+ *   ┌───────────┬──────┐
+ *   │   横 1     │      │  奥: 横2個（幅 L・奥行 S）を奥から手前へ
+ *   ├───────────┤ 空き │
+ *   │   横 2     │      │
+ *   ├───┬───┬───┴──────┤
+ *   │縦1│縦2│縦3│ 空き │  手前: 縦3個（幅 S・奥行 L）を左から右へ
+ *   └───┴───┴───┴──────┘
+ *
+ * 荷姿は一辺 L + 2S の正方形。奥行きは 2S（横2個）＋ L（縦3個）でちょうど一辺に収まり、
+ * 幅は 横が L、縦が 3S でどちらも一辺に収まる。
+ * ※ y は 0 が手前。奥ほど y が大きい
+ */
+function buildNabe5Slots(
+  bwCm: number, bdCm: number, bhPx: number, layers: number,
+  side: number, cm2px: number,
+): BoxSlot[] {
+  const S = Math.min(bwCm, bdCm) * cm2px;  // 短い辺
+  const L = Math.max(bwCm, bdCm) * cm2px;  // 長い辺
+  const slots: BoxSlot[] = [];
+
+  for (let layer = 0; layer < layers; layer++) {
+    const z = PALLET_H_PX + layer * bhPx;
+    // 1段ごとに90度まわす。正方形の荷姿なので、まわしてもはみ出さない
+    const turn = layer % 2 === 1;
+    const put = (x: number, y: number, w: number, d: number, seq: number) => {
+      const b = turn ? { x: side - y - d, y: x, w: d, d: w } : { x, y, w, d };
+      slots.push({ ...b, z, h: bhPx, seq });
+    };
+    // 奥の「横」2個。i=0 がいちばん奥
+    for (let i = 0; i < 2; i++) put(0, side - (i + 1) * S, L, S, i);
+    // 手前の「縦」3個。左から右へ
+    for (let i = 0; i < 3; i++) put(i * S, 0, S, L, 2 + i);
   }
   return slots;
 }
@@ -743,8 +791,8 @@ export function isPduJarPot(itemName?: string): boolean {
 
 /* ===== Main Component ===== */
 export default function PalletDiagram({
-  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe, noIntro,
-  stackAnim, stackSpeed = 1,
+  palletCount, fraction, qtyPerPallet, type, itemName, measurements, packingQty,
+  overrideRotateY, wireframe, noIntro, stackAnim, stackSpeed = 1,
 }: PalletDiagramProps) {
   const isFull = palletCount > 0;
   const isFraction = !isFull && fraction > 0;
@@ -752,6 +800,8 @@ export default function PalletDiagram({
 
   const [bwCm, bdCm, bhCm] = getBoxDimsCm(measurements, itemName);
   const isNabe = type === '鍋';
+  // 大きい箱の内鍋（1ケース12個入りなど）は 1段5個。従来の8個入りは 1段6個のまま
+  const isNabe5 = isBigNabeBox(type, packingQty);
   const is7 = is7PerLayerType(itemName);
   // 鍋と7個積みが先。どちらでもない JRI・JPV が6個積み
   const is6 = !isNabe && !is7 && is6PerLayerType(itemName);
@@ -763,7 +813,13 @@ export default function PalletDiagram({
   // Calculate pallet dimensions in cm
   let palletWcm: number;
   let palletDcm: number;
-  if (isNabe) {
+  if (isNabe5) {
+    // 大きい箱の内鍋: 荷姿（L + 2S の正方形）をそのままパレットの大きさにする。
+    // 1段ごとに90度まわして積むので、どちらの向きでも収まる
+    const side = Math.max(bwCm, bdCm) + Math.min(bwCm, bdCm) * 2;
+    palletWcm = side;
+    palletDcm = side;
+  } else if (isNabe) {
     // 鍋パレット: 物理パレット110×110cmを中心に表示
     // 100サイズ(3×38=114): ほぼパレットに収まる
     // 180サイズ(3×42=126): パレットからはみ出る
@@ -799,6 +855,10 @@ export default function PalletDiagram({
   } else if (isJarPot) {
     allSlots = buildJarPotSlots(bh, layers, pw, pd);
     perLayer = 4;
+  } else if (isNabe5) {
+    // 大きい箱の内鍋は 奥に横2個 ＋ 手前に縦3個 で 1段5個
+    allSlots = buildNabe5Slots(bwCm, bdCm, bh, layers, pw, cm2px);
+    perLayer = NABE5_PER_LAYER;
   } else if (isNabe || is6) {
     // 鍋はどの種目でも、JRI・JPV は3列×2行で、1段6個
     allSlots = buildNabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);

@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { ContainerItem, ItemType } from './types';
 import { detectItemType, isPartLikeName } from './typeDetector';
+import { isBigNabeBox, isLargeSizeName } from './itemQuantity';
 import { getStoredToken } from './githubSave';
 
 const REPO_OWNER = 'tcta-tottori';
@@ -464,15 +465,14 @@ export function linkItemsWithMaster(
     if (master.packingQty > 0 && updated.packingQty === 0) {
       updated.packingQty = master.packingQty;
     }
-    // 鍋のデフォルト1P数（マスタにもない場合のフォールバック）
-    // 60/100サイズ→30, 180サイズ→24
+    // 鍋のデフォルト1P数（マスタにもない場合のフォールバック）。段数 × 1段の個数で出す。
+    //   段数     … 60/100サイズ→5段, 180サイズ→4段
+    //   1段の個数 … 大きい箱（1ケース12個入りなど）→5個, 従来の8個入り→6個
+    // つまり 大きい箱: 100→25 / 180→20、従来: 100→30 / 180→24
     if (updated.qtyPerPallet === 0 && updated.type === '鍋') {
-      const name = updated.itemName || '';
-      if (name.includes('180') || /18[RWCS]/.test(name)) {
-        updated.qtyPerPallet = 24;
-      } else {
-        updated.qtyPerPallet = 30; // 60/100サイズ共通
-      }
+      const layers = isLargeSizeName(updated.itemName || '') ? 4 : 5;
+      const perLayer = isBigNabeBox(updated.type, updated.packingQty) ? 5 : 6;
+      updated.qtyPerPallet = layers * perLayer;
     }
     // パレット数・端数を自動計算（qtyPerPalletが設定済みで、元データにパレット情報がない場合）
     // caseCountが0の場合、totalQtyとpackingQtyから逆算

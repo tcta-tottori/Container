@@ -1019,7 +1019,7 @@ export default function ItemDetailPanel({
               /* タップで全画面表示（積む順番どおりに箱が降りてくる） */
               <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
                 onClick={(e) => { e.stopPropagation(); setFullscreenPallet('full'); }}>
-                <PalletDiagram palletCount={displayPallets} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false}
+                <PalletDiagram palletCount={displayPallets} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} packingQty={item.packingQty} wireframe={false}
                   /* 全画面にしなくても、その場で積み方が分かるように流す */
                   stackAnim stackSpeed={INLINE_STACK_SPEED} />
               </div>
@@ -1032,7 +1032,7 @@ export default function ItemDetailPanel({
                 alignSelf: 'flex-start',
               }}
                 onClick={(e) => { e.stopPropagation(); handleFractionTap(); }}>
-                <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false} />
+                <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} packingQty={item.packingQty} wireframe={false} />
               </div>
             )}
           </div>
@@ -1225,7 +1225,7 @@ export default function ItemDetailPanel({
               <PalletDiagram
                 palletCount={0} fraction={inspectionDeducted}
                 qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-                measurements={item.measurements} wireframe={false}
+                measurements={item.measurements} packingQty={item.packingQty} wireframe={false}
                 overrideRotateY={autoFsRotRef.current}
                 noIntro
               />
@@ -1364,7 +1364,7 @@ export default function ItemDetailPanel({
                 palletCount={fullscreenPallet === 'full' ? item.palletCount : 0}
                 fraction={fullscreenPallet === 'fraction' ? inspectionDeducted : 0}
                 qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-                measurements={item.measurements} wireframe={false}
+                measurements={item.measurements} packingQty={item.packingQty} wireframe={false}
                 overrideRotateY={fsRotateY}
                 noIntro
                 // パレットの図はまずパレットだけを出し、積む順番どおりに箱を降ろす

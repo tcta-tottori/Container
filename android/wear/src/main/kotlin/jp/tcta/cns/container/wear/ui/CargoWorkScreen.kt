@@ -634,13 +634,14 @@ private fun ItemPage(
 @Composable
 private fun ItemDetailPage(item: CargoItem, items: List<CargoItem>, onClose: () -> Unit) {
     val accent = itemTypeAccent(item.itemType)
-    val stack = remember(item.id, item.cartonCount, item.qtyPerPallet, item.measurements, item.name) {
+    val stack = remember(item.id, item.cartonCount, item.qtyPerPallet, item.measurements, item.name, item.packingQty) {
         PalletLayout.buildFractionStack(
             cartons = item.cartonCount,
             qtyPerPallet = item.qtyPerPallet,
             itemType = item.itemType,
             itemName = item.name,
             measurements = item.measurements,
+            packingQty = item.packingQty,
         )
     }
     val listState = rememberScalingLazyListState()
