@@ -8,6 +8,7 @@
 import { getGeminiKey } from './geminiApi';
 import { getVoiceSettings, styleInstruction } from './voiceSettings';
 import { pcm16ToWavBlob, normalizeJapaneseForTts } from './ttsAudio';
+import { getCachedSpeech, putCachedSpeech, speechCacheKey } from './ttsCache';
 
 /** 直近の TTS エラーメッセージ（UI 表示用） */
 let _lastTtsError: string | null = null;
@@ -43,26 +44,65 @@ function parseSampleRate(mimeType: string): number {
 }
 
 /**
+ * その文言・その話し方の音声を見分ける鍵を返す。
+ * 「もう作ってあるか」を先に調べたいところ（まとめて作る画面）から使う。
+ */
+export function geminiSpeechKey(
+  text: string,
+  options?: { voice?: string; model?: string; stylePrefix?: string },
+): string {
+  const settings = getVoiceSettings();
+  return speechCacheKey({
+    model: options?.model || settings.model,
+    voice: options?.voice || settings.main.voice,
+    style: options?.stylePrefix || styleInstruction(settings.main),
+    text: normalizeJapaneseForTts(text),
+  });
+}
+
+/**
  * Gemini TTS で音声を生成する。
  * 話者・トーン・モデルは設定ページの内容（voiceSettings）を既定値として使う。
+ *
+ * 同じ「モデル・話者・話し方・文」の音声は一度作ったら端末に取っておき、
+ * 次からは作らずにそれを返す（`ttsCache.ts`）。コールの文言は毎回おなじものが
+ * 多いので、待ち時間も通信も API の消費も無くなる。
+ *
+ * @param options.skipCache 取っておいた音声を使わず、必ず作り直す（試聴のやり直しなど）
  */
 export async function geminiGenerateSpeech(
   text: string,
-  options?: { voice?: string; model?: string; signal?: AbortSignal; stylePrefix?: string },
+  options?: {
+    voice?: string;
+    model?: string;
+    signal?: AbortSignal;
+    stylePrefix?: string;
+    skipCache?: boolean;
+  },
 ): Promise<Blob> {
-  const apiKey = getGeminiKey();
-  if (!apiKey) throw new Error('Gemini API キーが設定されていません');
-
   const settings = getVoiceSettings();
   const voice = options?.voice || settings.main.voice;
   const model = options?.model || settings.model;
-
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   // スタイル指示は最小限にして生成時間を短縮（句読点のスペース挿入で間は十分確保）
   const normalized = normalizeJapaneseForTts(text);
   const stylePrefix = options?.stylePrefix || styleInstruction(settings.main);
   const styled = `${stylePrefix}: ${normalized}`;
+
+  // 取っておいた音声があればそれを使う（API キーが無くても鳴らせる）
+  const cacheKey = speechCacheKey({ model, voice, style: stylePrefix, text: normalized });
+  if (!options?.skipCache) {
+    const cached = await getCachedSpeech(cacheKey);
+    if (cached) {
+      setLastTtsError(null);
+      return cached;
+    }
+  }
+
+  const apiKey = getGeminiKey();
+  if (!apiKey) throw new Error('Gemini API キーが設定されていません');
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const body = {
     contents: [{ parts: [{ text: styled }] }],
@@ -105,5 +145,8 @@ export async function geminiGenerateSpeech(
   setLastTtsError(null); // 成功時はエラーをクリア
   const pcm = base64ToUint8Array(b64);
   const sampleRate = parseSampleRate(mime);
-  return pcm16ToWavBlob(pcm, sampleRate);
+  const blob = pcm16ToWavBlob(pcm, sampleRate);
+  // しまうのは待たない（鳴らすほうを先に進める）
+  void putCachedSpeech(cacheKey, blob, normalized);
+  return blob;
 }

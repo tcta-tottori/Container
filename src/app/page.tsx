@@ -18,7 +18,10 @@ import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, climateToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
 import { syncToWatch, setWatchCommandHandler } from '@/lib/watchSync';
-import { getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled } from '@/lib/callPhrases';
+import {
+  getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled,
+  REQUEST_CALL_TEXT, NAME_CALL_TEXT,
+} from '@/lib/callPhrases';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
@@ -207,12 +210,6 @@ function UpdateNotification() {
     </div>
   );
 }
-
-/** 「お願いします！」ボタンで読み上げる言葉 */
-const REQUEST_CALL_TEXT = 'お願いします！';
-
-/** 「長谷川さん！お願いします！」ボタンで読み上げる言葉 */
-const NAME_CALL_TEXT = '長谷川さん！お願いします！';
 
 export default function Home() {
   const {

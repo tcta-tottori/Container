@@ -11,6 +11,7 @@ import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
 import { loadCallPhrases, DEFAULT_CALL_PHRASES } from '@/lib/callPhrases';
 import { ExternalLinkIcon } from '@/components/AppIcons';
+import CallCachePanel from '@/components/CallCachePanel';
 
 type ProfileKey = 'main' | 'cheer';
 
@@ -584,6 +585,9 @@ export default function VoiceSettingsPanel() {
         onTest={() => void playTest(tab)}
       />
 
+      {/* 中身が決まっているコールは、先に作って取っておける */}
+      <CallCachePanel hasKey={keySaved} />
+
       <button
         onClick={() => update({ ...DEFAULT_VOICE_SETTINGS })}
         style={{
@@ -598,6 +602,8 @@ export default function VoiceSettingsPanel() {
       <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, lineHeight: 1.6, marginTop: 12 }}>
         ※ 通常コールは品名・残数・進捗などの読み上げ、応援コールは応援ボタンと定期コールの応援に使います。<br />
         ※ Gemini TTS はコールのたびに通信します。圏外や API エラーのときは自動で端末の音声に切り替えて鳴らします。<br />
+        ※ 一度作った音声は端末に取っておき、同じ文言なら次から作り直しません（待ち時間も通信もかかりません）。
+        話者・話し方・モデルを変えると別の音声になるので、作り直しになります。<br />
         ※ 端末の音声はアプリ版だと端末に入っている日本語の声から選べます。
         「Google 音声サービス」の高品質な声を入れておくと、標準の声よりはっきり聞き取れます。
       </p>
