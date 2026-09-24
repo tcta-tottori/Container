@@ -153,11 +153,17 @@ export function parseJkpVolume(wb: XLSX.WorkBook): Map<string, JkpVolume> {
 //   B列(col1)  = 気高コード
 //   O列(col14)以降 = 日付ごとの納入数量
 // 納入日判定: N列=納入指示 の行で数量が入っている列の、Row10 の日付を納入日とする
-// 読込範囲: 当日から一週間以内
+// 読込範囲: 当日から一週間以内 ＋ 直近の過去納入 2 回分（前回・2回前）
+
+/** 過去にさかのぼって読み込む納入回数（前回・2回前の 2 回分） */
+export const PAST_DELIVERY_COUNT = 2;
+/** 過去の納入日を探す範囲（日数）。これより古い列は見ない */
+const PAST_LOOKBACK_DAYS = 120;
 
 export interface JkpUpdataResult {
   shipments: JkpShipment[];
-  activeDates: string[]; // 納入指示行に数量がある列の納品日（YYYY-MM-DD、当日〜7日以内）
+  activeDates: string[]; // 読み込んだ納品日（YYYY-MM-DD、過去納入分＋当日〜7日）
+  pastDates: string[];   // 過去納入分の納品日（古い順。最大 PAST_DELIVERY_COUNT 日）
 }
 
 /** 今日の日付をYYYY-MM-DD形式で返す（ローカルタイム） */
@@ -181,10 +187,10 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   );
   if (!sheetName) {
     console.warn('[JKP] updataシートが見つかりません。シート一覧:', Object.keys(wb.Sheets));
-    return { shipments: [], activeDates: [] };
+    return { shipments: [], activeDates: [], pastDates: [] };
   }
   const ws = wb.Sheets[sheetName];
-  if (!ws) return { shipments: [], activeDates: [] };
+  if (!ws) return { shipments: [], activeDates: [], pastDates: [] };
 
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
   // Excelの最大列(XFD=16383)まで走査。ファイルは毎週日付列が右に追加されるため
@@ -209,7 +215,7 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   }
   if (dateRow < 0) {
     console.warn('[JKP] 日付行が見つかりません');
-    return { shipments: [], activeDates: [] };
+    return { shipments: [], activeDates: [], pastDates: [] };
   }
   console.log(`[JKP] 納品日行: row${dateRow} (Excel row${dateRow + 1})`);
 
@@ -266,12 +272,33 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   // ── 読込対象範囲: 当日から1週間以内（当日〜当日+7日） ──
   const todayStr = todayLocalStr();
   const endStr = addDaysLocalStr(7);
-  console.log(`[JKP] 読込対象範囲: ${todayStr} 〜 ${endStr}`);
+  const lookbackStr = addDaysLocalStr(-PAST_LOOKBACK_DAYS);
+  const dataStartRow = dateRow + 2; // row11(0-indexed) = Excel row12
+
+  // ── 過去納入分の納入日を先に確定（前回・2回前の2回分） ──
+  // 当日より前の列で数量(>0)が入っている日付を集め、新しい方から PAST_DELIVERY_COUNT 日だけ残す。
+  // 「何日前か」ではなく「何回前の納入か」で決めるので、納入間隔が空いても前回・2回前を取りこぼさない。
+  const pastCols: [number, string][] = [];
+  colDateMap.forEach((dateStr, col) => {
+    if (dateStr >= todayStr || dateStr < lookbackStr) return;
+    pastCols.push([col, dateStr]);
+  });
+  const pastCandidates = new Set<string>();
+  for (let r = dataStartRow; r <= range.e.r; r++) {
+    if (String(getCell(r, 13)).trim() !== '納入指示') continue;
+    for (const [col, dateStr] of pastCols) {
+      if (pastCandidates.has(dateStr)) continue;
+      const val = getCell(r, col);
+      if (typeof val === 'number' && !isNaN(val) && val > 0) pastCandidates.add(dateStr);
+    }
+  }
+  const pastDates = Array.from(pastCandidates).sort().slice(-PAST_DELIVERY_COUNT);
+  const pastDateSet = new Set(pastDates);
+  console.log(`[JKP] 読込対象範囲: ${todayStr} 〜 ${endStr} ＋ 過去納入分 [${pastDates.join(', ') || 'なし'}]`);
 
   // ── データ行パース: N列(col13)="納入指示" の行のみ ──
   // 納入日判定: 納入指示行で数量(>0)が入っている列のRow10の日付を納入日とする
-  //            （当日〜7日以内の列のみ対象、それ以外は読込しない）
-  const dataStartRow = dateRow + 2; // row11(0-indexed) = Excel row12
+  //            （当日〜7日以内、または過去納入分の列のみ対象、それ以外は読込しない）
   const shipments: JkpShipment[] = [];
   const activeDatesSet = new Set<string>();
 
@@ -288,7 +315,8 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
     // 納入指示行の各列を走査: 数量>0 かつ 範囲内の日付 のみ記録
     const schedule = new Map<string, number | string>();
     colDateMap.forEach((dateStr, col) => {
-      if (dateStr < todayStr || dateStr > endStr) return;
+      const inRange = (dateStr >= todayStr && dateStr <= endStr) || pastDateSet.has(dateStr);
+      if (!inRange) return;
       const val = getCell(r, col);
       if (typeof val === 'number' && !isNaN(val) && val > 0) {
         schedule.set(dateStr, val);
@@ -302,8 +330,8 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   }
 
   const activeDates = Array.from(activeDatesSet).sort();
-  console.log(`[JKP] updata: ${shipments.length}品目, 納入日: ${activeDates.length}日 [${activeDates.join(', ')}]`);
-  return { shipments, activeDates };
+  console.log(`[JKP] updata: ${shipments.length}品目, 納入日: ${activeDates.length}日 [${activeDates.join(', ')}] (うち過去納入分 ${pastDates.length}日)`);
+  return { shipments, activeDates, pastDates };
 }
 
 /** 今日以降の最も近い出荷日を探す */
