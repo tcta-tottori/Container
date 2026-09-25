@@ -79,12 +79,27 @@ export default function JkpSchedulePage({ shipments, onSelectShipment }: JkpSche
   const [endDate, setEndDate] = useState(fmtDate(addDays(today, 14)));
   const [sizeFilter, setSizeFilter] = useState<'all' | '100' | '180'>('all');
 
+  const todayStr = fmtDate(today);
+
+  // 読み込んだ過去納入分（前回・2回前）のうち一番古い日。無ければ空
+  const pastStart = useMemo(() => {
+    let earliest = '';
+    for (const s of shipments) {
+      s.schedule.forEach((val, date) => {
+        if (!val || date >= todayStr) return;
+        if (!earliest || date < earliest) earliest = date;
+      });
+    }
+    return earliest;
+  }, [shipments, todayStr]);
+
   // プリセットボタン
   const presets = [
-    { label: '今日', start: fmtDate(today), end: fmtDate(today) },
-    { label: '今週', start: fmtDate(today), end: fmtDate(addDays(today, 6 - today.getDay())) },
-    { label: '2週間', start: fmtDate(today), end: fmtDate(addDays(today, 14)) },
-    { label: '1ヶ月', start: fmtDate(today), end: fmtDate(addDays(today, 30)) },
+    ...(pastStart ? [{ label: '過去納入', start: pastStart, end: todayStr }] : []),
+    { label: '今日', start: todayStr, end: todayStr },
+    { label: '今週', start: todayStr, end: fmtDate(addDays(today, 6 - today.getDay())) },
+    { label: '2週間', start: todayStr, end: fmtDate(addDays(today, 14)) },
+    { label: '1ヶ月', start: todayStr, end: fmtDate(addDays(today, 30)) },
   ];
 
   // 日付グループ化データ

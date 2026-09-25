@@ -850,33 +850,42 @@ export default function Home() {
         const sheet1Items = parseJkpSheet1(wb);
         // 体積Ｍ３: CBM・箱寸
         const volumeMap = parseJkpVolume(wb);
-        // updata: 出荷スケジュール（納入指示行の数量がある列のRow10日付を納入日として読込、当日〜7日）
-        const { shipments, activeDates } = parseJkpUpdata(wb);
+        // updata: 出荷スケジュール（納入指示行の数量がある列のRow10日付を納入日として読込、
+        //         過去納入分2回分〈前回・2回前〉＋当日〜7日）
+        const { shipments, activeDates, pastDates } = parseJkpUpdata(wb);
         setJkpShipments(shipments);
 
-        // パーサーが既に当日〜7日に絞り込み済み
+        // パーサーが既に「過去納入分＋当日〜7日」に絞り込み済み
         const today = new Date().toISOString().slice(0, 10);
         const oneWeekLater = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-        const scheduleDates = getScheduleDatesInRange(shipments, today, oneWeekLater);
+        const upcomingDates = getScheduleDatesInRange(shipments, today, oneWeekLater);
+        // 過去納入分（古い順）を先頭に並べる: 2回前 → 前回 → 当日以降
+        const scheduleDates = [...pastDates, ...upcomingDates];
 
         if (scheduleDates.length === 0) {
-          setLoadingMsg(`${today}〜${oneWeekLater}の出荷データがありません (updata:${shipments.length}件, 納入日:${activeDates.length}件)`);
+          setLoadingMsg(`${today}〜${oneWeekLater}と過去納入分の出荷データがありません (updata:${shipments.length}件, 納入日:${activeDates.length}件)`);
           await new Promise((r) => setTimeout(r, 3000));
           return;
         }
 
-        setLoadingMsg(`${scheduleDates.length}日分のデータ検出（納入指示基準）。変換中...`);
+        const pastNote = pastDates.length > 0 ? `／過去納入${pastDates.length}回分を含む` : '';
+        setLoadingMsg(`${scheduleDates.length}日分のデータ検出（納入指示基準${pastNote}）。変換中...`);
 
         // 日付ごとにContainerを作成: "鍋(04/23)" 形式
+        // 過去納入分は頭に回数を付けて区別する: "前回 鍋(04/16)" / "2回前 鍋(04/09)"
         const containers = [];
         let totalItems = 0;
         for (const date of scheduleDates) {
           const items = jkpToContainerItems(sheet1Items, volumeMap, shipments, date);
           if (items.length === 0) continue;
           const dateLabel = date.slice(5).replace('-', '/');
+          const pastIdx = pastDates.indexOf(date);
+          // 新しい過去納入日から 1回前(前回), 2回前, … と数える
+          const backCount = pastIdx >= 0 ? pastDates.length - pastIdx : 0;
+          const prefix = backCount === 1 ? '前回 ' : backCount > 1 ? `${backCount}回前 ` : '';
           containers.push({
             date,
-            containerNo: `鍋(${dateLabel})`,
+            containerNo: `${prefix}鍋(${dateLabel})`,
             items,
           });
           totalItems += items.length;
@@ -908,8 +917,9 @@ export default function Home() {
         loadData(containers);
         saveRecentFile(file, containers.length, totalItems, 'jkp');
 
-        // 紐付済みなのでuseEffectの再紐付をスキップ
-        linkedRef.current = `${containers[0].containerNo}-0`;
+        // 選択されるコンテナ（当日分）は先頭とは限らない（過去納入分を前に並べるため）ので、
+        // ここではキーを立てず、useEffect 側の紐付にまかせる
+        linkedRef.current = null;
 
         await new Promise((r) => setTimeout(r, 500));
       } catch (e) {

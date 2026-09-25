@@ -70,13 +70,22 @@ const initialState: ContainerState = {
   autoAnnounce: true,
 };
 
-/** 今日の日付に該当するコンテナのインデックスを返す（該当なしは0） */
+/**
+ * 今日の日付に該当するコンテナのインデックスを返す。
+ * 該当がないときは「今日より後で一番近い日」を選び、それも無ければ過去のうち一番新しい日（＝前回分）を選ぶ。
+ * 過去納入分（前回・2回前）を先頭に並べて読み込むので、先頭固定にすると古い分が開いてしまう。
+ */
 function findTodayContainerIdx(containers: Container[]): number {
   if (containers.length === 0) return 0;
   const now = new Date();
+  const yyyy = String(now.getFullYear());
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const dd = String(now.getDate()).padStart(2, '0');
   const todayMd = `${mm}-${dd}`;
+  const todayStr = `${yyyy}-${todayMd}`;
+  // 今日が無かったとき用に、今日に一番近い「先の日」と「過去の日」を覚えておく
+  let nextIdx = -1, nextDate = '';
+  let lastPastIdx = -1, lastPastDate = '';
   for (let i = 0; i < containers.length; i++) {
     const c = containers[i];
     // date フィールド（YYYY-MM-DD）で照合
@@ -88,7 +97,15 @@ function findTodayContainerIdx(containers: Container[]): number {
       const cdd = m[2].padStart(2, '0');
       if (`${cmm}-${cdd}` === todayMd) return i;
     }
+    if (!c.date || c.date.length < 10) continue;
+    if (c.date > todayStr) {
+      if (nextIdx < 0 || c.date < nextDate) { nextIdx = i; nextDate = c.date; }
+    } else if (lastPastIdx < 0 || c.date > lastPastDate) {
+      lastPastIdx = i; lastPastDate = c.date;
+    }
   }
+  if (nextIdx >= 0) return nextIdx;       // これからの納入分のうち一番近い日
+  if (lastPastIdx >= 0) return lastPastIdx; // 全部過去なら一番新しい日（＝前回分）
   return 0;
 }
 
