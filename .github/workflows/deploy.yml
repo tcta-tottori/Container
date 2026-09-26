@@ -14,6 +14,7 @@ on:
       - claude/add-gemini-voice-system-7J6VK
       - claude/new-session-ve46d
       - claude/needs-update-76b67n
+      - claude/pixel-watch-container-app-1ke1ck
   # 手動デプロイ用。GitHub App / API 経由のマージでは push イベントが発火せず
   # 自動デプロイが走らないため、Actions 画面から任意のブランチで実行できるようにする。
   workflow_dispatch:

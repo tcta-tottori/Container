@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ランチャーアイコンの前面。CNS のアイコン（public/icons/icon-512.svg）の立方体だけを取り出したもの。
+
+  adaptive icon は 108dp のうち中央 72dp だけが見える。元のアイコンでは立方体がタイルの約 71% を
+  占めているので、72dp に対して同じ割合（約 51dp）に合わせている。
+  これで切り抜きの形（丸・角丸など）が変わっても、元のアイコンと同じ見え方になる。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 上面 -->
+    <path
+        android:pathData="M54,30.5 L74.26,42.25 L54,54 L33.74,42.25 Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4.22"
+        android:strokeLineJoin="round" />
+    <!-- 左面 -->
+    <path
+        android:pathData="M33.74,42.25 L54,54 L54,77.5 L33.74,65.75 Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4.22"
+        android:strokeLineJoin="round" />
+    <!-- 右面 -->
+    <path
+        android:pathData="M74.26,42.25 L54,54 L54,77.5 L74.26,65.75 Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="4.22"
+        android:strokeLineJoin="round" />
+</vector>

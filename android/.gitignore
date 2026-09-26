@@ -1,0 +1,17 @@
+# Gradle
+.gradle/
+build/
+.kotlin/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 署名・秘密情報（debug 用の共有鍵だけは例外）
+*.jks
+*.keystore
+!keystore/debug.keystore

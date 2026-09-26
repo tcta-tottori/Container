@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ItemType } from '@/lib/types';
+import { isBigNabeBox, nabePerLayer } from '@/lib/itemQuantity';
 import { cardboardFace } from './SizeDiagram';
 
 interface PalletDiagramProps {
@@ -11,6 +12,8 @@ interface PalletDiagramProps {
   type: ItemType;
   itemName?: string;
   measurements?: string;
+  /** 入数（個/ケース）。大きい箱の内鍋（1段5個）かどうかの判定に使う */
+  packingQty?: number;
   overrideRotateY?: number;
   wireframe?: boolean;
   /** 出現時のフェードインを省く（全画面表示のように最初から見せたいとき） */
@@ -27,6 +30,7 @@ interface PalletDiagramProps {
 
 /* ===== Constants ===== */
 const PALLET_H_PX = 8; // pallet base height in px
+
 
 /* ===== Parse measurements ===== */
 function parseMeas(s: string): [number, number, number] | null {
@@ -363,7 +367,88 @@ function buildNabeSlots(
 }
 
 /**
- * JPI など「1段7個」の積み方。
+ * 大きい箱の内鍋（3L JPV-T100 など、1ケース12個入り）の「1段5個」の積み方。
+ *
+ * 奥に「横」（長辺が左右）を2個ならべ、その手前に「縦」（長辺が奥行き）を3個ならべる。
+ * どちらの列も左右いっぱいに広げて置く。
+ *
+ *   ┌──────────┬──────────┐
+ *   │   横 1    │   横 2    │  奥: 幅 L・奥行 S を左右に2個
+ *   ├──────┬───┴───┬──────┤
+ *   │ 縦 3  │  縦 4  │ 縦 5  │  手前: 幅 S・奥行 L を左右に3個
+ *   └──────┴───────┴──────┘
+ *
+ * 荷姿は 幅 max(2L, 3S) × 奥行き S + L。
+ * 箱の長辺と短辺が 3:2 のときは 2L = 3S になり、両方の列がぴったりそろう。
+ * ※ y は 0 が手前。奥ほど y が大きい
+ */
+function buildNabe5Slots(
+  bwCm: number, bdCm: number, bhPx: number, layers: number,
+  pw: number, pd: number, cm2px: number,
+): BoxSlot[] {
+  const S = Math.min(bwCm, bdCm) * cm2px;  // 短い辺
+  const L = Math.max(bwCm, bdCm) * cm2px;  // 長い辺
+  // 列ごとに、幅の狭いほうは中央に寄せる
+  const backX0 = (pw - 2 * L) / 2;
+  const frontX0 = (pw - 3 * S) / 2;
+  const slots: BoxSlot[] = [];
+
+  for (let layer = 0; layer < layers; layer++) {
+    const z = PALLET_H_PX + layer * bhPx;
+    // 奥の「横」2個。左から右へ
+    for (let i = 0; i < 2; i++) {
+      slots.push({ x: backX0 + i * L, y: pd - S, z, w: L, d: S, h: bhPx, seq: i });
+    }
+    // 手前の「縦」3個。左から右へ
+    for (let i = 0; i < 3; i++) {
+      slots.push({ x: frontX0 + i * S, y: 0, z, w: S, d: L, h: bhPx, seq: 2 + i });
+    }
+  }
+  return slots;
+}
+
+/**
+ * 大きい箱の内鍋の 180 サイズ（5L JPV-T180 など、1ケース12個入り）の「1段4個」の積み方。
+ *
+ * 2列 × 2行 で、4個とも同じ向き（長辺が左右）に置く。
+ *
+ *   ┌──────────┬──────────┐
+ *   │   横 1    │   横 2    │  奥
+ *   ├──────────┼──────────┤
+ *   │   横 3    │   横 4    │  手前
+ *   └──────────┴──────────┘
+ *
+ * 荷姿は 幅 2L × 奥行き 2S。
+ * ※ y は 0 が手前。奥ほど y が大きい
+ */
+function buildNabe4Slots(
+  bwCm: number, bdCm: number, bhPx: number, layers: number,
+  pw: number, pd: number, cm2px: number,
+): BoxSlot[] {
+  const S = Math.min(bwCm, bdCm) * cm2px;  // 短い辺
+  const L = Math.max(bwCm, bdCm) * cm2px;  // 長い辺
+  const x0 = (pw - 2 * L) / 2;
+  const y0 = (pd - 2 * S) / 2;
+  const slots: BoxSlot[] = [];
+
+  for (let layer = 0; layer < layers; layer++) {
+    const z = PALLET_H_PX + layer * bhPx;
+    for (let r = 0; r < 2; r++) {        // r = 0 が奥
+      for (let c = 0; c < 2; c++) {      // c = 0 が左
+        slots.push({
+          x: x0 + c * L,
+          y: y0 + (1 - r) * S,
+          z, w: L, d: S, h: bhPx, seq: r * 2 + c,
+        });
+      }
+    }
+  }
+  return slots;
+}
+
+
+/**
+ * JPI・JPK・JRD・JPD の「1段7個」の積み方。
  *
  * 1段目: 横3個 ＋ 縦4個
  *   - 右側に「横」（長い辺が左右）を奥から手前へ3個ならべる
@@ -377,7 +462,7 @@ function buildNabeSlots(
  * 2段目は 縦3個 → 横4個 の順。
  * ※ y は 0 が手前。奥ほど y が大きい
  */
-function buildJPI7Slots(
+function buildJP7Slots(
   bwCm: number, bdCm: number, bhPx: number, layers: number,
   pw: number, pd: number, cm2px: number,
 ): BoxSlot[] {
@@ -559,7 +644,7 @@ function buildGenericSlots(
  * mode 'backColumn'（ポリカバー・鍋など）:
  *   奥の列から積む。1列ぶんを上（4〜5段目）まで積み終えてから手前の列に移る。
  *   列のなかは 中央 → 左 → 右 の順。
- * mode 'layer'（PDU の段ボール・1段7個の JPI など）:
+ * mode 'layer'（PDU の段ボール・1段7個の機種など）:
  *   1段ずつ仕上げていく。1段のなかの順番は seq（積み方で決まっている順）に従い、
  *   seq が無ければ 奥→手前・中央→左→右 の順にする。
  */
@@ -713,8 +798,27 @@ function getBoxDimsCm(measurements?: string, itemName?: string): [number, number
   return [55, 38, 38];
 }
 
-function isJPIType(itemName?: string): boolean {
-  return !!itemName && /JPI[+\-]?[A-Z]/.test(itemName.replace(/\s/g, ''));
+/** 1段7個で積む機種の頭 */
+const SEVEN_PER_LAYER = ['JPI', 'JPK', 'JRD', 'JPD'];
+
+/** 1段6個で積む機種の頭 */
+const SIX_PER_LAYER = ['JRI', 'JPV'];
+
+/** 空白を取って大文字にした品名。機種の頭を見るのに使う */
+function normalizedName(itemName?: string): string {
+  return (itemName || '').replace(/\s/g, '').toUpperCase();
+}
+
+/** 1段7個で積む品目か（JPI・JPK・JRD・JPD） */
+function is7PerLayerType(itemName?: string): boolean {
+  const n = normalizedName(itemName);
+  return !!n && SEVEN_PER_LAYER.some((p) => n.startsWith(p));
+}
+
+/** 1段6個で積む品目か（JRI・JPV）。鍋も種目を問わず1段6個 */
+function is6PerLayerType(itemName?: string): boolean {
+  const n = normalizedName(itemName);
+  return !!n && SIX_PER_LAYER.some((p) => n.startsWith(p));
 }
 
 /** PDU が付くジャーポット（2箱シュリンクで1玉の積み方）。PDZ など他の機種は従来どおり */
@@ -724,8 +828,8 @@ export function isPduJarPot(itemName?: string): boolean {
 
 /* ===== Main Component ===== */
 export default function PalletDiagram({
-  palletCount, fraction, qtyPerPallet, type, itemName, measurements, overrideRotateY, wireframe, noIntro,
-  stackAnim, stackSpeed = 1,
+  palletCount, fraction, qtyPerPallet, type, itemName, measurements, packingQty,
+  overrideRotateY, wireframe, noIntro, stackAnim, stackSpeed = 1,
 }: PalletDiagramProps) {
   const isFull = palletCount > 0;
   const isFraction = !isFull && fraction > 0;
@@ -733,7 +837,15 @@ export default function PalletDiagram({
 
   const [bwCm, bdCm, bhCm] = getBoxDimsCm(measurements, itemName);
   const isNabe = type === '鍋';
-  const isJPI = isJPIType(itemName);
+  // 大きい箱の内鍋（1ケース12個入りなど）は 100/60サイズが1段5個、180サイズが1段4個。
+  // 従来の8個入りは 1段6個のまま
+  const nabeBig = isBigNabeBox(type, packingQty);
+  const nabeBigPerLayer = nabeBig ? nabePerLayer(type, packingQty, itemName || '') : 0;
+  const isNabe5 = nabeBigPerLayer === 5;
+  const isNabe4 = nabeBigPerLayer === 4;
+  const is7 = is7PerLayerType(itemName);
+  // 鍋と7個積みが先。どちらでもない JRI・JPV が6個積み
+  const is6 = !isNabe && !is7 && is6PerLayerType(itemName);
   const isJarPot = type === 'ジャーポット' || /^(PDR|PDU|PVW)/.test(itemName || '');
   const isPdu = isJarPot && isPduJarPot(itemName);
   // PDU は2箱で1玉のため、図に描く1個 = 2ケース
@@ -742,13 +854,21 @@ export default function PalletDiagram({
   // Calculate pallet dimensions in cm
   let palletWcm: number;
   let palletDcm: number;
-  if (isNabe) {
+  if (nabeBig) {
+    // 大きい箱の内鍋: 荷姿をそのままパレットの大きさにする
+    //   1段5個 … 幅 max(2L, 3S) × 奥行き S + L
+    //   1段4個 … 幅 2L × 奥行き 2S（2列×2行）
+    const sCm = Math.min(bwCm, bdCm);
+    const lCm = Math.max(bwCm, bdCm);
+    palletWcm = isNabe4 ? 2 * lCm : Math.max(2 * lCm, 3 * sCm);
+    palletDcm = isNabe4 ? 2 * sCm : sCm + lCm;
+  } else if (isNabe) {
     // 鍋パレット: 物理パレット110×110cmを中心に表示
     // 100サイズ(3×38=114): ほぼパレットに収まる
     // 180サイズ(3×42=126): パレットからはみ出る
     palletWcm = 110;
     palletDcm = 110;
-  } else if (isJPI) {
+  } else if (is7) {
     // 1段ごとに90度まわして積むので、どちらの向きでも収まる正方形にする
     const smallDim = Math.min(bwCm, bdCm);
     const largeDim = Math.max(bwCm, bdCm);
@@ -778,13 +898,20 @@ export default function PalletDiagram({
   } else if (isJarPot) {
     allSlots = buildJarPotSlots(bh, layers, pw, pd);
     perLayer = 4;
-  } else if (isNabe) {
-    // 鍋はどの種目（JPI含む）でも統一で1段6個
-
+  } else if (isNabe4) {
+    // 大きい箱の内鍋の180サイズは 2列×2行 で 1段4個
+    allSlots = buildNabe4Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
+    perLayer = nabeBigPerLayer;
+  } else if (isNabe5) {
+    // 大きい箱の内鍋の100/60サイズは 奥に横2個 ＋ 手前に縦3個 で 1段5個
+    allSlots = buildNabe5Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
+    perLayer = nabeBigPerLayer;
+  } else if (isNabe || is6) {
+    // 鍋はどの種目でも、JRI・JPV は3列×2行で、1段6個
     allSlots = buildNabeSlots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = allSlots.length > 0 ? Math.round(allSlots.length / layers) : 6;
-  } else if (isJPI) {
-    allSlots = buildJPI7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
+  } else if (is7) {
+    allSlots = buildJP7Slots(bwCm, bdCm, bh, layers, pw, pd, cm2px);
     perLayer = 7;
   } else {
     // qtyPerPalletを使って現実的な段数・個数/段を決定
@@ -865,7 +992,7 @@ export default function PalletDiagram({
    * パレットが出たあと、箱が積む順番どおりに上から落ちてくる。
    * 3D の重なり順を崩さないよう、箱ごとの入れ物は増やさず、
    * 箱の translateZ をそのまま持つキーフレームを奥行きごとに作って当てる。 */
-  const stackOrder = stackAnim ? buildStackOrder(renderSlots, (isPdu || isJPI) ? 'layer' : 'backColumn') : null;
+  const stackOrder = stackAnim ? buildStackOrder(renderSlots, (isPdu || is7) ? 'layer' : 'backColumn') : null;
   // 速さ（1 = 標準）。大きいほど速い
   const speed = Math.min(4, Math.max(0.25, stackSpeed || 1));
   /** パレットが出てから最初の箱が落ちてくるまで（秒） */

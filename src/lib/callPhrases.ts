@@ -37,6 +37,12 @@ export function setTenMinClimateEnabled(on: boolean): void {
   localStorage.setItem(TENMIN_CLIMATE_KEY, on ? '1' : '0');
 }
 
+/** 合図のコール（クイックメニューの「お願いします！」・ウォッチの request） */
+export const REQUEST_CALL_TEXT = 'お願いします！';
+
+/** 名前を呼ぶ合図のコール（クイックメニュー・ウォッチの name） */
+export const NAME_CALL_TEXT = '長谷川さん！お願いします！';
+
 /** デフォルトのコールフレーズ（以前指定した固有名入りのコール） */
 export const DEFAULT_CALL_PHRASES: string[] = [
   'がんばれ、まさ',
@@ -76,6 +82,18 @@ export function saveCallPhrases(phrases: string[]): void {
   } catch {
     /* ignore */
   }
+}
+
+/**
+ * 中身が決まっているコールの文言をぜんぶ返す（重複は除く）。
+ *
+ * これらは毎回おなじ文なので、一度だけ音声を作って取っておけば
+ * 次からは待たずに鳴らせる（`src/lib/ttsCache.ts`）。
+ * どれも「応援コール」のプロファイルで読み上げている。
+ */
+export function fixedCallTexts(): string[] {
+  const all = [REQUEST_CALL_TEXT, NAME_CALL_TEXT, ...loadCallPhrases()];
+  return Array.from(new Set(all.map((s) => s.trim()).filter((s) => s.length > 0)));
 }
 
 /** ランダムにコールフレーズを1つ返す */

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Container } from '@/lib/types';
 import { SwitchBotReading, SwitchBotStatus } from '@/lib/switchbot';
 import { MegaphoneIcon, WeatherIcon, DropletIcon, CloseIcon, SettingsIcon, RiverIcon, HandIcon } from '@/components/AppIcons';
+import { PEOPLE } from '@/lib/people';
 
 interface QuickActionsProps {
   /** コンテナ選択（読込済みのときだけ表示） */
@@ -15,6 +16,8 @@ interface QuickActionsProps {
   onWeather?: () => void;
   /** 「お願いします！」のコール（作業ページでのみ有効） */
   onRequestCall?: () => void;
+  /** 「長谷川さん！お願いします！」のコール（作業ページでのみ有効） */
+  onNameCall?: () => void;
   /** 水の音 */
   waterPlaying: boolean;
   onWater: () => void;
@@ -27,6 +30,10 @@ interface QuickActionsProps {
   onOpenSwitchBot: () => void;
   /** せせらぎモード（川の映像）を開く */
   onOpenRiver: () => void;
+  /** 人物出現。選んだ人が一覧のところに出る（[always] なら消えずにずっと） */
+  onShowPerson?: (id: string, always: boolean) => void;
+  /** いま常時表示にしている人の ID。ボタンを光らせるのに使う */
+  alwaysPersonId?: string | null;
   /** 左メニューなど別の画面が開いている間は隠す */
   hidden?: boolean;
 }
@@ -96,12 +103,15 @@ function Row({
  */
 export default function QuickActions({
   containers, selectedIdx, onSelectContainer,
-  onCheer, onWeather, onRequestCall,
+  onCheer, onWeather, onRequestCall, onNameCall,
   waterPlaying, onWater, onWaterSettings,
-  switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, hidden,
+  switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, onShowPerson, alwaysPersonId, hidden,
 }: QuickActionsProps) {
   const [open, setOpen] = useState(false);
   const [sbInfoOpen, setSbInfoOpen] = useState(false);
+  // 人物出現の出し方。true なら常時表示。いま常時表示にしている人がいればそれに合わせる
+  const [personAlways, setPersonAlways] = useState(false);
+  useEffect(() => { if (alwaysPersonId) setPersonAlways(true); }, [alwaysPersonId]);
 
   // 別の画面が開いたら閉じる
   useEffect(() => {
@@ -190,6 +200,15 @@ export default function QuickActions({
               />
             )}
 
+            {onNameCall && (
+              <Row
+                icon={<HandIcon size={22} />}
+                title="長谷川さん！お願いします！"
+                sub="名前を呼ぶ合図のコール"
+                onClick={() => { onNameCall(); setOpen(false); }}
+              />
+            )}
+
             {onWeather && (
               <Row
                 icon={<WeatherIcon size={22} />}
@@ -223,6 +242,54 @@ export default function QuickActions({
               sub="川の映像に品目情報が流れます"
               onClick={() => { onOpenRiver(); setOpen(false); }}
             />
+
+            {/*
+              * 人物出現。名前を選ぶと、一覧のところにその人が出る。
+              * 「10秒」なら 10 秒で消え、「常時」なら消えずにずっと居る
+              * （一覧を見たいときは 1 回タップすると数秒だけ消える）。
+              */}
+            {onShowPerson && (
+              <>
+                <div className="quick-heading quick-heading-row">
+                  <span>人物出現</span>
+                  <span className="quick-seg">
+                    <button
+                      className={`quick-seg-btn${personAlways ? '' : ' active'}`}
+                      onClick={() => setPersonAlways(false)}
+                    >
+                      10秒
+                    </button>
+                    <button
+                      className={`quick-seg-btn${personAlways ? ' active' : ''}`}
+                      onClick={() => setPersonAlways(true)}
+                    >
+                      常時
+                    </button>
+                  </span>
+                </div>
+                <div className="quick-person-list">
+                  {PEOPLE.map((p) => {
+                    const showing = alwaysPersonId === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        className={`quick-person${showing ? ' active' : ''}`}
+                        onClick={() => { onShowPerson(p.id, personAlways); setOpen(false); }}
+                        title={showing ? `${p.name} の常時表示をやめる` : `${p.name} を出す`}
+                      >
+                        <img src={p.image} alt="" draggable={false} />
+                        <span>{showing ? 'やめる' : p.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="quick-person-hint">
+                  {personAlways
+                    ? '常時: ずっと出ます。1 回タップで少しだけ消え、2 回タップでやめます'
+                    : '10秒: ゆっくり出てゆっくり消えます。2 回タップですぐ消せます'}
+                </div>
+              </>
+            )}
 
             <Row
               icon={<SwitchBotMark size={22} />}

@@ -6,7 +6,7 @@ import type { OriginalValues } from '@/hooks/useContainerData';
 import { COLOR_MAP } from '@/data/colorMap';
 import { extractColor, areSimilarItems, getSimilarityReason } from '@/lib/typeDetector';
 import { buildJapanesePartName } from '@/lib/partTranslations';
-import { getNabeModelColor, nabeColorToDarkBg } from '@/lib/nabeColors';
+import { getNabeModelColor } from '@/lib/nabeColors';
 import { displayQuantities } from '@/lib/itemQuantity';
 import { buildVolumeWeights } from '@/lib/containerLoad';
 import { usePalletTap } from '@/hooks/usePalletTap';
@@ -269,9 +269,38 @@ function shortenName(name: string): string {
 }
 
 /* ===== スワイプ行（左→右にスワイプで完了） ===== */
-function SwipeRow({ children, onSwipe, style, className }: {
+/** 種類の色を暗く落とした 1 色。[amount] が大きいほど色が濃く出る */
+function tint(accent: string, amount: number): string {
+  const hex = accent.replace('#', '');
+  if (hex.length !== 6) return '#1e2233';
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgb(${Math.round(8 + r * amount)},${Math.round(12 + g * amount)},${Math.round(10 + b * amount)})`;
+}
+
+/** 種類の色で塗りつぶすグラデーション */
+function tintGradient(accent: string, deg: number, from: number, mid: number, to: number): string {
+  return `linear-gradient(${deg}deg, ${tint(accent, from)} 0%, ${tint(accent, mid)} 55%, ${tint(accent, to)} 100%)`;
+}
+
+/** 一覧の行に出す 数字＋単位。数字は大きく、単位はごく小さく */
+function ListValue({ value, unit, color }: {
+  value: string; unit: string; color: string;
+}) {
+  return (
+    <span className="detail-list-val">
+      <span className="detail-list-val-num" style={{ color }}>{value}</span>
+      <span className="detail-list-val-unit" style={{ color }}>{unit}</span>
+    </span>
+  );
+}
+
+function SwipeRow({ children, onSwipe, style, className, current }: {
   children: React.ReactNode; onSwipe: () => void;
   style?: React.CSSProperties; className?: string;
+  /** いま表示している部品の行か（一覧を真ん中に寄せるときの目印） */
+  current?: boolean;
 }) {
   const startX = useRef(0);
   const dx = useRef(0);
@@ -299,12 +328,14 @@ function SwipeRow({ children, onSwipe, style, className }: {
   }, [onSwipe]);
 
   return (
-    <div style={{ overflow: 'visible', position: 'relative' }}>
+    <div data-current-row={current ? '1' : undefined}
+      style={{ overflow: 'hidden', position: 'relative', borderRadius: 29 }}>
       <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%',
+        position: 'absolute', inset: 0,
         background: 'linear-gradient(90deg, #16a34a 0%, #22c55e 100%)',
-        boxShadow: '0 0 20px rgba(34,197,94,0.5), 0 0 40px rgba(34,197,94,0.2), inset 0 0 10px rgba(255,255,255,0.1)',
-        display: 'flex', alignItems: 'center', paddingLeft: 16,
+        boxShadow: 'inset 0 0 10px rgba(255,255,255,0.15)',
+        borderRadius: 29,
+        display: 'flex', alignItems: 'center', paddingLeft: 20,
         color: '#fff', fontSize: 12, fontWeight: 700, gap: 4,
         textShadow: '0 0 8px rgba(255,255,255,0.6)',
       }}>✓ 完了</div>
@@ -346,11 +377,12 @@ function UndoSwipeRow({ children, onSwipe, style, className, onClick }: {
   }, [onSwipe]);
 
   return (
-    <div style={{ overflow: 'hidden', position: 'relative' }}>
+    <div style={{ overflow: 'hidden', position: 'relative', borderRadius: 29 }}>
       <div style={{
-        position: 'absolute', right: 0, top: 0, bottom: 0, width: '100%',
+        position: 'absolute', inset: 0,
         background: 'linear-gradient(270deg, #dc2626 0%, #ef4444 100%)',
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 16,
+        borderRadius: 29,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 20,
         color: '#fff', fontSize: 12, fontWeight: 700, gap: 4,
       }}>↩ 元に戻す</div>
       <div ref={rowRef} className={className} style={{ ...style, position: 'relative', zIndex: 1 }}
@@ -463,6 +495,21 @@ export default function ItemDetailPanel({
     if (a180 !== b180) return a180 - b180;
     return a.itemName.localeCompare(b.itemName);
   };
+  // 一覧は、いま表示している部品が真ん中に来るように動かす
+  const listScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = listScrollRef.current;
+    if (!box) return;
+    // 描き終わってから測る
+    const raf = requestAnimationFrame(() => {
+      const row = box.querySelector<HTMLElement>('[data-current-row="1"]');
+      if (!row) return;
+      const top = row.offsetTop - (box.clientHeight - row.offsetHeight) / 2;
+      box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [item.id]);
+
   const sortedItems = isNabeContainer
     ? [...activeItems.sort(nabeSort), ...doneItems.sort(nabeSort)]
     : [...activeItems, ...doneItems];
@@ -532,63 +579,9 @@ export default function ItemDetailPanel({
   const weightTotal = allItems.reduce((sum, it) => sum + weightOf(it), 0) || 1;
 
   // リスト行の背景色（メニューカラーと統一・ダーク系）
-  const TYPE_ROW_BG: Record<string, string> = {
-    'ポリカバー': '#162218', 'ジャーポット': '#1e1520', '箱': '#151e2c', '部品': '#1c1628', '鍋': '#1e1518', 'ヤーマン部品': '#1c1a14', 'その他': '#1a1a1e',
-  };
 
   // 種類別の背景色（ダーク/ライト）
   const isLightMode = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
-  const HERO_BG_DARK: Record<string, { base: string; c1: string; c2: string; c3: string }> = {
-    'ポリカバー': { base: '#081a12', c1: '#0a3d22', c2: '#06291a', c3: '#0d4a2a' },
-    'ジャーポット': { base: '#1a0818', c1: '#3d0a35', c2: '#29061e', c3: '#4a0d42' },
-    '箱': { base: '#1a1008', c1: '#3d280a', c2: '#291c06', c3: '#4a300d' },
-    '部品': { base: '#12081a', c1: '#280a3d', c2: '#1c0629', c3: '#300d4a' },
-    '鍋': { base: '#1a0808', c1: '#3d0a0a', c2: '#290606', c3: '#4a0d0d' },
-    'ヤーマン部品': { base: '#1a1608', c1: '#3d320a', c2: '#292406', c3: '#4a3c0d' },
-    'その他': { base: '#101218', c1: '#1a2030', c2: '#141822', c3: '#1e2838' },
-  };
-  const HERO_BG_LIGHT: Record<string, { base: string; c1: string; c2: string; c3: string }> = {
-    'ポリカバー': { base: '#0e8040', c1: '#009868', c2: '#38a828', c3: '#08904a' },    // 濃い緑→シアン
-    'ジャーポット': { base: '#6830a8', c1: '#902880', c2: '#5038b0', c3: '#883098' },   // 濃い紫
-    '箱': { base: '#a87810', c1: '#b89018', c2: '#986808', c3: '#c08818' },             // 濃いゴールド
-    '部品': { base: '#4040a8', c1: '#6030b8', c2: '#2858c0', c3: '#5038a8' },           // 濃い青紫
-    '鍋': { base: '#b83028', c1: '#c85020', c2: '#a82840', c3: '#c04828' },             // 濃い赤
-    'ヤーマン部品': { base: '#907810', c1: '#a89018', c2: '#806808', c3: '#988018' },   // 濃いゴールド
-    'その他': { base: '#386888', c1: '#2860a0', c2: '#487880', c3: '#205898' },         // 濃い青
-  };
-  const HERO_BG = isLightMode ? HERO_BG_LIGHT : HERO_BG_DARK;
-  // 鍋はnabeColorから背景を動的生成
-  const heroBg = (() => {
-    if (item.type === '鍋' && nabeColor) {
-      const hex = nabeColor.replace('#', '');
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      if (isLightMode) {
-        return {
-          base: `rgb(${Math.min(200, Math.round(r * 0.6 + 20))},${Math.min(200, Math.round(g * 0.6 + 20))},${Math.min(200, Math.round(b * 0.6 + 20))})`,
-          c1: `rgb(${Math.min(200, Math.round(r * 0.7 + 10))},${Math.min(200, Math.round(g * 0.5 + 40))},${Math.min(200, Math.round(b * 0.7 + 10))})`,
-          c2: `rgb(${Math.min(200, Math.round(r * 0.5 + 40))},${Math.min(200, Math.round(g * 0.65 + 20))},${Math.min(200, Math.round(b * 0.65 + 20))})`,
-          c3: `rgb(${Math.min(200, Math.round(r * 0.75))},${Math.min(200, Math.round(g * 0.55 + 30))},${Math.min(200, Math.round(b * 0.6 + 20))})`,
-        };
-      }
-      return {
-        base: `rgb(${Math.round(r * 0.1 + 8)},${Math.round(g * 0.1 + 8)},${Math.round(b * 0.1 + 8)})`,
-        c1: `rgb(${Math.round(r * 0.24 + 5)},${Math.round(g * 0.24 + 5)},${Math.round(b * 0.24 + 5)})`,
-        c2: `rgb(${Math.round(r * 0.16 + 4)},${Math.round(g * 0.16 + 4)},${Math.round(b * 0.16 + 4)})`,
-        c3: `rgb(${Math.round(r * 0.29 + 6)},${Math.round(g * 0.29 + 6)},${Math.round(b * 0.29 + 6)})`,
-      };
-    }
-    return HERO_BG[item.type] || HERO_BG['その他'];
-  })();
-
-  const heroVars = {
-    '--hero-c1': heroBg.c1,
-    '--hero-c2': heroBg.c2,
-    '--hero-c3': heroBg.c3,
-    '--hero-bg': heroBg.base,
-  } as React.CSSProperties;
-
   // カウントアップアニメーション（フェードアウト中は値をフリーズ）
   const isTransitioning = animKey !== item.id;
   const rawFraction = item.fraction % 1 !== 0 ? Math.ceil(item.fraction) : item.fraction;
@@ -851,27 +844,13 @@ export default function ItemDetailPanel({
   }, [fullscreenPallet, item.id, item.palletCount, inspectionDeducted]);
 
   return (
-    <div className="detail-root" style={{ background: '#1a1d2e' }}>
-      {/* === 上半分（アニメーショングラデーション） === */}
-      <div className="detail-upper hero-animated" style={{
-        position: 'relative', overflow: 'hidden', ...heroVars,
-      }}>
-        {/* 深いグラデーション背景 + ノイズテクスチャ */}
+    <div className="detail-root">
+      {/* === 上半分（品目のカード） === */}
+      <div className="detail-upper" style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* 枠の中は品目の種類の色で塗る（動かさない、素直なグラデーション） */}
         <div style={{
           position: 'absolute', inset: 0, zIndex: 0,
-          background: `
-            radial-gradient(ellipse 120% 80% at 70% 30%, var(--hero-c1) 0%, transparent 60%),
-            radial-gradient(ellipse 100% 100% at 20% 80%, var(--hero-c3) 0%, transparent 50%),
-            radial-gradient(ellipse 80% 60% at 90% 70%, var(--hero-c2) 0%, transparent 55%),
-            var(--hero-bg)
-          `,
-        }} />
-        {/* 動く靄レイヤー */}
-        <div className="hero-glow-layer" style={{
-          background: `
-            radial-gradient(ellipse 60% 50% at 30% 40%, var(--hero-c1) 0%, transparent 50%),
-            radial-gradient(ellipse 50% 60% at 70% 60%, var(--hero-c3) 0%, transparent 50%)
-          `,
+          background: tintGradient(accentColor, 160, 0.46, 0.26, 0.13),
         }} />
 
         {/* 積載分布ゲージ + 種類数 + 進捗率（右上 — 常時表示、バッジ行と同じ高さ）
@@ -1040,7 +1019,7 @@ export default function ItemDetailPanel({
               /* タップで全画面表示（積む順番どおりに箱が降りてくる） */
               <div key={`pl-${animKey}`} style={{ flex: 1, height: '100%', minWidth: 0, cursor: 'pointer' }}
                 onClick={(e) => { e.stopPropagation(); setFullscreenPallet('full'); }}>
-                <PalletDiagram palletCount={displayPallets} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false}
+                <PalletDiagram palletCount={displayPallets} fraction={0} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} packingQty={item.packingQty} wireframe={false}
                   /* 全画面にしなくても、その場で積み方が分かるように流す */
                   stackAnim stackSpeed={INLINE_STACK_SPEED} />
               </div>
@@ -1053,7 +1032,7 @@ export default function ItemDetailPanel({
                 alignSelf: 'flex-start',
               }}
                 onClick={(e) => { e.stopPropagation(); handleFractionTap(); }}>
-                <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} wireframe={false} />
+                <PalletDiagram palletCount={0} fraction={inspectionDeducted} qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName} measurements={item.measurements} packingQty={item.packingQty} wireframe={false} />
               </div>
             )}
           </div>
@@ -1111,14 +1090,8 @@ export default function ItemDetailPanel({
       </div>
 
       {/* === 下半分リスト === */}
-      <div className="detail-list-section" style={{ background: '#1a1d2e' }}>
-        <div className="detail-list-header" style={{ background: '#1e2130' }}>
-          <span className="detail-list-h-name" style={{ color: 'rgba(255,255,255,0.6)' }}>品名</span>
-          <span className="detail-list-h-num" style={{ color: 'rgba(255,255,255,0.6)' }}>PL</span>
-          <span className="detail-list-h-num" style={{ color: 'rgba(255,255,255,0.6)' }}>CS</span>
-          <span className="detail-list-h-num detail-list-h-total" style={{ color: 'rgba(255,255,255,0.6)' }}>PCS</span>
-        </div>
-        <div className="detail-list-scroll">
+      <div className="detail-list-section">
+        <div className="detail-list-scroll" ref={listScrollRef}>
           {sortedItems.map((it) => {
             const c = COLOR_MAP[it.type] || COLOR_MAP['その他'];
             const isActive = it.id === item.id;
@@ -1129,22 +1102,35 @@ export default function ItemDetailPanel({
             // 鍋は機種別カラーを使用
             const itNabeColor = getNabeModelColor(it.itemName, it.type);
             const itAccent = itNabeColor || c.accent;
-            const typeBg = itNabeColor ? nabeColorToDarkBg(itNabeColor) : (TYPE_ROW_BG[it.type] || TYPE_ROW_BG['その他']);
-            const rowBg = isDone ? '#1e1e22' : isActive ? '#2a1f10' : typeBg;
+            const rowBg = isDone
+              ? 'linear-gradient(100deg, #202228 0%, #191b22 100%)'
+              : tintGradient(itAccent, 100, isActive ? 0.40 : 0.28, isActive ? 0.30 : 0.20, isActive ? 0.20 : 0.12);
 
+            // 数字は大きく、単位はごく小さく。位置をそろえるため列の幅は決め打ちにする
+            const nameColor = isDone
+              ? '#999'
+              : isActive ? '#ffffff' : isLightMode ? '#1a1a2e' : (itNabeColor || 'rgba(255,255,255,0.9)');
+            const plColor = isDone ? '#999' : isActive ? '#ffffff' : isLightMode ? '#1a6030' : itAccent;
+            const numColor = isDone ? '#999' : isLightMode ? '#1a1a2e' : 'rgba(255,255,255,0.95)';
+            const pcsColor = isDone ? '#999' : isLightMode ? '#555' : 'rgba(255,255,255,0.85)';
             const content = (
               <>
                 <span className="detail-list-dot" style={{ backgroundColor: isDone ? '#555' : itAccent }} />
                 <MarqueeText text={displayName}
                   className="detail-list-name"
                   style={isDone
-                    ? { color: '#999', textDecoration: 'line-through' }
-                    : isActive ? { fontWeight: 700, color: '#e67e00' } : { color: isLightMode ? '#1a1a2e' : (itNabeColor || 'rgba(255,255,255,0.85)') }
+                    ? { color: nameColor, textDecoration: 'line-through' }
+                    : { color: nameColor, fontWeight: isActive ? 800 : 600 }
                   } />
-                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e67e00' : isLightMode ? '#1a6030' : itAccent, fontWeight: 600 }}>{fmtNum(it.palletCount)}</span>
-                <span className="detail-list-num" style={{ color: isDone ? '#999' : isActive ? '#e67e00' : isLightMode ? '#1a1a2e' : 'rgba(255,255,255,0.7)' }}>{fmtNum(it.fraction)}</span>
-                <span className="detail-list-num detail-list-total" style={{ color: isDone ? '#999' : isLightMode ? '#555' : 'rgba(255,255,255,0.55)' }}>
-                  {Math.ceil(it.totalQty).toLocaleString()}
+                <span className="detail-list-vals">
+                  {/* PL も CT も 0 のときだけ pcs だけにする。それ以外は全部出す */}
+                  {!(it.palletCount <= 0 && it.fraction <= 0) && (
+                    <>
+                      <ListValue value={fmtNum(it.palletCount)} unit="PL" color={plColor} />
+                      <ListValue value={fmtNum(it.fraction)} unit="CT" color={numColor} />
+                    </>
+                  )}
+                  <ListValue value={Math.ceil(it.totalQty).toLocaleString()} unit="pcs" color={pcsColor} />
                 </span>
               </>
             );
@@ -1154,8 +1140,8 @@ export default function ItemDetailPanel({
                 <UndoSwipeRow key={it.id}
                   onSwipe={() => onUncompleteItem?.(it.id)}
                   onClick={() => onUncompleteItem?.(it.id)}
-                  className="detail-list-row"
-                  style={{ background: rowBg, borderLeftColor: '#444', borderLeftWidth: 3 }}
+                  className="detail-list-row detail-list-pill done"
+                  style={{ background: rowBg }}
                 >{content}</UndoSwipeRow>
               );
             }
@@ -1173,11 +1159,12 @@ export default function ItemDetailPanel({
             return (
               <SwipeRow key={it.id}
                 onSwipe={() => onCompleteItem?.(it.id)}
-                className={`detail-list-row ${isActive ? 'active' : ''}`}
+                current={isActive}
+                className={`detail-list-row detail-list-pill ${isActive ? 'active' : ''}`}
                 style={{
                   background: finalRowBg,
-                  borderLeftColor: isActive ? '#ff6d00' : itAccent,
-                  borderLeftWidth: isActive ? 4 : 3,
+                  // 選ばれている行だけオレンジの枠で囲む
+                  borderColor: isActive ? '#ff8c21' : 'rgba(255,255,255,0.08)',
                 }}
               >
                 <div style={{ display: 'contents' }} onClick={() => onSelectItem?.(origIdx)}>
@@ -1186,8 +1173,8 @@ export default function ItemDetailPanel({
               </SwipeRow>
             );
           })}
-          {/* リスト下部余白（最下行が見えるように） */}
-          <div style={{ height: 60, flexShrink: 0 }} />
+          {/* リスト下部余白。いちばん下の行がマイクなどのボタンに隠れないようにする */}
+          <div className="detail-list-tail" />
         </div>
       </div>
 
@@ -1238,7 +1225,7 @@ export default function ItemDetailPanel({
               <PalletDiagram
                 palletCount={0} fraction={inspectionDeducted}
                 qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-                measurements={item.measurements} wireframe={false}
+                measurements={item.measurements} packingQty={item.packingQty} wireframe={false}
                 overrideRotateY={autoFsRotRef.current}
                 noIntro
               />
@@ -1377,7 +1364,7 @@ export default function ItemDetailPanel({
                 palletCount={fullscreenPallet === 'full' ? item.palletCount : 0}
                 fraction={fullscreenPallet === 'fraction' ? inspectionDeducted : 0}
                 qtyPerPallet={item.qtyPerPallet} type={item.type} itemName={item.itemName}
-                measurements={item.measurements} wireframe={false}
+                measurements={item.measurements} packingQty={item.packingQty} wireframe={false}
                 overrideRotateY={fsRotateY}
                 noIntro
                 // パレットの図はまずパレットだけを出し、積む順番どおりに箱を降ろす

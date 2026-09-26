@@ -29,6 +29,13 @@ const SELF_DECLARING_WORDS = [
 ];
 /** 種類を絞り込めない一般的な言葉。カタカナを数える前に取り除くだけ */
 const GENERIC_WORDS = ['カバー', 'ｶﾊﾞｰ'];
+/**
+ * 出荷の状態を表すだけの言葉。品物の名前ではないので、数える前に取り除く。
+ * これが残っていると、機種名のうしろに付いているだけで部品と見なしてしまう。
+ *   例) PDU+A30S(KZ)半完成 / PDRS30SﾊﾝｶﾝｾｲZS1C はどちらもジャーポット本体
+ * 「ｶﾝｾｲｿﾄﾌﾞﾀｶﾊﾞｰ」のような本当の部品名は ﾊﾝ が付かないので、これには当たらない。
+ */
+const STATE_WORDS = ['半完成', '半成品', '完成品', 'ﾊﾝｶﾝｾｲ', 'ハンカンセイ'];
 
 /**
  * 品名が「品物の名前」になっているか（＝機種名だけではないか）を見る。
@@ -36,6 +43,7 @@ const GENERIC_WORDS = ['カバー', 'ｶﾊﾞｰ'];
  * 機種名のあとや代わりに品物の名前が書いてあれば、それは本体ではなく部品。
  *   例) JPV-Lレバーメッキ / JRICﾎｳﾈﾂｲﾀC / ｶﾝｾｲｿﾄﾌﾞﾀｶﾊﾞｰ(KK) / SR-VSX180绝缘胶片
  * ただし品名じたいが「ポリカバー」と名乗っていれば、それは本体とみなす。
+ * 「半完成」「ﾊﾝｶﾝｾｲ」のような出荷の状態を表すだけの言葉は数えない（[STATE_WORDS]）。
  */
 export function isPartLikeName(itemName: string): boolean {
   const name = (itemName || '').trim();
@@ -43,7 +51,7 @@ export function isPartLikeName(itemName: string): boolean {
   // 自分でポリカバー／ジャーポットと名乗っているものは本体
   if (SELF_DECLARING_WORDS.some((w) => name.includes(w))) return false;
   let rest = name;
-  for (const w of GENERIC_WORDS) rest = rest.split(w).join('');
+  for (const w of [...STATE_WORDS, ...GENERIC_WORDS]) rest = rest.split(w).join('');
   const kata = rest.match(KATAKANA)?.length ?? 0;
   const kanji = rest.match(KANJI)?.length ?? 0;
   return kata >= 2 || kanji >= 2;
@@ -103,8 +111,8 @@ export function detectTypeByItemName(itemName: string): ItemType {
   if (name.startsWith('外箱') || name.startsWith('彩盒')) return '箱';
 
   let type: ItemType | null = null;
-  // ポリカバー: JP*, JRI*, JKX*, SR* で始まる
-  if (/^(JP[A-Z]|JRI|JKX|SR)/.test(name)) type = 'ポリカバー';
+  // ポリカバー: JP*, JRI*, JRD*, JKX*, SR* で始まる
+  if (/^(JP[A-Z]|JRI|JRD|JKX|SR)/.test(name)) type = 'ポリカバー';
   // ジャーポット: PDR*, PDU*, PVW*, PDZ*, WMS* で始まる
   else if (/^(PDR|PDU|PVW|PDZ|WMS)/.test(name)) type = 'ジャーポット';
 
@@ -196,9 +204,9 @@ export function extractColor(itemName: string): string | null {
   }
 
   // 括弧なしパターン: JRI-H100KKB, JPV-X100K 等、末尾の色コードを検出
-  // ポリカバー系プレフィックス(JRI-, JPI-, JPV-, JPK-, JPH-等)の品名のみ対象
+  // ポリカバー系プレフィックス(JRI-, JRD-, JPI-, JPV-, JPK-, JPD-, JPH-等)の品名のみ対象
   const name = itemName.replace(/ポリカバー/g, '').replace(/ﾎﾟﾘｶﾊﾞｰ/g, '').trim();
-  if (/^(JRI|JPI|JPV|JPK|JPH|JPA|JPB|JPG|JRG|JRB)-/.test(name)) {
+  if (/^(JRI|JRD|JPI|JPV|JPK|JPD|JPH|JPA|JPB|JPG|JRG|JRB)-/.test(name)) {
     // 末尾の色コード: KKB, KB, KM, KV, K, WS, WM, WG, WY, WP, W, TD, T
     const suffixMatch = name.match(/(KKB|KB|KM|KV|K|WS|WM|WG|WY|WP|W|TD|T)$/);
     if (suffixMatch) {

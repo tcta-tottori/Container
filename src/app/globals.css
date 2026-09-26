@@ -85,7 +85,15 @@ body {
   .detail-panel { width: 100%; height: 100%; }
   .list-panel-side { display: none; }
   .stat-grid-portrait { grid-template-columns: repeat(2, 1fr) !important; }
+  /* カードは画面の縁から少し離して、四隅を丸くする */
+  .detail-panel .detail-upper {
+    height: calc(50% - 10px);
+    margin: 10px 10px 0;
+    border-radius: 26px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+  }
 }
+@media (orientation: landscape) { .detail-panel .detail-upper { margin: 0; } }
 .full-panel { width: 100%; height: 100%; }
 
 /* ===== Header ===== */
@@ -93,7 +101,7 @@ body {
 .app-header {
   position: sticky; top: 0; z-index: 60;
   display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
-  height: calc(72px + var(--safe-top));
+  height: calc(56px + var(--safe-top));
   padding: var(--safe-top) 10px 0;
   background: var(--header-bg);
   border-bottom: 1px solid var(--border-subtle);
@@ -178,7 +186,7 @@ body {
 .header-right { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }
 .header-btn {
   display: flex; align-items: center; justify-content: center;
-  min-width: 48px; width: 48px; height: 48px; border-radius: 12px;
+  min-width: 42px; width: 42px; height: 42px; border-radius: 11px;
   background: transparent; border: 1px solid rgba(255,255,255,0.1);
   color: rgba(255,255,255,0.6); transition: all 0.15s ease;
   cursor: pointer; font-size: 19px; flex-shrink: 0;
@@ -262,8 +270,8 @@ body {
 
 /* ===== ヘッダー右の気温表示 ===== */
 .header-climate {
-  display: flex; align-items: center; gap: 10px;
-  padding: 4px 8px; margin-right: -2px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 0 6px; margin-right: -2px;
   border-radius: 12px; cursor: pointer;
   background: transparent; border: none;
   transition: background 0.15s ease;
@@ -272,7 +280,7 @@ body {
 .header-climate:hover { background: rgba(255,255,255,0.06); }
 .header-climate:active { background: rgba(255,255,255,0.1); }
 .header-climate-val {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 3px; line-height: 1.05;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 1px; line-height: 1.05;
 }
 .header-climate-row { display: inline-flex; align-items: center; gap: 4px; }
 .header-climate-num {
@@ -282,7 +290,7 @@ body {
 /* 暑さ指数バッジ（レベルで色が変わる） */
 .header-wbgt {
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-  min-width: 46px; height: 46px; padding: 0 6px; border-radius: 12px;
+  min-width: 42px; height: 40px; padding: 0 6px; border-radius: 11px;
   font-variant-numeric: tabular-nums; flex-shrink: 0;
 }
 .header-wbgt-num { font-size: 17px; font-weight: 900; line-height: 1.05; }
@@ -290,16 +298,17 @@ body {
 /* 狭い画面では経過時間と気温が重ならないように少し詰める */
 @media (max-width: 400px) {
   .header-work-elapsed { font-size: 21px !important; letter-spacing: 0.5px; }
-  .header-climate { gap: 7px; padding: 4px 4px; }
+  .header-climate { gap: 7px; padding: 0 4px; }
   .header-climate-num { font-size: 17px; }
-  .header-wbgt { min-width: 40px; height: 42px; }
+  .header-wbgt { min-width: 38px; height: 38px; }
   .header-wbgt-num { font-size: 15px; }
   .header-wbgt-label { font-size: 8px; }
 }
 
 /* ===== 右下の展開メニュー（クイック操作） ===== */
 .quick-fab {
-  position: fixed; right: 16px; bottom: 20px; z-index: 140;
+  /* マイクボタンと同じ高さに並べる（下端の安全領域を避ける） */
+  position: fixed; right: 16px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 140;
   width: 48px; height: 48px; border-radius: 15px;
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(160deg, #262a3d 0%, #1c2033 100%);
@@ -684,82 +693,18 @@ body {
 }
 
 /* ===== Detail panel ===== */
-.detail-root { display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden; }
+.detail-root {
+  display: flex; flex-direction: column; height: 100%; position: relative; overflow: hidden;
+  /* 地はメニューと同じグレー。色は品目の点・数字だけに使う */
+  background: linear-gradient(180deg, #171a29 0%, #14161f 100%);
+}
 .detail-upper {
   display: flex; flex-direction: column; gap: 4px;
   padding: 10px 14px 10px; position: relative; z-index: 1;
   border-radius: 18px;
+  /* 縁ははっきり描く（色は入れない） */
+  border: 2px solid rgba(255,255,255,0.16);
   height: 50%; flex-shrink: 0; overflow: hidden;
-}
-.hero-animated {
-  background: var(--hero-bg, #0c0e18);
-}
-.hero-glow-layer {
-  position: absolute; inset: -60% -40%;
-  width: 200%; height: 220%;
-  pointer-events: none; z-index: 0;
-  animation: heroMist1 10s ease-in-out infinite alternate;
-  will-change: transform, opacity;
-  opacity: 0.8;
-  filter: blur(40px);
-}
-/* 2層目の靄（ゆっくり揺らぎ） */
-.hero-animated::after {
-  content: '';
-  position: absolute; inset: -40% -30%;
-  width: 180%; height: 180%;
-  pointer-events: none; z-index: 0;
-  background:
-    radial-gradient(ellipse 50% 40% at 60% 40%, var(--hero-c1, transparent) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 50% at 30% 70%, var(--hero-c2, transparent) 0%, transparent 55%);
-  animation: heroMist2 14s ease-in-out infinite alternate-reverse;
-  filter: blur(50px);
-  opacity: 0.5;
-  mix-blend-mode: screen;
-}
-@keyframes heroMist1 {
-  0% {
-    transform: translate(0%, 0%) rotate(0deg) scale(1);
-    opacity: 0.9;
-  }
-  20% {
-    transform: translate(12%, -8%) rotate(5deg) scale(1.12);
-    opacity: 1;
-  }
-  40% {
-    transform: translate(-8%, 10%) rotate(-3deg) scale(0.95);
-    opacity: 0.7;
-  }
-  60% {
-    transform: translate(10%, 6%) rotate(6deg) scale(1.15);
-    opacity: 1;
-  }
-  80% {
-    transform: translate(-6%, -10%) rotate(-4deg) scale(1.05);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translate(5%, -3%) rotate(2deg) scale(1.08);
-    opacity: 0.95;
-  }
-}
-@keyframes heroMist2 {
-  0% {
-    transform: translate(5%, 5%) rotate(3deg) scale(1.05);
-    opacity: 0.6;
-  }
-  33% {
-    transform: translate(-10%, -5%) rotate(-5deg) scale(1.15);
-    opacity: 0.85;
-  }
-  66% {
-    transform: translate(8%, -8%) rotate(4deg) scale(0.95);
-    opacity: 0.5;
-  }
-  100% {
-    transform: translate(-5%, 10%) rotate(-2deg) scale(1.1);
-    opacity: 0.75;
-  }
 }
 .detail-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; position: relative; z-index: 3; flex-shrink: 0; min-height: 24px; }
 .detail-part-no { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); margin-left: auto; letter-spacing: 0.3px; }
@@ -855,8 +800,12 @@ body {
 /* === リスト === */
 .detail-list-section {
   flex: 1; display: flex; flex-direction: column;
-  min-height: 0;
+  min-height: 0; background: transparent; position: relative;
 }
+/*
+ * 一覧の上下は、黒い膜をかぶせるのではなく行そのものを透かして消す。
+ * 上はカードの下へ、下はボタンの裏へ、切れ目なく溶けていく。
+ */
 .detail-list-header {
   display: flex; align-items: center; gap: 4px;
   padding: 5px 12px; flex-shrink: 0;
@@ -869,6 +818,81 @@ body {
 .detail-list-h-num { width: 38px; text-align: center; flex-shrink: 0; }
 .detail-list-h-total { width: 50px; text-align: right; }
 .detail-list-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* === 一覧（縦画面）: 丸みのある帯 === */
+.detail-list-section .detail-list-scroll {
+  padding: 22px 10px 0;
+  display: flex; flex-direction: column; gap: 6px;
+  /* 端に近づくほど薄くなる。上はカードへ潜り、下はボタンの裏へ抜ける */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.35) 14px,
+    #000 46px,
+    #000 calc(100% - 130px),
+    rgba(0, 0, 0, 0.35) calc(100% - 34px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.35) 14px,
+    #000 46px,
+    #000 calc(100% - 130px),
+    rgba(0, 0, 0, 0.35) calc(100% - 34px),
+    transparent 100%
+  );
+}
+.detail-list-section .detail-list-scroll > * { flex-shrink: 0; }
+/* いちばん下の行が、マイク（56px）と右下のボタンに隠れないだけの余白 */
+.detail-list-tail {
+  height: calc(96px + env(safe-area-inset-bottom, 0px));
+  flex-shrink: 0;
+}
+.detail-list-row.detail-list-pill {
+  height: 42px; padding: 0 16px;
+  border: 1.5px solid transparent; border-radius: 21px;
+  border-left-width: 1.5px;
+  gap: 10px; font-size: 15.5px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  animation: none;
+}
+.detail-list-row.detail-list-pill.active {
+  border-width: 2px;
+  animation: pill-glow 2s ease-in-out infinite;
+}
+.detail-list-row.detail-list-pill.done {
+  /* 透過させると、スワイプで出る赤い地が透けて見えるので不透明のまま暗くする */
+  opacity: 1;
+}
+@keyframes pill-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(255,140,33,0.14); }
+  50% { box-shadow: 0 0 12px rgba(255,140,33,0.30), 0 0 24px rgba(255,140,33,0.10); }
+}
+.detail-list-row.detail-list-pill .detail-list-dot { width: 10px; height: 10px; }
+.detail-list-row.detail-list-pill .detail-list-name {
+  flex: 1 1 0; min-width: 0; font-size: 15.5px; letter-spacing: -0.2px;
+}
+/* 右 2/5 に PL / CT / pcs をまとめて右詰めで置く。
+   桁が多くて 2/5 に収まらないときだけ、品名側を詰めて広がる（数字は切らない） */
+.detail-list-vals {
+  flex: 0 0 auto; min-width: 40%;
+  display: flex; align-items: baseline; justify-content: flex-end;
+  gap: 10px;
+}
+.detail-list-val {
+  display: flex; align-items: baseline; justify-content: flex-end;
+  gap: 2px; flex-shrink: 0;
+}
+.detail-list-val-num {
+  font-size: 21px; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.5px;
+}
+.detail-list-val-unit { font-size: 9.5px; font-weight: 700; opacity: 0.55; line-height: 1; }
+/* 幅の狭い端末では間を少し詰める */
+@media (max-width: 380px) {
+  .detail-list-vals { gap: 7px; }
+}
 .detail-list-row {
   display: flex; align-items: center; gap: 6px;
   padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.05);
@@ -1457,3 +1481,115 @@ body {
 body.load3d-open > *:not(.load3d-layer) * {
   animation-play-state: paused !important;
 }
+
+/* ===== 人物出現 ===== */
+/*
+ * 一覧のところに、選んだ人がゆっくり現れて、ゆっくり消える。
+ * 縦向きは画面の下半分（一覧）、横向きは一覧が出ている右半分。
+ * ヘッダー（z-index 60）より下に置いて、時計や気温は隠さない。
+ */
+.person-appear {
+  position: fixed;
+  top: 50%; left: 0; right: 0; bottom: 0;
+  z-index: 55;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none; -webkit-user-select: none;
+  will-change: opacity, transform;
+}
+@media (orientation: landscape) {
+  .person-appear { top: 0; left: 50%; }
+}
+/* 人のうしろにうっすら光を置いて、暗がりから浮かび上がって見えるようにする */
+.person-appear::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(ellipse 56% 56% at 50% 44%, rgba(255,255,255,0.07), transparent 72%);
+}
+.person-appear-photo {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain;
+  /* 四角い写真に見えないよう、まわりを透かして地に溶かす */
+  -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 44%, #000 52%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 62% at 50% 44%, #000 52%, transparent 100%);
+  pointer-events: none;
+}
+.person-appear-name {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  text-align: center; pointer-events: none;
+  font-size: 14px; font-weight: 800; letter-spacing: 3px;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95);
+}
+
+/* 現れる: すっと寄りながら浮かび上がる */
+@keyframes personIn {
+  from { opacity: 0; transform: scale(1.07) translateY(12px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+/* 消える: すこし引きながら溶けていく */
+@keyframes personOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(1.04) translateY(-6px); }
+}
+.person-appear-in { animation: personIn var(--person-in-ms) ease-out both; }
+.person-appear-out { animation: personOut var(--person-out-ms) ease-in both; }
+.person-appear-dismiss { animation: personOut var(--person-dismiss-ms) ease-in both; }
+
+/* 動きを減らす設定のときは、ふわっと出入りするだけにする */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes personIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes personOut { from { opacity: 1; } to { opacity: 0; } }
+}
+
+/* 人物出現の名前選び（右下メニューの中） */
+.quick-person-list { display: flex; gap: 8px; }
+.quick-person {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 6px; border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.85); cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-person:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.quick-person:active { transform: scale(0.98); }
+.quick-person img {
+  width: 46px; height: 46px; border-radius: 50%; object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+.quick-person span { font-size: 12px; font-weight: 700; }
+
+/* 人物出現の出し方の切り替え（10秒 / 常時） */
+.quick-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.quick-seg {
+  display: inline-flex; padding: 2px; border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.quick-seg-btn {
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+  color: rgba(255,255,255,0.5); background: transparent; border: none;
+  cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.quick-seg-btn.active { background: rgba(167,139,250,0.28); color: #fff; }
+.quick-person-hint {
+  font-size: 10px; line-height: 1.5; padding: 0 4px;
+  color: rgba(255,255,255,0.38);
+}
+/* いま常時表示にしている人。もう一度押すとやめる */
+.quick-person.active {
+  background: rgba(167,139,250,0.22);
+  border-color: rgba(167,139,250,0.6);
+  color: #fff;
+}
+.quick-person.active img { border-color: rgba(196,181,253,0.9); }
+
+/* 常時表示で、タップして消えているあいだ。下の一覧を触れるようにする */
+.person-appear-hidden { opacity: 0; }
+.person-appear-dismiss, .person-appear-hidden { pointer-events: none; }

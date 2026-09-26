@@ -2,10 +2,8 @@
 
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { fetchMasterFileLastUpdate } from '@/lib/masterLoader';
-import { DriveFile, downloadFromDrive, driveErrorMessage } from '@/lib/googleDrive';
 import { classifyFile, isImageFile, isExcelFile, ClassifiedFile } from '@/lib/fileClassifier';
 import { FileIcon } from '@/components/AppIcons';
-import GoogleDrivePicker from '@/components/GoogleDrivePicker';
 
 export type { FileRole, ClassifiedFile } from '@/lib/fileClassifier';
 export { classifyFile, isImageFile, isExcelFile } from '@/lib/fileClassifier';
@@ -18,21 +16,9 @@ interface FileDropZoneProps {
   onMasterLoaded?: (file: File) => void;
   onPhotoLoaded?: (file: File) => void;
   onMultiFilesLoaded?: (classified: ClassifiedFile[]) => void;
-  /**
-   * Googleドライブから取ってくる間の表示。
-   * ここで読込画面のローディングを出しておくと、選んだあと作業ページに着くまで
-   * 画面が途切れない。msg に null を渡すと消す。
-   */
-  onLoadingChange?: (msg: string | null, progress?: number) => void;
   /** 作業画面のレイアウト内に埋め込んで表示する（ヘッダー・メニューを残す） */
   embedded?: boolean;
 }
-
-/**
- * ドライブから取ってくる間に使う進捗の幅。
- * このあとの解析はここから先を受け持つ（読込画面の進捗は戻らないようにしてある）。
- */
-const DRIVE_PROGRESS_MAX = 45;
 
 /* ===== CNSロゴSVG（正方形キューブ + ネオングロー） ===== */
 function CnsLogo({ size = 56 }: { size?: number }) {
@@ -51,30 +37,45 @@ function CnsLogo({ size = 56 }: { size?: number }) {
   );
 }
 
-/* ===== Google ドライブ公式ロゴ ===== */
-function GoogleDriveLogo({ size = 26 }: { size?: number }) {
+/** ドロップゾーンを押したときに出す選び方のボタン */
+function PickButton({ label, hint, icon, onClick }: {
+  label: string; hint: string; icon: React.ReactNode; onClick: () => void;
+}) {
   return (
-    <svg width={size} height={size * 78 / 87.3} viewBox="0 0 87.3 78" fill="none"
-      xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ flexShrink: 0 }}>
-      <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
-      <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
-      <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
-      <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
-      <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
-      <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
-    </svg>
+    <button
+      onClick={onClick}
+      className="cns-action-btn"
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12, width: '100%',
+        padding: '14px 16px', borderRadius: 14, textAlign: 'left',
+        background: 'rgba(107,82,212,0.18)',
+        border: '1.5px solid rgba(155,69,201,0.35)',
+        color: '#fff', cursor: 'pointer', transition: 'background 0.2s ease',
+      }}
+    >
+      <span style={{
+        width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(155,69,201,0.22)', color: '#c4b5fd',
+      }}>{icon}</span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 15, fontWeight: 700 }}>{label}</span>
+        <span style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{hint}</span>
+      </span>
+    </button>
   );
 }
 
-export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded, onLoadingChange, embedded }: FileDropZoneProps) {
+export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContainerLoaded, onJkpLoaded, onMasterLoaded, onPhotoLoaded, onMultiFilesLoaded, embedded }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [classifiedFiles, setClassifiedFiles] = useState<ClassifiedFile[]>([]);
-  const [driveBusy, setDriveBusy] = useState(false);
-  /** アプリ内のドライブ選択画面を開いているか */
-  const [pickerOpen, setPickerOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [masterLastUpdate, setMasterLastUpdate] = useState<{ date: string; message: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** その場で撮る用（アプリではカメラが開く） */
+  const cameraRef = useRef<HTMLInputElement>(null);
+  /** 押したときに出す「ファイルを選ぶ / 写真を撮る」 */
+  const [pickOpen, setPickOpen] = useState(false);
 
   useEffect(() => {
     // マスタファイルの最終更新情報を取得
@@ -150,43 +151,6 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
     handleFiles(e.dataTransfer.files);
   }, [handleFiles]);
 
-  /**
-   * アプリ内で選んだファイルを取ってくる。
-   * 選び終わった時点で読込画面のローディングへ切り替わり、
-   * 取得が終わるとそのまま解析（作業ページへの遷移）へ続く。
-   */
-  const loadFromDrive = useCallback(async (picked: DriveFile[]) => {
-    setPickerOpen(false);
-    if (picked.length === 0) return;
-    setDriveBusy(true);
-    try {
-      const files: File[] = [];
-      for (let i = 0; i < picked.length; i++) {
-        const p = picked[i];
-        const label = picked.length > 1
-          ? `Googleドライブから読み込み中... (${i + 1}/${picked.length})`
-          : 'Googleドライブから読み込み中...';
-        // 1ファイルぶんの取得を、全体の進捗のうちの1区画として進める
-        const slice = DRIVE_PROGRESS_MAX / picked.length;
-        onLoadingChange?.(`${label}\n${p.name}`, slice * i);
-        const file = await downloadFromDrive(p, (ratio) => {
-          onLoadingChange?.(`${label}\n${p.name}`, slice * (i + ratio));
-        });
-        files.push(file);
-      }
-
-      onLoadingChange?.('ファイルを確認中...', DRIVE_PROGRESS_MAX);
-      // ここから先は各ファイルの読込処理がローディングの続きを受け持つ
-      const started = handleFiles(files);
-      if (!started) onLoadingChange?.(null);
-    } catch (err) {
-      onLoadingChange?.(driveErrorMessage(err));
-      setTimeout(() => onLoadingChange?.(null), 2600);
-    } finally {
-      setDriveBusy(false);
-    }
-  }, [handleFiles, onLoadingChange]);
-
   const gradientStyle = 'linear-gradient(135deg, #4a7af7 0%, #6b52d4 35%, #9b45c9 65%, #c0549a 100%)';
 
   return (
@@ -225,7 +189,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
             </div>
           </div>{/* 左カラム閉じ */}
 
-          {/* 右カラム: ドロップゾーン + Googleドライブ */}
+          {/* 右カラム: ドロップゾーン（押すとファイル選択か写真撮影かを選ぶ） */}
           <div className="drop-zone-right">
 
             {/* ドロップゾーン */}
@@ -233,7 +197,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               onDrop={onDrop}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
-              onClick={() => inputRef.current?.click()}
+              onClick={() => setPickOpen(true)}
               style={{
                 border: `2px dashed ${isDragging ? 'rgba(107,82,212,0.6)' : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: 16, padding: '26px 16px', textAlign: 'center', cursor: 'pointer',
@@ -252,7 +216,7 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
                 Excel / 写真をドラッグ＆ドロップ
               </p>
               <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, margin: 0 }}>
-                またはタップして選択（.xlsx / .xlsm / .xls / .jpg / .png）
+                またはタップして「ファイルを選ぶ / 写真を撮る」（.xlsx / .xlsm / .xls / .jpg / .png）
               </p>
               {classifiedFiles.length > 0 && (
                 <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -276,45 +240,80 @@ export default function FileDropZone({ onFileLoaded, onAqssLoaded, onAqssContain
               <input ref={inputRef} type="file" accept=".xlsx,.xlsm,.xls,.jpg,.jpeg,.png,.webp,.heic,.heif,.bmp,image/*" multiple
                 onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
                 className="hidden" />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment"
+                onChange={(e) => { if (e.target.files) handleFiles(e.target.files); e.target.value = ''; }}
+                className="hidden" />
             </div>
-
-            {/* ===== Google ドライブ（ドロップゾーンと同じ横幅の大ボタン） ===== */}
-            <button
-              onClick={() => setPickerOpen(true)}
-              disabled={driveBusy}
-              className="cns-action-btn"
-              style={{
-                marginTop: 14, width: '100%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                padding: '18px 20px', borderRadius: 16,
-                background: 'linear-gradient(135deg, rgba(66,133,244,0.25) 0%, rgba(107,82,212,0.25) 50%, rgba(155,69,201,0.25) 100%)',
-                border: '1.5px solid rgba(66,133,244,0.35)',
-                cursor: driveBusy ? 'wait' : 'pointer', transition: 'all 0.3s ease',
-                color: '#fff', fontSize: 16, fontWeight: 700,
-                boxShadow: '0 0 16px rgba(66,133,244,0.15), 0 0 32px rgba(107,82,212,0.08)',
-                textShadow: '0 0 12px rgba(138,180,255,0.5)',
-                letterSpacing: 0.3, opacity: driveBusy ? 0.6 : 1,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(66,133,244,0.4) 0%, rgba(107,82,212,0.4) 50%, rgba(155,69,201,0.4) 100%)';
-                e.currentTarget.style.boxShadow = '0 0 24px rgba(66,133,244,0.3), 0 0 48px rgba(107,82,212,0.15)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(66,133,244,0.25) 0%, rgba(107,82,212,0.25) 50%, rgba(155,69,201,0.25) 100%)';
-                e.currentTarget.style.boxShadow = '0 0 16px rgba(66,133,244,0.15), 0 0 32px rgba(107,82,212,0.08)';
-              }}
-            >
-              <GoogleDriveLogo size={28} />
-              {driveBusy ? '読み込み中...' : 'Google ドライブ'}
-            </button>
 
           </div>{/* 右カラム閉じ */}
         </div>{/* columns閉じ */}
       </div>
 
-      {/* ドライブのファイル選択（アプリ内で完結する） */}
-      {pickerOpen && (
-        <GoogleDrivePicker onSelect={loadFromDrive} onClose={() => setPickerOpen(false)} />
+      {/* 読み込み方の選択（画面の真ん中に出すポップアップ） */}
+      {pickOpen && (
+        <div
+          onClick={() => setPickOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 20,
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            animation: 'fadeIn 0.16s ease',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 360,
+              display: 'flex', flexDirection: 'column', gap: 10,
+              padding: 18, borderRadius: 22,
+              background: 'linear-gradient(160deg, #23273a 0%, #1c2030 55%, #171a29 100%)',
+              border: '1.5px solid rgba(255,255,255,0.14)',
+              boxShadow: '0 18px 50px rgba(0,0,0,0.6)',
+            }}
+          >
+            <div style={{
+              color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 700,
+              letterSpacing: 0.4, padding: '0 4px 2px',
+            }}>
+              読み込み方を選ぶ
+            </div>
+            <PickButton
+              label="ファイルを選ぶ"
+              hint="Excel / 保存済みの写真"
+              onClick={() => { setPickOpen(false); inputRef.current?.click(); }}
+              icon={
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.5l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
+                </svg>
+              }
+            />
+            <PickButton
+              label="写真を撮る"
+              hint="コンテナ日程の紙をその場で撮る"
+              onClick={() => { setPickOpen(false); cameraRef.current?.click(); }}
+              icon={
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+              }
+            />
+            <button
+              onClick={() => setPickOpen(false)}
+              style={{
+                padding: '10px', borderRadius: 12, marginTop: 2,
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.55)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              やめる
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { ContainerItem, ItemType } from './types';
 import { detectItemType, isPartLikeName } from './typeDetector';
+import { isLargeSizeName, nabePerLayer } from './itemQuantity';
 import { getStoredToken } from './githubSave';
 
 const REPO_OWNER = 'tcta-tottori';
@@ -384,12 +385,42 @@ export async function fetchMasterFileLastUpdate(): Promise<{ date: string; messa
  *
  * @returns 紐付後のアイテム配列（新しい配列を返す）と紐付結果ログ
  */
+/**
+ * 1P数・ケース数が無いところを補い、パレット枚数・端数を出し直す。
+ * sourcePalletCount は元データのパレット枚数（0 のときだけ計算し直す）。
+ */
+function fillPalletCounts(updated: ContainerItem, sourcePalletCount: number): ContainerItem {
+  // 鍋のデフォルト1P数（マスタにもない場合のフォールバック）。段数 × 1段の個数で出す。
+  //   段数     … 60/100サイズ→5段, 180サイズ→4段
+  //   1段の個数 … nabePerLayer（大きい箱は 100→5個・180→4個、従来の8個入りは6個）
+  // つまり 大きい箱: 100→25 / 180→16、従来: 100→30 / 180→24
+  if (updated.qtyPerPallet === 0 && updated.type === '鍋') {
+    const name = updated.itemName || '';
+    const layers = isLargeSizeName(name) ? 4 : 5;
+    updated.qtyPerPallet = layers * nabePerLayer(updated.type, updated.packingQty, name);
+  }
+  // パレット数・端数を自動計算（qtyPerPalletが設定済みで、元データにパレット情報がない場合）
+  // caseCountが0の場合、totalQtyとpackingQtyから逆算
+  if (updated.caseCount === 0 && updated.totalQty > 0 && updated.packingQty > 0) {
+    updated.caseCount = Math.ceil(updated.totalQty / updated.packingQty);
+    updated.fraction = updated.caseCount;
+  }
+  if (updated.qtyPerPallet > 0 && updated.caseCount > 0 && sourcePalletCount === 0) {
+    updated.palletCount = Math.floor(updated.caseCount / updated.qtyPerPallet);
+    updated.fraction = updated.caseCount % updated.qtyPerPallet;
+  }
+  return updated;
+}
+
 export function linkItemsWithMaster(
   items: ContainerItem[],
   masterItems: ContainerItem[],
 ): { linkedItems: ContainerItem[]; linked: number; unlinked: number; total: number } {
   if (masterItems.length === 0) {
-    return { linkedItems: items, linked: 0, unlinked: items.length, total: items.length };
+    // マスタが取れなくても、鍋は段数の決まりでパレットに割っておく
+    const linkedItems = items.map((item) =>
+      item.type === '鍋' ? fillPalletCounts({ ...item }, item.palletCount) : item);
+    return { linkedItems, linked: 0, unlinked: items.length, total: items.length };
   }
 
   // マスタの検索用Map
@@ -410,7 +441,9 @@ export function linkItemsWithMaster(
       master = byPartNumber.get(item.partNumber);
     }
 
-    if (!master) return item;
+    // マスタに無い品目はそのまま。ただし鍋は「100→5段・180→4段」の決まりでパレットに割る
+    // （マスタ未登録の JPI-X180 などが 1P数 0 のまま、全部が端数になって6段以上に積まれていた）
+    if (!master) return item.type === '鍋' ? fillPalletCounts({ ...item }, item.palletCount) : item;
 
     linked++;
     const updated = { ...item };
@@ -464,28 +497,7 @@ export function linkItemsWithMaster(
     if (master.packingQty > 0 && updated.packingQty === 0) {
       updated.packingQty = master.packingQty;
     }
-    // 鍋のデフォルト1P数（マスタにもない場合のフォールバック）
-    // 60/100サイズ→30, 180サイズ→24
-    if (updated.qtyPerPallet === 0 && updated.type === '鍋') {
-      const name = updated.itemName || '';
-      if (name.includes('180') || /18[RWCS]/.test(name)) {
-        updated.qtyPerPallet = 24;
-      } else {
-        updated.qtyPerPallet = 30; // 60/100サイズ共通
-      }
-    }
-    // パレット数・端数を自動計算（qtyPerPalletが設定済みで、元データにパレット情報がない場合）
-    // caseCountが0の場合、totalQtyとpackingQtyから逆算
-    if (updated.caseCount === 0 && updated.totalQty > 0 && updated.packingQty > 0) {
-      updated.caseCount = Math.ceil(updated.totalQty / updated.packingQty);
-      updated.fraction = updated.caseCount;
-    }
-    if (updated.qtyPerPallet > 0 && updated.caseCount > 0 && item.palletCount === 0) {
-      updated.palletCount = Math.floor(updated.caseCount / updated.qtyPerPallet);
-      updated.fraction = updated.caseCount % updated.qtyPerPallet;
-    }
-
-    return updated;
+    return fillPalletCounts(updated, item.palletCount);
   });
 
   // === 第2パス: measurements/cbm/grossWeight が空のアイテムに類似品名からフォールバック ===

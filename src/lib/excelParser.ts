@@ -355,6 +355,42 @@ function mergeItems(items: ContainerItem[]): ContainerItem[] {
 }
 
 /**
+ * ファイル名から「入荷日」と「コンテナ番号」を読み取る。
+ *
+ * コンテナ番号・入荷日の行が無く、中身（品目）だけを書き出したファイル
+ * （「コンテナ内容_20260902.xlsx」など）を読むときに使う。
+ *   - 日付       … 20260902 / 2026-09-02 / 2026.09.02 のかたち
+ *   - コンテナ番号 … 26K0705 のかたちが入っていればそれ。
+ *                   無ければ日付を取り除いた残り（例:「コンテナ内容」）
+ */
+export function containerFromFileName(fileName: string): { date: string; containerNo: string } {
+  const base = fileName.replace(/\.[^.]+$/, '').trim();
+
+  let date = '';
+  let dateText = '';
+  const m = base.match(/(20\d{2})[-_./]?(\d{2})[-_./]?(\d{2})/);
+  if (m) {
+    const month = Number(m[2]);
+    const day = Number(m[3]);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      date = `${m[1]}-${m[2]}-${m[3]}`;
+      dateText = m[0];
+    }
+  }
+
+  // 26K0705 のようなコンテナ番号が名前に入っていれば、それを使う
+  const noMatch = base.match(/\d{2}[A-Za-z]\d{3,5}/);
+  let containerNo = noMatch ? noMatch[0] : '';
+  if (!containerNo) {
+    containerNo = (dateText ? base.split(dateText).join('') : base)
+      .replace(/^[-_.\s]+/, '')
+      .replace(/[-_.\s]+$/, '')
+      .trim();
+  }
+  return { date, containerNo: containerNo || base };
+}
+
+/**
  * Excel ファイルをブラウザ内でパースし、コンテナデータを返す
  */
 export async function parseExcelFile(file: File): Promise<ParseResult> {
@@ -379,6 +415,10 @@ export async function parseExcelFile(file: File): Promise<ParseResult> {
   const containers: Container[] = [];
   const errors: string[] = [];
   let current: Container | null = null;
+  // コンテナ番号・入荷日の行より前に出てきた品目。
+  // そういう行が最後まで無ければ、ファイル名から 1 コンテナ分として読む
+  const fallback = containerFromFileName(file.name);
+  const looseItems: ContainerItem[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -408,13 +448,23 @@ export async function parseExcelFile(file: File): Promise<ParseResult> {
     if (normalizeHeader(cVal) === '品番' || normalizeHeader(dVal) === '品名') continue;
 
     // 品名の列に値があればアイテム行
-    if (dVal && typeof dVal === 'string' && dVal.trim() !== '' && current) {
-      const item = createContainerItem(row, columns, lookup, current.containerNo, i);
-      current.items.push(item);
+    if (dVal && typeof dVal === 'string' && dVal.trim() !== '') {
+      const owner = current;
+      const item = createContainerItem(
+        row, columns, lookup, owner ? owner.containerNo : fallback.containerNo, i,
+      );
+      if (owner) owner.items.push(item);
+      else looseItems.push(item);
     }
   }
   if (current && current.items.length > 0) {
     containers.push(current);
+  }
+
+  // コンテナ番号・入荷日の行が 1 つも無いファイル（中身だけを書き出した
+  // 「コンテナ内容_20260902.xlsx」など）は、ファイル名から 1 コンテナ分として読む
+  if (containers.length === 0 && looseItems.length > 0) {
+    containers.push({ date: fallback.date, containerNo: fallback.containerNo, items: looseItems });
   }
 
   // 同一コンテナ内の同一品番・同一品名を合算
@@ -428,7 +478,13 @@ export async function parseExcelFile(file: File): Promise<ParseResult> {
   }
 
   if (containers.length === 0) {
-    errors.push('コンテナデータが見つかりませんでした');
+    // 何が違うのか分かるように、読んだシートと見出し行も添える
+    errors.push(
+      'コンテナデータが見つかりませんでした'
+      + `（シート: ${wb.SheetNames.join(' / ') || 'なし'}`
+      + ` / 読んだシート: ${wsName}`
+      + ` / 見出し行: ${headerRow >= 0 ? `${headerRow + 1}行目` : '見つからず'}）`,
+    );
   }
 
   return { containers, errors };

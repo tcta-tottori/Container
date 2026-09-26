@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- カメラで撮った写真の置き場。自分の cache の中だけを外に見せる -->
+<paths>
+    <cache-path
+        name="photos"
+        path="photos/" />
+</paths>

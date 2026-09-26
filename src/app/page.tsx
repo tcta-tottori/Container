@@ -17,9 +17,11 @@ import FileDropZone from '@/components/FileDropZone';
 import HeaderBar, { ItemTimeLog } from '@/components/HeaderBar';
 import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, climateToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
-import { getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled } from '@/lib/callPhrases';
-import { getVoiceSettings, subscribeVoiceSettings, VoiceSettings } from '@/lib/voiceSettings';
-import { prepareSherpaTts } from '@/lib/sherpaTts';
+import { syncToWatch, setWatchCommandHandler } from '@/lib/watchSync';
+import {
+  getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled,
+  REQUEST_CALL_TEXT, NAME_CALL_TEXT,
+} from '@/lib/callPhrases';
 import ItemListPanel from '@/components/ItemListPanel';
 import ItemEditPage from '@/components/ItemEditPage';
 // ActionBar removed - replaced by floating mic button
@@ -33,6 +35,8 @@ import { getWaterSoundEngine, setupWaterAutoResume } from '@/lib/waterSound';
 import { useWaterSound } from '@/hooks/useWaterSound';
 import WeatherPopup from '@/components/WeatherPopup';
 import QuickActions from '@/components/QuickActions';
+import PersonAppearance from '@/components/PersonAppearance';
+import { Person, PERSON_CALL_PREFIX, findPerson } from '@/lib/people';
 import RiverMode from '@/components/RiverMode';
 import MistVideo from '@/components/MistVideo';
 import { MIST_PEAK, MIST_CLEAR_MS } from '@/lib/mistVideo';
@@ -207,9 +211,6 @@ function UpdateNotification() {
   );
 }
 
-/** 「お願いします！」ボタンで読み上げる言葉 */
-const REQUEST_CALL_TEXT = 'お願いします！';
-
 export default function Home() {
   const {
     state,
@@ -245,18 +246,6 @@ export default function Home() {
   const { speak, speakCheer, speakThenCheer, announceItem, announceAllComplete, announceContainerSummary } =
     useSpeech();
 
-  /**
-   * sherpa-onnx（端末内 TTS）を選んでいるときは、最初のコールで待たされないよう
-   * 先にモデルを読み込んでおく。設定を切り替えたときも読み込む。
-   */
-  useEffect(() => {
-    const preload = (s: VoiceSettings) => {
-      if (s.engine !== 'sherpa' || !s.sherpa.preload) return;
-      void prepareSherpaTts().catch(() => { /* 失敗しても端末の音声で鳴る */ });
-    };
-    preload(getVoiceSettings());
-    return subscribeVoiceSettings(preload);
-  }, []);
 
   const prevItemRef = useRef<string | null>(null);
   const currentItemRef = useRef(currentItem);
@@ -274,6 +263,10 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   // せせらぎモード（川の映像）
   const [riverOpen, setRiverOpen] = useState(false);
+  /** 一覧のところに出している人。出していないときは null */
+  const [person, setPerson] = useState<Person | null>(null);
+  /** その人を常時表示にしているか（10 秒で消えず、タップで少しだけ消える） */
+  const [personAlways, setPersonAlways] = useState(false);
   /** せせらぎモードから戻ったあと、元の画面の上で晴れていく靄 */
   const [riverTail, setRiverTail] = useState(false);
   /** せせらぎモードに入るとき、こちらで水の音BGMを止めたか（戻すときの目印） */
@@ -282,6 +275,27 @@ export default function Home() {
   // 温湿度バー用: 気象庁（Open-Meteo）データ + SwitchBot データ
   const [barWeather, setBarWeather] = useState<WeatherData | null>(null);
   const [switchbot, setSwitchbot] = useState<SwitchBotReading | null>(null);
+
+  // Pixel Watch へ同期（Android アプリで開いているときだけ。ブラウザでは何もしない）
+  useEffect(() => {
+    syncToWatch({
+      containers: state.containers,
+      selectedContainerIdx: state.selectedContainerIdx,
+      items: state.items,
+      currentItemIdx: state.currentItemIdx,
+      originalValues: state.originalValues,
+      completedIds: state.completedIds,
+      workStartTime: state.workStartTime,
+      workPausedAt: state.workPausedAt,
+      climate: switchbot ?? barWeather,
+      // 作業ページを開いた時点でウォッチに知らせる（通知を押すとその作業画面が開く）
+      workViewOpen: viewMode === 'work' && state.items.length > 0,
+    });
+  }, [
+    state.containers, state.selectedContainerIdx, state.items, state.currentItemIdx,
+    state.originalValues, state.completedIds, state.workStartTime, state.workPausedAt,
+    switchbot, barWeather, viewMode,
+  ]);
   const [sbStatus, setSbStatus] = useState<SwitchBotStatus>('idle');
   const [sbError, setSbError] = useState<string | null>(null);
   const sbStopRef = useRef<null | (() => void)>(null);
@@ -577,7 +591,7 @@ export default function Home() {
   }, [handleSbReading]);
 
   /**
-   * 読込の進み具合。Googleドライブから取ってくる分と、そのあとの解析とで
+   * 読込の進み具合。ファイルを取ってくる分と、そのあとの解析とで
    * 別々に数えているため、あとの段階が小さい値を出しても戻さない。
    */
   const advanceProgress = useCallback((p: number) => {
@@ -597,16 +611,6 @@ export default function Home() {
     }, 1000); // 100%表示1秒
   }, []);
 
-  /**
-   * Googleドライブから取ってくる間のローディング表示。
-   * 取得が終わるとそのまま各ファイルの読込処理が続きを受け持つので、
-   * 選んでから作業ページに着くまで画面が途切れない。
-   */
-  const handleDriveLoading = useCallback((msg: string | null, progress?: number) => {
-    setLoadingMsg(msg);
-    setLoadingProgress(progress ?? 0);
-    if (msg === null) setLoadingClosing(false);
-  }, []);
 
   const handleFileLoaded = useCallback(
     async (file: File) => {
@@ -846,33 +850,42 @@ export default function Home() {
         const sheet1Items = parseJkpSheet1(wb);
         // 体積Ｍ３: CBM・箱寸
         const volumeMap = parseJkpVolume(wb);
-        // updata: 出荷スケジュール（納入指示行の数量がある列のRow10日付を納入日として読込、当日〜7日）
-        const { shipments, activeDates } = parseJkpUpdata(wb);
+        // updata: 出荷スケジュール（納入指示行の数量がある列のRow10日付を納入日として読込、
+        //         過去納入分2回分〈前回・2回前〉＋当日〜7日）
+        const { shipments, activeDates, pastDates } = parseJkpUpdata(wb);
         setJkpShipments(shipments);
 
-        // パーサーが既に当日〜7日に絞り込み済み
+        // パーサーが既に「過去納入分＋当日〜7日」に絞り込み済み
         const today = new Date().toISOString().slice(0, 10);
         const oneWeekLater = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-        const scheduleDates = getScheduleDatesInRange(shipments, today, oneWeekLater);
+        const upcomingDates = getScheduleDatesInRange(shipments, today, oneWeekLater);
+        // 過去納入分（古い順）を先頭に並べる: 2回前 → 前回 → 当日以降
+        const scheduleDates = [...pastDates, ...upcomingDates];
 
         if (scheduleDates.length === 0) {
-          setLoadingMsg(`${today}〜${oneWeekLater}の出荷データがありません (updata:${shipments.length}件, 納入日:${activeDates.length}件)`);
+          setLoadingMsg(`${today}〜${oneWeekLater}と過去納入分の出荷データがありません (updata:${shipments.length}件, 納入日:${activeDates.length}件)`);
           await new Promise((r) => setTimeout(r, 3000));
           return;
         }
 
-        setLoadingMsg(`${scheduleDates.length}日分のデータ検出（納入指示基準）。変換中...`);
+        const pastNote = pastDates.length > 0 ? `／過去納入${pastDates.length}回分を含む` : '';
+        setLoadingMsg(`${scheduleDates.length}日分のデータ検出（納入指示基準${pastNote}）。変換中...`);
 
         // 日付ごとにContainerを作成: "鍋(04/23)" 形式
+        // 過去納入分は頭に回数を付けて区別する: "前回 鍋(04/16)" / "2回前 鍋(04/09)"
         const containers = [];
         let totalItems = 0;
         for (const date of scheduleDates) {
           const items = jkpToContainerItems(sheet1Items, volumeMap, shipments, date);
           if (items.length === 0) continue;
           const dateLabel = date.slice(5).replace('-', '/');
+          const pastIdx = pastDates.indexOf(date);
+          // 新しい過去納入日から 1回前(前回), 2回前, … と数える
+          const backCount = pastIdx >= 0 ? pastDates.length - pastIdx : 0;
+          const prefix = backCount === 1 ? '前回 ' : backCount > 1 ? `${backCount}回前 ` : '';
           containers.push({
             date,
-            containerNo: `鍋(${dateLabel})`,
+            containerNo: `${prefix}鍋(${dateLabel})`,
             items,
           });
           totalItems += items.length;
@@ -904,8 +917,9 @@ export default function Home() {
         loadData(containers);
         saveRecentFile(file, containers.length, totalItems, 'jkp');
 
-        // 紐付済みなのでuseEffectの再紐付をスキップ
-        linkedRef.current = `${containers[0].containerNo}-0`;
+        // 選択されるコンテナ（当日分）は先頭とは限らない（過去納入分を前に並べるため）ので、
+        // ここではキーを立てず、useEffect 側の紐付にまかせる
+        linkedRef.current = null;
 
         await new Promise((r) => setTimeout(r, 500));
       } catch (e) {
@@ -1247,12 +1261,87 @@ export default function Home() {
     riverPausedWaterRef.current = false;
   }, [waterPlaying, toggleWater]);
 
+  /** いま常時表示にしている人（していなければ null）。メニューの光り方に使う */
+  const alwaysPersonId = personAlways && person ? person.id : null;
+
+  /**
+   * 人物出現。一覧のところに、選んだ人を出す。
+   * [always] が false なら 10 秒で消える。true なら消えずにずっと居る。
+   * 出ている間にもう一度選ばれたら、その人に差し替えて数え直す。
+   * 常時表示のときに同じ人をもう一度選んだら、常時表示をやめる。
+   */
+  const showPerson = useCallback((id: string, always = false) => {
+    const found = findPerson(id);
+    if (!found) return;
+    if (always && alwaysPersonId === id) {
+      setPerson(null);
+      setPersonAlways(false);
+      return;
+    }
+    setPerson(found);
+    setPersonAlways(always);
+  }, [alwaysPersonId]);
+
+  /** 人物出現を片付ける（10 秒たった / ダブルタップで切り上げた） */
+  const clearPerson = useCallback(() => {
+    setPerson(null);
+    setPersonAlways(false);
+  }, []);
+
   // 残した靄は晴れきったら片付ける
   useEffect(() => {
     if (!riverTail) return;
     const t = setTimeout(() => setRiverTail(false), RIVER_TAIL_MS);
     return () => clearTimeout(t);
   }, [riverTail]);
+
+  /*
+   * Pixel Watch からの操作を受け取る（Android アプリで開いているときだけ）。
+   * 画面のタップと同じ処理を通すので、コールも表示も CNS の操作と揃う。
+   * 対象の品目がいまの品目と違うときは、まず切り替えるだけにして誤操作を防ぐ。
+   *
+   * 天気・水の音・せせらぎモードは、スマホのメニューのボタンを押したのと同じ。
+   * せせらぎモードと水の音を使うので、その処理を作ったあとに置いてある。
+   */
+  useEffect(() => {
+    setWatchCommandHandler((command) => {
+      // コールはどの品目でも鳴らせる（品目の指定は要らない）
+      if (command.type === 'call') {
+        if (command.arg === 'name') speakCheer(NAME_CALL_TEXT);
+        else if (command.arg === 'cheer') speakCheer(getRandomCallPhrase());
+        else if (command.arg === 'item') { if (currentItem) announceItem(currentItem, state.items); }
+        else if (command.arg === 'weather') handleWeatherCall();
+        else if (command.arg === 'water') toggleWater();
+        else if (command.arg === 'river') openRiver();
+        else if (command.arg?.startsWith(PERSON_CALL_PREFIX)) showPerson(command.arg.slice(PERSON_CALL_PREFIX.length));
+        else speakCheer(REQUEST_CALL_TEXT);
+        return;
+      }
+      const idx = state.items.findIndex((it) => it.id === command.itemId);
+      if (idx < 0) return;
+      // 完了を戻すのは、いま出している品目でなくてもそのまま効かせる
+      if (command.type === 'uncompleteItem') {
+        uncompleteItem(command.itemId);
+        return;
+      }
+      if (command.type === 'selectItem') {
+        handleSelectItem(idx);
+        return;
+      }
+      if (idx !== state.currentItemIdx) {
+        handleSelectItem(idx);
+        return;
+      }
+      if (command.type === 'decrementPallet') handleDecrease();
+      else if (command.type === 'incrementPallet') handleIncrease();
+    });
+    return () => setWatchCommandHandler(null);
+  }, [
+    state.items, state.currentItemIdx, handleSelectItem, handleDecrease, handleIncrease,
+    speakCheer, announceItem, currentItem, uncompleteItem,
+    handleWeatherCall, toggleWater, openRiver, showPerson,
+  ]);
+
 
 
   // 前回の再生状態を自動再開（ブラウザ制限のため最初の操作を待って再生）
@@ -1383,6 +1472,10 @@ export default function Home() {
       {weatherPopup && (
         <WeatherPopup weather={weatherPopup} onClose={closeWeatherPopup} isSpeaking={isSpeaking} />
       )}
+      {/* 人物出現（一覧のところ）。常時表示でなければ 10 秒で消える。ダブルタップでも消える */}
+      {person && !riverOpen && (
+        <PersonAppearance person={person} always={personAlways} onDone={clearPerson} />
+      )}
       {historyOpen && (
         <HistoryModal
           onClose={() => setHistoryOpen(false)}
@@ -1503,6 +1596,7 @@ export default function Home() {
           onSelectContainer={selectContainer}
           onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
           onRequestCall={view === 'work' ? () => speakCheer(REQUEST_CALL_TEXT) : undefined}
+          onNameCall={view === 'work' ? () => speakCheer(NAME_CALL_TEXT) : undefined}
           onWeather={view === 'work' ? handleWeatherCall : undefined}
           waterPlaying={waterPlaying}
           onWater={toggleWater}
@@ -1513,6 +1607,8 @@ export default function Home() {
           onToggleSwitchBot={toggleSwitchBot}
           onOpenSwitchBot={() => setSbPopupOpen(true)}
           onOpenRiver={openRiver}
+          onShowPerson={showPerson}
+          alwaysPersonId={alwaysPersonId}
           hidden={menuOpen || manualOpen || settingsTab !== null || historyOpen || riverOpen}
         />
 
@@ -1528,7 +1624,6 @@ export default function Home() {
                 onJkpLoaded={handleJkpLoaded}
                 onMasterLoaded={handleMasterLoaded}
                 onPhotoLoaded={handlePhotoLoaded}
-                onLoadingChange={handleDriveLoading}
               />
             </div>
           )}
@@ -1710,7 +1805,12 @@ export default function Home() {
               onContextMenu={(e) => e.preventDefault()}
               className={`mic-float-btn ${isListening && !isSpeaking ? 'mic-btn-recording' : ''}`}
               style={{
-                position: 'fixed', bottom: 20, zIndex: 100,
+                position: 'fixed', zIndex: 100,
+                /*
+                 * 下端の安全領域（ジェスチャーバー）は、ボタンの内側ではなく置き場所で避ける。
+                 * padding で避けるとボタンの中身だけが上へずれてしまう。
+                 */
+                bottom: 'calc(20px + env(safe-area-inset-bottom, 0px))',
                 width: 56, height: 56, borderRadius: '50%',
                 background: isSpeaking
                   ? 'radial-gradient(circle at 35% 35%, #b48eff, #8b5cf6 50%, #6d28d9 80%, #4c1d95)'
@@ -1727,7 +1827,6 @@ export default function Home() {
                     : '0 4px 20px rgba(74,110,247,0.35), 0 0 40px rgba(107,82,212,0.15), inset 0 1px 2px rgba(255,255,255,0.15)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 transition: 'all 0.3s ease',
-                paddingBottom: 'env(safe-area-inset-bottom, 0px)',
               }}>
               {isPreparingSpeech ? (
                 /* Gemini TTS 取得中: 回転スピナー */
