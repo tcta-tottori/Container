@@ -7,7 +7,9 @@
 
 import { getGeminiKey } from './geminiApi';
 import { getVoiceSettings, styleInstruction, LEGACY_TTS_MODEL } from './voiceSettings';
-import { pcm16ToWavBlob, normalizeJapaneseForTts, cleanSpeechPcm } from './ttsAudio';
+import {
+  pcm16ToWavBlob, normalizeJapaneseForTts, cleanSpeechPcm, readPcm16Wav, isRiff, concatBytes,
+} from './ttsAudio';
 import { getCachedSpeech, putCachedSpeech, speechCacheKey } from './ttsCache';
 
 /** 直近の TTS エラーメッセージ（UI 表示用） */
@@ -26,6 +28,31 @@ export function setLastTtsError(msg: string | null): void {
 export function subscribeTtsError(fn: (msg: string | null) => void): () => void {
   _errorListeners.add(fn);
   return () => { _errorListeners.delete(fn); };
+}
+
+/**
+ * 直近に作った音声の中身（雑音などの原因を調べるため、設定画面に出す・保存できる）。
+ * raw は Gemini から届いたそのままのデータ、blob は整えたあと実際に鳴らす音声。
+ */
+export interface LastSpeechInfo {
+  model: string;
+  mime: string;
+  parts: number;
+  bytes: number;
+  raw: Uint8Array;
+  blob: Blob;
+  at: number;
+}
+
+let _lastSpeech: LastSpeechInfo | null = null;
+
+function recordLastSpeech(info: Omit<LastSpeechInfo, 'at'>): void {
+  _lastSpeech = { ...info, at: Date.now() };
+}
+
+/** 直近に作った音声の中身。まだ作っていなければ null（取っておいた音声を鳴らしただけのときも null） */
+export function getLastSpeechInfo(): LastSpeechInfo | null {
+  return _lastSpeech;
 }
 
 /** base64 文字列を Uint8Array にデコード */
@@ -146,22 +173,38 @@ export async function geminiGenerateSpeech(
   }
 
   const data = await res.json();
-  const part = data?.candidates?.[0]?.content?.parts?.[0];
-  const inline = part?.inlineData || part?.inline_data;
-  const b64 = inline?.data;
-  const mime = inline?.mimeType || inline?.mime_type || 'audio/L16;codec=pcm;rate=24000';
+  // 音声は 1 つとは限らない（長い文だと分かれて返ることがある）。ぜんぶつなげる
+  const parts: { data?: string; mimeType?: string; mime_type?: string }[] =
+    (data?.candidates?.[0]?.content?.parts || [])
+      .map((p: { inlineData?: unknown; inline_data?: unknown }) => p?.inlineData || p?.inline_data)
+      .filter((d: { data?: string } | undefined) => !!d?.data);
+  const mime = parts[0]?.mimeType || parts[0]?.mime_type || 'audio/L16;codec=pcm;rate=24000';
 
-  if (!b64) {
+  if (parts.length === 0) {
     const msg = `モデル「${model}」: 音声データが返ってきません`;
     setLastTtsError(msg);
     throw new Error(msg);
   }
 
   setLastTtsError(null); // 成功時はエラーをクリア
-  const sampleRate = parseSampleRate(mime);
-  // 読み終わりのあとの雑音を削り、最後をなめらかに終わらせる
-  const pcm = cleanSpeechPcm(base64ToUint8Array(b64), sampleRate);
-  const blob = pcm16ToWavBlob(pcm, sampleRate);
+  const raw = concatBytes(parts.map((p) => base64ToUint8Array(p.data!)));
+
+  let blob: Blob;
+  if (/wav/i.test(mime) || isRiff(raw)) {
+    // WAV（ヘッダ付き）で返ってきたら、中の PCM を取り出して整える
+    const wav = readPcm16Wav(raw);
+    blob = wav
+      ? pcm16ToWavBlob(cleanSpeechPcm(wav.pcm, wav.sampleRate), wav.sampleRate)
+      : new Blob([raw], { type: 'audio/wav' });
+  } else if (/L16|pcm/i.test(mime)) {
+    // 16bit PCM。読み終わりのあとの雑音を削り、最後をなめらかに終わらせる
+    const sampleRate = parseSampleRate(mime);
+    blob = pcm16ToWavBlob(cleanSpeechPcm(raw, sampleRate), sampleRate);
+  } else {
+    // mp3 など圧縮された音声は、そのまま鳴らす（PCM として包むと雑音になる）
+    blob = new Blob([raw], { type: mime.split(';')[0] });
+  }
+  recordLastSpeech({ model, mime, parts: parts.length, bytes: raw.byteLength, raw, blob });
   // しまうのは待たない（鳴らすほうを先に進める）
   void putCachedSpeech(cacheKey, blob, normalized);
   return blob;

@@ -13,6 +13,7 @@ import {
 } from '@/lib/voiceSettings';
 import { applyVolume } from '@/lib/audioBoost';
 import { toFriendlySpeech } from '@/lib/friendlyCall';
+import { shiftPitchBlob } from '@/lib/pitchShift';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
@@ -189,7 +190,8 @@ function speakGemini(text: string, profile: VoiceProfile, onDone?: () => void): 
         signal, stylePrefix: styleInstruction(profile), voice: profile.voice,
       });
       _geminiFails = 0; // 鳴ったら数え直す
-      return blob;
+      // 声の高さは鳴らす直前に変える（取っておく音声はそのまま）
+      return shiftPitchBlob(blob, profile.pitch);
     },
     onDone,
     (finish) => {
