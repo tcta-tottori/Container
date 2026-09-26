@@ -8,6 +8,7 @@
  */
 
 import { MAX_VOLUME } from '@/lib/audioBoost';
+import { MIN_PITCH, MAX_PITCH } from '@/lib/pitchShift';
 
 const STORAGE_KEY = 'cns_voice_settings';
 
@@ -112,7 +113,11 @@ export interface VoiceProfile {
   customStyle: string;
   /** 話す速さ（0.6〜1.6） */
   rate: number;
-  /** 声の高さ（0.6〜1.6）。Web Speech のみ数値で反映、Gemini は指示文に反映 */
+  /**
+   * 声の高さ（0.6〜2.0）。1.0 がその声そのまま。
+   * Gemini TTS は作った音声の高さを変えて反映する（`pitchShift.ts`。速さは変わらない）。
+   * 端末の音声は読み上げの高さとして反映する（上限 2.0）。
+   */
   pitch: number;
 }
 
@@ -173,7 +178,7 @@ function normalizeProfile(p: Partial<VoiceProfile> | undefined, fallback: VoiceP
     tone: isKnownTone(p?.tone) ? p.tone : fallback.tone,
     customStyle: typeof p?.customStyle === 'string' ? p.customStyle : '',
     rate: clamp(Number(p?.rate ?? fallback.rate), 0.6, 1.6),
-    pitch: clamp(Number(p?.pitch ?? fallback.pitch), 0.6, 1.6),
+    pitch: clamp(Number(p?.pitch ?? fallback.pitch), MIN_PITCH, MAX_PITCH),
   };
 }
 
@@ -247,13 +252,12 @@ export function subscribeVoiceSettings(fn: (s: VoiceSettings) => void): () => vo
 /** プロファイルから Gemini TTS へ渡すスタイル指示文を組み立てる */
 export function styleInstruction(p: VoiceProfile): string {
   const base = p.tone === 'custom'
-    ? (p.customStyle.trim() || DEFAULT_VOICE_SETTINGS.main.customStyle)
+    ? (p.customStyle.trim() || 'はっきりと読む')
     : (TONE_PRESETS.find((t) => t.id === p.tone)?.style || 'はっきりと読む');
   const parts = [base];
   if (p.rate >= 1.25) parts.push('速めのテンポで');
   else if (p.rate <= 0.85) parts.push('ゆっくりと');
-  if (p.pitch >= 1.25) parts.push('高めの声で');
-  else if (p.pitch <= 0.85) parts.push('低めの声で');
+  // 声の高さは、作った音声の高さを変えて反映する（指示文では頼まない）
   return parts.join('、');
 }
 

@@ -28,6 +28,48 @@ function wavBuffer(byteLen: number, sampleRate: number): { buf: ArrayBuffer; vie
   return { buf, view };
 }
 
+/** 先頭が「RIFF」（WAV のヘッダ）か */
+export function isRiff(bytes: Uint8Array): boolean {
+  return bytes.length >= 12
+    && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46;
+}
+
+/** いくつかのバイト列を 1 つにつなげる */
+export function concatBytes(chunks: Uint8Array[]): Uint8Array<ArrayBuffer> {
+  if (chunks.length === 1) return chunks[0].slice();
+  const out = new Uint8Array(chunks.reduce((n, c) => n + c.byteLength, 0));
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.byteLength; }
+  return out;
+}
+
+/** 16bit モノラルの WAV から PCM と sample rate を取り出す。形が違えば null */
+export function readPcm16Wav(bytes: Uint8Array): { pcm: Uint8Array; sampleRate: number } | null {
+  if (!isRiff(bytes)) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const tag = (o: number) => String.fromCharCode(bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]);
+  let offset = 12;
+  let sampleRate = 0;
+  let channels = 0;
+  let bits = 0;
+  while (offset + 8 <= bytes.byteLength) {
+    const id = tag(offset);
+    const size = view.getUint32(offset + 4, true);
+    const body = offset + 8;
+    if (id === 'fmt ') {
+      channels = view.getUint16(body + 2, true);
+      sampleRate = view.getUint32(body + 4, true);
+      bits = view.getUint16(body + 14, true);
+    } else if (id === 'data') {
+      if (channels !== 1 || bits !== 16 || !sampleRate) return null;
+      const end = Math.min(bytes.byteLength, body + size);
+      return { pcm: bytes.subarray(body, end), sampleRate };
+    }
+    offset = body + size + (size % 2);
+  }
+  return null;
+}
+
 /** 16bit PCM（L16, モノラル）を WAV に変換 */
 export function pcm16ToWavBlob(pcm: Uint8Array, sampleRate: number): Blob {
   const { buf } = wavBuffer(pcm.byteLength, sampleRate);
@@ -57,6 +99,12 @@ const FADE_IN_SEC = 0.005;
 const STRAY_GAP_SEC = 0.6;
 /** 雑音とみなす短い音の長さの上限（秒） */
 const STRAY_MAX_SEC = 0.35;
+/** 声のあと、これ以上黙ってから出た「ザーッ」という音（声らしくない音）は長くても削る（秒） */
+const NOISE_GAP_SEC = 0.25;
+/** 声らしくない音とみなす、波が 0 をまたぐ割合（ザーッという音は高い。声の母音は低い） */
+const NOISE_ZCR = 0.3;
+/** 声のあと、これより小さい音（声の大きさに対する割合）は長くても削る */
+const QUIET_RATIO = 0.2;
 
 /**
  * 作った音声（16bit PCM）の終わりを整える。
@@ -95,15 +143,38 @@ export function cleanSpeechPcm(pcm: Uint8Array, sampleRate: number): Uint8Array 
   while (last >= 0 && !voiced(last)) last--;
   if (last < 0) return pcm;
 
-  // 最後のかたまりが「長く黙ったあとの短い音」なら雑音として外す
+  // 区切りごとの「波が 0 をまたぐ割合」（ザーッという雑音は高い）
+  const zcr = new Float32Array(frames);
+  for (let f = 0; f < frames; f++) {
+    let cross = 0;
+    const end = Math.min(count, (f + 1) * frame);
+    for (let i = f * frame + 1; i < end; i++) if ((samples[i - 1] < 0) !== (samples[i] < 0)) cross++;
+    zcr[f] = cross / Math.max(1, end - f * frame - 1);
+  }
+  // 声の大きさの目安（声の区切りの音量の中央値）
+  const voicedRms = Array.from(rms).filter((v) => v >= threshold).sort((a, b) => a - b);
+  const speechLevel = voicedRms[Math.floor(voicedRms.length / 2)] || peak;
+
+  // 最後のかたまりが雑音なら外す（雑音が続くこともあるので、声に当たるまで繰り返す）
   const gapFrames = Math.round(STRAY_GAP_SEC / FRAME_SEC);
   const strayFrames = Math.round(STRAY_MAX_SEC / FRAME_SEC);
-  let start = last;
-  while (start > 0 && voiced(start - 1)) start--;
-  let before = start - 1;
-  while (before >= 0 && !voiced(before)) before--;
-  if (before >= 0 && last - start + 1 <= strayFrames && start - before - 1 >= gapFrames) {
-    last = before;
+  const noiseGapFrames = Math.round(NOISE_GAP_SEC / FRAME_SEC);
+  for (;;) {
+    let start = last;
+    while (start > 0 && voiced(start - 1)) start--;
+    let before = start - 1;
+    while (before >= 0 && !voiced(before)) before--;
+    if (before < 0) break;
+    const gap = start - before - 1;
+    const len = last - start + 1;
+    let zSum = 0;
+    let rSum = 0;
+    for (let f = start; f <= last; f++) { zSum += zcr[f]; rSum += rms[f]; }
+    const noisy = zSum / len >= NOISE_ZCR;
+    const quiet = rSum / len < speechLevel * QUIET_RATIO;
+    const stray = len <= strayFrames && gap >= gapFrames;
+    if (stray || (gap >= noiseGapFrames && (noisy || quiet))) last = before;
+    else break;
   }
 
   const endSample = Math.min(count, (last + 1) * frame + Math.round(TAIL_KEEP_SEC * sampleRate));
