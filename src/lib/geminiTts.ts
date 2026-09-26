@@ -7,7 +7,7 @@
 
 import { getGeminiKey } from './geminiApi';
 import { getVoiceSettings, styleInstruction, LEGACY_TTS_MODEL } from './voiceSettings';
-import { pcm16ToWavBlob, normalizeJapaneseForTts } from './ttsAudio';
+import { pcm16ToWavBlob, normalizeJapaneseForTts, cleanSpeechPcm } from './ttsAudio';
 import { getCachedSpeech, putCachedSpeech, speechCacheKey } from './ttsCache';
 
 /** 直近の TTS エラーメッセージ（UI 表示用） */
@@ -87,7 +87,17 @@ export async function geminiGenerateSpeech(
   // スタイル指示は最小限にして生成時間を短縮（句読点のスペース挿入で間は十分確保）
   const normalized = normalizeJapaneseForTts(text);
   const stylePrefix = options?.stylePrefix || styleInstruction(settings.main);
-  const styled = `${stylePrefix}: ${normalized}`;
+  // 話し方の指示と読む文を見出しで分けて送る。
+  // 「指示: 文」の形だと、長い文（ファイルを読み込んだ直後のコールなど）で
+  // 指示文まで読み上げてしまうことがあるため。
+  const styled = [
+    '### DIRECTOR\'S NOTES',
+    `話し方: ${stylePrefix}`,
+    '（この指示は読み上げず、TRANSCRIPT の文だけを読む）',
+    '',
+    '#### TRANSCRIPT',
+    normalized,
+  ].join('\n');
 
   // 取っておいた音声があればそれを使う（API キーが無くても鳴らせる）
   const cacheKey = speechCacheKey({ model, voice, style: stylePrefix, text: normalized });
@@ -148,8 +158,9 @@ export async function geminiGenerateSpeech(
   }
 
   setLastTtsError(null); // 成功時はエラーをクリア
-  const pcm = base64ToUint8Array(b64);
   const sampleRate = parseSampleRate(mime);
+  // 読み終わりのあとの雑音を削り、最後をなめらかに終わらせる
+  const pcm = cleanSpeechPcm(base64ToUint8Array(b64), sampleRate);
   const blob = pcm16ToWavBlob(pcm, sampleRate);
   // しまうのは待たない（鳴らすほうを先に進める）
   void putCachedSpeech(cacheKey, blob, normalized);
