@@ -33,26 +33,32 @@ export const TTS_MODEL_OPTIONS: { id: string; label: string; note: string }[] = 
   { id: LEGACY_TTS_MODEL,            label: 'Gemini 3.1 Flash TTS',      note: '以前のモデル（プレビュー）' },
 ];
 
-/** 選択できる話者（Gemini TTS のプリセット音声） */
+/** 選択できる話者（Gemini TTS のプリセット音声）。女性の声だけを並べる */
 export interface VoiceOption {
   id: string;
   label: string;
   desc: string;
-  gender: '女性' | '男性';
 }
 
 export const VOICE_OPTIONS: VoiceOption[] = [
-  { id: 'Kore',      label: 'コレ',       desc: '落ち着いた声',     gender: '女性' },
-  { id: 'Aoede',     label: 'アオイデ',   desc: '爽やかな声',       gender: '女性' },
-  { id: 'Leda',      label: 'レダ',       desc: '若々しい声',       gender: '女性' },
-  { id: 'Zephyr',    label: 'ゼファー',   desc: '明るい声',         gender: '女性' },
-  { id: 'Puck',      label: 'パック',     desc: '元気な声',         gender: '男性' },
-  { id: 'Charon',    label: 'カロン',     desc: '説明向きの声',     gender: '男性' },
-  { id: 'Fenrir',    label: 'フェンリル', desc: '活発な声',         gender: '男性' },
-  { id: 'Orus',      label: 'オルス',     desc: '力強い声',         gender: '男性' },
-  { id: 'Enceladus', label: 'エンケラ',   desc: '囁くような声',     gender: '男性' },
-  { id: 'Achird',    label: 'アキルド',   desc: '親しみやすい声',   gender: '男性' },
+  { id: 'Kore',         label: 'コレ',         desc: '落ち着いた声' },
+  { id: 'Leda',         label: 'レダ',         desc: '若々しい声' },
+  { id: 'Aoede',        label: 'アオイデ',     desc: '爽やかな声' },
+  { id: 'Zephyr',       label: 'ゼファー',     desc: '明るい声' },
+  { id: 'Autonoe',      label: 'アウトノエ',   desc: 'はつらつとした声' },
+  { id: 'Laomedeia',    label: 'ラオメデイア', desc: '元気な声' },
+  { id: 'Callirrhoe',   label: 'カリロエ',     desc: 'おおらかな声' },
+  { id: 'Despina',      label: 'デスピナ',     desc: 'なめらかな声' },
+  { id: 'Erinome',      label: 'エリノメ',     desc: '澄んだ声' },
+  { id: 'Achernar',     label: 'アケルナル',   desc: 'やわらかい声' },
+  { id: 'Vindemiatrix', label: 'ヴィンデミアトリックス', desc: 'やさしい声' },
+  { id: 'Sulafat',      label: 'スラファト',   desc: 'あたたかい声' },
 ];
+
+/** 並べている声か（以前選べた男性の声などは、初期の声に戻す） */
+function isKnownVoice(voice: unknown): voice is string {
+  return VOICE_OPTIONS.some((v) => v.id === voice);
+}
 
 /** トーン（話し方）のプリセット。自由入力でも上書きできる */
 export const TONE_PRESETS: {
@@ -89,10 +95,10 @@ export const TONE_PRESETS: {
 ];
 
 /**
- * やさしい口調モードの声。モードをオンにしている間は、コールの声の設定の代わりにこれで読む
- * （コールの声の設定そのものは書き換えない）。
+ * やさしい口調モードの声の初期値。モードをオンにしている間は、
+ * コールの声（main）の代わりに `friendly` の声で読む。声・速さ・トーンは設定で変えられる。
  */
-export const FRIENDLY_PROFILE: VoiceProfile = {
+export const DEFAULT_FRIENDLY_PROFILE: VoiceProfile = {
   voice: 'Leda', tone: 'friendly', customStyle: '', rate: 0.95, pitch: 1.2,
 };
 
@@ -120,10 +126,12 @@ export interface VoiceSettings {
   main: VoiceProfile;
   /**
    * やさしい口調モード（`src/lib/friendlyCall.ts`）。
-   * オンの間は FRIENDLY_PROFILE の声で、語尾を「〜ね」「お願いね」に言い換え、
+   * オンの間は `friendly` の声で、語尾を「〜ね」「お願いね」に言い換え、
    * 完了のコールに「超嬉しい」を足して読む。
    */
   friendlyMode: boolean;
+  /** やさしい口調モードの声（コールの声とは別に変えられる） */
+  friendly: VoiceProfile;
   /**
    * 音量（0〜3）。1.0 が端末の音量そのまま。
    * 1.0 を超える分は Web Audio のゲインで持ち上げる（`src/lib/audioBoost.ts`）。
@@ -143,6 +151,7 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   model: DEFAULT_TTS_MODEL,
   main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0 },
   friendlyMode: false,
+  friendly: DEFAULT_FRIENDLY_PROFILE,
   volume: 1.0,
   webVoice: '',
 };
@@ -160,7 +169,7 @@ function isKnownTone(tone: unknown): tone is string {
 
 function normalizeProfile(p: Partial<VoiceProfile> | undefined, fallback: VoiceProfile): VoiceProfile {
   return {
-    voice: typeof p?.voice === 'string' && p.voice ? p.voice : fallback.voice,
+    voice: isKnownVoice(p?.voice) ? p.voice : fallback.voice,
     tone: isKnownTone(p?.tone) ? p.tone : fallback.tone,
     customStyle: typeof p?.customStyle === 'string' ? p.customStyle : '',
     rate: clamp(Number(p?.rate ?? fallback.rate), 0.6, 1.6),
@@ -206,6 +215,7 @@ export function getVoiceSettings(): VoiceSettings {
     model: typeof parsed.model === 'string' && parsed.model ? parsed.model : DEFAULT_TTS_MODEL,
     main: normalizeProfile(parsed.main, DEFAULT_VOICE_SETTINGS.main),
     friendlyMode: parsed.friendlyMode === true,
+    friendly: normalizeProfile(parsed.friendly, DEFAULT_FRIENDLY_PROFILE),
     volume: clamp(Number(parsed.volume ?? 1), 0, MAX_VOLUME),
     webVoice: typeof parsed.webVoice === 'string' ? parsed.webVoice : '',
   };
@@ -218,6 +228,7 @@ export function saveVoiceSettings(next: VoiceSettings): void {
     engine: normalizeEngine(next.engine),
     main: normalizeProfile(next.main, DEFAULT_VOICE_SETTINGS.main),
     friendlyMode: next.friendlyMode === true,
+    friendly: normalizeProfile(next.friendly, DEFAULT_FRIENDLY_PROFILE),
     volume: clamp(Number(next.volume), 0, MAX_VOLUME),
     webVoice: typeof next.webVoice === 'string' ? next.webVoice : '',
   };
@@ -262,7 +273,7 @@ export function engineLabel(engine: VoiceEngine): string {
 
 /** いまコールに使う声（やさしい口調モードならその声） */
 export function callProfile(settings: VoiceSettings): VoiceProfile {
-  return settings.friendlyMode ? FRIENDLY_PROFILE : settings.main;
+  return settings.friendlyMode ? settings.friendly : settings.main;
 }
 
 /** 表示用のトーン名 */
