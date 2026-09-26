@@ -65,8 +65,11 @@ export const TONE_PRESETS: { id: string; label: string; style: string }[] = [
   {
     id: 'drum',
     label: 'ドラム風',
-    style: 'スマホの翻訳・読み上げアプリの合成音声のように、やさしく丁寧な女性の声で、'
-      + '抑揚をおさえて少し機械的に、一語ずつ区切ってゆっくり淡々と読む',
+    // 参考: fm23「ドラムの翻訳アプリっぽいボイス3選」
+    // 翻訳アプリ・音声アシスタントの AI 音声で、ロボットの名残りがあるのがポイント
+    style: 'スマホの翻訳アプリや音声アシスタントの AI 合成音声のように読む。'
+      + '明るく澄んだ若い女性の声で、丁寧でやさしいが、抑揚は平坦で一定のリズム、'
+      + '感情はこめず、少しロボットっぽさの残る機械的な発音で、語尾は上げずに淡々と区切って読む',
   },
 ];
 
@@ -87,6 +90,11 @@ export interface VoiceProfile {
    * 「がんばれ、まさ」を「まささん、がんばってください。」のように言い換えて読む。
    */
   drumSpeech: boolean;
+  /**
+   * 声にロボットっぽさを足すか（`src/lib/robotVoice.ts`）。
+   * Gemini TTS の音声にだけかかる（端末の音声は音を取り出せないため）。
+   */
+  robot: boolean;
 }
 
 
@@ -116,8 +124,8 @@ export interface VoiceSettings {
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   engine: 'gemini',
   model: DEFAULT_TTS_MODEL,
-  main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0, drumSpeech: false },
-  cheer: { voice: 'Zephyr', tone: 'cheer',  customStyle: '', rate: 1.1, pitch: 1.0, drumSpeech: false },
+  main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0, drumSpeech: false, robot: false },
+  cheer: { voice: 'Zephyr', tone: 'cheer',  customStyle: '', rate: 1.1, pitch: 1.0, drumSpeech: false, robot: false },
   volume: 1.0,
   webVoice: '',
 };
@@ -134,6 +142,7 @@ function normalizeProfile(p: Partial<VoiceProfile> | undefined, fallback: VoiceP
     rate: clamp(Number(p?.rate ?? fallback.rate), 0.6, 1.6),
     pitch: clamp(Number(p?.pitch ?? fallback.pitch), 0.6, 1.6),
     drumSpeech: p?.drumSpeech === true,
+    robot: p?.robot === true,
   };
 }
 
@@ -231,11 +240,14 @@ export function engineLabel(engine: VoiceEngine): string {
 
 /**
  * ドラム風にまとめて切り替えるときの値。
- * 声はやわらかい女性の声、トーンは読み上げアプリ風、口調もていねいにする。
+ * 声は若く澄んだ女性の声、トーンは翻訳アプリの AI 音声風、口調もていねいにして、
+ * ロボットの名残りを少し足す。
  * 端末の音声でもそれらしく聞こえるよう、少しゆっくり・少し高めにする。
  */
 export function drumProfile(base: VoiceProfile): VoiceProfile {
-  return { ...base, voice: 'Leda', tone: 'drum', rate: 0.9, pitch: 1.15, drumSpeech: true };
+  return {
+    ...base, voice: 'Leda', tone: 'drum', rate: 0.9, pitch: 1.15, drumSpeech: true, robot: true,
+  };
 }
 
 /** 表示用のトーン名 */

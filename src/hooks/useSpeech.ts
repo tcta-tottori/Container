@@ -12,6 +12,7 @@ import {
 } from '@/lib/voiceSettings';
 import { applyVolume } from '@/lib/audioBoost';
 import { spokenText } from '@/lib/drumCall';
+import { robotize } from '@/lib/robotVoice';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
@@ -188,7 +189,8 @@ function speakGemini(text: string, profile: VoiceProfile, onDone?: () => void): 
         signal, stylePrefix: styleInstruction(profile), voice: profile.voice,
       });
       _geminiFails = 0; // 鳴ったら数え直す
-      return blob;
+      // ロボットっぽさは鳴らす直前に足す（取っておく音声は加工前のまま）
+      return profile.robot ? robotize(blob) : blob;
     },
     onDone,
     (finish) => {

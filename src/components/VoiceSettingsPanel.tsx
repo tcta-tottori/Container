@@ -11,6 +11,7 @@ import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
 import { loadCallPhrases, DEFAULT_CALL_PHRASES } from '@/lib/callPhrases';
 import { spokenText } from '@/lib/drumCall';
+import { robotize } from '@/lib/robotVoice';
 import { ExternalLinkIcon } from '@/components/AppIcons';
 import CallCachePanel from '@/components/CallCachePanel';
 
@@ -101,12 +102,14 @@ function ProfileEditor({
   onTest: () => void;
   testing: boolean;
 }) {
-  const drumOn = profile.tone === 'drum' && profile.drumSpeech && profile.voice === 'Leda';
+  const drumOn = profile.tone === 'drum' && profile.drumSpeech && profile.robot && profile.voice === 'Leda';
   return (
     <div>
       {/* ドラム風（VIVANT のドラムの読み上げアプリのような声・口調）にまとめて切り替える */}
       <button
-        onClick={() => onChange(drumOn ? { ...profile, tone: 'clear', drumSpeech: false, rate: 1.0, pitch: 1.0 } : drumProfile(profile))}
+        onClick={() => onChange(drumOn
+          ? { ...profile, tone: 'clear', drumSpeech: false, robot: false, rate: 1.0, pitch: 1.0 }
+          : drumProfile(profile))}
         style={{
           width: '100%', textAlign: 'left', padding: '11px 13px', borderRadius: 12, marginBottom: 16,
           background: drumOn ? 'rgba(251,191,36,0.18)' : 'rgba(255,255,255,0.04)',
@@ -118,7 +121,7 @@ function ProfileEditor({
           🥁 ドラム風コール {drumOn ? '（オン）' : ''}
         </div>
         <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3, lineHeight: 1.5 }}>
-          VIVANT のドラムが読み上げアプリで話すような、やさしく丁寧で少し機械的な声・口調でコールします。
+          VIVANT のドラムの翻訳アプリのような、丁寧でやさしく、ロボットの名残りがある AI 音声っぽい声・口調でコールします。
           {drumOn ? 'もう一度押すと元に戻します。' : ''}
         </div>
       </button>
@@ -203,6 +206,27 @@ function ProfileEditor({
           ? '端末の音声では「話す速さ」と「声の高さ」が反映されます。'
           : `指示文: ${styleInstruction(profile)}`}
       </div>
+
+      {/* ロボットっぽさ（音の加工）。Gemini の音声にだけかかる */}
+      <label style={{
+        display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 12, cursor: 'pointer',
+        color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 700,
+        opacity: engine === 'gemini' ? 1 : 0.45,
+      }}>
+        <input
+          type="checkbox"
+          checked={profile.robot}
+          disabled={engine !== 'gemini'}
+          onChange={(e) => onChange({ ...profile, robot: e.target.checked })}
+          style={{ marginTop: 2 }}
+        />
+        <span>
+          ロボットっぽさを足す
+          <span style={{ display: 'block', color: '#64748b', fontSize: 11, fontWeight: 400, marginTop: 2 }}>
+            なめらかすぎる声に、翻訳アプリの AI 音声のような機械っぽさをうっすら重ねます（Gemini TTS のみ）
+          </span>
+        </span>
+      </label>
 
       {/* 口調（文の言い換え）。声の設定とは別に切り替えられる */}
       <label style={{
@@ -337,11 +361,12 @@ export default function VoiceSettingsPanel() {
 
     setTesting(true);
     try {
-      const blob = await geminiGenerateSpeech(text, {
+      const raw = await geminiGenerateSpeech(text, {
         voice: profile.voice,
         model: settings.model,
         stylePrefix: styleInstruction(profile),
       });
+      const blob = profile.robot ? await robotize(raw) : raw;
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       const detach = await applyVolume(audio, settings.volume);
