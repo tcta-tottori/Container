@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS, TTS_MODEL_OPTIONS,
+  FRIENDLY_VOICE, DEFAULT_FRIENDLY_PROFILE,
   VoiceSettings, VoiceProfile, VoiceEngine,
   getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, styleInstruction, webSpeechVolume,
 } from '@/lib/voiceSettings';
@@ -55,18 +56,42 @@ function Label({ children, hint }: { children: React.ReactNode; hint?: string })
 
 /** 数値スライダー（速さ・高さ・音量） */
 function Slider({
-  label, value, min, max, step, format, onChange,
+  label, value, min, max, step, format, onChange, fineStep,
 }: {
   label: string; value: number; min: number; max: number; step: number;
   format: (v: number) => string; onChange: (v: number) => void;
+  /** 指定すると、値の横に −／＋ の微調整ボタンを出す（この幅ずつ動かす） */
+  fineStep?: number;
 }) {
+  const nudge = (d: number) => {
+    const v = Math.round((value + d) * 100) / 100;
+    onChange(Math.min(max, Math.max(min, v)));
+  };
+  const fineBtn = (d: number, text: string) => (
+    <button
+      onClick={() => nudge(d)}
+      aria-label={`${label}を${d > 0 ? '上げる' : '下げる'}`}
+      style={{
+        width: 30, height: 26, borderRadius: 8, flexShrink: 0,
+        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)',
+        color: '#e2e8f0', fontSize: 15, fontWeight: 700, lineHeight: 1, cursor: 'pointer',
+      }}
+    >
+      {text}
+    </button>
+  );
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 7 }}>
-        <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 700 }}>{label}</span>
-        <span style={{ color: '#c4b5fd', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
+        <span style={{ flex: 1, color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 700 }}>{label}</span>
+        {fineStep && fineBtn(-fineStep, '−')}
+        <span style={{
+          minWidth: 52, textAlign: 'center',
+          color: '#c4b5fd', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 700,
+        }}>
           {format(value)}
         </span>
+        {fineStep && fineBtn(fineStep, '＋')}
       </div>
       <input
         className="voice-range"
@@ -107,18 +132,32 @@ const RECOMMENDED_STYLES: { label: string; style: string }[] = [
 
 /** コールの話者／トーン設定 */
 function ProfileEditor({
-  profile, engine, canSample, onChange, onTest, testing,
+  profile, engine, canSample, onChange, onTest, testing, lockVoice,
 }: {
   profile: VoiceProfile;
+  /** 声を固定するときの声（やさしい口調モード）。話者の一覧を出さない */
+  lockVoice?: string;
   engine: VoiceEngine;
   canSample: boolean;
   onChange: (p: VoiceProfile) => void;
   onTest: () => void;
   testing: boolean;
 }) {
+  const locked = lockVoice ? VOICE_OPTIONS.find((v) => v.id === lockVoice) : undefined;
   return (
     <div>
-      {/* 話者 */}
+      {/* 話者（固定のときは名前だけ見せる） */}
+      {lockVoice ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
+          padding: '10px 12px', borderRadius: 10,
+          background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(167,139,250,0.4)',
+        }}>
+          <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>声</span>
+          <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>{locked?.label || lockVoice}</span>
+          <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 'auto', whiteSpace: 'nowrap' }}>このモードでは固定</span>
+        </div>
+      ) : (<>
       <Label hint={
         engine === 'web' ? 'ここは Gemini TTS 用です。端末の音声は上の「端末の声」で選びます'
           : undefined
@@ -149,6 +188,7 @@ function ProfileEditor({
           );
         })}
       </div>
+      </>)}
 
       {/* トーン */}
       <Label hint={engine === 'gemini'
@@ -162,7 +202,12 @@ function ProfileEditor({
           return (
             <button
               key={t.id}
-              onClick={() => onChange({ ...profile, ...('apply' in t ? t.apply : undefined), tone: t.id })}
+              onClick={() => onChange({
+                ...profile,
+                ...('apply' in t ? t.apply : undefined),
+                tone: t.id,
+                ...(lockVoice ? { voice: lockVoice } : undefined),
+              })}
               style={{
                 padding: '8px 14px', borderRadius: 999,
                 background: active ? 'rgba(139,92,246,0.28)' : 'rgba(255,255,255,0.04)',
@@ -222,12 +267,12 @@ function ProfileEditor({
       </div>
 
       <Slider
-        label="話す速さ" value={profile.rate} min={0.6} max={1.6} step={0.05}
+        label="話す速さ" value={profile.rate} min={0.6} max={1.6} step={0.01} fineStep={0.01}
         format={(v) => `${v.toFixed(2)}倍`}
         onChange={(v) => onChange({ ...profile, rate: v })}
       />
       <Slider
-        label="声の高さ" value={profile.pitch} min={MIN_PITCH} max={MAX_PITCH} step={0.05}
+        label="声の高さ" value={profile.pitch} min={MIN_PITCH} max={MAX_PITCH} step={0.01} fineStep={0.01}
         format={(v) => `${v.toFixed(2)}`}
         onChange={(v) => onChange({ ...profile, pitch: v })}
       />
@@ -348,7 +393,7 @@ function FriendlyModeCard({ on, onToggle }: { on: boolean; onToggle: () => void 
           <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>やさしい口調モード</div>
           <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 3, lineHeight: 1.5 }}>
             語尾を「〜ね」「お願いね」にしてコールし、完了したら「超嬉しい」とひとこと添えます。
-            声・速さ・トーンは、オンにすると下でモード用に変えられます（初期はレダ・高め・少しゆっくり）。
+            声はアオイデに固定。トーン・速さ・高さは、オンにすると下でモード用に微調整できます。
           </div>
         </div>
         <div style={{
@@ -757,6 +802,7 @@ export default function VoiceSettingsPanel() {
       </div>
 
       <ProfileEditor
+        lockVoice={settings.friendlyMode ? FRIENDLY_VOICE : undefined}
         key={settings.friendlyMode ? 'friendly' : 'main'}
         profile={settings.friendlyMode ? settings.friendly : settings.main}
         engine={settings.engine}
@@ -765,6 +811,19 @@ export default function VoiceSettingsPanel() {
         onChange={(p) => update(settings.friendlyMode ? { ...settings, friendly: p } : { ...settings, main: p })}
         onTest={() => void playTest(settings.friendlyMode)}
       />
+
+      {settings.friendlyMode && (
+        <button
+          onClick={() => update({ ...settings, friendly: { ...DEFAULT_FRIENDLY_PROFILE } })}
+          style={{
+            width: '100%', marginTop: 14, padding: '10px 12px', borderRadius: 10,
+            background: 'rgba(244,114,182,0.1)', border: '1px solid rgba(244,114,182,0.35)',
+            color: '#f9a8d4', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          やさしい口調モードの声を初期設定に戻す（アオイデ・速さ 1.25・高さ 1.95）
+        </button>
+      )}
 
       <button
         onClick={() => update({ ...DEFAULT_VOICE_SETTINGS })}
