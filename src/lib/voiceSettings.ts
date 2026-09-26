@@ -105,10 +105,10 @@ export const FRIENDLY_STYLE = '案内係の女性のように、高めの声で�
  * やさしい口調モードの声の初期値。モードをオンにしている間は、
  * コールの声（main）の代わりに `friendly` の声で読む。
  * 声はアオイデに固定し、トーン・速さ・高さだけを設定で微調整できる。
- * 初期値は、実際に聞いていちばん理想に近かった設定（速さ 1.25・高さ 1.95）。
+ * 初期値は、実際に聞いていちばん理想に近かった設定（速さ 1.25）に、高さ 1.20 を合わせたもの。
  */
 export const DEFAULT_FRIENDLY_PROFILE: VoiceProfile = {
-  voice: FRIENDLY_VOICE, tone: 'custom', customStyle: FRIENDLY_STYLE, rate: 1.25, pitch: 1.95,
+  voice: FRIENDLY_VOICE, tone: 'custom', customStyle: FRIENDLY_STYLE, rate: 1.25, pitch: 1.2,
 };
 
 /** コールの読み上げ役の設定 */
