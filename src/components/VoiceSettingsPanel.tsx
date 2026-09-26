@@ -499,10 +499,11 @@ export default function VoiceSettingsPanel() {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
 
     if (settings.engine === 'web') {
-      const u = new SpeechSynthesisUtterance(text);
+      // 端末の音声では、やさしい口調モードでも口調・速さ・高さは通常のコールの設定で読む
+      const u = new SpeechSynthesisUtterance(SAMPLE_TEXT);
       u.lang = 'ja-JP';
-      u.rate = Math.min(2, Math.max(0.5, profile.rate * 1.1));
-      u.pitch = Math.min(2, Math.max(0, profile.pitch));
+      u.rate = Math.min(2, Math.max(0.5, settings.main.rate * 1.1));
+      u.pitch = Math.min(2, Math.max(0, settings.main.pitch));
       u.volume = webSpeechVolume(settings);
       const picked = window.speechSynthesis.getVoices()
         .find((v) => v.voiceURI === settings.webVoice);
