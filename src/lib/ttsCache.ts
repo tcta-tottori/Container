@@ -93,8 +93,14 @@ function run<T>(
 }
 
 /**
+ * 音声の作り方の版。作り方を変えたら上げる（前の作り方で取っておいた音声を使わないため）。
+ * 2: 指示文と読む文を分けて送り、末尾の雑音を削るようにした
+ */
+const SPEECH_FORMAT_VERSION = 2;
+
+/**
  * 音声を見分ける鍵。
- * モデル・話者・話し方・文 のどれかが変われば別の音声になる。
+ * モデル・話者・話し方・文・作り方の版 のどれかが変われば別の音声になる。
  */
 export function speechCacheKey(parts: {
   model: string;
@@ -102,7 +108,7 @@ export function speechCacheKey(parts: {
   style: string;
   text: string;
 }): string {
-  return [parts.model, parts.voice, parts.style, parts.text].join('\u0001');
+  return [SPEECH_FORMAT_VERSION, parts.model, parts.voice, parts.style, parts.text].join('\u0001');
 }
 
 /** しまってある音声を取り出す。無ければ null */
