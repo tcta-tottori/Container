@@ -182,7 +182,9 @@ async function speakBlob(
  * 失敗したときはコールが無音にならないよう端末の音声で読み上げ直し、
  * それが続くようなら設定そのものを端末の音声に切り替える。
  */
-function speakGemini(text: string, profile: VoiceProfile, onDone?: () => void): Promise<void> {
+function speakGemini(
+  text: string, profile: VoiceProfile, onDone?: () => void, fallback?: SpeechPlan,
+): Promise<void> {
   return speakBlob(
     text,
     async (signal) => {
@@ -196,7 +198,8 @@ function speakGemini(text: string, profile: VoiceProfile, onDone?: () => void): 
     onDone,
     (finish) => {
       noteGeminiFailure();
-      speakWebSpeech(text, finish, profile);
+      // AI の声で鳴らせなかったときは、端末の音声用の文・声（通常の口調と数値）で読む
+      speakWebSpeech(fallback?.text ?? text, finish, fallback?.profile ?? profile);
     },
   );
 }
@@ -225,7 +228,17 @@ function activeEngine(): VoiceEngine {
 }
 
 /** 指定プロファイルで読み上げる（エンジンの切り替えとフォールバックをまとめる） */
-function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): void {
+/** 読む文とその声 */
+interface SpeechPlan {
+  text: string;
+  profile: VoiceProfile;
+}
+
+/**
+ * 指定プロファイルで読み上げる。
+ * @param fallback 端末の音声で読むときの文と声。省略すると text・profile をそのまま使う
+ */
+function speakWith(text: string, profile: VoiceProfile, onDone?: () => void, fallback?: SpeechPlan): void {
   if (typeof window === 'undefined') return;
 
   // 前のコールを待っている人がいたら、割り込んだこの時点で終わりとして解放する
@@ -244,9 +257,9 @@ function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): vo
 
   const engine = activeEngine();
   if (engine === 'gemini') {
-    void speakGemini(text, profile, done);
+    void speakGemini(text, profile, done, fallback);
   } else {
-    speakWebSpeech(text, done, profile);
+    speakWebSpeech(fallback?.text ?? text, done, fallback?.profile ?? profile);
   }
 }
 
@@ -257,9 +270,11 @@ function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): vo
 function speak(text: string, onDone?: () => void): void {
   stopCurrentPlayback();
   const settings = getVoiceSettings();
-  // やさしい口調モードなら、語尾を言い換えてモードの声で読む
+  // やさしい口調モードなら、語尾を言い換えてモードの声で読む。
+  // ただし AI の声（Gemini）で鳴らせないとき（キーが無い・通信できない・端末の音声に
+  // 切り替わった）は、口調も速さ・高さも通常のコールの設定で読む
   const spoken = settings.friendlyMode ? toFriendlySpeech(text) : text;
-  speakWith(spoken, callProfile(settings), onDone);
+  speakWith(spoken, callProfile(settings), onDone, { text, profile: settings.main });
 }
 
 export function useSpeech() {
