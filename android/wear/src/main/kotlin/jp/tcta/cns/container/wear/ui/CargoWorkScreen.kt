@@ -1384,7 +1384,6 @@ private fun CallMenu(
         ACTION_INCREMENT to stringResource(R.string.action_increment),
         WatchCommand.CALL_REQUEST to stringResource(R.string.call_request),
         WatchCommand.CALL_NAME to stringResource(R.string.call_name),
-        WatchCommand.CALL_CHEER to stringResource(R.string.call_cheer),
         WatchCommand.CALL_ITEM to stringResource(R.string.call_item),
         WatchCommand.CALL_WEATHER to stringResource(R.string.call_weather),
         WatchCommand.CALL_WATER to stringResource(R.string.call_water),

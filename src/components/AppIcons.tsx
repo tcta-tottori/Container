@@ -37,11 +37,6 @@ export function WeatherIcon(p: IconProps) {
   return <Svg {...p}><path d="M16 13a4 4 0 1 0-5-5" /><path d="M7 18a4 4 0 0 1 .5-7.97A5 5 0 0 1 17 12.5a3.5 3.5 0 0 1-.5 6.95H7z" /></Svg>;
 }
 
-/** 応援コール（メガホン） */
-export function MegaphoneIcon(p: IconProps) {
-  return <Svg {...p}><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z" /><path d="M16 9a3.5 3.5 0 0 1 0 6" /><path d="M18.5 6.5a7 7 0 0 1 0 11" /></Svg>;
-}
-
 /** お願いしますコール（手のひら） */
 export function HandIcon(p: IconProps) {
   return (

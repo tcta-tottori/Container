@@ -18,8 +18,6 @@ interface SettingsPageProps {
   onClose: () => void;
   /** 開いたときに選択しておくタブ */
   initialTab?: SettingsTab;
-  /** コールの試聴。読み終わったら onDone を呼ぶ */
-  onTestCall?: (phrase: string, onDone: () => void) => void;
 }
 
 /** Gemini API キーを取りに行く Google AI Studio のページ */
@@ -214,7 +212,7 @@ const TABS: { id: SettingsTab; label: string; Icon: typeof ChatIcon }[] = [
 ];
 
 /** 音声・コール・水の音・AI写真をまとめて設定するページ */
-export default function SettingsPage({ onClose, initialTab = 'voice', onTestCall }: SettingsPageProps) {
+export default function SettingsPage({ onClose, initialTab = 'voice' }: SettingsPageProps) {
   // 旧「コール」タブ指定で開かれても、統合後の音声タブを出す
   const [tab, setTab] = useState<SettingsTab>(initialTab === 'call' ? 'voice' : initialTab);
 
@@ -291,18 +289,18 @@ export default function SettingsPage({ onClose, initialTab = 'voice', onTestCall
           {tab === 'voice' && (
             <>
               <VoiceSettingsPanel />
-              {/* 声の設定に続けてコールの内容。声を変えたらすぐ下で試聴して確かめられる */}
+              {/* 声の設定に続けて、10分ごとのコールの設定 */}
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 margin: '22px 0 14px',
               }}>
                 <ChatIcon size={16} />
                 <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                  コールの内容
+                  10分ごとのコール
                 </span>
                 <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
               </div>
-              <CallPhraseSettings onTest={onTestCall} />
+              <CallPhraseSettings />
             </>
           )}
           {tab === 'water' && <WaterSoundPanel />}

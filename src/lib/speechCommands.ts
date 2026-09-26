@@ -15,7 +15,6 @@ export type VoiceAction =
   | 'QUERY_PROGRESS'
   | 'UNDO_DECREASE'
   | 'QUERY_TYPE_COUNT'
-  | 'MASA_CHEER'
   | 'WEATHER'
   | 'TEMPERATURE'
   | 'TOTTORI_NEWS'
@@ -71,8 +70,6 @@ const VOICE_COMMANDS: [string, VoiceAction][] = [
   ['もとにもど', 'UNDO_DECREASE'],
   ['何種類', 'QUERY_TYPE_COUNT'],
   ['なんしゅるい', 'QUERY_TYPE_COUNT'],
-  ['まさ', 'MASA_CHEER'],
-  ['マサ', 'MASA_CHEER'],
   ['今日の天気', 'WEATHER'],
   ['天気', 'WEATHER'],
   ['てんき', 'WEATHER'],

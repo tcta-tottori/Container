@@ -308,7 +308,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#60a5fa' }}>右下のボタン</strong>（上向きの山マーク）を押すと下からメニューが開き、
-                    コンテナの選択・応援コール・「お願いします！」コール・天気コール・水の音・せせらぎモード・SwitchBot 接続をまとめて操作できます。
+                    コンテナの選択・「お願いします！」コール・天気コール・水の音・せせらぎモード・SwitchBot 接続をまとめて操作できます。
                     開いている間はマークが下向きになります。
                   </div>
                   <div style={{ marginBottom: 8 }}>
@@ -387,7 +387,7 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                     2回続けて失敗したら設定を「端末の音声」に切り替え、画面に知らせます（圏外や API エラーで無音になるのを防ぐため）。
                   </div>
                   <div>
-                    <strong style={{ color: '#a78bfa' }}>声・トーンの設定</strong>: メニュー →「設定」→「音声・コール」で、使う音声API・話す人・トーン・速さ・音量を変更できます（通常コールと応援コールで別々に設定）。
+                    <strong style={{ color: '#a78bfa' }}>声・トーンの設定</strong>: メニュー →「設定」→「音声・コール」で、使う音声API・話す人・トーン・速さ・音量を変更できます（すべてのコールで同じ声を使います）。
                     音声 API は <strong>Gemini TTS</strong>（高品質・通信あり）と <strong>端末の音声</strong>（通信なし）から選べます。アプリ版では端末に入っている日本語の声を選べます。
                   </div>
                 </div>
@@ -617,7 +617,6 @@ export default function ManualPage({ onClose }: ManualPageProps) {
                   <div style={{ marginBottom: 8 }}>
                     <strong style={{ color: '#fb923c' }}>お願いします！</strong> / <strong style={{ color: '#fb923c' }}>長谷川さん！</strong> …
                     スマホの右下メニューにある同じコールと同じものです。<br />
-                    <strong style={{ color: '#fb923c' }}>応援コール</strong> … 設定に登録した文からひとつ読み上げます。<br />
                     <strong style={{ color: '#fb923c' }}>いまの品目を読み上げ</strong> … 品名とパレット・ケース数を読み上げます。
                   </div>
                   <div>
