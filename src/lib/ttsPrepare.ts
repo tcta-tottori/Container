@@ -11,6 +11,7 @@
 import { fixedCallTexts } from './callPhrases';
 import { geminiGenerateSpeech, geminiSpeechKey } from './geminiTts';
 import { getCachedSpeech } from './ttsCache';
+import { spokenText } from './drumCall';
 import { getVoiceSettings, styleInstruction } from './voiceSettings';
 
 /** まとめて作っている途中の様子 */
@@ -47,8 +48,9 @@ export async function prepareFixedCalls(
   onProgress?: (p: PrepareProgress) => void,
   signal?: AbortSignal,
 ): Promise<PrepareResult> {
-  const texts = fixedCallTexts();
   const profile = getVoiceSettings().cheer;
+  // 鳴らすときと同じ文で作る（ドラム風の口調なら言い換えた文）
+  const texts = Array.from(new Set(fixedCallTexts().map((t) => spokenText(t, profile))));
   const opts = { voice: profile.voice, stylePrefix: styleInstruction(profile) };
 
   const result: PrepareResult = { made: 0, kept: 0, failed: 0 };

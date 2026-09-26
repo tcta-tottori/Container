@@ -21,7 +21,17 @@ export type VoiceEngine = 'gemini' | 'web';
 
 
 /** Gemini TTS の既定モデル */
-export const DEFAULT_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
+export const DEFAULT_TTS_MODEL = 'gemini-3.8-flash-tts';
+
+/** 以前の既定モデル。新しいモデルが使えないときはこれで作り直す */
+export const LEGACY_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
+
+/** 設定画面からワンタップで選べる TTS モデル */
+export const TTS_MODEL_OPTIONS: { id: string; label: string; note: string }[] = [
+  { id: 'gemini-3.8-flash-tts',      label: 'Gemini 3.8 Flash TTS',      note: '最新・表現力が高い（推奨）' },
+  { id: 'gemini-3.8-flash-lite-tts', label: 'Gemini 3.8 Flash-Lite TTS', note: '軽量・速い・低コスト' },
+  { id: LEGACY_TTS_MODEL,            label: 'Gemini 3.1 Flash TTS',      note: '以前のモデル（プレビュー）' },
+];
 
 /** 選択できる話者（Gemini TTS のプリセット音声） */
 export interface VoiceOption {
@@ -52,6 +62,12 @@ export const TONE_PRESETS: { id: string; label: string; style: string }[] = [
   { id: 'cheer',   label: '応援',     style: '大きな声で明るく応援するように読む' },
   { id: 'urgent',  label: '急かす',   style: 'テンション高く、急かすようにあおって読む' },
   { id: 'low',     label: '低め',     style: '低めの声で落ち着いて読む' },
+  {
+    id: 'drum',
+    label: 'ドラム風',
+    style: 'スマホの翻訳・読み上げアプリの合成音声のように、やさしく丁寧な女性の声で、'
+      + '抑揚をおさえて少し機械的に、一語ずつ区切ってゆっくり淡々と読む',
+  },
 ];
 
 /** 1つの読み上げ役（通常コール / 応援コール）の設定 */
@@ -66,6 +82,11 @@ export interface VoiceProfile {
   rate: number;
   /** 声の高さ（0.6〜1.6）。Web Speech のみ数値で反映、Gemini は指示文に反映 */
   pitch: number;
+  /**
+   * 口調もドラム風にするか（`src/lib/drumCall.ts`）。
+   * 「がんばれ、まさ」を「まささん、がんばってください。」のように言い換えて読む。
+   */
+  drumSpeech: boolean;
 }
 
 
@@ -95,8 +116,8 @@ export interface VoiceSettings {
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   engine: 'gemini',
   model: DEFAULT_TTS_MODEL,
-  main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0 },
-  cheer: { voice: 'Zephyr', tone: 'cheer',  customStyle: '', rate: 1.1, pitch: 1.0 },
+  main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0, drumSpeech: false },
+  cheer: { voice: 'Zephyr', tone: 'cheer',  customStyle: '', rate: 1.1, pitch: 1.0, drumSpeech: false },
   volume: 1.0,
   webVoice: '',
 };
@@ -112,6 +133,7 @@ function normalizeProfile(p: Partial<VoiceProfile> | undefined, fallback: VoiceP
     customStyle: typeof p?.customStyle === 'string' ? p.customStyle : '',
     rate: clamp(Number(p?.rate ?? fallback.rate), 0.6, 1.6),
     pitch: clamp(Number(p?.pitch ?? fallback.pitch), 0.6, 1.6),
+    drumSpeech: p?.drumSpeech === true,
   };
 }
 
@@ -205,6 +227,15 @@ export function webSpeechVolume(settings: VoiceSettings): number {
 export function engineLabel(engine: VoiceEngine): string {
   if (engine === 'web') return '端末の音声';
   return 'Gemini TTS';
+}
+
+/**
+ * ドラム風にまとめて切り替えるときの値。
+ * 声はやわらかい女性の声、トーンは読み上げアプリ風、口調もていねいにする。
+ * 端末の音声でもそれらしく聞こえるよう、少しゆっくり・少し高めにする。
+ */
+export function drumProfile(base: VoiceProfile): VoiceProfile {
+  return { ...base, voice: 'Leda', tone: 'drum', rate: 0.9, pitch: 1.15, drumSpeech: true };
 }
 
 /** 表示用のトーン名 */

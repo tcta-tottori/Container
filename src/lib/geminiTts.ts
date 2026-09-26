@@ -6,7 +6,7 @@
  */
 
 import { getGeminiKey } from './geminiApi';
-import { getVoiceSettings, styleInstruction } from './voiceSettings';
+import { getVoiceSettings, styleInstruction, LEGACY_TTS_MODEL } from './voiceSettings';
 import { pcm16ToWavBlob, normalizeJapaneseForTts } from './ttsAudio';
 import { getCachedSpeech, putCachedSpeech, speechCacheKey } from './ttsCache';
 
@@ -125,6 +125,11 @@ export async function geminiGenerateSpeech(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
+    // 新しいモデルがまだ使えないキー・地域では、以前のモデルで作り直す
+    if (res.status === 404 && model !== LEGACY_TTS_MODEL) {
+      console.warn(`モデル「${model}」が見つからないため ${LEGACY_TTS_MODEL} で作り直します`);
+      return geminiGenerateSpeech(text, { ...options, model: LEGACY_TTS_MODEL });
+    }
     const msg = `モデル「${model}」エラー (HTTP ${res.status}): ${errText.slice(0, 160)}`;
     setLastTtsError(msg);
     throw new Error(msg);

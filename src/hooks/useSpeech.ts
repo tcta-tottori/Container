@@ -11,6 +11,7 @@ import {
   getVoiceSettings, saveVoiceSettings, styleInstruction, webSpeechVolume, VoiceEngine, VoiceProfile,
 } from '@/lib/voiceSettings';
 import { applyVolume } from '@/lib/audioBoost';
+import { spokenText } from '@/lib/drumCall';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
@@ -221,8 +222,10 @@ function activeEngine(): VoiceEngine {
 }
 
 /** 指定プロファイルで読み上げる（エンジンの切り替えとフォールバックをまとめる） */
-function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): void {
+function speakWith(rawText: string, profile: VoiceProfile, onDone?: () => void): void {
   if (typeof window === 'undefined') return;
+  // ドラム風の口調にする設定なら、ここで文を言い換える
+  const text = spokenText(rawText, profile);
 
   // 前のコールを待っている人がいたら、割り込んだこの時点で終わりとして解放する
   const prevDone = _currentDone;

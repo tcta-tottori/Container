@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS,
+  VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS, TTS_MODEL_OPTIONS, drumProfile,
   VoiceSettings, VoiceProfile, VoiceEngine,
   getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, styleInstruction, webSpeechVolume,
 } from '@/lib/voiceSettings';
@@ -10,6 +10,7 @@ import { MAX_VOLUME, applyVolume, isBoostSupported } from '@/lib/audioBoost';
 import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/geminiTts';
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
 import { loadCallPhrases, DEFAULT_CALL_PHRASES } from '@/lib/callPhrases';
+import { spokenText } from '@/lib/drumCall';
 import { ExternalLinkIcon } from '@/components/AppIcons';
 import CallCachePanel from '@/components/CallCachePanel';
 
@@ -89,17 +90,39 @@ function Slider({
 
 /** コール・応援それぞれの話者／トーン設定 */
 function ProfileEditor({
-  profile, engine, canSample, onChange, onTest, testing,
+  profile, engine, canSample, onChange, onTest, testing, sample,
 }: {
   profile: VoiceProfile;
+  /** 試聴で読む文（口調の言い換え例を見せるため） */
+  sample: string;
   engine: VoiceEngine;
   canSample: boolean;
   onChange: (p: VoiceProfile) => void;
   onTest: () => void;
   testing: boolean;
 }) {
+  const drumOn = profile.tone === 'drum' && profile.drumSpeech && profile.voice === 'Leda';
   return (
     <div>
+      {/* ドラム風（VIVANT のドラムの読み上げアプリのような声・口調）にまとめて切り替える */}
+      <button
+        onClick={() => onChange(drumOn ? { ...profile, tone: 'clear', drumSpeech: false, rate: 1.0, pitch: 1.0 } : drumProfile(profile))}
+        style={{
+          width: '100%', textAlign: 'left', padding: '11px 13px', borderRadius: 12, marginBottom: 16,
+          background: drumOn ? 'rgba(251,191,36,0.18)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${drumOn ? 'rgba(251,191,36,0.55)' : 'rgba(255,255,255,0.12)'}`,
+          color: '#fff', cursor: 'pointer',
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 700 }}>
+          🥁 ドラム風コール {drumOn ? '（オン）' : ''}
+        </div>
+        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3, lineHeight: 1.5 }}>
+          VIVANT のドラムが読み上げアプリで話すような、やさしく丁寧で少し機械的な声・口調でコールします。
+          {drumOn ? 'もう一度押すと元に戻します。' : ''}
+        </div>
+      </button>
+
       {/* 話者 */}
       <Label hint={
         engine === 'web' ? 'ここは Gemini TTS 用です。端末の音声は上の「端末の声」で選びます'
@@ -180,6 +203,25 @@ function ProfileEditor({
           ? '端末の音声では「話す速さ」と「声の高さ」が反映されます。'
           : `指示文: ${styleInstruction(profile)}`}
       </div>
+
+      {/* 口調（文の言い換え）。声の設定とは別に切り替えられる */}
+      <label style={{
+        display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 16, cursor: 'pointer',
+        color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 700,
+      }}>
+        <input
+          type="checkbox"
+          checked={profile.drumSpeech}
+          onChange={(e) => onChange({ ...profile, drumSpeech: e.target.checked })}
+          style={{ marginTop: 2 }}
+        />
+        <span>
+          口調もドラム風にする
+          <span style={{ display: 'block', color: '#64748b', fontSize: 11, fontWeight: 400, marginTop: 2 }}>
+            例: 「{sample}」→「{spokenText(sample, { ...profile, drumSpeech: true })}」
+          </span>
+        </span>
+      </label>
 
       <Slider
         label="話す速さ" value={profile.rate} min={0.6} max={1.6} step={0.05}
@@ -274,7 +316,7 @@ export default function VoiceSettingsPanel() {
 
   const playTest = useCallback(async (key: ProfileKey) => {
     const profile = settings[key];
-    const text = sampleText(key);
+    const text = spokenText(sampleText(key), profile);
     if (audioRef.current) { try { audioRef.current.pause(); } catch { /* ignore */ } audioRef.current = null; }
     if (detachRef.current) { detachRef.current(); detachRef.current = null; }
     if (urlRef.current) { try { URL.revokeObjectURL(urlRef.current); } catch { /* ignore */ } urlRef.current = null; }
@@ -447,7 +489,27 @@ export default function VoiceSettingsPanel() {
             </div>
           )}
 
-          <Label hint="他のモデルを試すときはここに入力します">TTS モデル</Label>
+          <Label hint="選ぶか、他のモデルを試すときは下に入力します">TTS モデル</Label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+            {TTS_MODEL_OPTIONS.map((m) => {
+              const active = settings.model === m.id;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => update({ ...settings, model: m.id })}
+                  style={{
+                    textAlign: 'left', padding: '9px 12px', borderRadius: 10,
+                    background: active ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${active ? 'rgba(167,139,250,0.6)' : 'rgba(255,255,255,0.1)'}`,
+                    color: '#fff', cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{m.label}</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{m.note}</div>
+                </button>
+              );
+            })}
+          </div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
             <input
               type="text"
@@ -581,6 +643,7 @@ export default function VoiceSettingsPanel() {
         engine={settings.engine}
         canSample={canSample}
         testing={testing}
+        sample={sampleText(tab)}
         onChange={(p) => update({ ...settings, [tab]: p })}
         onTest={() => void playTest(tab)}
       />
