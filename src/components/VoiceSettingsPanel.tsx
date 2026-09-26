@@ -5,7 +5,9 @@ import {
   VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS, TTS_MODEL_OPTIONS,
   VoiceSettings, VoiceProfile, VoiceEngine,
   getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, styleInstruction, webSpeechVolume,
+  callProfile,
 } from '@/lib/voiceSettings';
+import { toFriendlySpeech } from '@/lib/friendlyCall';
 import { MAX_VOLUME, applyVolume, isBoostSupported } from '@/lib/audioBoost';
 import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/geminiTts';
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
@@ -196,6 +198,78 @@ function ProfileEditor({
   );
 }
 
+/** やさしい口調モードの言い換え例（設定画面に見せる） */
+const FRIENDLY_EXAMPLES = [
+  'お願いします！',
+  'ポリカバー、3パレットと2ケース。',
+  '残り4品目です。',
+  'ポリカバー、完了。',
+];
+
+/** やさしい口調モードのスイッチ */
+function FriendlyModeCard({
+  on, onToggle, onTest, testing, canSample,
+}: {
+  on: boolean;
+  onToggle: () => void;
+  onTest: () => void;
+  testing: boolean;
+  canSample: boolean;
+}) {
+  return (
+    <div style={{
+      padding: '12px 14px', borderRadius: 14, marginBottom: 12,
+      background: on ? 'rgba(244,114,182,0.12)' : 'rgba(255,255,255,0.04)',
+      border: `1px solid ${on ? 'rgba(244,114,182,0.5)' : 'rgba(255,255,255,0.1)'}`,
+    }}>
+      <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>やさしい口調モード</div>
+          <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 3, lineHeight: 1.5 }}>
+            高めの声でやさしく、区切りごとに少し間をとって、語尾を「〜ね」「お願いね」にしてコールします。
+            完了したら「超嬉しい」とひとこと添えます。
+          </div>
+        </div>
+        <div style={{
+          width: 48, height: 28, borderRadius: 999, flexShrink: 0,
+          background: on ? 'linear-gradient(135deg, #f472b6, #8b5cf6)' : 'rgba(255,255,255,0.15)',
+          border: '1px solid rgba(255,255,255,0.15)', position: 'relative',
+          transition: 'background 0.15s ease',
+        }}>
+          <div style={{
+            position: 'absolute', top: 2, left: on ? 22 : 2,
+            width: 22, height: 22, borderRadius: '50%', background: '#fff',
+            transition: 'left 0.15s ease',
+          }} />
+        </div>
+      </div>
+      <div style={{ marginTop: 10, display: 'grid', gap: 4 }}>
+        {FRIENDLY_EXAMPLES.map((t) => (
+          <div key={t} style={{ fontSize: 11.5, color: '#cbd5e1', lineHeight: 1.5 }}>
+            <span style={{ color: '#64748b' }}>{t}</span>
+            <span style={{ color: '#64748b' }}> → </span>
+            {toFriendlySpeech(t)}
+          </div>
+        ))}
+      </div>
+      {on && (
+        <button
+          onClick={onTest}
+          disabled={testing || !canSample}
+          style={{
+            width: '100%', padding: '11px', borderRadius: 11, marginTop: 10,
+            background: 'rgba(244,114,182,0.2)', border: '1px solid rgba(244,114,182,0.45)',
+            color: '#fff', fontSize: 13, fontWeight: 700,
+            cursor: testing || !canSample ? 'default' : 'pointer', opacity: testing || !canSample ? 0.5 : 1,
+          }}
+        >
+          {testing ? '読み上げ中…' : 'このモードで試聴'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** 音声コール（TTS）の設定セクション。設定ページの「音声」タブとして表示する */
 export default function VoiceSettingsPanel() {
   const [settings, setSettings] = useState<VoiceSettings>(() => getVoiceSettings());
@@ -257,9 +331,10 @@ export default function VoiceSettingsPanel() {
     saveVoiceSettings(next);
   }, []);
 
-  const playTest = useCallback(async () => {
-    const profile = settings.main;
-    const text = SAMPLE_TEXT;
+  /** 試聴。friendly なら、やさしい口調モードの声・言い換えで鳴らす */
+  const playTest = useCallback(async (friendly: boolean) => {
+    const profile = friendly ? callProfile({ ...settings, friendlyMode: true }) : settings.main;
+    const text = friendly ? toFriendlySpeech(SAMPLE_TEXT) : SAMPLE_TEXT;
     if (audioRef.current) { try { audioRef.current.pause(); } catch { /* ignore */ } audioRef.current = null; }
     if (detachRef.current) { detachRef.current(); detachRef.current = null; }
     if (urlRef.current) { try { URL.revokeObjectURL(urlRef.current); } catch { /* ignore */ } urlRef.current = null; }
@@ -557,13 +632,33 @@ export default function VoiceSettingsPanel() {
         height: 1, background: 'rgba(255,255,255,0.08)', margin: '6px 0 16px',
       }} />
 
+      {/* やさしい口調モード。声と口調をまとめて切り替える */}
+      <FriendlyModeCard
+        on={settings.friendlyMode}
+        onToggle={() => update({ ...settings, friendlyMode: !settings.friendlyMode })}
+        onTest={() => void playTest(true)}
+        testing={testing}
+        canSample={canSample}
+      />
+
+      {settings.friendlyMode && (
+        <div style={{
+          color: '#94a3b8', fontSize: 11.5, lineHeight: 1.6, margin: '0 0 12px',
+          padding: '9px 12px', borderRadius: 10,
+          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          モードがオンの間は、下の声の設定ではなくモードの声で読み上げます。
+          下の設定はモードをオフにしたときに使います。
+        </div>
+      )}
+
       <ProfileEditor
         profile={settings.main}
         engine={settings.engine}
         canSample={canSample}
         testing={testing}
         onChange={(p) => update({ ...settings, main: p })}
-        onTest={() => void playTest()}
+        onTest={() => void playTest(false)}
       />
 
       <button

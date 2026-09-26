@@ -9,8 +9,10 @@ import { geminiGenerateSpeech } from '@/lib/geminiTts';
 import { getGeminiKey } from '@/lib/geminiApi';
 import {
   getVoiceSettings, saveVoiceSettings, styleInstruction, webSpeechVolume, VoiceEngine, VoiceProfile,
+  callProfile,
 } from '@/lib/voiceSettings';
 import { applyVolume } from '@/lib/audioBoost';
+import { toFriendlySpeech } from '@/lib/friendlyCall';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
@@ -252,7 +254,10 @@ function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): vo
  */
 function speak(text: string, onDone?: () => void): void {
   stopCurrentPlayback();
-  speakWith(text, getVoiceSettings().main, onDone);
+  const settings = getVoiceSettings();
+  // やさしい口調モードなら、語尾を言い換えてモードの声で読む
+  const spoken = settings.friendlyMode ? toFriendlySpeech(text) : text;
+  speakWith(spoken, callProfile(settings), onDone);
 }
 
 export function useSpeech() {
