@@ -79,7 +79,22 @@ export const TONE_PRESETS: {
     style: '高めの声で、やさしく丁寧に、区切りごとに少し間をとって読む',
     apply: { voice: 'Leda', rate: 0.95, pitch: 1.2 },
   },
+  {
+    // やさしい口調モードで使う話し方（「〜ね」「お願いね」の言い換えと合わせる）
+    id: 'friendly',
+    label: 'やさしい口調',
+    style: '高めの声で、明るくやさしく親しみをこめて、区切りごとに少し間をとって読む',
+    apply: { voice: 'Leda', rate: 0.95, pitch: 1.2 },
+  },
 ];
+
+/**
+ * やさしい口調モードの声。モードをオンにしている間は、コールの声の設定の代わりにこれで読む
+ * （コールの声の設定そのものは書き換えない）。
+ */
+export const FRIENDLY_PROFILE: VoiceProfile = {
+  voice: 'Leda', tone: 'friendly', customStyle: '', rate: 0.95, pitch: 1.2,
+};
 
 /** コールの読み上げ役の設定 */
 export interface VoiceProfile {
@@ -104,6 +119,12 @@ export interface VoiceSettings {
   /** コールの声 */
   main: VoiceProfile;
   /**
+   * やさしい口調モード（`src/lib/friendlyCall.ts`）。
+   * オンの間は FRIENDLY_PROFILE の声で、語尾を「〜ね」「お願いね」に言い換え、
+   * 完了のコールに「超嬉しい」を足して読む。
+   */
+  friendlyMode: boolean;
+  /**
    * 音量（0〜3）。1.0 が端末の音量そのまま。
    * 1.0 を超える分は Web Audio のゲインで持ち上げる（`src/lib/audioBoost.ts`）。
    * 端末の音声（Web Speech API）は音を取り出せないため 1.0 が上限になる。
@@ -121,6 +142,7 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   engine: 'gemini',
   model: DEFAULT_TTS_MODEL,
   main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0 },
+  friendlyMode: false,
   volume: 1.0,
   webVoice: '',
 };
@@ -183,6 +205,7 @@ export function getVoiceSettings(): VoiceSettings {
     engine: normalizeEngine(parsed.engine),
     model: typeof parsed.model === 'string' && parsed.model ? parsed.model : DEFAULT_TTS_MODEL,
     main: normalizeProfile(parsed.main, DEFAULT_VOICE_SETTINGS.main),
+    friendlyMode: parsed.friendlyMode === true,
     volume: clamp(Number(parsed.volume ?? 1), 0, MAX_VOLUME),
     webVoice: typeof parsed.webVoice === 'string' ? parsed.webVoice : '',
   };
@@ -194,6 +217,7 @@ export function saveVoiceSettings(next: VoiceSettings): void {
     ...next,
     engine: normalizeEngine(next.engine),
     main: normalizeProfile(next.main, DEFAULT_VOICE_SETTINGS.main),
+    friendlyMode: next.friendlyMode === true,
     volume: clamp(Number(next.volume), 0, MAX_VOLUME),
     webVoice: typeof next.webVoice === 'string' ? next.webVoice : '',
   };
@@ -234,6 +258,11 @@ export function webSpeechVolume(settings: VoiceSettings): number {
 export function engineLabel(engine: VoiceEngine): string {
   if (engine === 'web') return '端末の音声';
   return 'Gemini TTS';
+}
+
+/** いまコールに使う声（やさしい口調モードならその声） */
+export function callProfile(settings: VoiceSettings): VoiceProfile {
+  return settings.friendlyMode ? FRIENDLY_PROFILE : settings.main;
 }
 
 /** 表示用のトーン名 */
