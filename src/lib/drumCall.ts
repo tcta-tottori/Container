@@ -85,3 +85,63 @@ export function toDrumSpeech(text: string): string {
 export function spokenText(text: string, profile: VoiceProfile): string {
   return profile.drumSpeech ? toDrumSpeech(text) : text;
 }
+
+/* ===== ドラムパッドのセリフ =====
+ * ボタンを押すと決まったセリフをドラムの声で話す。
+ * 参考: ヒヨプロ「Flutter で VIVANT のドラムが使用するアプリを再現してみた」の
+ * serifMap（「ボタン名」:「セリフ」の組）と同じ作り。
+ * 中身は設定画面から変えられ、localStorage に保存する。 */
+
+const SERIF_KEY = 'cns_drum_serifs';
+
+/** ドラムパッドの 1 つのボタン */
+export interface DrumSerif {
+  /** ボタンに出す名前 */
+  label: string;
+  /** 話すセリフ */
+  text: string;
+}
+
+/** 初期のセリフ（荷降ろしの現場で使う合図を、ドラムの口調で） */
+export const DEFAULT_DRUM_SERIFS: DrumSerif[] = [
+  { label: 'ドラムです',   text: 'ドラムです。' },
+  { label: 'お願いします', text: 'お願いします。' },
+  { label: 'ありがとう',   text: 'ありがとうございます。' },
+  { label: 'おつかれさま', text: 'おつかれさまです。' },
+  { label: '急いで',       text: '急いでください。' },
+  { label: '気をつけて',   text: '足元に気をつけてください。' },
+  { label: '休憩',         text: '休憩しましょう。' },
+  { label: '大丈夫',       text: '大丈夫です。' },
+];
+
+function cleanSerifs(list: unknown): DrumSerif[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((x): x is DrumSerif => !!x && typeof x === 'object'
+      && typeof (x as DrumSerif).text === 'string')
+    .map((x) => ({
+      label: (typeof x.label === 'string' ? x.label : '').trim(),
+      text: x.text.trim(),
+    }))
+    .filter((x) => x.text.length > 0)
+    .map((x) => ({ label: x.label || x.text, text: x.text }));
+}
+
+/** 保存されたセリフを読む（無ければ初期のセリフ） */
+export function loadDrumSerifs(): DrumSerif[] {
+  if (typeof window === 'undefined') return [...DEFAULT_DRUM_SERIFS];
+  try {
+    const raw = localStorage.getItem(SERIF_KEY);
+    if (raw) {
+      const list = cleanSerifs(JSON.parse(raw));
+      if (list.length > 0) return list;
+    }
+  } catch { /* ignore */ }
+  return [...DEFAULT_DRUM_SERIFS];
+}
+
+/** セリフを保存する（セリフが空のものは除く） */
+export function saveDrumSerifs(list: DrumSerif[]): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(SERIF_KEY, JSON.stringify(cleanSerifs(list))); } catch { /* ignore */ }
+}
