@@ -127,7 +127,7 @@ export interface WatchCommand {
   containerId?: string;
   /** ウォッチで操作した時刻 */
   issuedAt?: number;
-  /** 'call' のときにどのコールか（'request' | 'name' | 'cheer' | 'item'） */
+  /** 'call' のときにどのコールか（'request' | 'name' | 'item' など） */
   arg?: string;
 }
 

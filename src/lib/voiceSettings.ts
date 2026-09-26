@@ -62,18 +62,9 @@ export const TONE_PRESETS: { id: string; label: string; style: string }[] = [
   { id: 'cheer',   label: '応援',     style: '大きな声で明るく応援するように読む' },
   { id: 'urgent',  label: '急かす',   style: 'テンション高く、急かすようにあおって読む' },
   { id: 'low',     label: '低め',     style: '低めの声で落ち着いて読む' },
-  {
-    id: 'drum',
-    label: 'ドラム風',
-    // 参考: fm23「ドラムの翻訳アプリっぽいボイス3選」（ロボットの名残りがある AI 音声）。
-    // 指示文は短く、句点を入れない。長い指示や「。」を入れると、Gemini TTS が
-    // 指示文そのものを読み上げてしまい、コールの文が読まれなくなる。
-    // 機械っぽさは声（話者）とロボット加工（robotVoice.ts）で出す。
-    style: '抑揚をおさえて、丁寧に淡々と一定のリズムで読む',
-  },
 ];
 
-/** 1つの読み上げ役（通常コール / 応援コール / ドラム）の設定 */
+/** コールの読み上げ役の設定 */
 export interface VoiceProfile {
   /** 話者（Gemini の音声名） */
   voice: string;
@@ -85,56 +76,16 @@ export interface VoiceProfile {
   rate: number;
   /** 声の高さ（0.6〜1.6）。Web Speech のみ数値で反映、Gemini は指示文に反映 */
   pitch: number;
-  /**
-   * 口調もドラム風にするか（`src/lib/drumCall.ts`）。
-   * 「がんばれ、まさ」を「まささん、がんばってください。」のように言い換えて読む。
-   */
-  drumSpeech: boolean;
-  /**
-   * 声にロボットっぽさを足すか（`src/lib/robotVoice.ts`）。
-   * Gemini TTS の音声にだけかかる（端末の音声は音を取り出せないため）。
-   */
-  robot: boolean;
 }
 
-
-/** ドラムの声を使うコール。off: 使わない / cheer: 応援コールだけ / all: すべてのコール */
-export type DrumCalls = 'off' | 'cheer' | 'all';
-
-export const DRUM_CALLS_OPTIONS: { id: DrumCalls; label: string; note: string }[] = [
-  { id: 'off',   label: '使わない',     note: 'ドラムパッドだけで話す' },
-  { id: 'cheer', label: '応援コール',   note: '応援・合図・あおりをドラムの声で' },
-  { id: 'all',   label: 'すべて',       note: '品名や残数のコールもドラムの声で' },
-];
-
-/**
- * ドラムの声の初期値。
- * 声は若く澄んだ女性の声、トーンは翻訳アプリの AI 音声風、口調もていねいにして、
- * ロボットの名残りを少し足す。
- * 端末の音声でもそれらしく聞こえるよう、少しゆっくり・少し高めにする
- * （参考: ヒヨプロ「Flutter で VIVANT のドラムが使用するアプリを再現してみた」は
- *   読み上げの高さと速さを固定してドラムらしさを出している）。
- */
-export const DEFAULT_DRUM_PROFILE: VoiceProfile = {
-  voice: 'Leda', tone: 'drum', customStyle: '', rate: 0.9, pitch: 1.15, drumSpeech: true, robot: true,
-};
 
 export interface VoiceSettings {
   /** 使用する音声 API */
   engine: VoiceEngine;
   /** Gemini TTS のモデル名 */
   model: string;
-  /** 通常のコール */
+  /** コールの声 */
   main: VoiceProfile;
-  /** 応援・あおりコール */
-  cheer: VoiceProfile;
-  /**
-   * ドラム（VIVANT のドラムが使う翻訳アプリのような声）。
-   * ドラムパッドのセリフはいつもこの声。コールにも使える（`drumCalls`）。
-   */
-  drum: VoiceProfile;
-  /** どのコールをドラムの声で読むか */
-  drumCalls: DrumCalls;
   /**
    * 音量（0〜3）。1.0 が端末の音量そのまま。
    * 1.0 を超える分は Web Audio のゲインで持ち上げる（`src/lib/audioBoost.ts`）。
@@ -152,10 +103,7 @@ export interface VoiceSettings {
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   engine: 'gemini',
   model: DEFAULT_TTS_MODEL,
-  main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0, drumSpeech: false, robot: false },
-  cheer: { voice: 'Zephyr', tone: 'cheer',  customStyle: '', rate: 1.1, pitch: 1.0, drumSpeech: false, robot: false },
-  drum: DEFAULT_DRUM_PROFILE,
-  drumCalls: 'off',
+  main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0 },
   volume: 1.0,
   webVoice: '',
 };
@@ -164,15 +112,20 @@ function clamp(v: number, lo: number, hi: number): number {
   return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo;
 }
 
+/**
+ * 知っているトーンか。廃止したトーン（ドラム風）が保存されていたら使わない。
+ */
+function isKnownTone(tone: unknown): tone is string {
+  return tone === 'custom' || TONE_PRESETS.some((t) => t.id === tone);
+}
+
 function normalizeProfile(p: Partial<VoiceProfile> | undefined, fallback: VoiceProfile): VoiceProfile {
   return {
     voice: typeof p?.voice === 'string' && p.voice ? p.voice : fallback.voice,
-    tone: typeof p?.tone === 'string' && p.tone ? p.tone : fallback.tone,
+    tone: isKnownTone(p?.tone) ? p.tone : fallback.tone,
     customStyle: typeof p?.customStyle === 'string' ? p.customStyle : '',
     rate: clamp(Number(p?.rate ?? fallback.rate), 0.6, 1.6),
     pitch: clamp(Number(p?.pitch ?? fallback.pitch), 0.6, 1.6),
-    drumSpeech: typeof p?.drumSpeech === 'boolean' ? p.drumSpeech : fallback.drumSpeech,
-    robot: typeof p?.robot === 'boolean' ? p.robot : fallback.robot,
   };
 }
 
@@ -180,30 +133,6 @@ function normalizeProfile(p: Partial<VoiceProfile> | undefined, fallback: VoiceP
 /** 保存された値がどのエンジンを指しているか（知らない値は Gemini 扱い） */
 function normalizeEngine(v: unknown): VoiceEngine {
   return v === 'web' ? 'web' : 'gemini';
-}
-
-function normalizeDrumCalls(v: unknown): DrumCalls {
-  return v === 'cheer' || v === 'all' ? v : 'off';
-}
-
-/**
- * ドラムが独立した話し手になる前は、応援／通常コールのトーンを「ドラム風」に
- * していた。その設定のまま同じように鳴るよう、ドラムの声とコールの割り当てに移す。
- */
-function migrateDrum(parsed: Partial<VoiceSettings>): Pick<VoiceSettings, 'drum' | 'drumCalls'> {
-  if (parsed.drum) {
-    return {
-      drum: normalizeProfile(parsed.drum, DEFAULT_DRUM_PROFILE),
-      drumCalls: normalizeDrumCalls(parsed.drumCalls),
-    };
-  }
-  if (parsed.main?.tone === 'drum') {
-    return { drum: normalizeProfile(parsed.main, DEFAULT_DRUM_PROFILE), drumCalls: 'all' };
-  }
-  if (parsed.cheer?.tone === 'drum') {
-    return { drum: normalizeProfile(parsed.cheer, DEFAULT_DRUM_PROFILE), drumCalls: 'cheer' };
-  }
-  return { drum: DEFAULT_DRUM_PROFILE, drumCalls: 'off' };
 }
 
 /** 旧バージョンの設定から引き継ぐ（初回のみ） */
@@ -237,8 +166,6 @@ export function getVoiceSettings(): VoiceSettings {
     engine: normalizeEngine(parsed.engine),
     model: typeof parsed.model === 'string' && parsed.model ? parsed.model : DEFAULT_TTS_MODEL,
     main: normalizeProfile(parsed.main, DEFAULT_VOICE_SETTINGS.main),
-    cheer: normalizeProfile(parsed.cheer, DEFAULT_VOICE_SETTINGS.cheer),
-    ...migrateDrum(parsed),
     volume: clamp(Number(parsed.volume ?? 1), 0, MAX_VOLUME),
     webVoice: typeof parsed.webVoice === 'string' ? parsed.webVoice : '',
   };
@@ -250,9 +177,6 @@ export function saveVoiceSettings(next: VoiceSettings): void {
     ...next,
     engine: normalizeEngine(next.engine),
     main: normalizeProfile(next.main, DEFAULT_VOICE_SETTINGS.main),
-    cheer: normalizeProfile(next.cheer, DEFAULT_VOICE_SETTINGS.cheer),
-    drum: normalizeProfile(next.drum, DEFAULT_DRUM_PROFILE),
-    drumCalls: normalizeDrumCalls(next.drumCalls),
     volume: clamp(Number(next.volume), 0, MAX_VOLUME),
     webVoice: typeof next.webVoice === 'string' ? next.webVoice : '',
   };
@@ -293,13 +217,6 @@ export function webSpeechVolume(settings: VoiceSettings): number {
 export function engineLabel(engine: VoiceEngine): string {
   if (engine === 'web') return '端末の音声';
   return 'Gemini TTS';
-}
-
-/** そのコール（通常 / 応援）を、実際にどの声で読むか */
-export function profileForCall(settings: VoiceSettings, kind: 'main' | 'cheer'): VoiceProfile {
-  if (settings.drumCalls === 'all') return settings.drum;
-  if (settings.drumCalls === 'cheer' && kind === 'cheer') return settings.drum;
-  return settings[kind];
 }
 
 /** 表示用のトーン名 */

@@ -7,8 +7,7 @@ import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExce
 import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
-import { openVoiceProfileTab } from '@/components/VoiceSettingsPanel';
-import { useSpeech, cancelSpeech, setEngineFallbackNotice, speakDrum } from '@/hooks/useSpeech';
+import { useSpeech, cancelSpeech, setEngineFallbackNotice } from '@/hooks/useSpeech';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForCall } from '@/lib/partTranslations';
@@ -20,7 +19,7 @@ import ItemDetailPanel from '@/components/ItemDetailPanel';
 import { fetchWeather, weatherToSpeech, currentTempToSpeech, temperatureToSpeech, climateToSpeech, fetchTottoriNews, fetchFinanceNews, WeatherData } from '@/lib/weatherNews';
 import { syncToWatch, setWatchCommandHandler } from '@/lib/watchSync';
 import {
-  getRandomCallPhrase, isTenMinCheerEnabled, isTenMinClimateEnabled,
+  isTenMinClimateEnabled,
   REQUEST_CALL_TEXT, NAME_CALL_TEXT,
 } from '@/lib/callPhrases';
 import ItemListPanel from '@/components/ItemListPanel';
@@ -244,7 +243,7 @@ export default function Home() {
 
   const { formatted: workElapsed, rawSeconds: workRawSeconds } = useWorkTimer(state.workStartTime, state.workPausedAt);
   const [itemTimeLogs, setItemTimeLogs] = useState<ItemTimeLog[]>([]);
-  const { speak, speakCheer, speakThenCheer, announceItem, announceAllComplete, announceContainerSummary } =
+  const { speak, announceItem, announceAllComplete, announceContainerSummary } =
     useSpeech();
 
 
@@ -451,7 +450,7 @@ export default function Home() {
   }, []);
 
   // 10分ごとの定期進捗コール（作業中のみ）
-  // 「10分経過しました」+ 気温 + ランダム応援フレーズ。毎回応援フレーズが変わる。
+  // 「10分経過しました」（設定がオンなら気温も）。
   const periodicStateRef = useRef({ items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode });
   periodicStateRef.current = { items: state.items, completedIds: state.completedIds, autoAnnounce: state.autoAnnounce, viewMode };
 
@@ -461,11 +460,7 @@ export default function Home() {
    * 実測値があるときは気象庁の取得を待たない（通信が遅い・つながらない場合でも実測を読む）。
    */
   const announceElapsedCall = useCallback((minutes: number) => {
-    const say = (text: string) => {
-      // 応援コールは設定がオンのときだけ、応援リストから取ってそのまま（別発話で）続ける
-      if (isTenMinCheerEnabled()) speakThenCheer(text, getRandomCallPhrase());
-      else speak(text);
-    };
+    const say = (text: string) => speak(text);
 
     // 気温・湿度は既定ではコールしない（設定でオンにしたときだけ付ける）
     if (!isTenMinClimateEnabled()) {
@@ -487,7 +482,7 @@ export default function Home() {
       say(`${minutes}分経過しました。${currentTempToSpeech(w, null)}`);
       if (w) { setWeatherPopup(w); setBarWeather(w); }
     });
-  }, [getSbClimate, speak, speakThenCheer]);
+  }, [getSbClimate, speak]);
 
   /*
    * 何回めの 10 分までコールしたか。
@@ -1163,10 +1158,6 @@ export default function Home() {
           speak(parts.join('、') + '。');
           break;
         }
-        case 'MASA_CHEER': {
-          speakCheer(getRandomCallPhrase());
-          break;
-        }
         case 'WEATHER': {
           // 「取得中」は文字表示のみ（音声なし）。結果は音声コール＋ポップアップ表示。
           showToast('天気を取得中...');
@@ -1206,7 +1197,7 @@ export default function Home() {
         }
       }
     },
-    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, speakCheer, showToast, handleConfirmOk, handleContainerSummary, handleProgress, getSbClimate]
+    [moveNext, movePrev, handleComplete, handleAnnounce, handleIncrease, handleDecrease, currentItem, state.items, state.items.length, state.completedIds, speak, showToast, handleConfirmOk, handleContainerSummary, handleProgress, getSbClimate]
   );
 
   const { isListening, isSpeaking, isPreparingSpeech, speakingText, isSupported, lastTranscript, toggleListening } =
@@ -1308,14 +1299,14 @@ export default function Home() {
     setWatchCommandHandler((command) => {
       // コールはどの品目でも鳴らせる（品目の指定は要らない）
       if (command.type === 'call') {
-        if (command.arg === 'name') speakCheer(NAME_CALL_TEXT);
-        else if (command.arg === 'cheer') speakCheer(getRandomCallPhrase());
+        if (command.arg === 'name') speak(NAME_CALL_TEXT);
+        else if (command.arg === 'cheer') return; // 応援コールは廃止（古いウォッチアプリから来ても鳴らさない）
         else if (command.arg === 'item') { if (currentItem) announceItem(currentItem, state.items); }
         else if (command.arg === 'weather') handleWeatherCall();
         else if (command.arg === 'water') toggleWater();
         else if (command.arg === 'river') openRiver();
         else if (command.arg?.startsWith(PERSON_CALL_PREFIX)) showPerson(command.arg.slice(PERSON_CALL_PREFIX.length));
-        else speakCheer(REQUEST_CALL_TEXT);
+        else speak(REQUEST_CALL_TEXT);
         return;
       }
       const idx = state.items.findIndex((it) => it.id === command.itemId);
@@ -1339,7 +1330,7 @@ export default function Home() {
     return () => setWatchCommandHandler(null);
   }, [
     state.items, state.currentItemIdx, handleSelectItem, handleDecrease, handleIncrease,
-    speakCheer, announceItem, currentItem, uncompleteItem,
+    speak, announceItem, currentItem, uncompleteItem,
     handleWeatherCall, toggleWater, openRiver, showPerson,
   ]);
 
@@ -1467,7 +1458,6 @@ export default function Home() {
         <SettingsPage
           initialTab={settingsTab}
           onClose={() => setSettingsTab(null)}
-          onTestCall={(p, onDone) => speakCheer(p, onDone)}
         />
       )}
       {weatherPopup && (
@@ -1590,16 +1580,13 @@ export default function Home() {
           />
         )}
 
-        {/* 右下の展開メニュー（コンテナ選択・応援/天気コール・水の音・SwitchBot） */}
+        {/* 右下の展開メニュー（コンテナ選択・合図/天気コール・水の音・SwitchBot） */}
         <QuickActions
           containers={state.containers}
           selectedIdx={state.selectedContainerIdx}
           onSelectContainer={selectContainer}
-          onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
-          onRequestCall={view === 'work' ? () => speakCheer(REQUEST_CALL_TEXT) : undefined}
-          onNameCall={view === 'work' ? () => speakCheer(NAME_CALL_TEXT) : undefined}
-          onDrumSpeak={speakDrum}
-          onDrumSettings={() => { openVoiceProfileTab('drum'); setSettingsTab('voice'); }}
+          onRequestCall={view === 'work' ? () => speak(REQUEST_CALL_TEXT) : undefined}
+          onNameCall={view === 'work' ? () => speak(NAME_CALL_TEXT) : undefined}
           onWeather={view === 'work' ? handleWeatherCall : undefined}
           waterPlaying={waterPlaying}
           onWater={toggleWater}

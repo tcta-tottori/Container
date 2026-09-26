@@ -45,9 +45,6 @@ data class WatchCommand(
         /** 「長谷川さん！お願いします！」 */
         const val CALL_NAME = "name"
 
-        /** 応援コール（登録した文から 1 つ） */
-        const val CALL_CHEER = "cheer"
-
         /** いまの品目を読み上げる */
         const val CALL_ITEM = "item"
 
