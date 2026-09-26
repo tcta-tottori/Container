@@ -7,8 +7,11 @@ import {
   getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, styleInstruction, webSpeechVolume,
 } from '@/lib/voiceSettings';
 import { toFriendlySpeech } from '@/lib/friendlyCall';
+import { shiftPitchBlob, MIN_PITCH, MAX_PITCH } from '@/lib/pitchShift';
 import { MAX_VOLUME, applyVolume, isBoostSupported } from '@/lib/audioBoost';
-import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/geminiTts';
+import {
+  geminiGenerateSpeech, subscribeTtsError, getLastTtsError, getLastSpeechInfo,
+} from '@/lib/geminiTts';
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
 import { ExternalLinkIcon } from '@/components/AppIcons';
 
@@ -73,6 +76,34 @@ function Slider({
     </div>
   );
 }
+
+/**
+ * カスタムのトーンのおすすめ指示文。
+ * Gemini TTS には短く具体的に（声の年代・表情・速さ・間・語尾）を伝えると効きやすい。
+ * 句点（。）を入れると指示文まで読み上げることがあるので入れない。
+ */
+const RECOMMENDED_STYLES: { label: string; style: string }[] = [
+  {
+    label: 'やさしいお姉さん',
+    style: '二十代の女性が、にこやかにやさしく語りかけるように、高めの澄んだ声で、語尾をやわらかく読む',
+  },
+  {
+    label: '明るく元気',
+    style: '笑顔で話しているように、明るく弾む高めの声で、はきはきと、語尾を少し上げて読む',
+  },
+  {
+    label: 'かわいらしく',
+    style: 'かわいらしく甘めの高い声で、にこにこしながら、ゆったり区切って読む',
+  },
+  {
+    label: 'ていねいな案内',
+    style: '案内係の女性のように、高めの声で丁寧にやさしく、区切りごとに少し間をとって読む',
+  },
+  {
+    label: 'ささやき気味',
+    style: 'そっと寄り添うように、息をまぜたやわらかい高めの声で、ゆっくり読む',
+  },
+];
 
 /** コールの話者／トーン設定 */
 function ProfileEditor({
@@ -146,17 +177,39 @@ function ProfileEditor({
         })}
       </div>
       {profile.tone === 'custom' && (
-        <input
-          type="text"
-          value={profile.customStyle}
-          onChange={(e) => onChange({ ...profile, customStyle: e.target.value })}
-          placeholder="例: 低い声でゆっくり、落ち着いて読む"
-          style={{
-            width: '100%', padding: '11px 13px', borderRadius: 10, marginBottom: 12,
-            background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)',
-            color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-          }}
-        />
+        <>
+          <input
+            type="text"
+            value={profile.customStyle}
+            onChange={(e) => onChange({ ...profile, customStyle: e.target.value })}
+            placeholder="例: 低い声でゆっくり、落ち着いて読む"
+            style={{
+              width: '100%', padding: '11px 13px', borderRadius: 10, marginBottom: 8,
+              background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)',
+              color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ color: '#64748b', fontSize: 11, marginBottom: 6 }}>
+            おすすめの指示文（押すと入ります。「。」は入れないでください）
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
+            {RECOMMENDED_STYLES.map((r) => (
+              <button
+                key={r.label}
+                onClick={() => onChange({ ...profile, customStyle: r.style })}
+                style={{
+                  textAlign: 'left', padding: '8px 11px', borderRadius: 9,
+                  background: profile.customStyle === r.style ? 'rgba(244,114,182,0.18)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${profile.customStyle === r.style ? 'rgba(244,114,182,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                  color: '#fff', cursor: 'pointer',
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 700 }}>{r.label}</div>
+                <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2, lineHeight: 1.45 }}>{r.style}</div>
+              </button>
+            ))}
+          </div>
+        </>
       )}
       <div style={{
         color: '#64748b', fontSize: 11, lineHeight: 1.6, marginBottom: 16,
@@ -174,7 +227,7 @@ function ProfileEditor({
         onChange={(v) => onChange({ ...profile, rate: v })}
       />
       <Slider
-        label="声の高さ" value={profile.pitch} min={0.6} max={1.6} step={0.05}
+        label="声の高さ" value={profile.pitch} min={MIN_PITCH} max={MAX_PITCH} step={0.05}
         format={(v) => `${v.toFixed(2)}`}
         onChange={(v) => onChange({ ...profile, pitch: v })}
       />
@@ -193,6 +246,82 @@ function ProfileEditor({
       >
         {testing ? '生成中...' : 'この声で試聴'}
       </button>
+    </div>
+  );
+}
+
+/** ファイルとして保存させる */
+function saveFile(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+/**
+ * 直近に作った音声の中身。
+ * コールの雑音などの原因を調べるため、Gemini から届いた形式・長さを見せ、音声を保存できるようにする。
+ */
+function LastSpeechCard() {
+  const [, setTick] = useState(0);
+  const info = getLastSpeechInfo();
+  const rate = Number(/rate=(\d+)/.exec(info?.mime || '')?.[1] || 24000);
+  const rawSec = info && /L16|pcm/i.test(info.mime) ? info.bytes / 2 / rate : null;
+  const outSec = info ? Math.max(0, info.blob.size - 44) / 2 / rate : null;
+  const stamp = info ? new Date(info.at).toLocaleTimeString('ja-JP') : '';
+  return (
+    <div style={{
+      color: '#94a3b8', fontSize: 11, lineHeight: 1.6, marginBottom: 14,
+      padding: '9px 12px', borderRadius: 10, wordBreak: 'break-all',
+      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <span style={{ fontWeight: 700, color: '#cbd5e1', flex: 1 }}>直近に作った音声</span>
+        <button
+          onClick={() => setTick((t) => t + 1)}
+          style={{
+            padding: '3px 9px', borderRadius: 7, fontSize: 11, cursor: 'pointer',
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#94a3b8',
+          }}
+        >
+          更新
+        </button>
+      </div>
+      {!info ? (
+        <div>まだありません（試聴するか、新しい文言をコールすると出ます。取っておいた音声を鳴らしたときは出ません）</div>
+      ) : (
+        <>
+          <div>{stamp}・{info.model}・{info.mime}・{info.parts} 個</div>
+          <div>
+            届いた長さ {rawSec !== null ? `${rawSec.toFixed(2)} 秒` : '（圧縮形式）'}
+            {outSec !== null && ` → 整えたあと ${outSec.toFixed(2)} 秒`}
+          </div>
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <button
+              onClick={() => saveFile(new Blob([info.raw.slice()], { type: 'application/octet-stream' }), `cns-tts-raw-${info.at}.pcm`)}
+              style={{
+                flex: 1, padding: '7px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#e2e8f0',
+              }}
+            >
+              届いたままを保存
+            </button>
+            <button
+              onClick={() => saveFile(info.blob, `cns-tts-${info.at}.wav`)}
+              style={{
+                flex: 1, padding: '7px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
+                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#e2e8f0',
+              }}
+            >
+              鳴らした音声を保存
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -333,11 +462,12 @@ export default function VoiceSettingsPanel() {
 
     setTesting(true);
     try {
-      const blob = await geminiGenerateSpeech(text, {
+      const made = await geminiGenerateSpeech(text, {
         voice: profile.voice,
         model: settings.model,
         stylePrefix: styleInstruction(profile),
       });
+      const blob = await shiftPitchBlob(made, profile.pitch);
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       const detach = await applyVolume(audio, settings.volume);
@@ -529,6 +659,8 @@ export default function VoiceSettingsPanel() {
               初期値
             </button>
           </div>
+
+          <LastSpeechCard />
 
           {ttsError && (
             <div style={{
