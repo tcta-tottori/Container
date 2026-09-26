@@ -827,7 +827,7 @@ export default function VoiceSettingsPanel() {
             color: '#f9a8d4', fontSize: 13, fontWeight: 600, cursor: 'pointer',
           }}
         >
-          やさしい口調モードの声を初期設定に戻す（アオイデ・速さ 1.25・高さ 1.95）
+          やさしい口調モードの声を初期設定に戻す（アオイデ・速さ 1.25・高さ 1.20）
         </button>
       )}
 
