@@ -9,8 +9,11 @@ import { geminiGenerateSpeech } from '@/lib/geminiTts';
 import { getGeminiKey } from '@/lib/geminiApi';
 import {
   getVoiceSettings, saveVoiceSettings, styleInstruction, webSpeechVolume, VoiceEngine, VoiceProfile,
+  profileForCall,
 } from '@/lib/voiceSettings';
 import { applyVolume } from '@/lib/audioBoost';
+import { spokenText } from '@/lib/drumCall';
+import { robotize } from '@/lib/robotVoice';
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
@@ -187,7 +190,8 @@ function speakGemini(text: string, profile: VoiceProfile, onDone?: () => void): 
         signal, stylePrefix: styleInstruction(profile), voice: profile.voice,
       });
       _geminiFails = 0; // 鳴ったら数え直す
-      return blob;
+      // ロボットっぽさは鳴らす直前に足す（取っておく音声は加工前のまま）
+      return profile.robot ? robotize(blob) : blob;
     },
     onDone,
     (finish) => {
@@ -221,8 +225,10 @@ function activeEngine(): VoiceEngine {
 }
 
 /** 指定プロファイルで読み上げる（エンジンの切り替えとフォールバックをまとめる） */
-function speakWith(text: string, profile: VoiceProfile, onDone?: () => void): void {
+function speakWith(rawText: string, profile: VoiceProfile, onDone?: () => void): void {
   if (typeof window === 'undefined') return;
+  // ドラム風の口調にする設定なら、ここで文を言い換える
+  const text = spokenText(rawText, profile);
 
   // 前のコールを待っている人がいたら、割り込んだこの時点で終わりとして解放する
   const prevDone = _currentDone;
@@ -253,28 +259,38 @@ function speakThenCheer(pre: string, cheer: string): void {
   stopCurrentPlayback();
   const startCheer = () => speakCheer(cheer);
   if (!pre.trim()) { startCheer(); return; }
-  speakWith(pre, getVoiceSettings().main, startCheer);
+  speakWith(pre, profileForCall(getVoiceSettings(), 'main'), startCheer);
 }
 
 /**
- * 応援コール・あおりコール専用。設定ページの「応援コール」プロファイルで読み上げる。
+ * 応援コール・あおりコール専用。設定ページの「応援コール」プロファイルで読み上げる
+ * （ドラムの声を応援コールに使う設定なら、ドラムの声で）。
  * onDone は鳴り終わり（または失敗・中断）で必ず1回だけ呼ばれる。
  */
 function speakCheer(text: string, onDone?: () => void): void {
   stopCurrentPlayback();
-  speakWith(text, getVoiceSettings().cheer, onDone);
+  speakWith(text, profileForCall(getVoiceSettings(), 'cheer'), onDone);
 }
 
 /** 経過時間のあおりコール。応援コールと同じプロファイルを使う。 */
 function speakTaunt(text: string): void {
   stopCurrentPlayback();
-  speakWith(text, getVoiceSettings().cheer);
+  speakWith(text, profileForCall(getVoiceSettings(), 'cheer'));
 }
 
 /** 通常のコール。設定ページの「通常コール」プロファイルで読み上げる。 */
 function speak(text: string): void {
   stopCurrentPlayback();
-  speakWith(text, getVoiceSettings().main);
+  speakWith(text, profileForCall(getVoiceSettings(), 'main'));
+}
+
+/**
+ * ドラムパッドのセリフ。コールの割り当てに関係なく、いつもドラムの声で話す。
+ * onDone は鳴り終わり（または失敗・中断）で必ず1回だけ呼ばれる。
+ */
+export function speakDrum(text: string, onDone?: () => void): void {
+  stopCurrentPlayback();
+  speakWith(text, getVoiceSettings().drum, onDone);
 }
 
 export function useSpeech() {
