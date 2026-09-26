@@ -55,13 +55,30 @@ export const VOICE_OPTIONS: VoiceOption[] = [
 ];
 
 /** トーン（話し方）のプリセット。自由入力でも上書きできる */
-export const TONE_PRESETS: { id: string; label: string; style: string }[] = [
+export const TONE_PRESETS: {
+  id: string;
+  label: string;
+  /**
+   * Gemini TTS に渡す指示文。短く、句点（。）を入れない。
+   * 長い指示や句点があると、指示文そのものを読み上げてしまう。
+   */
+  style: string;
+  /** 選んだときに一緒にそろえる声・速さ・高さ（端末の音声でも近い話し方になるように） */
+  apply?: Partial<Pick<VoiceProfile, 'voice' | 'rate' | 'pitch'>>;
+}[] = [
   { id: 'clear',   label: 'はっきり', style: 'はっきりと落ち着いて読む' },
   { id: 'calm',    label: '穏やか',   style: 'やわらかく穏やかに読む' },
   { id: 'bright',  label: '明るい',   style: '明るく元気に読む' },
   { id: 'cheer',   label: '応援',     style: '大きな声で明るく応援するように読む' },
   { id: 'urgent',  label: '急かす',   style: 'テンション高く、急かすようにあおって読む' },
   { id: 'low',     label: '低め',     style: '低めの声で落ち着いて読む' },
+  {
+    // 録画を測った話し方: 声は高め（中心 400Hz 前後）で抑揚が大きめ、区切りで 0.4〜0.5 秒ほど間をとる
+    id: 'gentle',
+    label: 'ていねい高め',
+    style: '高めの声で、やさしく丁寧に、区切りごとに少し間をとって読む',
+    apply: { voice: 'Leda', rate: 0.95, pitch: 1.2 },
+  },
 ];
 
 /** コールの読み上げ役の設定 */

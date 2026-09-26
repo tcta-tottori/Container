@@ -130,7 +130,7 @@ function ProfileEditor({
           return (
             <button
               key={t.id}
-              onClick={() => onChange({ ...profile, tone: t.id })}
+              onClick={() => onChange({ ...profile, ...('apply' in t ? t.apply : undefined), tone: t.id })}
               style={{
                 padding: '8px 14px', borderRadius: 999,
                 background: active ? 'rgba(139,92,246,0.28)' : 'rgba(255,255,255,0.04)',
