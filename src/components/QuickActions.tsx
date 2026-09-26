@@ -5,6 +5,7 @@ import { Container } from '@/lib/types';
 import { SwitchBotReading, SwitchBotStatus } from '@/lib/switchbot';
 import { MegaphoneIcon, WeatherIcon, DropletIcon, CloseIcon, SettingsIcon, RiverIcon, HandIcon } from '@/components/AppIcons';
 import { PEOPLE } from '@/lib/people';
+import DrumPad from '@/components/DrumPad';
 
 interface QuickActionsProps {
   /** コンテナ選択（読込済みのときだけ表示） */
@@ -18,6 +19,10 @@ interface QuickActionsProps {
   onRequestCall?: () => void;
   /** 「長谷川さん！お願いします！」のコール（作業ページでのみ有効） */
   onNameCall?: () => void;
+  /** ドラムの声で話す（ドラムパッド）。鳴り終わったら onDone を呼ぶ */
+  onDrumSpeak?: (text: string, onDone?: () => void) => void;
+  /** ドラムの声とセリフの設定を開く */
+  onDrumSettings?: () => void;
   /** 水の音 */
   waterPlaying: boolean;
   onWater: () => void;
@@ -103,19 +108,20 @@ function Row({
  */
 export default function QuickActions({
   containers, selectedIdx, onSelectContainer,
-  onCheer, onWeather, onRequestCall, onNameCall,
+  onCheer, onWeather, onRequestCall, onNameCall, onDrumSpeak, onDrumSettings,
   waterPlaying, onWater, onWaterSettings,
   switchbot, sbStatus, sbError, onToggleSwitchBot, onOpenSwitchBot, onOpenRiver, onShowPerson, alwaysPersonId, hidden,
 }: QuickActionsProps) {
   const [open, setOpen] = useState(false);
   const [sbInfoOpen, setSbInfoOpen] = useState(false);
+  const [drumOpen, setDrumOpen] = useState(false);
   // 人物出現の出し方。true なら常時表示。いま常時表示にしている人がいればそれに合わせる
   const [personAlways, setPersonAlways] = useState(false);
   useEffect(() => { if (alwaysPersonId) setPersonAlways(true); }, [alwaysPersonId]);
 
   // 別の画面が開いたら閉じる
   useEffect(() => {
-    if (hidden) setOpen(false);
+    if (hidden) { setOpen(false); setDrumOpen(false); }
   }, [hidden]);
 
   // Esc で閉じる
@@ -206,6 +212,15 @@ export default function QuickActions({
                 title="長谷川さん！お願いします！"
                 sub="名前を呼ぶ合図のコール"
                 onClick={() => { onNameCall(); setOpen(false); }}
+              />
+            )}
+
+            {onDrumSpeak && (
+              <Row
+                icon={<span style={{ fontSize: 20, lineHeight: 1 }} aria-hidden="true">🥁</span>}
+                title="ドラムパッド"
+                sub="セリフのボタンや打った文をドラムの声で話す"
+                onClick={() => { setDrumOpen(true); setOpen(false); }}
               />
             )}
 
@@ -369,6 +384,14 @@ export default function QuickActions({
             </div>
           </div>
         </div>
+      )}
+
+      {drumOpen && onDrumSpeak && (
+        <DrumPad
+          onSpeak={onDrumSpeak}
+          onClose={() => setDrumOpen(false)}
+          onOpenSettings={onDrumSettings ? () => { setDrumOpen(false); onDrumSettings(); } : undefined}
+        />
       )}
     </>
   );

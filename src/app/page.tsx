@@ -7,7 +7,8 @@ import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExce
 import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
-import { useSpeech, cancelSpeech, setEngineFallbackNotice } from '@/hooks/useSpeech';
+import { openVoiceProfileTab } from '@/components/VoiceSettingsPanel';
+import { useSpeech, cancelSpeech, setEngineFallbackNotice, speakDrum } from '@/hooks/useSpeech';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForCall } from '@/lib/partTranslations';
@@ -1597,6 +1598,8 @@ export default function Home() {
           onCheer={view === 'work' ? () => speakCheer(getRandomCallPhrase()) : undefined}
           onRequestCall={view === 'work' ? () => speakCheer(REQUEST_CALL_TEXT) : undefined}
           onNameCall={view === 'work' ? () => speakCheer(NAME_CALL_TEXT) : undefined}
+          onDrumSpeak={speakDrum}
+          onDrumSettings={() => { openVoiceProfileTab('drum'); setSettingsTab('voice'); }}
           onWeather={view === 'work' ? handleWeatherCall : undefined}
           waterPlaying={waterPlaying}
           onWater={toggleWater}

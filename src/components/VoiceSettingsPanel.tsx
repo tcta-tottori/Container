@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS, TTS_MODEL_OPTIONS, drumProfile,
+  VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS, TTS_MODEL_OPTIONS, DRUM_CALLS_OPTIONS,
   VoiceSettings, VoiceProfile, VoiceEngine,
   getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, styleInstruction, webSpeechVolume,
 } from '@/lib/voiceSettings';
@@ -10,12 +10,20 @@ import { MAX_VOLUME, applyVolume, isBoostSupported } from '@/lib/audioBoost';
 import { geminiGenerateSpeech, subscribeTtsError, getLastTtsError } from '@/lib/geminiTts';
 import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
 import { loadCallPhrases, DEFAULT_CALL_PHRASES } from '@/lib/callPhrases';
-import { spokenText } from '@/lib/drumCall';
+import { spokenText, DrumSerif, loadDrumSerifs, saveDrumSerifs, DEFAULT_DRUM_SERIFS } from '@/lib/drumCall';
 import { robotize } from '@/lib/robotVoice';
 import { ExternalLinkIcon } from '@/components/AppIcons';
 import CallCachePanel from '@/components/CallCachePanel';
 
-type ProfileKey = 'main' | 'cheer';
+type ProfileKey = 'main' | 'cheer' | 'drum';
+
+/** 次に開いたときに出すタブ（クイックメニューのドラムパッドから設定を開くときに使う） */
+let _nextTab: ProfileKey | null = null;
+
+/** 音声設定を次に開いたとき、指定のタブ（通常 / 応援 / ドラム）を出す */
+export function openVoiceProfileTab(key: ProfileKey): void {
+  _nextTab = key;
+}
 
 const MAIN_SAMPLE = 'ポリカバー、3パレットと2ケース。';
 
@@ -26,6 +34,7 @@ const MAIN_SAMPLE = 'ポリカバー、3パレットと2ケース。';
  */
 function sampleText(key: ProfileKey): string {
   if (key === 'main') return MAIN_SAMPLE;
+  // ドラムも、口調の言い換えが分かるよう応援コールの文で試す
   const phrases = loadCallPhrases();
   return phrases[0] || DEFAULT_CALL_PHRASES[0];
 }
@@ -91,9 +100,11 @@ function Slider({
 
 /** コール・応援それぞれの話者／トーン設定 */
 function ProfileEditor({
-  profile, engine, canSample, onChange, onTest, testing, sample,
+  profile, engine, canSample, onChange, onTest, testing, sample, drumOptions,
 }: {
   profile: VoiceProfile;
+  /** ドラム用の項目（ロボットっぽさ・口調）を出すか */
+  drumOptions?: boolean;
   /** 試聴で読む文（口調の言い換え例を見せるため） */
   sample: string;
   engine: VoiceEngine;
@@ -102,30 +113,8 @@ function ProfileEditor({
   onTest: () => void;
   testing: boolean;
 }) {
-  const drumOn = profile.tone === 'drum' && profile.drumSpeech && profile.robot && profile.voice === 'Leda';
   return (
     <div>
-      {/* ドラム風（VIVANT のドラムの読み上げアプリのような声・口調）にまとめて切り替える */}
-      <button
-        onClick={() => onChange(drumOn
-          ? { ...profile, tone: 'clear', drumSpeech: false, robot: false, rate: 1.0, pitch: 1.0 }
-          : drumProfile(profile))}
-        style={{
-          width: '100%', textAlign: 'left', padding: '11px 13px', borderRadius: 12, marginBottom: 16,
-          background: drumOn ? 'rgba(251,191,36,0.18)' : 'rgba(255,255,255,0.04)',
-          border: `1px solid ${drumOn ? 'rgba(251,191,36,0.55)' : 'rgba(255,255,255,0.12)'}`,
-          color: '#fff', cursor: 'pointer',
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 700 }}>
-          🥁 ドラム風コール {drumOn ? '（オン）' : ''}
-        </div>
-        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3, lineHeight: 1.5 }}>
-          VIVANT のドラムの翻訳アプリのような、丁寧でやさしく、ロボットの名残りがある AI 音声っぽい声・口調でコールします。
-          {drumOn ? 'もう一度押すと元に戻します。' : ''}
-        </div>
-      </button>
-
       {/* 話者 */}
       <Label hint={
         engine === 'web' ? 'ここは Gemini TTS 用です。端末の音声は上の「端末の声」で選びます'
@@ -208,6 +197,7 @@ function ProfileEditor({
       </div>
 
       {/* ロボットっぽさ（音の加工）。Gemini の音声にだけかかる */}
+      {drumOptions && (<>
       <label style={{
         display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 12, cursor: 'pointer',
         color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 700,
@@ -246,6 +236,7 @@ function ProfileEditor({
           </span>
         </span>
       </label>
+      </>)}
 
       <Slider
         label="話す速さ" value={profile.rate} min={0.6} max={1.6} step={0.05}
@@ -277,9 +268,92 @@ function ProfileEditor({
 }
 
 /** 音声コール（TTS）の設定セクション。設定ページの「音声」タブとして表示する */
+/**
+ * ドラムパッドのセリフ（ボタン名とセリフの組）を編集する。
+ * 参考: ヒヨプロ「Flutter で VIVANT のドラムが使用するアプリを再現してみた」の serifMap。
+ */
+function DrumSerifEditor() {
+  const [list, setList] = useState<DrumSerif[]>([]);
+  useEffect(() => { setList(loadDrumSerifs()); }, []);
+
+  const change = (next: DrumSerif[]) => {
+    setList(next);
+    saveDrumSerifs(next);
+  };
+
+  const inputStyle: React.CSSProperties = {
+    minWidth: 0, padding: '9px 10px', borderRadius: 9,
+    background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)',
+    color: '#fff', fontSize: 13, outline: 'none',
+  };
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <Label hint="左がボタンの名前、右が話すセリフ。セリフが空の行は保存されません">
+        ドラムパッドのセリフ
+      </Label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+        {list.map((s, i) => (
+          <div key={i} style={{ display: 'flex', gap: 5 }}>
+            <input
+              value={s.label}
+              onChange={(e) => change(list.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))}
+              placeholder="ボタン名"
+              style={{ ...inputStyle, width: '34%', flexShrink: 0 }}
+            />
+            <input
+              value={s.text}
+              onChange={(e) => change(list.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
+              placeholder="セリフ"
+              style={{ ...inputStyle, flex: 1 }}
+            />
+            <button
+              onClick={() => change(list.filter((_, j) => j !== i))}
+              aria-label="このセリフを消す"
+              style={{
+                padding: '0 10px', borderRadius: 9, flexShrink: 0,
+                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                color: '#fca5a5', fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          onClick={() => setList([...list, { label: '', text: '' }])}
+          style={{
+            flex: 1, padding: '10px', borderRadius: 10,
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)',
+            color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+          }}
+        >
+          ＋ セリフを足す
+        </button>
+        <button
+          onClick={() => change([...DEFAULT_DRUM_SERIFS])}
+          style={{
+            padding: '10px 12px', borderRadius: 10,
+            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
+            color: '#94a3b8', fontSize: 12, cursor: 'pointer',
+          }}
+        >
+          初期のセリフに戻す
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function VoiceSettingsPanel() {
   const [settings, setSettings] = useState<VoiceSettings>(() => getVoiceSettings());
-  const [tab, setTab] = useState<ProfileKey>('main');
+  const [tab, setTab] = useState<ProfileKey>(() => {
+    const t = _nextTab || 'main';
+    _nextTab = null;
+    return t;
+  });
   const [keyDraft, setKeyDraft] = useState(() => getGeminiKey());
   const [keySaved, setKeySaved] = useState(() => !!getGeminiKey());
   const [apiState, setApiState] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
@@ -643,6 +717,7 @@ export default function VoiceSettingsPanel() {
         {([
           { id: 'main' as ProfileKey, label: '通常コール' },
           { id: 'cheer' as ProfileKey, label: '応援コール' },
+          { id: 'drum' as ProfileKey, label: '🥁 ドラム' },
         ]).map(({ id, label }) => {
           const active = tab === id;
           return (
@@ -663,7 +738,57 @@ export default function VoiceSettingsPanel() {
         })}
       </div>
 
+      {/* ドラムの声に割り当てているコールは、ここの声ではなくドラムの声で鳴る */}
+      {tab !== 'drum' && (settings.drumCalls === 'all' || (settings.drumCalls === 'cheer' && tab === 'cheer')) && (
+        <div style={{
+          color: '#fcd34d', fontSize: 11.5, lineHeight: 1.6, marginBottom: 14,
+          padding: '9px 12px', borderRadius: 10,
+          background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.3)',
+        }}>
+          いまはこのコールを 🥁 ドラムの声で読んでいます。ここの設定を使うには、
+          「ドラム」タブの「コールに使う」を変えてください。
+        </div>
+      )}
+
+      {tab === 'drum' && (
+        <div style={{
+          color: '#94a3b8', fontSize: 11.5, lineHeight: 1.6, marginBottom: 14,
+          padding: '9px 12px', borderRadius: 10,
+          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          VIVANT のドラムがスマホの翻訳アプリで話すような、丁寧でやさしく、ロボットの名残りがある
+          AI 音声っぽい声です。クイックメニューの「ドラムパッド」でセリフのボタンや打った文を話します。
+        </div>
+      )}
+
+      {tab === 'drum' && (
+        <>
+          <Label hint="ドラムの声で読むコール。ドラムパッドはいつもドラムの声です">コールに使う</Label>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+            {DRUM_CALLS_OPTIONS.map((o) => {
+              const active = settings.drumCalls === o.id;
+              return (
+                <button
+                  key={o.id}
+                  onClick={() => update({ ...settings, drumCalls: o.id })}
+                  style={{
+                    flex: 1, textAlign: 'left', padding: '9px 10px', borderRadius: 10,
+                    background: active ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${active ? 'rgba(251,191,36,0.55)' : 'rgba(255,255,255,0.1)'}`,
+                    color: '#fff', cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{o.label}</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2, lineHeight: 1.4 }}>{o.note}</div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       <ProfileEditor
+        drumOptions={tab === 'drum'}
         profile={settings[tab]}
         engine={settings.engine}
         canSample={canSample}
@@ -672,6 +797,8 @@ export default function VoiceSettingsPanel() {
         onChange={(p) => update({ ...settings, [tab]: p })}
         onTest={() => void playTest(tab)}
       />
+
+      {tab === 'drum' && <DrumSerifEditor />}
 
       {/* 中身が決まっているコールは、先に作って取っておける */}
       <CallCachePanel hasKey={keySaved} />
@@ -689,6 +816,7 @@ export default function VoiceSettingsPanel() {
 
       <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, lineHeight: 1.6, marginTop: 12 }}>
         ※ 通常コールは品名・残数・進捗などの読み上げ、応援コールは応援ボタンと定期コールの応援に使います。<br />
+        ※ 🥁 ドラムはドラムパッドのセリフの声です。「コールに使う」で応援コールやすべてのコールにも使えます。<br />
         ※ Gemini TTS はコールのたびに通信します。圏外や API エラーのときは自動で端末の音声に切り替えて鳴らします。<br />
         ※ 一度作った音声は端末に取っておき、同じ文言なら次から作り直しません（待ち時間も通信もかかりません）。
         話者・話し方・モデルを変えると別の音声になるので、作り直しになります。<br />
