@@ -5,7 +5,7 @@
  * 残った AI 音声らしさがポイント（参考: fm23「ドラムの翻訳アプリっぽいボイス3選」）。
  * 最近の TTS はなめらかすぎるので、作った音声にうっすら機械っぽさを重ねる。
  *
- * - 低い周波数で音量を細かく揺らす（ブーンという合成音声っぽいざらつき）
+ * - 声の高さに近い周波数で音量をわずかに揺らす（合成音声っぽいざらつき）
  * - ごく短い反響を重ねる（金属っぽい響き）
  * 聞き取りやすさを崩さない程度に弱めにかける。
  *
@@ -14,14 +14,18 @@
 
 import { float32ToWavBlob } from './ttsAudio';
 
-/** 揺らす周波数（Hz） */
-const MOD_HZ = 48;
-/** 揺らす深さ（0〜1） */
-const MOD_DEPTH = 0.3;
+/**
+ * 揺らす周波数（Hz）。
+ * 50Hz 前後だと揺れが「ブツブツ途切れる」ように聞こえるため、
+ * 声の高さに近い周波数にして、途切れではなく機械っぽい響きとして聞かせる。
+ */
+const MOD_HZ = 120;
+/** 揺らす深さ（0〜1）。深いと途切れて聞こえるので浅めにする */
+const MOD_DEPTH = 0.15;
 /** 反響の遅れ（秒） */
 const ECHO_SEC = 0.006;
 /** 反響の強さ */
-const ECHO_GAIN = 0.35;
+const ECHO_GAIN = 0.25;
 
 /** 16bit モノラル PCM の WAV から、サンプルと sample rate を取り出す。形が違えば null */
 function readPcm16Wav(buf: ArrayBuffer): { samples: Float32Array; sampleRate: number } | null {
