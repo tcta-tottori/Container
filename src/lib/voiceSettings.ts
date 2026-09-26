@@ -95,12 +95,20 @@ export const TONE_PRESETS: {
   },
 ];
 
+/** やさしい口調モードの声（固定）。試した中でいちばん理想に近かった声 */
+export const FRIENDLY_VOICE = 'Aoede';
+
+/** やさしい口調モードの初期の指示文（カスタムのおすすめ「ていねいな案内」） */
+export const FRIENDLY_STYLE = '案内係の女性のように、高めの声で丁寧にやさしく、区切りごとに少し間をとって読む';
+
 /**
  * やさしい口調モードの声の初期値。モードをオンにしている間は、
- * コールの声（main）の代わりに `friendly` の声で読む。声・速さ・トーンは設定で変えられる。
+ * コールの声（main）の代わりに `friendly` の声で読む。
+ * 声はアオイデに固定し、トーン・速さ・高さだけを設定で微調整できる。
+ * 初期値は、実際に聞いていちばん理想に近かった設定（速さ 1.25・高さ 1.95）。
  */
 export const DEFAULT_FRIENDLY_PROFILE: VoiceProfile = {
-  voice: 'Leda', tone: 'friendly', customStyle: '', rate: 0.95, pitch: 1.2,
+  voice: FRIENDLY_VOICE, tone: 'custom', customStyle: FRIENDLY_STYLE, rate: 1.25, pitch: 1.95,
 };
 
 /** コールの読み上げ役の設定 */
@@ -183,6 +191,15 @@ function normalizeProfile(p: Partial<VoiceProfile> | undefined, fallback: VoiceP
 }
 
 
+/**
+ * やさしい口調モードの声。声はいつもアオイデ。
+ * 声が違うもの（以前の初期値のレダなど）は、新しい初期値にそろえる。
+ */
+function normalizeFriendly(p: Partial<VoiceProfile> | undefined): VoiceProfile {
+  if (!p || p.voice !== FRIENDLY_VOICE) return { ...DEFAULT_FRIENDLY_PROFILE };
+  return { ...normalizeProfile(p, DEFAULT_FRIENDLY_PROFILE), voice: FRIENDLY_VOICE };
+}
+
 /** 保存された値がどのエンジンを指しているか（知らない値は Gemini 扱い） */
 function normalizeEngine(v: unknown): VoiceEngine {
   return v === 'web' ? 'web' : 'gemini';
@@ -220,7 +237,7 @@ export function getVoiceSettings(): VoiceSettings {
     model: typeof parsed.model === 'string' && parsed.model ? parsed.model : DEFAULT_TTS_MODEL,
     main: normalizeProfile(parsed.main, DEFAULT_VOICE_SETTINGS.main),
     friendlyMode: parsed.friendlyMode === true,
-    friendly: normalizeProfile(parsed.friendly, DEFAULT_FRIENDLY_PROFILE),
+    friendly: normalizeFriendly(parsed.friendly),
     volume: clamp(Number(parsed.volume ?? 1), 0, MAX_VOLUME),
     webVoice: typeof parsed.webVoice === 'string' ? parsed.webVoice : '',
   };
@@ -233,7 +250,7 @@ export function saveVoiceSettings(next: VoiceSettings): void {
     engine: normalizeEngine(next.engine),
     main: normalizeProfile(next.main, DEFAULT_VOICE_SETTINGS.main),
     friendlyMode: next.friendlyMode === true,
-    friendly: normalizeProfile(next.friendly, DEFAULT_FRIENDLY_PROFILE),
+    friendly: normalizeFriendly(next.friendly),
     volume: clamp(Number(next.volume), 0, MAX_VOLUME),
     webVoice: typeof next.webVoice === 'string' ? next.webVoice : '',
   };
