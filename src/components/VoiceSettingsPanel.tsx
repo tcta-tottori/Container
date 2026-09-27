@@ -1,50 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  VOICE_OPTIONS, TONE_PRESETS, DEFAULT_TTS_MODEL, DEFAULT_VOICE_SETTINGS, TTS_MODEL_OPTIONS,
-  FRIENDLY_VOICE, DEFAULT_FRIENDLY_PROFILE,
-  VoiceSettings, VoiceProfile, VoiceEngine,
-  getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, styleInstruction, webSpeechVolume,
+  DEFAULT_VOICE_SETTINGS, VoiceSettings, MIN_RATE, MAX_RATE, MIN_PITCH, MAX_PITCH,
+  getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, buildUtterance,
 } from '@/lib/voiceSettings';
-import { toFriendlySpeech } from '@/lib/friendlyCall';
-import { shiftPitchBlob, MIN_PITCH, MAX_PITCH } from '@/lib/pitchShift';
-import { MAX_VOLUME, applyVolume, isBoostSupported } from '@/lib/audioBoost';
-import {
-  geminiGenerateSpeech, subscribeTtsError, getLastTtsError, getLastSpeechInfo,
-} from '@/lib/geminiTts';
-import { getGeminiKey, setGeminiKey, verifyGeminiKey } from '@/lib/geminiApi';
-import { ExternalLinkIcon } from '@/components/AppIcons';
 
 /** 試聴で読み上げる文 */
 const SAMPLE_TEXT = 'ポリカバー、3パレットと2ケース。';
 
 /** 見出し */
-/** Gemini API キーを取りに行く Google AI Studio のページ */
-const AI_STUDIO_URL = 'https://aistudio.google.com/app/apikey';
-
-/** AI Studio（キーの取得ページ）へ飛ぶボタン */
-function AiStudioLink() {
-  return (
-    <a
-      href={AI_STUDIO_URL}
-      target="_blank"
-      rel="noreferrer"
-      title="Google AI Studio でAPIキーを取得"
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '6px 11px', borderRadius: 999,
-        background: 'rgba(138,180,255,0.12)', border: '1px solid rgba(138,180,255,0.35)',
-        color: '#8ab4ff', fontSize: 11.5, fontWeight: 700,
-        textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
-      }}
-    >
-      <ExternalLinkIcon size={13} strokeWidth={2} />
-      AI Studio でキーを取得
-    </a>
-  );
-}
-
 function Label({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div style={{ marginBottom: 7 }}>
@@ -54,14 +19,14 @@ function Label({ children, hint }: { children: React.ReactNode; hint?: string })
   );
 }
 
-/** 数値スライダー（速さ・高さ・音量） */
+/** 数値スライダー（速さ・高さ・音量）。値の横の −／＋ で細かく動かせる */
 function Slider({
   label, value, min, max, step, format, onChange, fineStep,
 }: {
   label: string; value: number; min: number; max: number; step: number;
   format: (v: number) => string; onChange: (v: number) => void;
-  /** 指定すると、値の横に −／＋ の微調整ボタンを出す（この幅ずつ動かす） */
-  fineStep?: number;
+  /** −／＋ ボタンで動かす幅 */
+  fineStep: number;
 }) {
   const nudge = (d: number) => {
     const v = Math.round((value + d) * 100) / 100;
@@ -84,14 +49,14 @@ function Slider({
     <div style={{ marginBottom: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
         <span style={{ flex: 1, color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 700 }}>{label}</span>
-        {fineStep && fineBtn(-fineStep, '−')}
+        {fineBtn(-fineStep, '−')}
         <span style={{
           minWidth: 52, textAlign: 'center',
           color: '#c4b5fd', fontSize: 13, fontFamily: 'var(--font-mono)', fontWeight: 700,
         }}>
           {format(value)}
         </span>
-        {fineStep && fineBtn(fineStep, '＋')}
+        {fineBtn(fineStep, '＋')}
       </div>
       <input
         className="voice-range"
@@ -102,350 +67,15 @@ function Slider({
   );
 }
 
-/**
- * カスタムのトーンのおすすめ指示文。
- * Gemini TTS には短く具体的に（声の年代・表情・速さ・間・語尾）を伝えると効きやすい。
- * 句点（。）を入れると指示文まで読み上げることがあるので入れない。
- */
-const RECOMMENDED_STYLES: { label: string; style: string }[] = [
-  {
-    label: 'やさしいお姉さん',
-    style: '二十代の女性が、にこやかにやさしく語りかけるように、高めの澄んだ声で、語尾をやわらかく読む',
-  },
-  {
-    label: '明るく元気',
-    style: '笑顔で話しているように、明るく弾む高めの声で、はきはきと、語尾を少し上げて読む',
-  },
-  {
-    label: 'かわいらしく',
-    style: 'かわいらしく甘めの高い声で、にこにこしながら、ゆったり区切って読む',
-  },
-  {
-    label: 'ていねいな案内',
-    style: '案内係の女性のように、高めの声で丁寧にやさしく、区切りごとに少し間をとって読む',
-  },
-  {
-    // 音の高さは一定のまま、語尾だけに甘さ・色っぽさをのせる（AI の案内音声らしさと人らしさを両立）
-    label: 'AI 案内・語尾やわらか',
-    style: 'AI の案内音声のように音の高さを一定に保ち、語尾の「ね」「よ」だけ少し甘くやわらかく、区切りよく読む',
-  },
-  {
-    label: 'ささやき気味',
-    style: 'そっと寄り添うように、息をまぜたやわらかい高めの声で、ゆっくり読む',
-  },
-];
-
-/** コールの話者／トーン設定 */
-function ProfileEditor({
-  profile, engine, canSample, onChange, onTest, testing, lockVoice,
-}: {
-  profile: VoiceProfile;
-  /** 声を固定するときの声（やさしい口調モード）。話者の一覧を出さない */
-  lockVoice?: string;
-  engine: VoiceEngine;
-  canSample: boolean;
-  onChange: (p: VoiceProfile) => void;
-  onTest: () => void;
-  testing: boolean;
-}) {
-  const locked = lockVoice ? VOICE_OPTIONS.find((v) => v.id === lockVoice) : undefined;
-  return (
-    <div>
-      {/* 話者（固定のときは名前だけ見せる） */}
-      {lockVoice ? (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
-          padding: '10px 12px', borderRadius: 10,
-          background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(167,139,250,0.4)',
-        }}>
-          <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>声</span>
-          <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' }}>{locked?.label || lockVoice}</span>
-          <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 'auto', whiteSpace: 'nowrap' }}>このモードでは固定</span>
-        </div>
-      ) : (<>
-      <Label hint={
-        engine === 'web' ? 'ここは Gemini TTS 用です。端末の音声は上の「端末の声」で選びます'
-          : undefined
-      }>
-        話す人（声）
-      </Label>
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, marginBottom: 16,
-        opacity: engine === 'gemini' ? 1 : 0.45,
-      }}>
-        {VOICE_OPTIONS.map((v) => {
-          const active = profile.voice === v.id;
-          return (
-            <button
-              key={v.id}
-              onClick={() => onChange({ ...profile, voice: v.id })}
-              disabled={engine !== 'gemini'}
-              style={{
-                textAlign: 'left', padding: '9px 11px', borderRadius: 10,
-                background: active ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${active ? 'rgba(167,139,250,0.6)' : 'rgba(255,255,255,0.1)'}`,
-                color: '#fff', cursor: engine === 'web' ? 'default' : 'pointer',
-              }}
-            >
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{v.label}</div>
-              <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{v.desc}</div>
-            </button>
-          );
-        })}
-      </div>
-      </>)}
-
-      {/* トーン */}
-      <Label hint={engine === 'gemini'
-        ? '読み上げ方の指示。カスタムでは自由に書けます'
-        : 'トーンの指示は Gemini TTS だけに反映されます'}>
-        トーン（話し方）
-      </Label>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-        {[...TONE_PRESETS, { id: 'custom', label: 'カスタム', style: '' }].map((t) => {
-          const active = profile.tone === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => onChange({
-                ...profile,
-                ...('apply' in t ? t.apply : undefined),
-                tone: t.id,
-                ...(lockVoice ? { voice: lockVoice } : undefined),
-              })}
-              style={{
-                padding: '8px 14px', borderRadius: 999,
-                background: active ? 'rgba(139,92,246,0.28)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${active ? 'rgba(167,139,250,0.6)' : 'rgba(255,255,255,0.1)'}`,
-                color: active ? '#fff' : 'rgba(255,255,255,0.6)',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-      {profile.tone === 'custom' && (
-        <>
-          <input
-            type="text"
-            value={profile.customStyle}
-            onChange={(e) => onChange({ ...profile, customStyle: e.target.value })}
-            placeholder="例: 低い声でゆっくり、落ち着いて読む"
-            style={{
-              width: '100%', padding: '11px 13px', borderRadius: 10, marginBottom: 8,
-              background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)',
-              color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-            }}
-          />
-          <div style={{ color: '#64748b', fontSize: 11, marginBottom: 6 }}>
-            おすすめの指示文（押すと入ります。「。」は入れないでください）
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
-            {RECOMMENDED_STYLES.map((r) => (
-              <button
-                key={r.label}
-                onClick={() => onChange({ ...profile, customStyle: r.style })}
-                style={{
-                  textAlign: 'left', padding: '8px 11px', borderRadius: 9,
-                  background: profile.customStyle === r.style ? 'rgba(244,114,182,0.18)' : 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${profile.customStyle === r.style ? 'rgba(244,114,182,0.5)' : 'rgba(255,255,255,0.1)'}`,
-                  color: '#fff', cursor: 'pointer',
-                }}
-              >
-                <div style={{ fontSize: 12, fontWeight: 700 }}>{r.label}</div>
-                <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2, lineHeight: 1.45 }}>{r.style}</div>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <div style={{
-        color: '#64748b', fontSize: 11, lineHeight: 1.6, marginBottom: 16,
-        padding: '8px 11px', borderRadius: 9,
-        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-      }}>
-        {engine === 'web'
-          ? '端末の音声では「話す速さ」と「声の高さ」が反映されます。'
-          : `指示文: ${styleInstruction(profile)}`}
-      </div>
-
-      <Slider
-        label="話す速さ" value={profile.rate} min={0.6} max={1.6} step={0.01} fineStep={0.01}
-        format={(v) => `${v.toFixed(2)}倍`}
-        onChange={(v) => onChange({ ...profile, rate: v })}
-      />
-      <Slider
-        label="声の高さ" value={profile.pitch} min={MIN_PITCH} max={MAX_PITCH} step={0.01} fineStep={0.01}
-        format={(v) => `${v.toFixed(2)}`}
-        onChange={(v) => onChange({ ...profile, pitch: v })}
-      />
-
-      <button
-        onClick={onTest}
-        disabled={testing || !canSample}
-        style={{
-          width: '100%', padding: '13px', borderRadius: 12, marginTop: 4,
-          background: 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(74,110,247,0.25))',
-          border: '1px solid rgba(167,139,250,0.5)',
-          color: '#fff', fontSize: 14, fontWeight: 700,
-          cursor: testing || !canSample ? 'default' : 'pointer',
-          opacity: testing || !canSample ? 0.55 : 1,
-        }}
-      >
-        {testing ? '生成中...' : 'この声で試聴'}
-      </button>
-    </div>
-  );
-}
-
-/** ファイルとして保存させる */
-function saveFile(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
-}
-
-/**
- * 直近に作った音声の中身。
- * コールの雑音などの原因を調べるため、Gemini から届いた形式・長さを見せ、音声を保存できるようにする。
- */
-function LastSpeechCard() {
-  const [, setTick] = useState(0);
-  const info = getLastSpeechInfo();
-  const rate = Number(/rate=(\d+)/.exec(info?.mime || '')?.[1] || 24000);
-  const rawSec = info && /L16|pcm/i.test(info.mime) ? info.bytes / 2 / rate : null;
-  const outSec = info ? Math.max(0, info.blob.size - 44) / 2 / rate : null;
-  const stamp = info ? new Date(info.at).toLocaleTimeString('ja-JP') : '';
-  return (
-    <div style={{
-      color: '#94a3b8', fontSize: 11, lineHeight: 1.6, marginBottom: 14,
-      padding: '9px 12px', borderRadius: 10, wordBreak: 'break-all',
-      background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <span style={{ fontWeight: 700, color: '#cbd5e1', flex: 1 }}>直近に作った音声</span>
-        <button
-          onClick={() => setTick((t) => t + 1)}
-          style={{
-            padding: '3px 9px', borderRadius: 7, fontSize: 11, cursor: 'pointer',
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', color: '#94a3b8',
-          }}
-        >
-          更新
-        </button>
-      </div>
-      {!info ? (
-        <div>まだありません（試聴するか、新しい文言をコールすると出ます。取っておいた音声を鳴らしたときは出ません）</div>
-      ) : (
-        <>
-          <div>{stamp}・{info.model}・{info.mime}・{info.parts} 個</div>
-          <div>
-            届いた長さ {rawSec !== null ? `${rawSec.toFixed(2)} 秒` : '（圧縮形式）'}
-            {outSec !== null && ` → 整えたあと ${outSec.toFixed(2)} 秒`}
-          </div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-            <button
-              onClick={() => saveFile(new Blob([info.raw.slice()], { type: 'application/octet-stream' }), `cns-tts-raw-${info.at}.pcm`)}
-              style={{
-                flex: 1, padding: '7px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
-                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#e2e8f0',
-              }}
-            >
-              届いたままを保存
-            </button>
-            <button
-              onClick={() => saveFile(info.blob, `cns-tts-${info.at}.wav`)}
-              style={{
-                flex: 1, padding: '7px', borderRadius: 8, fontSize: 11.5, cursor: 'pointer',
-                background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#e2e8f0',
-              }}
-            >
-              鳴らした音声を保存
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/** やさしい口調モードの言い換え例（設定画面に見せる） */
-const FRIENDLY_EXAMPLES = [
-  'お願いします！',
-  'ポリカバー、3パレットと2ケース。',
-  '残り4品目です。',
-  '注意、類似品があります。',
-  'ポリカバー、完了。',
-  '全品目完了です。',
-];
-
-/** やさしい口調モードのスイッチ */
-function FriendlyModeCard({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <div style={{
-      padding: '12px 14px', borderRadius: 14, marginBottom: 12,
-      background: on ? 'rgba(244,114,182,0.12)' : 'rgba(255,255,255,0.04)',
-      border: `1px solid ${on ? 'rgba(244,114,182,0.5)' : 'rgba(255,255,255,0.1)'}`,
-    }}>
-      <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>やさしい口調モード</div>
-          <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 3, lineHeight: 1.5 }}>
-            語尾を「〜ね」「お願いね」にしてコールし、完了したら「超嬉しい」とひとこと添えます。
-            声はアオイデに固定。トーン・速さ・高さは、オンにすると下でモード用に微調整できます。
-          </div>
-        </div>
-        <div style={{
-          width: 48, height: 28, borderRadius: 999, flexShrink: 0,
-          background: on ? 'linear-gradient(135deg, #f472b6, #8b5cf6)' : 'rgba(255,255,255,0.15)',
-          border: '1px solid rgba(255,255,255,0.15)', position: 'relative',
-          transition: 'background 0.15s ease',
-        }}>
-          <div style={{
-            position: 'absolute', top: 2, left: on ? 22 : 2,
-            width: 22, height: 22, borderRadius: '50%', background: '#fff',
-            transition: 'left 0.15s ease',
-          }} />
-        </div>
-      </div>
-      <div style={{ marginTop: 10, display: 'grid', gap: 4 }}>
-        {FRIENDLY_EXAMPLES.map((t) => (
-          <div key={t} style={{ fontSize: 11.5, color: '#cbd5e1', lineHeight: 1.5 }}>
-            <span style={{ color: '#64748b' }}>{t}</span>
-            <span style={{ color: '#64748b' }}> → </span>
-            {toFriendlySpeech(t)}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** 音声コール（TTS）の設定セクション。設定ページの「音声」タブとして表示する */
+/** 音声コールの設定セクション。設定ページの「音声・コール」タブに表示する */
 export default function VoiceSettingsPanel() {
   const [settings, setSettings] = useState<VoiceSettings>(() => getVoiceSettings());
-  const [keyDraft, setKeyDraft] = useState(() => getGeminiKey());
-  const [keySaved, setKeySaved] = useState(() => !!getGeminiKey());
-  const [apiState, setApiState] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
-  const [apiMsg, setApiMsg] = useState('');
-  const [testing, setTesting] = useState(false);
-  const [ttsError, setTtsError] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const urlRef = useRef<string | null>(null);
-  const detachRef = useRef<(() => void) | null>(null);
-  // SSR とクライアントで初期描画をそろえるため、対応判定はマウント後に行う
-  const [boostSupported, setBoostSupported] = useState(true);
   /** 端末が持っている日本語の声（アプリ版では Google の高品質な声が並ぶ） */
-  const [webVoices, setWebVoices] = useState<{ uri: string; name: string }[]>([]);
+  const [voices, setVoices] = useState<{ uri: string; name: string }[]>([]);
+  const [testing, setTesting] = useState(false);
 
-  useEffect(() => { setBoostSupported(isBoostSupported()); }, []);
+  // 外からの変更に表示を合わせる
+  useEffect(() => subscribeVoiceSettings(setSettings), []);
 
   // 端末の声は少し遅れて出てくることがあるので、変化を待ち受ける
   useEffect(() => {
@@ -455,7 +85,7 @@ export default function VoiceSettingsPanel() {
       const list = synth.getVoices()
         .filter((v) => v.lang && v.lang.toLowerCase().startsWith('ja'))
         .map((v) => ({ uri: v.voiceURI, name: v.name }));
-      setWebVoices(list);
+      setVoices(list);
     };
     read();
     synth.addEventListener?.('voiceschanged', read);
@@ -468,19 +98,8 @@ export default function VoiceSettingsPanel() {
     };
   }, []);
 
-  useEffect(() => {
-    setTtsError(getLastTtsError());
-    return subscribeTtsError(setTtsError);
-  }, []);
-
-  // コール側で端末の音声に切り替わったときなど、外からの変更に表示を合わせる
-  useEffect(() => subscribeVoiceSettings(setSettings), []);
-
   // パネルを閉じたら試聴を止める
   useEffect(() => () => {
-    if (audioRef.current) { try { audioRef.current.pause(); } catch { /* ignore */ } }
-    if (detachRef.current) { detachRef.current(); detachRef.current = null; }
-    if (urlRef.current) { try { URL.revokeObjectURL(urlRef.current); } catch { /* ignore */ } }
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
   }, []);
 
@@ -489,60 +108,16 @@ export default function VoiceSettingsPanel() {
     saveVoiceSettings(next);
   }, []);
 
-  /** 試聴。friendly なら、やさしい口調モードの声・言い換えで鳴らす */
-  const playTest = useCallback(async (friendly: boolean) => {
-    const profile = friendly ? settings.friendly : settings.main;
-    const text = friendly ? toFriendlySpeech(SAMPLE_TEXT) : SAMPLE_TEXT;
-    if (audioRef.current) { try { audioRef.current.pause(); } catch { /* ignore */ } audioRef.current = null; }
-    if (detachRef.current) { detachRef.current(); detachRef.current = null; }
-    if (urlRef.current) { try { URL.revokeObjectURL(urlRef.current); } catch { /* ignore */ } urlRef.current = null; }
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
-
-    if (settings.engine === 'web') {
-      // 端末の音声では、やさしい口調モードでも口調・速さ・高さは通常のコールの設定で読む
-      const u = new SpeechSynthesisUtterance(SAMPLE_TEXT);
-      u.lang = 'ja-JP';
-      u.rate = Math.min(2, Math.max(0.5, settings.main.rate * 1.1));
-      u.pitch = Math.min(2, Math.max(0, settings.main.pitch));
-      u.volume = webSpeechVolume(settings);
-      const picked = window.speechSynthesis.getVoices()
-        .find((v) => v.voiceURI === settings.webVoice);
-      if (picked) u.voice = picked;
-      window.speechSynthesis.speak(u);
-      return;
-    }
-
+  const playTest = useCallback(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = buildUtterance(SAMPLE_TEXT, settings);
     setTesting(true);
-    try {
-      const made = await geminiGenerateSpeech(text, {
-        voice: profile.voice,
-        model: settings.model,
-        stylePrefix: styleInstruction(profile),
-      });
-      const blob = await shiftPitchBlob(made, profile.pitch);
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      const detach = await applyVolume(audio, settings.volume);
-      audioRef.current = audio;
-      urlRef.current = url;
-      detachRef.current = detach;
-      const cleanup = () => {
-        detach();
-        if (detachRef.current === detach) detachRef.current = null;
-        if (urlRef.current === url) { URL.revokeObjectURL(url); urlRef.current = null; }
-        if (audioRef.current === audio) audioRef.current = null;
-      };
-      audio.onended = cleanup;
-      audio.onerror = cleanup;
-      await audio.play();
-    } catch (e) {
-      console.error('試聴に失敗:', e);
-    } finally {
-      setTesting(false);
-    }
+    const end = () => setTesting(false);
+    u.onend = end;
+    u.onerror = end;
+    window.speechSynthesis.speak(u);
   }, [settings]);
-
-  const canSample = settings.engine === 'web' || keySaved;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -564,278 +139,73 @@ export default function VoiceSettingsPanel() {
         }
       `}</style>
 
-      <div style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.6, marginBottom: 14 }}>
-        コールに使う音声 API・話す人・トーン・速さをここでまとめて設定します。
-      </div>
-
-      {/* ===== 音声 API ===== */}
-      <Label hint="Gemini TTS は高品質（通信あり）。端末の音声は準備不要で通信もいらない">音声 API</Label>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        {([
-          { id: 'gemini' as VoiceEngine, label: 'Gemini TTS' },
-          { id: 'web' as VoiceEngine, label: '端末の音声' },
-        ]).map(({ id, label }) => {
-          const active = settings.engine === id;
-          return (
-            <button
-              key={id}
-              onClick={() => update({ ...settings, engine: id })}
-              style={{
-                flex: 1, padding: '12px 6px', borderRadius: 12,
-                background: active ? 'rgba(139,92,246,0.22)' : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${active ? 'rgba(167,139,250,0.55)' : 'rgba(255,255,255,0.1)'}`,
-                color: active ? '#fff' : 'rgba(255,255,255,0.55)',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
-      {settings.engine === 'gemini' && (
-        <>
-          {/* キー欄のすぐ上に、取得ページ（AI Studio）へ飛ぶボタンを並べる */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Label hint="AI写真の設定と共通のキーです">Gemini API キー</Label>
-            </div>
-            <AiStudioLink />
-          </div>
-          <input
-            type="password"
-            value={keyDraft}
-            onChange={(e) => setKeyDraft(e.target.value)}
-            placeholder="AIza..."
-            autoComplete="off"
-            style={{
-              width: '100%', padding: '11px 13px', borderRadius: 10,
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-              color: '#fff', fontSize: 14, fontFamily: 'var(--font-mono)',
-              outline: 'none', boxSizing: 'border-box', marginBottom: 10,
-            }}
-          />
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <button
-              onClick={async () => {
-                if (!keyDraft.trim()) { setApiState('fail'); setApiMsg('APIキーを入力してください'); return; }
-                setApiState('testing');
-                try {
-                  const ok = await verifyGeminiKey(keyDraft.trim());
-                  if (ok) { setApiState('ok'); setApiMsg('接続OK'); }
-                  else { setApiState('fail'); setApiMsg('APIキーが無効です'); }
-                } catch (e) {
-                  setApiState('fail');
-                  setApiMsg(`テスト失敗: ${e instanceof Error ? e.message : String(e)}`);
-                }
-              }}
-              style={{
-                flex: 1, padding: '12px', borderRadius: 10,
-                background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.35)',
-                color: '#93c5fd', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              接続テスト
-            </button>
-            <button
-              onClick={() => {
-                setGeminiKey(keyDraft.trim());
-                setKeySaved(!!keyDraft.trim());
-                setApiState('ok'); setApiMsg('保存しました');
-              }}
-              style={{
-                flex: 1, padding: '12px', borderRadius: 10,
-                background: 'linear-gradient(135deg, rgba(52,211,153,0.3), rgba(96,165,250,0.3))',
-                border: '1px solid rgba(52,211,153,0.4)',
-                color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              保存
-            </button>
-          </div>
-          {apiState !== 'idle' && (
-            <div style={{
-              marginBottom: 12, padding: '9px 13px', borderRadius: 10, fontSize: 12,
-              background: apiState === 'ok' ? 'rgba(52,211,153,0.12)'
-                : apiState === 'fail' ? 'rgba(248,113,113,0.12)' : 'rgba(96,165,250,0.1)',
-              color: apiState === 'ok' ? '#6ee7b7' : apiState === 'fail' ? '#fca5a5' : '#93c5fd',
-              border: `1px solid ${apiState === 'ok' ? 'rgba(52,211,153,0.25)'
-                : apiState === 'fail' ? 'rgba(248,113,113,0.25)' : 'rgba(96,165,250,0.2)'}`,
-            }}>
-              {apiState === 'testing' ? '接続テスト中...' : apiMsg}
-            </div>
-          )}
-
-          <Label hint="選ぶか、他のモデルを試すときは下に入力します">TTS モデル</Label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-            {TTS_MODEL_OPTIONS.map((m) => {
-              const active = settings.model === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => update({ ...settings, model: m.id })}
-                  style={{
-                    textAlign: 'left', padding: '9px 12px', borderRadius: 10,
-                    background: active ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.04)',
-                    border: `1px solid ${active ? 'rgba(167,139,250,0.6)' : 'rgba(255,255,255,0.1)'}`,
-                    color: '#fff', cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{m.label}</div>
-                  <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>{m.note}</div>
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-            <input
-              type="text"
-              value={settings.model}
-              onChange={(e) => update({ ...settings, model: e.target.value })}
-              placeholder={DEFAULT_TTS_MODEL}
-              style={{
-                flex: 1, minWidth: 0, padding: '11px 13px', borderRadius: 10,
-                background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.12)',
-                color: '#fff', fontSize: 13, fontFamily: 'var(--font-mono)', outline: 'none',
-              }}
-            />
-            <button
-              onClick={() => update({ ...settings, model: DEFAULT_TTS_MODEL })}
-              style={{
-                padding: '11px 14px', borderRadius: 10, flexShrink: 0,
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
-                color: '#94a3b8', fontSize: 12, cursor: 'pointer',
-              }}
-            >
-              初期値
-            </button>
-          </div>
-
-          <LastSpeechCard />
-
-          {ttsError && (
-            <div style={{
-              color: '#fca5a5', fontSize: 11, lineHeight: 1.6, marginBottom: 14,
-              padding: '9px 12px', borderRadius: 10, wordBreak: 'break-all',
-              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-            }}>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>直近の TTS エラー</div>
-              {ttsError}
-            </div>
-          )}
-        </>
-      )}
-
-      {settings.engine === 'web' && (
-        <>
-          <Label hint="端末に入っている日本語の声。アプリ版では「Google 音声サービス」の高品質な声もここに並ぶ">
-            端末の声
-          </Label>
-          {webVoices.length === 0 ? (
-            <div style={{
-              color: '#94a3b8', fontSize: 11, lineHeight: 1.6, marginBottom: 16,
-              padding: '9px 12px', borderRadius: 10,
-              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-            }}>
-              使える声を探しています。出てこないときは端末の既定の声で読み上げます。
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-              {[{ uri: '', name: 'おまかせ（いちばん良い声）' }, ...webVoices].map((v) => {
-                const active = settings.webVoice === v.uri;
-                return (
-                  <button
-                    key={v.uri || 'auto'}
-                    onClick={() => update({ ...settings, webVoice: v.uri })}
-                    style={{
-                      textAlign: 'left', padding: '10px 12px', borderRadius: 10,
-                      background: active ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.04)',
-                      border: `1px solid ${active ? 'rgba(167,139,250,0.6)' : 'rgba(255,255,255,0.1)'}`,
-                      color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    }}
-                  >
-                    {v.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </>
+      <Label hint="端末に入っている日本語の声。アプリ版では「Google 音声サービス」の高品質な声もここに並びます">
+        声
+      </Label>
+      {voices.length === 0 ? (
+        <div style={{
+          color: '#94a3b8', fontSize: 11, lineHeight: 1.6, marginBottom: 16,
+          padding: '9px 12px', borderRadius: 10,
+          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+        }}>
+          使える声を探しています。出てこないときは端末の既定の声で読み上げます。
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+          {[{ uri: '', name: 'おまかせ（いちばん良い声）' }, ...voices].map((v) => {
+            const active = settings.webVoice === v.uri;
+            return (
+              <button
+                key={v.uri || 'auto'}
+                onClick={() => update({ ...settings, webVoice: v.uri })}
+                style={{
+                  textAlign: 'left', padding: '10px 12px', borderRadius: 10,
+                  background: active ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${active ? 'rgba(167,139,250,0.6)' : 'rgba(255,255,255,0.1)'}`,
+                  color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {v.name}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       <Slider
-        label="音量" value={settings.volume} min={0} max={MAX_VOLUME} step={0.05}
+        label="話す速さ" value={settings.rate} min={MIN_RATE} max={MAX_RATE} step={0.01} fineStep={0.01}
+        format={(v) => `${v.toFixed(2)}倍`}
+        onChange={(v) => update({ ...settings, rate: v })}
+      />
+      <Slider
+        label="声の高さ" value={settings.pitch} min={MIN_PITCH} max={MAX_PITCH} step={0.01} fineStep={0.01}
+        format={(v) => v.toFixed(2)}
+        onChange={(v) => update({ ...settings, pitch: v })}
+      />
+      <Slider
+        label="音量" value={settings.volume} min={0} max={1} step={0.01} fineStep={0.05}
         format={(v) => `${Math.round(v * 100)}%`}
         onChange={(v) => update({ ...settings, volume: v })}
       />
-      <div style={{
-        color: '#64748b', fontSize: 11, lineHeight: 1.6, marginBottom: 16,
-        padding: '8px 11px', borderRadius: 9,
-        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-      }}>
-        100% は端末の音量そのまま。それ以上はコールを増幅して鳴らす（最大 300%。端末の音声を除く）。
-        {settings.engine === 'web' && (
-          <>
-            <br />
-            端末の音声はブラウザの仕様で 100% が上限です。もっと大きくしたいときは
-            Gemini TTS に切り替えるか、端末側のメディア音量を上げてください。
-          </>
-        )}
-        {settings.engine !== 'web' && !boostSupported && (
-          <>
-            <br />
-            この端末は増幅に対応していないため 100% が上限になります。
-          </>
-        )}
-      </div>
 
-      <div style={{
-        height: 1, background: 'rgba(255,255,255,0.08)', margin: '6px 0 16px',
-      }} />
-
-      {/* やさしい口調モード。口調の言い換えと、モード用の声をまとめて切り替える */}
-      <FriendlyModeCard
-        on={settings.friendlyMode}
-        onToggle={() => update({ ...settings, friendlyMode: !settings.friendlyMode })}
-      />
-
-      {/* 下の声の設定は、モードがオンならモードの声、オフならふだんの声を変える */}
-      <div style={{
-        color: settings.friendlyMode ? '#f9a8d4' : '#93c5fd', fontSize: 12.5, fontWeight: 700,
-        margin: '4px 0 12px',
-      }}>
-        {settings.friendlyMode ? 'やさしい口調モードの声' : 'ふだんのコールの声'}
-      </div>
-
-      <ProfileEditor
-        lockVoice={settings.friendlyMode ? FRIENDLY_VOICE : undefined}
-        key={settings.friendlyMode ? 'friendly' : 'main'}
-        profile={settings.friendlyMode ? settings.friendly : settings.main}
-        engine={settings.engine}
-        canSample={canSample}
-        testing={testing}
-        onChange={(p) => update(settings.friendlyMode ? { ...settings, friendly: p } : { ...settings, main: p })}
-        onTest={() => void playTest(settings.friendlyMode)}
-      />
-
-      {settings.friendlyMode && (
-        <button
-          onClick={() => update({ ...settings, friendly: { ...DEFAULT_FRIENDLY_PROFILE } })}
-          style={{
-            width: '100%', marginTop: 14, padding: '10px 12px', borderRadius: 10,
-            background: 'rgba(244,114,182,0.1)', border: '1px solid rgba(244,114,182,0.35)',
-            color: '#f9a8d4', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-          }}
-        >
-          やさしい口調モードの声を初期設定に戻す（アオイデ・速さ 1.25・高さ 1.20）
-        </button>
-      )}
+      <button
+        onClick={playTest}
+        disabled={testing}
+        style={{
+          width: '100%', padding: '13px', borderRadius: 12, marginTop: 4,
+          background: 'linear-gradient(135deg, rgba(139,92,246,0.35), rgba(74,110,247,0.25))',
+          border: '1px solid rgba(167,139,250,0.5)',
+          color: '#fff', fontSize: 14, fontWeight: 700,
+          cursor: testing ? 'default' : 'pointer', opacity: testing ? 0.6 : 1,
+        }}
+      >
+        {testing ? '読み上げ中…' : 'この声で試聴'}
+      </button>
 
       <button
         onClick={() => update({ ...DEFAULT_VOICE_SETTINGS })}
         style={{
-          marginTop: 14, padding: '10px 12px', borderRadius: 10,
+          width: '100%', marginTop: 10, padding: '10px 12px', borderRadius: 10,
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.12)',
           color: '#94a3b8', fontSize: 13, fontWeight: 500, cursor: 'pointer',
         }}
@@ -844,12 +214,9 @@ export default function VoiceSettingsPanel() {
       </button>
 
       <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, lineHeight: 1.6, marginTop: 12 }}>
-        ※ 品名・残数・進捗・合図など、すべてのコールをこの声で読み上げます（やさしい口調モードの間はモードの声）。<br />
-        ※ Gemini TTS はコールのたびに通信します。圏外や API エラーのときは自動で端末の音声に切り替えて鳴らします。<br />
-        ※ 一度作った音声は端末に取っておき、同じ文言なら次から作り直しません（待ち時間も通信もかかりません）。
-        話者・話し方・モデルを変えると別の音声になるので、作り直しになります。<br />
-        ※ 端末の音声はアプリ版だと端末に入っている日本語の声から選べます。
-        「Google 音声サービス」の高品質な声を入れておくと、標準の声よりはっきり聞き取れます。
+        ※ 品名・残数・進捗・合図など、すべてのコールを端末の音声で読み上げます（通信なしで鳴ります）。<br />
+        ※ 音量は端末の音声の仕様で 100% が上限です。もっと大きくしたいときは端末側のメディア音量を上げてください。<br />
+        ※ 「Google 音声サービス」の高品質な声を入れておくと、標準の声よりはっきり聞き取れます。
       </p>
     </div>
   );
