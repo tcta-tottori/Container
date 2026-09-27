@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  DEFAULT_VOICE_SETTINGS, VoiceSettings, MIN_RATE, MAX_RATE, MIN_PITCH, MAX_PITCH,
+  DEFAULT_VOICE_SETTINGS, DEFAULT_WEB_VOICE, VoiceSettings, MIN_RATE, MAX_RATE, MIN_PITCH, MAX_PITCH,
   getVoiceSettings, saveVoiceSettings, subscribeVoiceSettings, buildUtterance,
 } from '@/lib/voiceSettings';
 
@@ -152,11 +152,12 @@ export default function VoiceSettingsPanel() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-          {[{ uri: '', name: 'おまかせ（いちばん良い声）' }, ...voices].map((v) => {
-            const active = settings.webVoice === v.uri;
+          {voices.map((v) => {
+            const active = settings.webVoice.toLowerCase() === v.uri.toLowerCase();
+            const isDefault = v.uri.toLowerCase() === DEFAULT_WEB_VOICE;
             return (
               <button
-                key={v.uri || 'auto'}
+                key={v.uri}
                 onClick={() => update({ ...settings, webVoice: v.uri })}
                 style={{
                   textAlign: 'left', padding: '10px 12px', borderRadius: 10,
@@ -165,10 +166,15 @@ export default function VoiceSettingsPanel() {
                   color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 }}
               >
-                {v.name}
+                {v.name}{isDefault && <span style={{ color: '#94a3b8', fontWeight: 500 }}>（初期値）</span>}
               </button>
             );
           })}
+          {!voices.some((v) => v.uri.toLowerCase() === settings.webVoice.toLowerCase()) && (
+            <div style={{ color: '#94a3b8', fontSize: 11, lineHeight: 1.6 }}>
+              選んでいる声（{settings.webVoice}）はこの端末に無いため、端末のいちばん良い日本語の声で読み上げます。
+            </div>
+          )}
         </div>
       )}
 
