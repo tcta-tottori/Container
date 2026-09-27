@@ -5,46 +5,18 @@ import { ContainerItem } from '@/lib/types';
 import { itemNameForSpeech, areSimilarItems } from '@/lib/typeDetector';
 import { itemNameForCall } from '@/lib/partTranslations';
 import { displayQuantities, quantityToSpeech } from '@/lib/itemQuantity';
-import { geminiGenerateSpeech } from '@/lib/geminiTts';
-import { getGeminiKey } from '@/lib/geminiApi';
-import {
-  getVoiceSettings, saveVoiceSettings, styleInstruction, webSpeechVolume, VoiceEngine, VoiceProfile,
-  callProfile,
-} from '@/lib/voiceSettings';
-import { applyVolume } from '@/lib/audioBoost';
-import { toFriendlySpeech } from '@/lib/friendlyCall';
-import { shiftPitchBlob } from '@/lib/pitchShift';
+import { getVoiceSettings, buildUtterance } from '@/lib/voiceSettings';
+
+/*
+ * 音声コール。端末の音声（Web Speech API）だけで読み上げる。
+ * 以前は Gemini TTS（通信して作る AI の声）も使えたが、通信を挟むと安定しないため廃止した。
+ */
 
 // 音声コール開始/終了のコールバック（録音一時停止用）
 let _onSpeakStart: ((text: string) => void) | null = null;
 let _onSpeakEnd: (() => void) | null = null;
-// Gemini TTS 等で「リクエスト送信完了 → 音声再生開始」の通知（読込スピナー解除用）
+// 音声が実際に鳴り始めたときの通知（読込スピナー解除用）
 let _onSpeakPlay: (() => void) | null = null;
-
-/* ===== Gemini が鳴らせなくなったときの自動切り替え =====
- * 圏外・APIエラーなどで音声が返ってこない状態が続くと、コールのたびに
- * 待たされたうえで無音になる。続けて失敗したら端末の音声に切り替える。 */
-/** 何回続けて失敗したら端末の音声に切り替えるか */
-const GEMINI_FAIL_LIMIT = 2;
-let _geminiFails = 0;
-/** 切り替えたことを画面に知らせる処理（page.tsx がトーストを出す） */
-let _onEngineFallback: ((message: string) => void) | null = null;
-
-/** 端末の音声に切り替えたときの通知先を登録する */
-export function setEngineFallbackNotice(fn: ((message: string) => void) | null): void {
-  _onEngineFallback = fn;
-}
-
-/** Gemini のコールが失敗したときの後始末。続けて失敗していたら端末の音声に切り替える */
-function noteGeminiFailure(): void {
-  _geminiFails += 1;
-  if (_geminiFails < GEMINI_FAIL_LIMIT) return;
-  const settings = getVoiceSettings();
-  if (settings.engine !== 'gemini') return;
-  saveVoiceSettings({ ...settings, engine: 'web' });
-  _geminiFails = 0;
-  _onEngineFallback?.('Gemini の音声が出ないため、端末の音声に切り替えました');
-}
 
 export function setSpeakCallbacks(
   onStart: (text: string) => void,
@@ -56,189 +28,27 @@ export function setSpeakCallbacks(
   _onSpeakPlay = onPlay || null;
 }
 
-// 現在再生中の Gemini 音声と生成中のリクエストを追跡
-let _currentAudio: HTMLAudioElement | null = null;
-let _currentAbort: AbortController | null = null;
-let _currentAudioUrl: string | null = null;
-/** ブースト用に繋いだ Web Audio ノードを切り離す処理 */
-let _currentDetach: (() => void) | null = null;
 /**
  * いま進行中のコールの「終わったら呼ぶ」処理。
- * 試聴ボタンの読込表示のように、鳴り終わりを待っている呼び出し元があるため、
- * 途中で止めたときも必ず呼んで待ちを解く。
+ * 鳴り終わりを待っている呼び出し元があるため、途中で止めたときも必ず呼んで待ちを解く。
  */
 let _currentDone: (() => void) | null = null;
 
-/** 現在の音声コール（Gemini / Web Speech）を全てキャンセル */
+/** 現在の音声コールを全てキャンセル */
 export function cancelSpeech(): void {
   if (typeof window === 'undefined') return;
   const pendingDone = _currentDone;
   _currentDone = null;
-  if (_currentAbort) {
-    try { _currentAbort.abort(); } catch { /* ignore */ }
-    _currentAbort = null;
-  }
-  if (_currentAudio) {
-    try {
-      _currentAudio.onended = null;
-      _currentAudio.onerror = null;
-      _currentAudio.pause();
-    } catch { /* ignore */ }
-    _currentAudio = null;
-  }
-  if (_currentAudioUrl) {
-    try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ }
-    _currentAudioUrl = null;
-  }
-  if (_currentDetach) { _currentDetach(); _currentDetach = null; }
-  if ('speechSynthesis' in window) {
-    window.speechSynthesis.cancel();
-  }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   _onSpeakEnd?.();
   pendingDone?.();
 }
 
-function speakWebSpeech(text: string, onDone?: () => void, profile?: VoiceProfile): void {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-    _onSpeakEnd?.();
-    onDone?.();
-    return;
-  }
-  const settings = getVoiceSettings();
-  const p = profile || settings.main;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = 'ja-JP';
-  u.rate = Math.min(2, Math.max(0.5, p.rate * 1.1));
-  u.pitch = Math.min(2, Math.max(0, p.pitch));
-  // 端末の音声は仕様上 1.0 が上限。ブースト分は乗せられない
-  u.volume = webSpeechVolume(settings);
-  // 設定で選ばれている声を優先。無ければ日本語の声のいちばん最初（端末が良い順に並べている）
-  const voices = window.speechSynthesis.getVoices();
-  const wanted = settings.webVoice
-    ? voices.find((v) => v.voiceURI === settings.webVoice)
-    : undefined;
-  const jaVoice = wanted || voices.find((v) => v.lang.startsWith('ja'));
-  if (jaVoice) u.voice = jaVoice;
-  let done = false;
-  const finish = () => { if (done) return; done = true; _onSpeakEnd?.(); onDone?.(); };
-  u.onstart = () => { _onSpeakStart?.(text); _onSpeakPlay?.(); };
-  u.onend = finish;
-  u.onerror = finish;
-  window.speechSynthesis.speak(u);
-}
-
 /**
- * 音声データを作って鳴らす共通処理（Gemini TTS）。
- * 生成に時間がかかるため、先にコール開始を通知して録音を止める。
- * @param makeBlob 音声（WAV）を作る処理。中断は signal で伝える。
- * @param onFail   生成・再生に失敗したときの逃げ道（端末の音声に切り替える）
+ * コール。設定ページの「音声・コール」の声・速さ・高さ・音量で読み上げる。
+ * onDone は鳴り終わり（または失敗・中断）で必ず1回だけ呼ばれる。
  */
-async function speakBlob(
-  text: string,
-  makeBlob: (signal: AbortSignal) => Promise<Blob>,
-  onDone?: () => void,
-  onFail?: (finish: () => void) => void,
-): Promise<void> {
-  const abort = new AbortController();
-  _currentAbort = abort;
-  // 生成前にコール開始を通知（録音をすぐ止めてフィードバック防止）
-  _onSpeakStart?.(text);
-  let finished = false;
-  const finish = () => { if (finished) return; finished = true; _onSpeakEnd?.(); onDone?.(); };
-  try {
-    const blob = await makeBlob(abort.signal);
-    if (abort.signal.aborted) return;
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    // 100%超はここで Web Audio のゲインに載せ替える
-    const detach = await applyVolume(audio, getVoiceSettings().volume);
-    if (abort.signal.aborted) { detach(); URL.revokeObjectURL(url); return; }
-    _currentAudio = audio;
-    _currentAudioUrl = url;
-    _currentDetach = detach;
-    const releaseUrl = () => {
-      detach();
-      if (_currentDetach === detach) _currentDetach = null;
-      if (_currentAudioUrl === url) { URL.revokeObjectURL(url); _currentAudioUrl = null; }
-      if (_currentAudio === audio) _currentAudio = null;
-    };
-    audio.onended = () => { releaseUrl(); finish(); };
-    audio.onerror = () => { releaseUrl(); finish(); };
-    audio.onplay = () => { _onSpeakPlay?.(); };
-    await audio.play();
-  } catch (err) {
-    if (abort.signal.aborted) return;
-    console.error('音声コールに失敗:', err);
-    if (onFail) onFail(finish);
-    else finish();
-  } finally {
-    if (_currentAbort === abort) _currentAbort = null;
-  }
-}
-
-/**
- * Gemini TTS で読み上げる。
- * 失敗したときはコールが無音にならないよう端末の音声で読み上げ直し、
- * それが続くようなら設定そのものを端末の音声に切り替える。
- */
-function speakGemini(
-  text: string, profile: VoiceProfile, onDone?: () => void, fallback?: SpeechPlan,
-): Promise<void> {
-  return speakBlob(
-    text,
-    async (signal) => {
-      const blob = await geminiGenerateSpeech(text, {
-        signal, stylePrefix: styleInstruction(profile), voice: profile.voice,
-      });
-      _geminiFails = 0; // 鳴ったら数え直す
-      // 声の高さは鳴らす直前に変える（取っておく音声はそのまま）
-      return shiftPitchBlob(blob, profile.pitch);
-    },
-    onDone,
-    (finish) => {
-      noteGeminiFailure();
-      // AI の声で鳴らせなかったときは、端末の音声用の文・声（通常の口調と数値）で読む
-      speakWebSpeech(fallback?.text ?? text, finish, fallback?.profile ?? profile);
-    },
-  );
-}
-
-/** 進行中のコールを停止（onEnd は呼ばない。新しい発話側で管理する） */
-function stopCurrentPlayback(): void {
-  if (typeof window === 'undefined') return;
-  if (_currentAbort) { try { _currentAbort.abort(); } catch { /* ignore */ } _currentAbort = null; }
-  if (_currentAudio) {
-    try { _currentAudio.onended = null; _currentAudio.onerror = null; _currentAudio.pause(); } catch { /* ignore */ }
-    _currentAudio = null;
-  }
-  if (_currentAudioUrl) { try { URL.revokeObjectURL(_currentAudioUrl); } catch { /* ignore */ } _currentAudioUrl = null; }
-  if (_currentDetach) { _currentDetach(); _currentDetach = null; }
-  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-}
-
-/**
- * 実際に使うエンジンを決める。
- * Gemini は API キーが無いと鳴らせないため、その場合は端末の音声に落とす。
- */
-function activeEngine(): VoiceEngine {
-  const engine = getVoiceSettings().engine;
-  if (engine === 'gemini') return getGeminiKey() ? 'gemini' : 'web';
-  return engine;
-}
-
-/** 指定プロファイルで読み上げる（エンジンの切り替えとフォールバックをまとめる） */
-/** 読む文とその声 */
-interface SpeechPlan {
-  text: string;
-  profile: VoiceProfile;
-}
-
-/**
- * 指定プロファイルで読み上げる。
- * @param fallback 端末の音声で読むときの文と声。省略すると text・profile をそのまま使う
- */
-function speakWith(text: string, profile: VoiceProfile, onDone?: () => void, fallback?: SpeechPlan): void {
+function speak(text: string, onDone?: () => void): void {
   if (typeof window === 'undefined') return;
 
   // 前のコールを待っている人がいたら、割り込んだこの時点で終わりとして解放する
@@ -251,30 +61,18 @@ function speakWith(text: string, profile: VoiceProfile, onDone?: () => void, fal
     if (called) return;
     called = true;
     if (_currentDone === done) _currentDone = null;
+    _onSpeakEnd?.();
     onDone?.();
   };
   _currentDone = done;
 
-  const engine = activeEngine();
-  if (engine === 'gemini') {
-    void speakGemini(text, profile, done, fallback);
-  } else {
-    speakWebSpeech(fallback?.text ?? text, done, fallback?.profile ?? profile);
-  }
-}
-
-/**
- * コール。設定ページの「音声・コール」の声で読み上げる。
- * onDone は鳴り終わり（または失敗・中断）で必ず1回だけ呼ばれる。
- */
-function speak(text: string, onDone?: () => void): void {
-  stopCurrentPlayback();
-  const settings = getVoiceSettings();
-  // やさしい口調モードなら、語尾を言い換えてモードの声で読む。
-  // ただし AI の声（Gemini）で鳴らせないとき（キーが無い・通信できない・端末の音声に
-  // 切り替わった）は、口調も速さ・高さも通常のコールの設定で読む
-  const spoken = settings.friendlyMode ? toFriendlySpeech(text) : text;
-  speakWith(spoken, callProfile(settings), onDone, { text, profile: settings.main });
+  if (!('speechSynthesis' in window)) { done(); return; }
+  window.speechSynthesis.cancel();
+  const u = buildUtterance(text, getVoiceSettings());
+  u.onstart = () => { _onSpeakStart?.(text); _onSpeakPlay?.(); };
+  u.onend = done;
+  u.onerror = done;
+  window.speechSynthesis.speak(u);
 }
 
 export function useSpeech() {

@@ -7,7 +7,7 @@ import { fetchMasterData, fetchAndLinkMaster, linkItemsWithMaster, parseAqssExce
 import { parseAqssToContainer } from '@/lib/aqssContainerParser';
 import { useContainerData } from '@/hooks/useContainerData';
 import { useWorkTimer } from '@/hooks/useTimer';
-import { useSpeech, cancelSpeech, setEngineFallbackNotice } from '@/hooks/useSpeech';
+import { useSpeech, cancelSpeech } from '@/hooks/useSpeech';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { VoiceAction } from '@/lib/speechCommands';
 import { itemNameForCall } from '@/lib/partTranslations';
@@ -961,12 +961,6 @@ export default function Home() {
     toastTimerRef.current = setTimeout(() => setToast(null), ms);
   }, []);
 
-  // Gemini が鳴らせなくなって端末の音声に切り替わったら、その旨を画面に出す
-  useEffect(() => {
-    setEngineFallbackNotice((msg) => showToast(msg, 5000));
-    return () => setEngineFallbackNotice(null);
-  }, [showToast]);
-
   const closeWeatherPopup = useCallback(() => setWeatherPopup(null), []);
 
   const handleWeatherCall = useCallback(() => {
@@ -1819,7 +1813,7 @@ export default function Home() {
                 transition: 'all 0.3s ease',
               }}>
               {isPreparingSpeech ? (
-                /* Gemini TTS 取得中: 回転スピナー */
+                /* 読み上げの準備中: 回転スピナー */
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
                   style={{ animation: 'ttsLoadSpin 0.9s linear infinite' }}>
                   <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.2)" strokeWidth="2.5" fill="none" />
