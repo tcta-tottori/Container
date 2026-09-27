@@ -18,6 +18,12 @@ export const MAX_RATE = 1.6;
 export const MIN_PITCH = 0.5;
 export const MAX_PITCH = 2.0;
 
+/**
+ * 初期の声。Google 音声サービスの高品質な日本語の声（端末内で鳴るので通信がいらない）。
+ * この声が無い端末では、端末のいちばん良い日本語の声で読む。
+ */
+export const DEFAULT_WEB_VOICE = 'ja-jp-x-jad-local';
+
 export interface VoiceSettings {
   /** 話す速さ（0.6〜1.6） */
   rate: number;
@@ -28,7 +34,7 @@ export interface VoiceSettings {
   /**
    * 使う声。`SpeechSynthesisVoice.voiceURI`。
    * アプリ版では端末が持っている日本語の声（Google の高品質な声など）から選べる。
-   * 空なら端末にいちばん良い声を選ばせる。
+   * 選んだ声がその端末に無ければ、端末のいちばん良い日本語の声で読む。
    */
   webVoice: string;
 }
@@ -37,7 +43,7 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   rate: 1.0,
   pitch: 1.0,
   volume: 1.0,
-  webVoice: '',
+  webVoice: DEFAULT_WEB_VOICE,
 };
 
 function clamp(v: number, lo: number, hi: number, fallback: number): number {
@@ -54,7 +60,8 @@ function normalize(raw: unknown): VoiceSettings {
     rate: clamp(rate, MIN_RATE, MAX_RATE, DEFAULT_VOICE_SETTINGS.rate),
     pitch: clamp(pitch, MIN_PITCH, MAX_PITCH, DEFAULT_VOICE_SETTINGS.pitch),
     volume: clamp(Number(p.volume ?? 1), 0, 1, 1),
-    webVoice: typeof p.webVoice === 'string' ? p.webVoice : '',
+    // 未設定（以前の「おまかせ」を含む）は初期の声にする
+    webVoice: typeof p.webVoice === 'string' && p.webVoice ? p.webVoice : DEFAULT_WEB_VOICE,
   };
 }
 
@@ -98,6 +105,13 @@ export function subscribeVoiceSettings(fn: (s: VoiceSettings) => void): () => vo
   return () => { _listeners.delete(fn); };
 }
 
+/** 声を名前で探す（大文字小文字は区別しない） */
+export function findVoice(voices: SpeechSynthesisVoice[], uri: string): SpeechSynthesisVoice | undefined {
+  if (!uri) return undefined;
+  const key = uri.toLowerCase();
+  return voices.find((v) => v.voiceURI.toLowerCase() === key);
+}
+
 /**
  * 端末の音声で読み上げる発話を作る（声・速さ・高さ・音量をそろえる）。
  * コールと設定画面の試聴で同じものを使う。
@@ -110,7 +124,7 @@ export function buildUtterance(text: string, settings: VoiceSettings): SpeechSyn
   u.volume = Math.min(1, Math.max(0, settings.volume));
   // 設定で選ばれている声を優先。無ければ日本語の声のいちばん最初（端末が良い順に並べている）
   const voices = window.speechSynthesis.getVoices();
-  const wanted = settings.webVoice ? voices.find((v) => v.voiceURI === settings.webVoice) : undefined;
+  const wanted = findVoice(voices, settings.webVoice);
   const ja = wanted || voices.find((v) => v.lang.toLowerCase().startsWith('ja'));
   if (ja) u.voice = ja;
   return u;
