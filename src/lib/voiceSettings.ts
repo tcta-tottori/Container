@@ -1,158 +1,32 @@
 'use client';
 
 /**
- * 音声コール（TTS）の設定。
+ * 音声コールの設定。
  *
- * 設定ページの「音声」タブから、使用する API・話者・トーン・速さなどをまとめて調整する。
+ * コールは端末の音声（Web Speech API）だけで読み上げる。
+ * 以前は Gemini TTS（通信して作る AI の声）も選べたが、通信を挟むと安定しないため廃止した。
+ * 設定ページの「音声・コール」から、声・速さ・高さ・音量を調整する。
  * 値は localStorage（`cns_voice_settings`）に JSON で保存する。
  */
 
-import { MAX_VOLUME } from '@/lib/audioBoost';
-import { MIN_PITCH, MAX_PITCH } from '@/lib/pitchShift';
-
 const STORAGE_KEY = 'cns_voice_settings';
 
-/** 旧バージョンのキー（自動移行用） */
-const LEGACY_VOICE_KEY = 'cns_gemini_voice';
-const LEGACY_ENABLED_KEY = 'cns_gemini_tts_enabled';
-const LEGACY_MODEL_KEY = 'cns_gemini_tts_model';
-
-/** 音声エンジン */
-export type VoiceEngine = 'gemini' | 'web';
-
-
-/** Gemini TTS の既定モデル */
-export const DEFAULT_TTS_MODEL = 'gemini-3.8-flash-tts';
-
-/** 以前の既定モデル。新しいモデルが使えないときはこれで作り直す */
-export const LEGACY_TTS_MODEL = 'gemini-3.1-flash-tts-preview';
-
-/** 設定画面からワンタップで選べる TTS モデル */
-export const TTS_MODEL_OPTIONS: { id: string; label: string; note: string }[] = [
-  { id: 'gemini-3.8-flash-tts',      label: 'Gemini 3.8 Flash TTS',      note: '最新・表現力が高い（推奨）' },
-  { id: 'gemini-3.8-flash-lite-tts', label: 'Gemini 3.8 Flash-Lite TTS', note: '軽量・速い・低コスト' },
-  { id: LEGACY_TTS_MODEL,            label: 'Gemini 3.1 Flash TTS',      note: '以前のモデル（プレビュー）' },
-];
-
-/** 選択できる話者（Gemini TTS のプリセット音声）。女性の声だけを並べる */
-export interface VoiceOption {
-  id: string;
-  label: string;
-  desc: string;
-}
-
-export const VOICE_OPTIONS: VoiceOption[] = [
-  { id: 'Kore',         label: 'コレ',         desc: '落ち着いた声' },
-  { id: 'Leda',         label: 'レダ',         desc: '若々しい声' },
-  { id: 'Aoede',        label: 'アオイデ',     desc: '爽やかな声' },
-  { id: 'Zephyr',       label: 'ゼファー',     desc: '明るい声' },
-  { id: 'Autonoe',      label: 'アウトノエ',   desc: 'はつらつとした声' },
-  { id: 'Laomedeia',    label: 'ラオメデイア', desc: '元気な声' },
-  { id: 'Callirrhoe',   label: 'カリロエ',     desc: 'おおらかな声' },
-  { id: 'Despina',      label: 'デスピナ',     desc: 'なめらかな声' },
-  { id: 'Erinome',      label: 'エリノメ',     desc: '澄んだ声' },
-  { id: 'Achernar',     label: 'アケルナル',   desc: 'やわらかい声' },
-  { id: 'Vindemiatrix', label: 'ヴィンデミアトリックス', desc: 'やさしい声' },
-  { id: 'Sulafat',      label: 'スラファト',   desc: 'あたたかい声' },
-];
-
-/** 並べている声か（以前選べた男性の声などは、初期の声に戻す） */
-function isKnownVoice(voice: unknown): voice is string {
-  return VOICE_OPTIONS.some((v) => v.id === voice);
-}
-
-/** トーン（話し方）のプリセット。自由入力でも上書きできる */
-export const TONE_PRESETS: {
-  id: string;
-  label: string;
-  /**
-   * Gemini TTS に渡す指示文。短く、句点（。）を入れない。
-   * 長い指示や句点があると、指示文そのものを読み上げてしまう。
-   */
-  style: string;
-  /** 選んだときに一緒にそろえる声・速さ・高さ（端末の音声でも近い話し方になるように） */
-  apply?: Partial<Pick<VoiceProfile, 'voice' | 'rate' | 'pitch'>>;
-}[] = [
-  { id: 'clear',   label: 'はっきり', style: 'はっきりと落ち着いて読む' },
-  { id: 'calm',    label: '穏やか',   style: 'やわらかく穏やかに読む' },
-  { id: 'bright',  label: '明るい',   style: '明るく元気に読む' },
-  { id: 'cheer',   label: '応援',     style: '大きな声で明るく応援するように読む' },
-  { id: 'urgent',  label: '急かす',   style: 'テンション高く、急かすようにあおって読む' },
-  { id: 'low',     label: '低め',     style: '低めの声で落ち着いて読む' },
-  {
-    // 録画を測った話し方: 声は高め（中心 400Hz 前後）で抑揚が大きめ、区切りで 0.4〜0.5 秒ほど間をとる
-    id: 'gentle',
-    label: 'ていねい高め',
-    style: '高めの声で、やさしく丁寧に、区切りごとに少し間をとって読む',
-    apply: { voice: 'Leda', rate: 0.95, pitch: 1.2 },
-  },
-  {
-    // やさしい口調モードで使う話し方（「〜ね」「お願いね」の言い換えと合わせる）
-    id: 'friendly',
-    label: 'やさしい口調',
-    style: '高めの声で、明るくやさしく親しみをこめて、区切りごとに少し間をとって読む',
-    apply: { voice: 'Leda', rate: 0.95, pitch: 1.2 },
-  },
-];
-
-/** やさしい口調モードの声（固定）。試した中でいちばん理想に近かった声 */
-export const FRIENDLY_VOICE = 'Aoede';
-
-/** やさしい口調モードの初期の指示文（カスタムのおすすめ「ていねいな案内」） */
-export const FRIENDLY_STYLE = '案内係の女性のように、高めの声で丁寧にやさしく、区切りごとに少し間をとって読む';
-
-/**
- * やさしい口調モードの声の初期値。モードをオンにしている間は、
- * コールの声（main）の代わりに `friendly` の声で読む。
- * 声はアオイデに固定し、トーン・速さ・高さだけを設定で微調整できる。
- * 初期値は、実際に聞いていちばん理想に近かった設定（速さ 1.25）に、高さ 1.20 を合わせたもの。
- */
-export const DEFAULT_FRIENDLY_PROFILE: VoiceProfile = {
-  voice: FRIENDLY_VOICE, tone: 'custom', customStyle: FRIENDLY_STYLE, rate: 1.25, pitch: 1.2,
-};
-
-/** コールの読み上げ役の設定 */
-export interface VoiceProfile {
-  /** 話者（Gemini の音声名） */
-  voice: string;
-  /** トーンのプリセット id（custom のときは customStyle を使う） */
-  tone: string;
-  /** tone が 'custom' のときの自由記述スタイル */
-  customStyle: string;
-  /** 話す速さ（0.6〜1.6） */
-  rate: number;
-  /**
-   * 声の高さ（0.6〜2.0）。1.0 がその声そのまま。
-   * Gemini TTS は作った音声の高さを変えて反映する（`pitchShift.ts`。速さは変わらない）。
-   * 端末の音声は読み上げの高さとして反映する（上限 2.0）。
-   */
-  pitch: number;
-}
-
+/** 話す速さの範囲 */
+export const MIN_RATE = 0.6;
+export const MAX_RATE = 1.6;
+/** 声の高さの範囲（端末の音声が受け付けるのは 0〜2） */
+export const MIN_PITCH = 0.5;
+export const MAX_PITCH = 2.0;
 
 export interface VoiceSettings {
-  /** 使用する音声 API */
-  engine: VoiceEngine;
-  /** Gemini TTS のモデル名 */
-  model: string;
-  /** コールの声 */
-  main: VoiceProfile;
-  /**
-   * やさしい口調モード（`src/lib/friendlyCall.ts`）。
-   * オンの間は `friendly` の声で、語尾を「〜ね」「お願いね」に言い換え、
-   * 完了のコールに「超嬉しい」を足して読む。
-   */
-  friendlyMode: boolean;
-  /** やさしい口調モードの声（コールの声とは別に変えられる） */
-  friendly: VoiceProfile;
-  /**
-   * 音量（0〜3）。1.0 が端末の音量そのまま。
-   * 1.0 を超える分は Web Audio のゲインで持ち上げる（`src/lib/audioBoost.ts`）。
-   * 端末の音声（Web Speech API）は音を取り出せないため 1.0 が上限になる。
-   */
+  /** 話す速さ（0.6〜1.6） */
+  rate: number;
+  /** 声の高さ（0.5〜2.0）。1.0 がその声そのまま */
+  pitch: number;
+  /** 音量（0〜1）。端末の音声は仕様上 1.0 が上限 */
   volume: number;
   /**
-   * 端末の音声で使う声。`SpeechSynthesisVoice.voiceURI`。
+   * 使う声。`SpeechSynthesisVoice.voiceURI`。
    * アプリ版では端末が持っている日本語の声（Google の高品質な声など）から選べる。
    * 空なら端末にいちばん良い声を選ばせる。
    */
@@ -160,100 +34,58 @@ export interface VoiceSettings {
 }
 
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
-  engine: 'gemini',
-  model: DEFAULT_TTS_MODEL,
-  main:  { voice: 'Kore',   tone: 'clear',  customStyle: '', rate: 1.0, pitch: 1.0 },
-  friendlyMode: false,
-  friendly: DEFAULT_FRIENDLY_PROFILE,
+  rate: 1.0,
+  pitch: 1.0,
   volume: 1.0,
   webVoice: '',
 };
 
-function clamp(v: number, lo: number, hi: number): number {
-  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : lo;
+function clamp(v: number, lo: number, hi: number, fallback: number): number {
+  return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;
 }
 
-/**
- * 知っているトーンか。廃止したトーン（ドラム風）が保存されていたら使わない。
- */
-function isKnownTone(tone: unknown): tone is string {
-  return tone === 'custom' || TONE_PRESETS.some((t) => t.id === tone);
-}
-
-function normalizeProfile(p: Partial<VoiceProfile> | undefined, fallback: VoiceProfile): VoiceProfile {
+/** 保存された値をそろえる（以前の形式の `main.rate` なども読む） */
+function normalize(raw: unknown): VoiceSettings {
+  const p = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const legacyMain = (p.main && typeof p.main === 'object' ? p.main : {}) as Record<string, unknown>;
+  const rate = Number(p.rate ?? legacyMain.rate ?? DEFAULT_VOICE_SETTINGS.rate);
+  const pitch = Number(p.pitch ?? legacyMain.pitch ?? DEFAULT_VOICE_SETTINGS.pitch);
   return {
-    voice: isKnownVoice(p?.voice) ? p.voice : fallback.voice,
-    tone: isKnownTone(p?.tone) ? p.tone : fallback.tone,
-    customStyle: typeof p?.customStyle === 'string' ? p.customStyle : '',
-    rate: clamp(Number(p?.rate ?? fallback.rate), 0.6, 1.6),
-    pitch: clamp(Number(p?.pitch ?? fallback.pitch), MIN_PITCH, MAX_PITCH),
+    rate: clamp(rate, MIN_RATE, MAX_RATE, DEFAULT_VOICE_SETTINGS.rate),
+    pitch: clamp(pitch, MIN_PITCH, MAX_PITCH, DEFAULT_VOICE_SETTINGS.pitch),
+    volume: clamp(Number(p.volume ?? 1), 0, 1, 1),
+    webVoice: typeof p.webVoice === 'string' ? p.webVoice : '',
   };
-}
-
-
-/**
- * やさしい口調モードの声。声はいつもアオイデ。
- * 声が違うもの（以前の初期値のレダなど）は、新しい初期値にそろえる。
- */
-function normalizeFriendly(p: Partial<VoiceProfile> | undefined): VoiceProfile {
-  if (!p || p.voice !== FRIENDLY_VOICE) return { ...DEFAULT_FRIENDLY_PROFILE };
-  return { ...normalizeProfile(p, DEFAULT_FRIENDLY_PROFILE), voice: FRIENDLY_VOICE };
-}
-
-/** 保存された値がどのエンジンを指しているか（知らない値は Gemini 扱い） */
-function normalizeEngine(v: unknown): VoiceEngine {
-  return v === 'web' ? 'web' : 'gemini';
-}
-
-/** 旧バージョンの設定から引き継ぐ（初回のみ） */
-function migrateLegacy(): Partial<VoiceSettings> {
-  if (typeof window === 'undefined') return {};
-  const out: Partial<VoiceSettings> = {};
-  const voice = localStorage.getItem(LEGACY_VOICE_KEY);
-  const enabled = localStorage.getItem(LEGACY_ENABLED_KEY);
-  const model = localStorage.getItem(LEGACY_MODEL_KEY);
-  if (voice) out.main = { ...DEFAULT_VOICE_SETTINGS.main, voice };
-  if (enabled === '0') out.engine = 'web';
-  if (model && model.includes('tts')) out.model = model;
-  return out;
 }
 
 let _cache: VoiceSettings | null = null;
 const _listeners = new Set<(s: VoiceSettings) => void>();
 
+/**
+ * Gemini TTS を使っていたころに端末へ取っておいた音声を消す（もう使わないので場所を空ける）。
+ * 1 回だけ試す。無ければ何も起きない。
+ */
+function removeOldSpeechCache(): void {
+  try { window.indexedDB?.deleteDatabase('cns-speech'); } catch { /* ignore */ }
+}
+
 export function getVoiceSettings(): VoiceSettings {
   if (_cache) return _cache;
   if (typeof window === 'undefined') return DEFAULT_VOICE_SETTINGS;
-  let parsed: Partial<VoiceSettings> = {};
+  removeOldSpeechCache();
+  let parsed: unknown = {};
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) parsed = JSON.parse(raw) as Partial<VoiceSettings>;
-    else parsed = migrateLegacy();
+    if (raw) parsed = JSON.parse(raw);
   } catch {
     parsed = {};
   }
-  _cache = {
-    engine: normalizeEngine(parsed.engine),
-    model: typeof parsed.model === 'string' && parsed.model ? parsed.model : DEFAULT_TTS_MODEL,
-    main: normalizeProfile(parsed.main, DEFAULT_VOICE_SETTINGS.main),
-    friendlyMode: parsed.friendlyMode === true,
-    friendly: normalizeFriendly(parsed.friendly),
-    volume: clamp(Number(parsed.volume ?? 1), 0, MAX_VOLUME),
-    webVoice: typeof parsed.webVoice === 'string' ? parsed.webVoice : '',
-  };
+  _cache = normalize(parsed);
   return _cache;
 }
 
 export function saveVoiceSettings(next: VoiceSettings): void {
-  _cache = {
-    ...next,
-    engine: normalizeEngine(next.engine),
-    main: normalizeProfile(next.main, DEFAULT_VOICE_SETTINGS.main),
-    friendlyMode: next.friendlyMode === true,
-    friendly: normalizeFriendly(next.friendly),
-    volume: clamp(Number(next.volume), 0, MAX_VOLUME),
-    webVoice: typeof next.webVoice === 'string' ? next.webVoice : '',
-  };
+  _cache = normalize(next);
   if (typeof window !== 'undefined') {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(_cache)); } catch { /* ignore */ }
   }
@@ -266,39 +98,20 @@ export function subscribeVoiceSettings(fn: (s: VoiceSettings) => void): () => vo
   return () => { _listeners.delete(fn); };
 }
 
-/** プロファイルから Gemini TTS へ渡すスタイル指示文を組み立てる */
-export function styleInstruction(p: VoiceProfile): string {
-  const base = p.tone === 'custom'
-    ? (p.customStyle.trim() || 'はっきりと読む')
-    : (TONE_PRESETS.find((t) => t.id === p.tone)?.style || 'はっきりと読む');
-  const parts = [base];
-  if (p.rate >= 1.25) parts.push('速めのテンポで');
-  else if (p.rate <= 0.85) parts.push('ゆっくりと');
-  // 声の高さは、作った音声の高さを変えて反映する（指示文では頼まない）
-  return parts.join('、');
-}
-
 /**
- * 端末の音声（Web Speech API）に渡す音量。
- * `SpeechSynthesisUtterance.volume` の上限は 1.0 で、ブースト分は反映できない。
+ * 端末の音声で読み上げる発話を作る（声・速さ・高さ・音量をそろえる）。
+ * コールと設定画面の試聴で同じものを使う。
  */
-export function webSpeechVolume(settings: VoiceSettings): number {
-  return Math.min(1, Math.max(0, settings.volume));
-}
-
-/** エンジンの表示名 */
-export function engineLabel(engine: VoiceEngine): string {
-  if (engine === 'web') return '端末の音声';
-  return 'Gemini TTS';
-}
-
-/** いまコールに使う声（やさしい口調モードならその声） */
-export function callProfile(settings: VoiceSettings): VoiceProfile {
-  return settings.friendlyMode ? settings.friendly : settings.main;
-}
-
-/** 表示用のトーン名 */
-export function toneLabel(p: VoiceProfile): string {
-  if (p.tone === 'custom') return p.customStyle.trim() || 'カスタム';
-  return TONE_PRESETS.find((t) => t.id === p.tone)?.label || 'はっきり';
+export function buildUtterance(text: string, settings: VoiceSettings): SpeechSynthesisUtterance {
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ja-JP';
+  u.rate = Math.min(2, Math.max(0.5, settings.rate * 1.1));
+  u.pitch = Math.min(2, Math.max(0, settings.pitch));
+  u.volume = Math.min(1, Math.max(0, settings.volume));
+  // 設定で選ばれている声を優先。無ければ日本語の声のいちばん最初（端末が良い順に並べている）
+  const voices = window.speechSynthesis.getVoices();
+  const wanted = settings.webVoice ? voices.find((v) => v.voiceURI === settings.webVoice) : undefined;
+  const ja = wanted || voices.find((v) => v.lang.toLowerCase().startsWith('ja'));
+  if (ja) u.voice = ja;
+  return u;
 }
