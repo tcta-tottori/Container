@@ -800,6 +800,11 @@ export default function Home() {
           await new Promise((r) => setTimeout(r, 2500));
           return;
         }
+        if (errors.length > 0) {
+          // Gemini が失敗して簡易OCRで読めた場合は、精度が落ちることを知らせる
+          setLoadingMsg(`簡易OCRで読込（精度低）: ${errors[0]}`);
+          await new Promise((r) => setTimeout(r, 2500));
+        }
 
         // マスタと紐付
         setLoadingMsg('GitHubから最新の品目一覧を取得中...');

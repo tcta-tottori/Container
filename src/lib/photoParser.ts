@@ -2,6 +2,7 @@ import { Container, ContainerItem } from './types';
 import { detectItemType } from './typeDetector';
 import { sortItems } from './sorter';
 import { geminiExtractContainer, getGeminiKey } from './geminiApi';
+import { prepareImageForOcr } from './imagePrep';
 
 /**
  * コンテナ日程の写真（JPG/PNG等）を解析し、Container に変換する。
@@ -27,6 +28,25 @@ export type PhotoProgressFn = (progress: number, message: string) => void;
 
 /** 品番パターン: 3TGxxx / 3YMxxx 系 */
 const PART_NUMBER_RE = /\b(3[A-Z]{2}[A-Z0-9]{6,12})\b/;
+/** OCR の読み違いを含む品番候補（先頭の 3 が S/B に、途中の 0/1 が O/I/l になりやすい） */
+const PART_CANDIDATE_RE = /(?:^|[^A-Za-z0-9])([3SB][A-Z]{2}[A-Za-z0-9]{6,12})(?![A-Za-z0-9])/;
+
+/** 品番候補の読み違いを補正する: 先頭は 3、4文字目以降で数字に挟まれた O/I/l/S/B は数字に */
+function fixPartNumber(raw: string): string {
+  const s = raw.toUpperCase().split('');
+  s[0] = '3';
+  const toDigit: Record<string, string> = { O: '0', D: '0', Q: '0', I: '1', L: '1', S: '5', B: '8', Z: '2' };
+  const isDigit = (c?: string) => !!c && /[0-9]/.test(c);
+  for (let i = 3; i < s.length; i++) {
+    const d = toDigit[s[i]];
+    if (!d) continue;
+    const prev = s[i - 1];
+    const next = s[i + 1];
+    // 末尾、または両隣が数字のときだけ置換（A10121 の A のような本物の英字は残す）
+    if ((isDigit(prev) || i === 3) && (isDigit(next) || next === undefined)) s[i] = d;
+  }
+  return s.join('');
+}
 const HEADER_DATE_RE = /(\d{1,2})月(\d{1,2})日[\s　]*([0-9A-Z]{4,10})?/;
 
 function extractNumbers(text: string): number[] {
@@ -130,11 +150,21 @@ function parseTesseractRow(
   const normalized = normalizeOcrText(line).trim();
   if (!normalized) return null;
 
-  const partMatch = normalized.match(PART_NUMBER_RE);
-  if (!partMatch) return null;
-  const partNumber = partMatch[1];
+  let partMatch = normalized.match(PART_NUMBER_RE);
+  let partNumber: string;
+  let partEnd: number;
+  if (partMatch) {
+    partNumber = partMatch[1];
+    partEnd = partMatch.index! + partNumber.length;
+  } else {
+    partMatch = normalized.match(PART_CANDIDATE_RE);
+    if (!partMatch) return null;
+    const raw = partMatch[1];
+    partNumber = fixPartNumber(raw);
+    partEnd = partMatch.index! + partMatch[0].length;
+  }
 
-  const afterPart = normalized.slice(partMatch.index! + partNumber.length).trim();
+  const afterPart = normalized.slice(partEnd).trim();
   const nums = extractNumbers(afterPart);
 
   const tokens = afterPart.split(/\s+/).filter(Boolean);
@@ -208,9 +238,15 @@ async function parseWithTesseract(
 
   onProgress?.(15, 'OCRエンジンを初期化中...');
 
+  // グレースケール化・コントラスト補正・文字が読める大きさへの拡大縮小
+  onProgress?.(20, '画像を補正中...');
+  const image = await prepareImageForOcr(file);
+
   let rawText = '';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let worker: any = null;
   try {
-    const result = await Tesseract.recognize(file, 'jpn+eng', {
+    worker = await Tesseract.createWorker('jpn+eng', 1, {
       logger: (m: { status: string; progress: number }) => {
         if (m.status === 'recognizing text') {
           const pct = 30 + Math.round(m.progress * 60);
@@ -220,6 +256,12 @@ async function parseWithTesseract(
         }
       },
     });
+    // 表は 1 ブロックの均一なテキストとして読ませ、列の間の空白を残す
+    await worker.setParameters({
+      tessedit_pageseg_mode: '6',
+      preserve_interword_spaces: '1',
+    });
+    const result = await worker.recognize(image);
     rawText = result.data.text || '';
   } catch (e) {
     return {
@@ -228,6 +270,8 @@ async function parseWithTesseract(
       errors: [`OCR失敗: ${e instanceof Error ? e.message : String(e)}`],
       engine: 'tesseract',
     };
+  } finally {
+    await worker?.terminate().catch(() => {});
   }
 
   onProgress?.(92, '表データを解析中...');
