@@ -149,9 +149,9 @@ export function parseJkpVolume(wb: XLSX.WorkBook): Map<string, JkpVolume> {
 //   Row8(Excel):  年マーカー (2025, 2026, ...)
 //   Row12+(Excel): データ行
 //     3行1組: [N列="納入指示", B列=3TGコード] / [N列="日産数", B列=品名] / [N列="残数"]
-//   N列(col13) = "納入指示" の行のみ対象
+//   見出し列（旧ファイルは N列、列追加後は P列など。自動検出）= "納入指示" の行のみ対象
 //   B列(col1)  = 気高コード
-//   O列(col14)以降 = 日付ごとの納入数量
+//   見出し列の右隣以降 = 日付ごとの納入数量
 // 納入日判定: N列=納入指示 の行で数量が入っている列の、Row10 の日付を納入日とする
 // 読込範囲: 当日から一週間以内 ＋ 直近の過去納入 2 回分（前回・2回前）
 
@@ -219,6 +219,22 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   }
   console.log(`[JKP] 納品日行: row${dateRow} (Excel row${dateRow + 1})`);
 
+  // ── 「納入指示」「日産数」「残数」が書かれた列（見出し列）を自動検出 ──
+  // 以前は N列(col13) 固定だったが、ファイル側で列が追加されると右へずれて読めなくなる
+  // （例: 2列追加されて P列(col15) に移った）。見出し列の右隣から日付ごとの数量が並ぶ。
+  let labelCol = -1;
+  for (let r = dateRow + 1; r <= Math.min(range.e.r, dateRow + 60) && labelCol < 0; r++) {
+    for (let c = 0; c <= Math.min(maxCol, 60); c++) {
+      if (String(getCell(r, c)).trim() === '納入指示') { labelCol = c; break; }
+    }
+  }
+  if (labelCol < 0) {
+    console.warn('[JKP] 「納入指示」の列が見つかりません');
+    return { shipments: [], activeDates: [], pastDates: [] };
+  }
+  const firstQtyCol = labelCol + 1;
+  console.log(`[JKP] 見出し列: ${XLSX.utils.encode_col(labelCol)}列 (col${labelCol})`);
+
   // ── 年マーカー行を自動検出（dateRowより上、高い列番号帯で検索） ──
   let yearRow = -1;
   for (let r = dateRow - 1; r >= 0; r--) {
@@ -233,12 +249,12 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   }
   console.log(`[JKP] 年マーカー行: ${yearRow >= 0 ? 'row' + yearRow : '見つからず'}`);
 
-  // ── 列→日付マッピング構築（O列=col14以降のみ） ──
+  // ── 列→日付マッピング構築（見出し列の右隣以降のみ） ──
   // 年マーカーがある場合は厳密なカスケードを要求し、年マーカー前の列は日付化しない
   // （年マーカーがない場合のみ現在年にフォールバック）
   let hasYearMarkers = false;
   if (yearRow >= 0) {
-    for (let c = 14; c <= maxCol; c++) {
+    for (let c = firstQtyCol; c <= maxCol; c++) {
       const yr = getCell(yearRow, c);
       if (typeof yr === 'number' && yr >= 2014 && yr <= 2030) {
         hasYearMarkers = true;
@@ -249,7 +265,7 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   let currentYear: number | null = hasYearMarkers ? null : new Date().getFullYear();
   const colDateMap = new Map<number, string>();
 
-  for (let c = 14; c <= maxCol; c++) {
+  for (let c = firstQtyCol; c <= maxCol; c++) {
     if (yearRow >= 0) {
       const yr = getCell(yearRow, c);
       if (typeof yr === 'number' && yr >= 2014 && yr <= 2030) {
@@ -285,7 +301,7 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   });
   const pastCandidates = new Set<string>();
   for (let r = dataStartRow; r <= range.e.r; r++) {
-    if (String(getCell(r, 13)).trim() !== '納入指示') continue;
+    if (String(getCell(r, labelCol)).trim() !== '納入指示') continue;
     for (const [col, dateStr] of pastCols) {
       if (pastCandidates.has(dateStr)) continue;
       const val = getCell(r, col);
@@ -296,14 +312,14 @@ export function parseJkpUpdata(wb: XLSX.WorkBook): JkpUpdataResult {
   const pastDateSet = new Set(pastDates);
   console.log(`[JKP] 読込対象範囲: ${todayStr} 〜 ${endStr} ＋ 過去納入分 [${pastDates.join(', ') || 'なし'}]`);
 
-  // ── データ行パース: N列(col13)="納入指示" の行のみ ──
+  // ── データ行パース: 見出し列="納入指示" の行のみ ──
   // 納入日判定: 納入指示行で数量(>0)が入っている列のRow10の日付を納入日とする
   //            （当日〜7日以内、または過去納入分の列のみ対象、それ以外は読込しない）
   const shipments: JkpShipment[] = [];
   const activeDatesSet = new Set<string>();
 
   for (let r = dataStartRow; r <= range.e.r; r++) {
-    const nCol = String(getCell(r, 13)).trim();
+    const nCol = String(getCell(r, labelCol)).trim();
     if (nCol !== '納入指示') continue;
 
     const partNumber = String(getCell(r, 1)).trim();
