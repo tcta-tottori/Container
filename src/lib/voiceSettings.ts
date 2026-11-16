@@ -129,12 +129,15 @@ export function numberToKana(n: number): string {
 }
 
 /**
- * 読み上げ用に、端末の音声が英語読みしやすい言い方を日本語読みに直す。
- * 「2パレット」は「ツーパレット」と英語で読まれてしまうため、数字をひらがなにして「にパレット」と読ませる。
+ * 読み上げ用に、端末の音声が読み違えやすい言い方を正しい読みに直す。
+ * - 「2パレット」は「ツーパレット」と英語で読まれてしまうため、数字をひらがなにして「にパレット」と読ませる。
+ * - 「残り」は「ざんり」と読まれてしまうため、「のこり」と書いて読ませる。
  */
 export function readingForSpeech(text: string): string {
-  return text.replace(/(\d+)(\s*)(パレット)/g, (_m, num: string, sp: string, word: string) =>
-    numberToKana(Number(num)) + sp + word);
+  return text
+    .replace(/残り/g, 'のこり')
+    .replace(/(\d+)(\s*)(パレット)/g, (_m, num: string, sp: string, word: string) =>
+      numberToKana(Number(num)) + sp + word);
 }
 
 /**
