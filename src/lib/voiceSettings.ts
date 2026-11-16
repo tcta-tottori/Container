@@ -112,12 +112,37 @@ export function findVoice(voices: SpeechSynthesisVoice[], uri: string): SpeechSy
   return voices.find((v) => v.voiceURI.toLowerCase() === key);
 }
 
+const DIGIT_KANA = ['', 'いち', 'に', 'さん', 'よん', 'ご', 'ろく', 'なな', 'はち', 'きゅう'];
+const HUNDREDS_KANA = ['', 'ひゃく', 'にひゃく', 'さんびゃく', 'よんひゃく', 'ごひゃく', 'ろっぴゃく', 'ななひゃく', 'はっぴゃく', 'きゅうひゃく'];
+const THOUSANDS_KANA = ['', 'せん', 'にせん', 'さんぜん', 'よんせん', 'ごせん', 'ろくせん', 'ななせん', 'はっせん', 'きゅうせん'];
+
+/** 0〜9999 の数をひらがなの読みにする（例: 2→に、12→じゅうに）。範囲外は数字のまま返す */
+export function numberToKana(n: number): string {
+  if (!Number.isInteger(n) || n < 0 || n > 9999) return String(n);
+  if (n === 0) return 'ぜろ';
+  const th = Math.floor(n / 1000);
+  const h = Math.floor((n % 1000) / 100);
+  const t = Math.floor((n % 100) / 10);
+  const o = n % 10;
+  const tens = t === 0 ? '' : (t === 1 ? '' : DIGIT_KANA[t]) + 'じゅう';
+  return THOUSANDS_KANA[th] + HUNDREDS_KANA[h] + tens + DIGIT_KANA[o];
+}
+
+/**
+ * 読み上げ用に、端末の音声が英語読みしやすい言い方を日本語読みに直す。
+ * 「2パレット」は「ツーパレット」と英語で読まれてしまうため、数字をひらがなにして「にパレット」と読ませる。
+ */
+export function readingForSpeech(text: string): string {
+  return text.replace(/(\d+)(\s*)(パレット)/g, (_m, num: string, sp: string, word: string) =>
+    numberToKana(Number(num)) + sp + word);
+}
+
 /**
  * 端末の音声で読み上げる発話を作る（声・速さ・高さ・音量をそろえる）。
  * コールと設定画面の試聴で同じものを使う。
  */
 export function buildUtterance(text: string, settings: VoiceSettings): SpeechSynthesisUtterance {
-  const u = new SpeechSynthesisUtterance(text);
+  const u = new SpeechSynthesisUtterance(readingForSpeech(text));
   u.lang = 'ja-JP';
   u.rate = Math.min(2, Math.max(0.5, settings.rate * 1.1));
   u.pitch = Math.min(2, Math.max(0, settings.pitch));
